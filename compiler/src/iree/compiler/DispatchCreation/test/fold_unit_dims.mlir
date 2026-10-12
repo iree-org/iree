@@ -767,10 +767,10 @@ util.func public @dequantize_conv_unit_batch(%q: tensor<1x4x4x2xi8>, %s: tensor<
   %cst = arith.constant 0.000000e+00 : f32
   %dqinit = tensor.empty() : tensor<1x4x4x2xf32>
   %dq = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+      <indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
                         affine_map<(d0, d1, d2, d3) -> ()>,
                         affine_map<(d0, d1, d2, d3) -> ()>,
-                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>]}
+                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>]>
       ins(%q, %s, %z : tensor<1x4x4x2xi8>, tensor<f32>, tensor<i8>)
       outs(%dqinit : tensor<1x4x4x2xf32>) -> tensor<1x4x4x2xf32>
   %init = tensor.empty() : tensor<1x3x3x2xf32>

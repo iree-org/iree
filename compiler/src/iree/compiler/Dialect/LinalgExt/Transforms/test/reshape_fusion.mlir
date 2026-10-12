@@ -855,10 +855,10 @@ util.func public @quantize_collapse_input(%x: tensor<4x8x64xf32>, %s: tensor<32x
   %collapsed = tensor.collapse_shape %x [[0, 1], [2]] : tensor<4x8x64xf32> into tensor<32x64xf32>
   %init = tensor.empty() : tensor<32x64xi8>
   %q = iree_linalg_ext.quantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0, d1)>],
-       quant_min = -128 : i64, quant_max = 127 : i64}
+       quant_min = -128, quant_max = 127>
       ins(%collapsed, %s : tensor<32x64xf32>, tensor<32xf32>)
       outs(%init : tensor<32x64xi8>) -> tensor<32x64xi8>
   util.return %q : tensor<32x64xi8>
@@ -882,10 +882,10 @@ util.func public @dequantize_expand_result(%q: tensor<32x64xi8>, %s: tensor<32xf
     %z: tensor<32xi8>) -> tensor<4x8x64xf32> {
   %init = tensor.empty() : tensor<32x64xf32>
   %dq = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%q, %s, %z : tensor<32x64xi8>, tensor<32xf32>, tensor<32xi8>)
       outs(%init : tensor<32x64xf32>) -> tensor<32x64xf32>
   %expanded = tensor.expand_shape %dq [[0, 1], [2]] output_shape [4, 8, 64] : tensor<32x64xf32> into tensor<4x8x64xf32>
@@ -911,9 +911,9 @@ util.func public @dequantize_scalar_qparam_expand_result(%q: tensor<32x64xi8>, %
     -> tensor<4x8x64xf32> {
   %init = tensor.empty() : tensor<32x64xf32>
   %dq = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%q, %s : tensor<32x64xi8>, f32)
       outs(%init : tensor<32x64xf32>) -> tensor<32x64xf32>
   %expanded = tensor.expand_shape %dq [[0, 1], [2]] output_shape [4, 8, 64] : tensor<32x64xf32> into tensor<4x8x64xf32>

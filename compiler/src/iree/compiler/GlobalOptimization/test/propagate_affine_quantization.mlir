@@ -11,8 +11,8 @@ func.func @absorb_quantize_producer_collapse(%input: tensor<2x3x4xf32>, %scale: 
       : tensor<2x3x4xf32> into tensor<6x4xf32>
   %init = tensor.empty() : tensor<6x4xi8>
   %quantized = iree_linalg_ext.quantize_affine
-      {indexing_maps = [#id2, #scalar2, #id2],
-       quant_min = -128 : i64, quant_max = 127 : i64}
+      <indexing_maps = [#id2, #scalar2, #id2],
+       quant_min = -128, quant_max = 127>
       ins(%collapsed, %scale : tensor<6x4xf32>, f32)
       outs(%init : tensor<6x4xi8>) -> tensor<6x4xi8>
   return %quantized : tensor<6x4xi8>
@@ -38,8 +38,8 @@ func.func @decline_quantize_scale_collapse(%input: tensor<6x4xf32>,
       : tensor<2x3xf32> into tensor<6xf32>
   %init = tensor.empty() : tensor<6x4xi8>
   %quantized = iree_linalg_ext.quantize_affine
-      {indexing_maps = [#id2, #row2, #id2],
-       quant_min = -128 : i64, quant_max = 127 : i64}
+      <indexing_maps = [#id2, #row2, #id2],
+       quant_min = -128, quant_max = 127>
       ins(%input, %collapsed : tensor<6x4xf32>, tensor<6xf32>)
       outs(%init : tensor<6x4xi8>) -> tensor<6x4xi8>
   return %quantized : tensor<6x4xi8>
@@ -60,7 +60,7 @@ func.func @decline_quantize_scale_collapse(%input: tensor<6x4xf32>,
 func.func @absorb_consumer_expand(%aq: tensor<3x6x6xi8>, %sa: f32, %za: i64) -> tensor<1x3x6x6xf32> {
   %init = tensor.empty() : tensor<3x6x6xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [#id3, #scalar3, #scalar3, #id3]}
+      <indexing_maps = [#id3, #scalar3, #scalar3, #id3]>
       ins(%aq, %sa, %za : tensor<3x6x6xi8>, f32, i64)
       outs(%init : tensor<3x6x6xf32>) -> tensor<3x6x6xf32>
   %expanded = tensor.expand_shape %a [[0, 1], [2], [3]] output_shape [1, 3, 6, 6]
@@ -87,7 +87,7 @@ func.func @decline_expand_with_multiple_consumers(%aq: tensor<3x6x6xi8>, %sa: f3
     -> (tensor<1x3x6x6xf32>, tensor<3x6x6xf32>) {
   %init = tensor.empty() : tensor<3x6x6xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [#id3, #scalar3, #scalar3, #id3]}
+      <indexing_maps = [#id3, #scalar3, #scalar3, #id3]>
       ins(%aq, %sa, %za : tensor<3x6x6xi8>, f32, i64)
       outs(%init : tensor<3x6x6xf32>) -> tensor<3x6x6xf32>
   %expanded = tensor.expand_shape %a [[0, 1], [2], [3]] output_shape [1, 3, 6, 6]
@@ -115,7 +115,7 @@ func.func @bubble_pad_through_asymmetric_dequantize(%aq: tensor<4x4xi8>, %sa: f3
   %cst = arith.constant 0.000000e+00 : f32
   %init = tensor.empty() : tensor<4x4xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [#id2, #scalar2, #scalar2, #id2]}
+      <indexing_maps = [#id2, #scalar2, #scalar2, #id2]>
       ins(%aq, %sa, %za : tensor<4x4xi8>, f32, i64)
       outs(%init : tensor<4x4xf32>) -> tensor<4x4xf32>
   %padded = tensor.pad %a low[1, 1] high[1, 1] {
@@ -148,7 +148,7 @@ func.func @bubble_pad_through_multi_use_dequantize(%aq: tensor<4x4xi8>, %sa: f32
   %cst = arith.constant 0.000000e+00 : f32
   %init = tensor.empty() : tensor<4x4xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [#id2, #scalar2, #scalar2, #id2]}
+      <indexing_maps = [#id2, #scalar2, #scalar2, #id2]>
       ins(%aq, %sa, %za : tensor<4x4xi8>, f32, i64)
       outs(%init : tensor<4x4xf32>) -> tensor<4x4xf32>
   %padded = tensor.pad %a low[1, 1] high[1, 1] {
@@ -159,9 +159,9 @@ func.func @bubble_pad_through_multi_use_dequantize(%aq: tensor<4x4xi8>, %sa: f32
 }
 // CHECK-LABEL: func.func @bubble_pad_through_multi_use_dequantize(
 //  CHECK-SAME:     %[[AQ:[a-zA-Z0-9_]+]]: tensor<4x4xi8>
-//   CHECK-DAG:   %[[UNPADDED:.+]] = iree_linalg_ext.dequantize_affine {{.*}} ins(%[[AQ]],
+//   CHECK-DAG:   %[[UNPADDED:.+]] = iree_linalg_ext.dequantize_affine <{{.*}}> ins(%[[AQ]],
 //   CHECK-DAG:   %[[PADDED_Q:.+]] = tensor.pad %[[AQ]] low[1, 1] high[1, 1]
-//   CHECK-DAG:   %[[PADDED:.+]] = iree_linalg_ext.dequantize_affine {{.*}} ins(%[[PADDED_Q]],
+//   CHECK-DAG:   %[[PADDED:.+]] = iree_linalg_ext.dequantize_affine <{{.*}}> ins(%[[PADDED_Q]],
 //       CHECK:   return %[[PADDED]], %[[UNPADDED]]
 
 // -----
@@ -176,7 +176,7 @@ func.func @bubble_pad_through_0d_zero_point_dequantize(%aq: tensor<4x4xi8>,
   %cst = arith.constant 0.000000e+00 : f32
   %init = tensor.empty() : tensor<4x4xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [#id2, #scalar2, #scalar2, #id2]}
+      <indexing_maps = [#id2, #scalar2, #scalar2, #id2]>
       ins(%aq, %sa, %za : tensor<4x4xi8>, tensor<f32>, tensor<i8>)
       outs(%init : tensor<4x4xf32>) -> tensor<4x4xf32>
   %padded = tensor.pad %a low[1, 1] high[1, 1] {
@@ -211,7 +211,7 @@ func.func @bubble_pad_keeps_static_result_type(%aq: tensor<?x4xi8>, %sa: f32, %z
   %dim = tensor.dim %aq, %c0 : tensor<?x4xi8>
   %init = tensor.empty(%dim) : tensor<?x4xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [#id2, #scalar2, #scalar2, #id2]}
+      <indexing_maps = [#id2, #scalar2, #scalar2, #id2]>
       ins(%aq, %sa, %za : tensor<?x4xi8>, f32, i8)
       outs(%init : tensor<?x4xf32>) -> tensor<?x4xf32>
   %padded = tensor.pad %a low[1, 1] high[1, 1] {
@@ -240,7 +240,7 @@ func.func @bubble_pad_through_symmetric_dequantize(%aq: tensor<4x4xi8>, %sa: ten
   %cst = arith.constant 0.000000e+00 : f32
   %init = tensor.empty() : tensor<4x4xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [#id2, #row2, #id2]}
+      <indexing_maps = [#id2, #row2, #id2]>
       ins(%aq, %sa : tensor<4x4xi8>, tensor<4xf32>)
       outs(%init : tensor<4x4xf32>) -> tensor<4x4xf32>
   %padded = tensor.pad %a low[0, 1] high[0, 1] {
@@ -270,7 +270,7 @@ func.func @decline_pad_along_quantized_axis(%aq: tensor<4x4xi8>, %sa: tensor<4xf
   %cst = arith.constant 0.000000e+00 : f32
   %init = tensor.empty() : tensor<4x4xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [#id2, #row2, #id2]}
+      <indexing_maps = [#id2, #row2, #id2]>
       ins(%aq, %sa : tensor<4x4xi8>, tensor<4xf32>)
       outs(%init : tensor<4x4xf32>) -> tensor<4x4xf32>
   %padded = tensor.pad %a low[1, 0] high[1, 0] {
@@ -296,7 +296,7 @@ func.func @decline_pad_with_per_channel_zero_point(%aq: tensor<4x4xi8>, %sa: ten
   %cst = arith.constant 0.000000e+00 : f32
   %init = tensor.empty() : tensor<4x4xf32>
   %a = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [#id2, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>, #id2]}
+      <indexing_maps = [#id2, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>, #id2]>
       ins(%aq, %sa, %za : tensor<4x4xi8>, tensor<4xf32>, tensor<4xi8>)
       outs(%init : tensor<4x4xf32>) -> tensor<4x4xf32>
   %padded = tensor.pad %a low[0, 1] high[0, 1] {
@@ -318,10 +318,10 @@ func.func @pad_permuted_output(%q: tensor<2x3xi8>, %scale: tensor<2xf32>,
     %zp: i8) -> tensor<5x2xf32> {
   %init = tensor.empty() : tensor<3x2xf32>
   %d = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> (d0)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d1, d0)>]}
+                        affine_map<(d0, d1) -> (d1, d0)>]>
       ins(%q, %scale, %zp : tensor<2x3xi8>, tensor<2xf32>, i8)
       outs(%init : tensor<3x2xf32>) -> tensor<3x2xf32>
   %zero = arith.constant 0.0 : f32
@@ -347,9 +347,9 @@ func.func @generic_transpose_after_dequantize(%q: tensor<2x3xi8>, %scale: f32)
     -> tensor<3x2xf32> {
   %init = tensor.empty() : tensor<2x3xf32>
   %d = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%q, %scale : tensor<2x3xi8>, f32)
       outs(%init : tensor<2x3xf32>) -> tensor<2x3xf32>
   %transpose_init = tensor.empty() : tensor<3x2xf32>

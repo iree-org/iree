@@ -14,9 +14,9 @@ util.func public @fuse_transpose_into_dequantize(%q: tensor<2x3x4xi8>,
     %scale: tensor<2xf32>) -> tensor<4x3x2xf32> {
   %init = tensor.empty() : tensor<3x2x4xf32>
   %d = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                         affine_map<(d0, d1, d2) -> (d0)>,
-                        affine_map<(d0, d1, d2) -> (d1, d0, d2)>]}
+                        affine_map<(d0, d1, d2) -> (d1, d0, d2)>]>
       ins(%q, %scale : tensor<2x3x4xi8>, tensor<2xf32>)
       outs(%init : tensor<3x2x4xf32>) -> tensor<3x2x4xf32>
   %transpose_init = tensor.empty() : tensor<4x3x2xf32>
@@ -44,9 +44,9 @@ util.func public @decline_transpose_into_multi_use_dequantize(%q: tensor<2x3xi8>
     %scale: f32) -> (tensor<3x2xf32>, tensor<2x3xf32>) {
   %init = tensor.empty() : tensor<2x3xf32>
   %d = iree_linalg_ext.dequantize_affine
-      {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                         affine_map<(d0, d1) -> ()>,
-                        affine_map<(d0, d1) -> (d0, d1)>]}
+                        affine_map<(d0, d1) -> (d0, d1)>]>
       ins(%q, %scale : tensor<2x3xi8>, f32)
       outs(%init : tensor<2x3xf32>) -> tensor<2x3xf32>
   %transpose_init = tensor.empty() : tensor<3x2xf32>
