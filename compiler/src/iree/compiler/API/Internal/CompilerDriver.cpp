@@ -1149,6 +1149,12 @@ void Invocation::dumpCompilationPhase(IREEVMPipelinePhase phase,
           std::string(path.begin(), path.end())}));
 }
 
+// Returns true if LLVM's -print-pipeline-passes flag was given.
+static bool shouldPrintPipelinePasses() {
+  llvm::PassBuilder passBuilder;
+  return passBuilder.getPrintPipelinePasses().has_value();
+}
+
 bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   auto passManager = createPassManager();
 
@@ -1236,7 +1242,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     return false;
   }
 
-  if (llvm::PrintPipelinePasses) {
+  if (shouldPrintPipelinePasses()) {
     passManager->dump();
   }
   if (failed(passManager->run(parsedModule))) {
@@ -1254,7 +1260,7 @@ bool Invocation::runTextualPassPipeline(const char *textPassPipeline) {
     return false;
   }
 
-  if (llvm::PrintPipelinePasses) {
+  if (shouldPrintPipelinePasses()) {
     passManager->dump();
   }
   if (failed(passManager->run(parsedModule))) {
