@@ -69,6 +69,37 @@ private:
   DenseMap<Operation *, std::unique_ptr<IndexSet>> funcMap;
 };
 
+// Returns whether an operation can be discarded when its results are unused.
+static bool isDiscardableOp(Operation *op) {
+  if (mlir::wouldOpBeTriviallyDead(op)) {
+    return true;
+  }
+  if (auto memInterface = dyn_cast<MemoryEffectOpInterface>(op)) {
+    SmallVector<MemoryEffects::EffectInstance> effects;
+    memInterface.getEffects(effects);
+    return llvm::none_of(effects, [](const auto &effect) {
+      return isa<MemoryEffects::Write>(effect.getEffect());
+    });
+  }
+  if (auto hoistableOp = dyn_cast<IREE::Util::HoistableOpInterface>(op)) {
+    return hoistableOp.isHoistableOp();
+  }
+  return false;
+}
+
+// Includes producers captured by nested regions, not just explicit operands.
+static SmallVector<Operation *> getProducerOps(Operation *op) {
+  SetVector<Value> operands(op->operand_begin(), op->operand_end());
+  mlir::getUsedValuesDefinedAbove(op->getRegions(), operands);
+  SmallVector<Operation *> producers;
+  for (Value operand : operands) {
+    if (Operation *producer = operand.getDefiningOp()) {
+      producers.push_back(producer);
+    }
+  }
+  return producers;
+}
+
 // Erases all ops in |leafOps| and all of their potentially newly-dead
 // transitive producer dependencies.
 //
@@ -100,36 +131,12 @@ static void pruneDeadOps(ArrayRef<Operation *> leafOps) {
     // Also elide ops with no uses that have MemoryEffects::Effect::Read but no
     // writes - these match the semantics of canonicalization ElideUnusedOp
     // patterns (ops that are pure-ish but can't be marked Pure due to CSE).
-    bool canDelete = mlir::isOpTriviallyDead(op);
-    if (!canDelete && op->use_empty()) {
-      auto memInterface = dyn_cast<MemoryEffectOpInterface>(op);
-      if (memInterface) {
-        SmallVector<MemoryEffects::EffectInstance> effects;
-        memInterface.getEffects(effects);
-        // Safe to delete if it only has Allocate/Read effects (no Write).
-        canDelete =
-            llvm::none_of(effects, [](const MemoryEffects::EffectInstance &it) {
-              return isa<MemoryEffects::Write>(it.getEffect());
-            });
-      } else if (auto hoistableOp =
-                     dyn_cast<IREE::Util::HoistableOpInterface>(op)) {
-        // Operations with HoistableOpInterface can be deleted if unused and
-        // hoistable (pure). This handles control flow ops like scf.for/scf.if
-        // whose bodies contain only hoistable operations.
-        canDelete = hoistableOp.isHoistableOp();
-      }
-    }
-    if (!canDelete) {
+    if (!op->use_empty() || !isDiscardableOp(op)) {
       continue;
     }
 
     // Collect defining operations before we delete this op.
-    SmallVector<Operation *> producerOps;
-    for (Value operand : op->getOperands()) {
-      if (Operation *producer = operand.getDefiningOp()) {
-        producerOps.push_back(producer);
-      }
-    }
+    auto producerOps = getProducerOps(op);
 
     // Erase the dead operation.
     op->erase();
@@ -156,7 +163,7 @@ struct EncodingPolicy {
   // This can dramatically improve startup time, reduces memory fragmentation,
   // and reduces dispatch overheads.
   bool packParameters = true; // false;
-  // Include direct parameter loads that have no modifications.
+  // Consolidate parameter inputs still required by the main module.
   // When true the output parameter indices will have all required parameters
   // and any original parameters will not be required by the base program at
   // runtime. When false the user must provide the original parameters.
@@ -186,14 +193,17 @@ struct EncodingPolicy {
 };
 
 // An encoding expression represents a subgraph of operations that transforms
-// input parameters/constants into output values stored to globals. Each
-// expression can have multiple inputs (parameter loads) and multiple outputs
-// (global stores). The expression is hoisted to the encoder module where it
-// can be evaluated offline, with the results stored as pre-encoded parameters.
+// input parameters/constants into output values stored to globals, or copies
+// a parameter still needed by the main module. Each expression can have
+// multiple inputs and outputs. It is evaluated offline in the encoder module,
+// with the results stored as pre-encoded parameters.
 struct EncodingExpr {
   // Affinity of consumers of the expression in the original program.
   // All outputs share the same affinity.
   IREE::Stream::AffinityAttr affinityAttr;
+  // Dependencies that must still be awaited by the replacement in the main
+  // module. These do not constrain offline encoding.
+  Value awaitTimepoint;
 
   struct Input {
     // Inlined constant resource or parameter load.
@@ -213,14 +223,21 @@ struct EncodingExpr {
     int64_t size = 0;
     // Constant pattern value if this is a splat.
     TypedAttr splatPattern;
-    // Sink op storing the produced output into a global.
+    // Sink op storing the produced output into a global, or null when copying
+    // a parameter whose load must be replaced at all uses.
     mutable IREE::Util::GlobalStoreOpInterface storeOp;
-    // Produced value feeding into the store.
-    // This may be either be directly consumed by the store or an op earlier in
-    // the slice in cases where there are metadata ops we want to skip.
+    // Produced value to serialize. For a global store this may be its operand
+    // or an earlier value in the slice, skipping metadata-only operations.
+    // For a retained parameter this is the original load's result.
     Value producedValue;
 
-    Location getLoc() const { return storeOp.getLoc(); }
+    Operation *getOwner() const {
+      return storeOp ? storeOp.getOperation() : producedValue.getDefiningOp();
+    }
+    Value getReplacedValue() const {
+      return storeOp ? storeOp.getStoredGlobalValue() : producedValue;
+    }
+    Location getLoc() const { return getOwner()->getLoc(); }
 
     // Returns true if the output is a constant splat that needs no execution.
     // Only certain data types/widths are supported in the format and if not
@@ -239,7 +256,7 @@ struct EncodingExpr {
   };
   SmallVector<Output> outputs;
 
-  // All operations (excluding outputs).
+  // Operations to evaluate in the encoder (excluding global stores).
   SetVector<Operation *> ops;
 
   // Returns a fused location from all operations in the expression.
@@ -262,11 +279,11 @@ struct EncodingExpr {
     if (outputs.empty()) {
       return {};
     }
-    auto globalStoreOp = outputs.front().storeOp;
-    Value storedValue = globalStoreOp.getStoredGlobalValue();
+    const auto &output = outputs.front();
+    Value storedValue = output.getReplacedValue();
     auto *producingOp = storedValue.getDefiningOp();
     return IREE::Stream::ResourceConfigAttr::lookup(
-        producingOp ? producingOp : globalStoreOp);
+        producingOp ? producingOp : output.getOwner());
   }
 
   // Returns true if the expression has any parameter inputs.
@@ -987,6 +1004,72 @@ static EncodingExprSet gatherEncodingExprSet(mlir::ModuleOp moduleOp,
   }
 
   return exprSet;
+}
+
+// Adds copies of parameter inputs that will still be needed after hoisting.
+// Consolidation is independent of the profitability and eligibility of the
+// computations consuming a parameter: those computations may remain in the
+// main module, but their parameter inputs must come from the output archive.
+static void appendRetainedParameterExprs(mlir::ModuleOp moduleOp,
+                                         EncodingExprSet &exprSet) {
+  // Predict the same backwards DCE performed after replacing global stores.
+  // This avoids serializing original inputs used exclusively by hoisted code,
+  // while retaining inputs shared with computations that stay in the module.
+  DenseSet<Operation *> discardedOps;
+  DenseSet<Value> retainedTimepoints;
+  SmallVector<Operation *> worklist;
+  for (const auto &expr : exprSet.exprs) {
+    if (expr.awaitTimepoint) {
+      retainedTimepoints.insert(expr.awaitTimepoint);
+    }
+    for (const auto &output : expr.outputs) {
+      discardedOps.insert(output.storeOp);
+      llvm::append_range(worklist, getProducerOps(output.storeOp));
+    }
+  }
+  auto isDiscarded = [&](Operation *op) {
+    for (; op; op = op->getParentOp()) {
+      if (discardedOps.contains(op)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  while (!worklist.empty()) {
+    Operation *op = worklist.pop_back_val();
+    if (isDiscarded(op) || !isDiscardableOp(op)) {
+      continue;
+    }
+    bool hasRetainedUse = llvm::any_of(op->getResults(), [&](Value result) {
+      return retainedTimepoints.contains(result) ||
+             llvm::any_of(result.getUsers(),
+                          [&](Operation *user) { return !isDiscarded(user); });
+    });
+    if (hasRetainedUse) {
+      continue;
+    }
+    discardedOps.insert(op);
+    llvm::append_range(worklist, getProducerOps(op));
+  }
+
+  // Walk the whole module, including functions and control flow that are not
+  // candidates for global-initializer expression hoisting.
+  moduleOp.walk([&](IREE::Stream::AsyncConstantOp constantOp) {
+    auto parameterAttr = dyn_cast<NamedParameterAttr>(constantOp.getValue());
+    if (!parameterAttr || constantOp->use_empty() || isDiscarded(constantOp)) {
+      return;
+    }
+    EncodingExpr expr;
+    expr.affinityAttr = lookupConsumerAffinityAttr(constantOp.getResult());
+    expr.awaitTimepoint = constantOp.getAwaitTimepoint();
+    expr.inputs.push_back({constantOp});
+    expr.ops.insert(constantOp);
+    EncodingExpr::Output output;
+    output.size = parameterAttr.getStorageSize();
+    output.producedValue = constantOp.getResult();
+    expr.outputs.push_back(output);
+    exprSet.exprs.push_back(std::move(expr));
+  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -1767,18 +1850,12 @@ addTargetEncoderFunc(Location loc, const TargetPlan &targetPlan,
     // preserve await_timepoint.
     IRMapping exprMapping;
     for (auto *sourceOp : step.expr->ops) {
-      auto *clonedOp = funcBuilder.clone(*sourceOp, exprMapping);
-      if (auto affinityOp =
-              dyn_cast<IREE::Stream::AffinityOpInterface>(clonedOp)) {
-        affinityOp.removeAffinityAttrs();
-      }
-      // Convert AsyncConstantOp with parameter values to AsyncParameterLoadOp.
-      // This ensures await_timepoint is preserved through lowering, since
-      // AsyncConstantOp goes through ResourceConstantsOp which drops await.
-      if (auto constantOp = dyn_cast<IREE::Stream::AsyncConstantOp>(clonedOp)) {
+      if (auto constantOp = dyn_cast<IREE::Stream::AsyncConstantOp>(sourceOp)) {
         if (auto parameterAttr =
                 dyn_cast<NamedParameterAttr>(constantOp.getValue())) {
-          // Materialize parameter scope and key as util.buffer.constant.
+          // Load the parameter independently of the original load's operands.
+          // Its size is fixed by the attribute and its timepoint belongs to
+          // the main program, not the offline encoder.
           Value scopeValue;
           if (auto scopeAttr = parameterAttr.getScope()) {
             scopeValue = IREE::Util::BufferConstantOp::create(
@@ -1787,30 +1864,27 @@ addTargetEncoderFunc(Location loc, const TargetPlan &targetPlan,
           Value keyValue = IREE::Util::BufferConstantOp::create(
               funcBuilder, constantOp.getLoc(),
               parameterAttr.getKey().getValue());
-          // Create zero offset for full parameter load.
-          Value zeroOffset = i64Set.get(0);
-          Value resultSize = constantOp.getResultSize();
-          // Create AsyncParameterLoadOp with the wait fence as await.
+          Value resultSize = indexSet.get(parameterAttr.getStorageSize());
           auto paramLoadOp = IREE::Stream::AsyncParameterLoadOp::create(
               funcBuilder, constantOp.getLoc(),
-              constantOp.getResult().getType(),
-              funcBuilder.getType<IREE::Stream::TimepointType>(),
+              constantOp.getResult().getType(), timepointType,
               /*await_timepoint=*/lastTimepoint, scopeValue, keyValue,
-              zeroOffset, resultSize, targetPlan.affinityAttr);
-          // Await the result timepoint to get a resolved resource that can be
-          // used by streamable ops without explicit synchronization.
+              i64Set.get(0), resultSize, targetPlan.affinityAttr);
           auto awaitOp = IREE::Stream::TimepointAwaitOp::create(
               funcBuilder, constantOp.getLoc(), paramLoadOp.getResult(),
               resultSize, paramLoadOp.getResultTimepoint());
-          // Update mapping to use the awaited result.
-          exprMapping.map(sourceOp->getResult(0), awaitOp.getResults().front());
-          // Erase the cloned AsyncConstantOp.
-          constantOp.erase();
-          clonedOp = awaitOp;
-        } else {
-          // Non-parameter constant: just set await_timepoint.
-          constantOp.getAwaitTimepointMutable().assign(lastTimepoint);
+          exprMapping.map(constantOp.getResult(), awaitOp.getResults().front());
+          continue;
         }
+      }
+      auto *clonedOp = funcBuilder.clone(*sourceOp, exprMapping);
+      if (auto affinityOp =
+              dyn_cast<IREE::Stream::AffinityOpInterface>(clonedOp)) {
+        affinityOp.removeAffinityAttrs();
+      }
+      // Non-parameter constants also wait for the preceding encoder step.
+      if (auto constantOp = dyn_cast<IREE::Stream::AsyncConstantOp>(clonedOp)) {
+        constantOp.getAwaitTimepointMutable().assign(lastTimepoint);
       }
       auto symbolUses = SymbolTable::getSymbolUses(clonedOp);
       if (symbolUses.has_value()) {
@@ -1935,21 +2009,13 @@ static void replaceEncodedExprs(ArrayRef<TargetPlan> targetPlans) {
   // target each with its own set of placed parameters.
   IndexSetCollection indexSetCollection;
   for (auto &step : targetPlan.steps) {
-    // Collect external timepoints once per expression (shared by all outputs).
-    Value expressionAwaitTimepoint;
-    if (!step.expr->outputs.empty()) {
-      OpBuilder timepointBuilder(step.expr->outputs.front().storeOp);
-      expressionAwaitTimepoint =
-          collectExternalTimepoints(*step.expr, timepointBuilder);
-    }
-
     for (auto &output : step.expr->outputs) {
       const auto *it = step.outputMap.find(&output);
       if (it == step.outputMap.end()) {
         continue; // no serialization required
       }
-      auto *indexSet = indexSetCollection.get(output.storeOp);
-      OpBuilder builder(output.storeOp);
+      auto *indexSet = indexSetCollection.get(output.getOwner());
+      OpBuilder builder(output.getOwner());
 
       // Since each target may have a unique size and packing of their
       // encoded parameters we need to reference the plan-specific parameter.
@@ -1960,11 +2026,11 @@ static void replaceEncodedExprs(ArrayRef<TargetPlan> targetPlans) {
 
       // Embed an inline constant referencing the parameter and slice out the
       // subrange (if any).
-      Value oldValue = output.storeOp.getStoredGlobalValue();
+      Value oldValue = output.getReplacedValue();
 
       Value constantValue = IREE::Stream::AsyncConstantOp::create(
           builder, output.getLoc(), oldValue.getType(),
-          expressionAwaitTimepoint, parameterAttr, storageSizeValue,
+          step.expr->awaitTimepoint, parameterAttr, storageSizeValue,
           step.expr->affinityAttr);
       Value newValue = constantValue;
       if (subrange.offset != 0 || subrange.length != storageSize) {
@@ -1985,7 +2051,11 @@ static void replaceEncodedExprs(ArrayRef<TargetPlan> targetPlans) {
             builder, output.getLoc(), constantValue, storageSizeValue,
             indexSet->get(subrange.offset), indexSet->get(subrange.length));
       }
-      output.storeOp.setStoredGlobalValue(newValue);
+      if (output.storeOp) {
+        output.storeOp.setStoredGlobalValue(newValue);
+      } else {
+        oldValue.replaceAllUsesWith(newValue);
+      }
 
       // Now that we've replaced a use (but maybe not all uses!) we may be able
       // to kill one or more ops. Since expressions/outputs may share IR we
@@ -2079,6 +2149,16 @@ struct SplitParameterEncoderPass final
       } else {
         LLVM_DEBUG(DBGS() << "skipping expression based on policy\n");
       }
+    }
+
+    // Determine dependencies before liveness analysis: timepoints retained by
+    // encoded loads may keep some of the original computations alive.
+    for (auto &expr : filteredExprSet.exprs) {
+      OpBuilder builder(expr.outputs.front().getOwner());
+      expr.awaitTimepoint = collectExternalTimepoints(expr, builder);
+    }
+    if (encodingPolicy.includeUnmodified) {
+      appendRetainedParameterExprs(moduleOp, filteredExprSet);
     }
 
     if (filteredExprSet.empty()) {
