@@ -478,3 +478,48 @@ func.func @quantized_conv_nhwc_hwcf(%input: tensor<1x10x10x4xi8>, %filter: tenso
 // CHECK-LABEL: func.func @quantized_conv_nhwc_hwcf(
 //       CHECK:   linalg.conv_2d_nhwc_hwcf_q
 //   CHECK-NOT:   linalg.generic
+
+// -----
+
+// A preset lowering config refers to the original loops, so configured
+// convolutions are left alone.
+#input_map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d1 + d4, d2 + d5)>
+#filter_map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d3, d4, d5)>
+#output_map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+func.func @generic_conv_lowering_config(%input: tensor<4x10x10xf32>, %filter: tensor<16x4x3x3xf32>,
+                                        %init: tensor<16x8x8xf32>) -> tensor<16x8x8xf32> {
+  %0 = linalg.generic {indexing_maps = [#input_map, #filter_map, #output_map],
+                       iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"],
+                       lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0, 0, 0]]>}
+      ins(%input, %filter : tensor<4x10x10xf32>, tensor<16x4x3x3xf32>) outs(%init : tensor<16x8x8xf32>) {
+  ^bb0(%in: f32, %weight: f32, %acc: f32):
+    %product = arith.mulf %in, %weight : f32
+    %sum = arith.addf %acc, %product : f32
+    linalg.yield %sum : f32
+  } -> tensor<16x8x8xf32>
+  return %0 : tensor<16x8x8xf32>
+}
+// CHECK-LABEL: func.func @generic_conv_lowering_config(
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%{{.+}}, %{{.+}} : tensor<4x10x10xf32>, tensor<16x4x3x3xf32>)
+//  CHECK-SAME:       lowering_config =
+//   CHECK-NOT:   linalg.generic
+
+// -----
+
+// The same holds for a preset compilation info.
+#compilation = #iree_codegen.compilation_info<
+  lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0, 0, 0, 0]]>,
+  translation_info = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Default>>>
+func.func @conv_compilation_info(%input: tensor<1x16x16x4xf32>, %filter: tensor<3x3x4x16xf32>,
+                                 %init: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32> {
+  %0 = linalg.conv_2d_nhwc_hwcf {compilation_info = #compilation,
+                                 dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+      ins(%input, %filter : tensor<1x16x16x4xf32>, tensor<3x3x4x16xf32>)
+      outs(%init : tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32>
+  return %0 : tensor<1x14x14x16xf32>
+}
+// CHECK-LABEL: func.func @conv_compilation_info(
+//       CHECK:   linalg.conv_2d_nhwc_hwcf
+//  CHECK-SAME:       compilation_info =
+//   CHECK-NOT:   linalg.generic
