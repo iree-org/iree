@@ -205,7 +205,8 @@ We periodically promote one of these candidates to a "stable" release.
 
 Developers authoring patches that include major or breaking changes should
 coordinate merge timing and contribute release notes on the pinned issue that
-tracks the next release. A pinned issue tracking the release should be filed, based on
+tracks the next release. A pinned issue tracking the release should be filed,
+based on
 [release-tracker-template.md](https://github.com/iree-org/iree/blob/main/docs/website/docs/developers/general/release-tracker-template.md):
 copy it, replace the placeholders, and file it with the GitHub CLI:
 
@@ -239,9 +240,13 @@ request that some feature make the cut.
 ### :octicons-note-16: Compiling release notes
 
 Release notes are collected on the tracking issue, where either contributors add
-announcements and notable changes as they land, or they are collected on release day.
+announcements and notable changes as they land, or they are collected on release
+day.
 
-Generate the "New contributors" list and the full changelog for the range from the previous stable release to the candidate, e.g. with the "Generate release notes" button when drafting a GitHub release, or:
+Generate the "New contributors" list and the full changelog for the range from
+the previous stable release to the candidate, e.g. with the "Generate release
+notes" button when drafting a GitHub release, or:
+
 ```bash
 gh api repos/iree-org/iree/releases/generate-notes \
   -f tag_name=v3.12.0 \
@@ -269,11 +274,12 @@ module version, and whether they changed since the previous release:
 
 2. Create a new release on GitHub:
 
-    * Create a new GitHub draft release (via the WebUI or CLI). Set the tag to be created and select a target commit. For example, if the
-        candidate release was tagged `iree-3.1.0rc20241119` at commit `3ed07da`,
-        set the new release tag `v3.1.0` and use the same commit. GitHub
-        creates the tag when the release is published, so nothing needs to be
-        pushed beforehand.
+    * Create a new GitHub draft release (via the WebUI or CLI). Set the tag to
+        be created and select a target commit. For example, if the candidate
+        release was tagged `iree-3.1.0rc20241119` at commit `3ed07da`, set the
+        new release tag `v3.1.0` and use the same commit. GitHub creates the
+        tag when the release is published, so nothing needs to be pushed
+        beforehand.
 
         ![rename_tag](./release-tag.png)
 
@@ -290,8 +296,8 @@ module version, and whether they changed since the previous release:
         The release can also be created from the command line. `gh` creates
         the tag on publish, the same way the web UI does. The command also sets
         the title and release notes from the next two steps. The assets are
-        uploaded to the draft later. You can extract the release notes `notes.md` from the release
-        tracking issue.
+        uploaded to the draft later. You can extract the release notes
+        `notes.md` from the release tracking issue.
 
         ```bash
         gh issue view <issue number> --repo iree-org/iree --json body --jq .body \
