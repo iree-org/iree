@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 #define DEBUG_TYPE "linalg-ext-tiling"
 
@@ -908,6 +909,18 @@ LogicalResult SortOp::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
+  // Sorting independent slices is not a sort of the entire dimension. Only
+  // parallel dimensions may be partitioned, including when fusing a consumer.
+  int64_t dimension = getDimension();
+  if (!isConstantIntValue(offsets[dimension], 0)) {
+    return failure();
+  }
+  auto coversSortDimension = ValueBoundsConstraintSet::areEqual(
+      ValueBoundsConstraintSet::Variable(sizes[dimension]),
+      ValueBoundsConstraintSet::Variable(getOperand(0), dimension));
+  if (failed(coversSortDimension) || !*coversSortDimension) {
+    return failure();
+  }
   resultOffsets = llvm::to_vector(offsets);
   resultSizes = llvm::to_vector(sizes);
   return success();

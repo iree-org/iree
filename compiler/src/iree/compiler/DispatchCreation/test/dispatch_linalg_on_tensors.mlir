@@ -1,5 +1,30 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(canonicalize, util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}, iree-dispatch-creation-clone-producers-into-dispatch-regions, iree-dispatch-creation-convert-dispatch-regions-to-workgroups, iree-dispatch-creation-convert-tensor-to-flow, canonicalize, iree-dispatch-creation-materialize-default-workgroup-count-region), cse, canonicalize, cse)" %s | FileCheck %s
 
+// CHECK-LABEL: util.func public @argsort_unused_comparator_workspace(
+// CHECK-SAME: %[[INPUT:[a-zA-Z0-9_]+]]: tensor<?xi64>
+// CHECK: flow.tensor.alloca
+// CHECK-COUNT-2: linalg.copy
+// CHECK-NOT: linalg.copy
+// CHECK: %[[DISPATCH:.+]]:2 = flow.dispatch.workgroups
+// CHECK: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>
+// CHECK-SAME: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>
+// CHECK: iree_linalg_ext.sort dimension(0)
+// CHECK-COUNT-2: iree_tensor_ext.dispatch.tensor.store
+// CHECK: util.return %[[DISPATCH]]#0, %[[INPUT]]
+util.func public @argsort_unused_comparator_workspace(
+    %keys: tensor<?xi64>, %indices: tensor<?xi64>)
+    -> (tensor<?xi64>, tensor<?xi64>) {
+  %sorted:2 = iree_linalg_ext.sort dimension(0)
+      outs(%keys, %indices : tensor<?xi64>, tensor<?xi64>) {
+  ^bb0(%lhs: i64, %rhs: i64, %lhs_index: i64, %rhs_index: i64):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i64
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<?xi64>, tensor<?xi64>
+  util.return %sorted#1, %keys : tensor<?xi64>, tensor<?xi64>
+}
+
+// -----
+
 util.func public @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %1 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
@@ -912,9 +937,16 @@ util.func public @sort_3d(%arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
 //  CHECK-DAG:   %[[ARG1_D0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[ARG1_D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //  CHECK-DAG:   %[[ARG1_D2:.+]] = tensor.dim %[[ARG1]], %[[C2]]
+//      CHECK:   %[[STORAGE0:.+]] = flow.tensor.alloca : tensor<?x?x?xi32>
+//      CHECK:   %[[WORK0:.+]] = flow.dispatch.workgroups
+//      CHECK:   linalg.copy
+//      CHECK:   %[[STORAGE1:.+]] = flow.tensor.alloca : tensor<?x?x?xf32>
+//      CHECK:   %[[WORK1:.+]] = flow.dispatch.workgroups
+//      CHECK:   linalg.copy
+//  CHECK-NOT:   linalg.copy
 //      CHECK:   %[[RESULT_OUT:.+]]:2 = flow.dispatch.workgroups[
 // CHECK-SAME:       %[[ARG0_D0]], %[[ARG0_D1]], %[[ARG0_D2]], %[[ARG1_D0]], %[[ARG1_D1]], %[[ARG1_D2]]]
-// CHECK-SAME:       (%[[ARG0]], %[[ARG1]], %[[ARG0_D0]], %[[ARG0_D1]], %[[ARG0_D2]], %[[ARG1_D0]], %[[ARG1_D1]], %[[ARG1_D2]])
+// CHECK-SAME:       (%[[WORK0]], %[[WORK1]], %[[ARG0_D0]], %[[ARG0_D1]], %[[ARG0_D2]], %[[ARG1_D0]], %[[ARG1_D1]], %[[ARG1_D2]])
 // CHECK-NEXT:       (%[[ARG0_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x?xi32>>
 // CHECK-SAME:        %[[ARG1_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x?xf32>>,
 // CHECK-SAME:        %[[ARG0_D0_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG0_D1_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG0_D2_CAPTURE:[a-zA-Z0-9_]+]]: index,

@@ -1,5 +1,49 @@
 // RUN: iree-opt %s --pass-pipeline="builtin.module(func.func(iree-codegen-iree-comprehensive-bufferize, canonicalize, cse, canonicalize))" --split-input-file | FileCheck %s
 
+// Sort receives initialized writable working roles from dispatch creation.
+// Bufferization must use those bindings without a private kernel allocation.
+#pipeline_layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+func.func @sort_dynamic_workspace() {
+  %n = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : index
+  %keys_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(0)
+      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>{%n}
+  %indices_binding = hal.interface.binding.subspan layout(#pipeline_layout) binding(1)
+      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>{%n}
+  %keys = iree_tensor_ext.dispatch.tensor.load %keys_binding,
+      offsets = [0], sizes = [%n], strides = [1]
+      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>{%n} -> tensor<?xi64>
+  %indices = iree_tensor_ext.dispatch.tensor.load %indices_binding,
+      offsets = [0], sizes = [%n], strides = [1]
+      : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>{%n} -> tensor<?xi64>
+  %sorted:2 = iree_linalg_ext.sort dimension(0)
+      outs(%keys, %indices : tensor<?xi64>, tensor<?xi64>) {
+  ^bb0(%lhs: i64, %rhs: i64, %lhs_index: i64, %rhs_index: i64):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i64
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<?xi64>, tensor<?xi64>
+  iree_tensor_ext.dispatch.tensor.store %sorted#1, %indices_binding,
+      offsets = [0], sizes = [%n], strides = [1]
+      : tensor<?xi64> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>{%n}
+  iree_tensor_ext.dispatch.tensor.store %sorted#0, %keys_binding,
+      offsets = [0], sizes = [%n], strides = [1]
+      : tensor<?xi64> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>{%n}
+  return
+}
+// CHECK-LABEL: func.func @sort_dynamic_workspace
+// CHECK-NOT: memref.alloc
+// CHECK: %[[KEYS:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0)
+// CHECK-NOT: memref.alloc
+// CHECK: %[[INDICES:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
+// CHECK-NOT: memref.alloc
+// CHECK: iree_linalg_ext.sort dimension(0) outs(%[[KEYS]], %[[INDICES]] : memref<?xi64{{.*}}>, memref<?xi64{{.*}}>)
+// CHECK-NOT: memref.alloc
+// CHECK: return
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 3, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>,
