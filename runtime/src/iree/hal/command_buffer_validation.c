@@ -101,9 +101,15 @@ static iree_status_t iree_hal_command_buffer_validate_binding_requirements(
     const iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_buffer_binding_t binding,
     iree_hal_buffer_binding_requirements_t requirements) {
-  // Check for binding presence.
-  if (requirements.usage == IREE_HAL_BUFFER_USAGE_NONE) {
-    // Binding slot is unused and its value in the table is ignored.
+  // Check for binding presence. A slot is unused only when it has no
+  // requirements at all; some operations require a buffer without imposing a
+  // specific usage or access mode.
+  if (requirements.required_compatibility == 0 &&
+      requirements.usage == IREE_HAL_BUFFER_USAGE_NONE &&
+      requirements.access == IREE_HAL_MEMORY_ACCESS_NONE &&
+      requirements.type == IREE_HAL_MEMORY_TYPE_NONE &&
+      requirements.max_byte_offset == 0 &&
+      requirements.min_byte_alignment == 0) {
     return iree_ok_status();
   } else if (!binding.buffer) {
     // Binding is used and required.
@@ -112,18 +118,23 @@ static iree_status_t iree_hal_command_buffer_validate_binding_requirements(
         "binding table slot requires a buffer but none was provided");
   }
 
-  // Ensure the buffer is compatible with the device.
+  // Ensure the buffer is compatible with the device when the operation
+  // requires specific queue compatibility.
   // NOTE: this check is very slow! We may want to disable this outside of debug
   // mode or try to fast path it if the buffer is known-good.
-  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
-      command_buffer, validation_state, binding.buffer,
-      requirements.required_compatibility, requirements.usage));
+  if (requirements.required_compatibility) {
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_compatibility(
+        command_buffer, validation_state, binding.buffer,
+        requirements.required_compatibility, requirements.usage));
+  }
 
   // Verify buffer compatibility.
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
       iree_hal_buffer_allowed_usage(binding.buffer), requirements.usage));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
-      iree_hal_buffer_allowed_access(binding.buffer), requirements.access));
+  if (requirements.access != IREE_HAL_MEMORY_ACCESS_NONE) {
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
+        iree_hal_buffer_allowed_access(binding.buffer), requirements.access));
+  }
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
       iree_hal_buffer_memory_type(binding.buffer), requirements.type));
 
@@ -348,6 +359,40 @@ iree_status_t iree_hal_command_buffer_advise_buffer_validation(
   };
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
       command_buffer, validation_state, buffer_ref, buffer_reqs));
+
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_command_buffer_flush_buffer_validation(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_ref_t target_ref) {
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
+
+  const iree_hal_buffer_binding_requirements_t target_reqs = {
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .max_byte_offset = target_ref.offset + target_ref.length,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+      command_buffer, validation_state, target_ref, target_reqs));
+
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_command_buffer_invalidate_buffer_validation(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_command_buffer_validation_state_t* validation_state,
+    iree_hal_buffer_ref_t target_ref) {
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_categories(
+      command_buffer, validation_state, IREE_HAL_COMMAND_CATEGORY_TRANSFER));
+
+  const iree_hal_buffer_binding_requirements_t target_reqs = {
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      .max_byte_offset = target_ref.offset + target_ref.length,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_buffer_requirements(
+      command_buffer, validation_state, target_ref, target_reqs));
 
   return iree_ok_status();
 }
