@@ -2,9 +2,9 @@
 // RUN: iree-run-mlir --Xcompiler,iree-hal-target-backends=llvm-cpu --Xcompiler,iree-llvmcpu-target-cpu=generic %s --function=argsort_internal_consumer --input="3xi64=[3 1 2]" | FileCheck %s --check-prefix=CONSUMER
 // REDUCTION-LABEL: EXEC @argsort_internal_key_use
 // REDUCTION: 3xi64=1 2 0
-// REDUCTION: i64=6
+// REDUCTION: i64=14
 // REDUCTION: 3xi64=3 1 2
-// Internal data use still needs mutable keys even though no key tensor escapes.
+// The weighted sum distinguishes sorted keys (14) from the original order (11).
 #identity = affine_map<(d0) -> (d0)>
 #scalar = affine_map<(d0) -> ()>
 func.func @argsort_internal_key_use(%keys: tensor<?xi64>) -> (tensor<?xi64>, tensor<i64>, tensor<?xi64>) {
@@ -29,7 +29,12 @@ func.func @argsort_internal_key_use(%keys: tensor<?xi64>) -> (tensor<?xi64>, ten
     %sum = linalg.generic {indexing_maps = [#identity, #scalar], iterator_types = ["reduction"]}
         ins(%sorted#0 : tensor<?xi64>) outs(%sum_init : tensor<i64>) {
     ^bb0(%key: i64, %acc: i64):
-      %next = arith.addi %key, %acc : i64
+      %position = linalg.index 0 : index
+      %position_i64 = arith.index_cast %position : index to i64
+      %one = arith.constant 1 : i64
+      %weight = arith.addi %position_i64, %one : i64
+      %weighted_key = arith.muli %weight, %key : i64
+      %next = arith.addi %weighted_key, %acc : i64
       linalg.yield %next : i64
     } -> tensor<i64>
     flow.return %sorted#1, %sum : tensor<?xi64>, tensor<i64>
