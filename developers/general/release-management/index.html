@@ -4156,6 +4156,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#compiling-release-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compiling release notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#promoting-a-candidate-to-stable" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6454,6 +6465,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#compiling-release-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Compiling release notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#promoting-a-candidate-to-stable" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6791,10 +6813,21 @@ These are published on GitHub with the "pre-release" status. For debugging this
 process, see the <a href="../../debugging/releases/">Release debugging playbook</a>.</p>
 <p>We periodically promote one of these candidates to a "stable" release.</p>
 <h2 id="running-a-release"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M14.064 0h.186C15.216 0 16 .784 16 1.75v.186a8.75 8.75 0 0 1-2.564 6.186l-.458.459q-.472.471-.979.904v3.207c0 .608-.315 1.172-.833 1.49l-2.774 1.707a.75.75 0 0 1-1.11-.418l-.954-3.102a1 1 0 0 1-.145-.125L3.754 9.816a1 1 0 0 1-.124-.145L.528 8.717a.75.75 0 0 1-.418-1.11l1.71-2.774A1.75 1.75 0 0 1 3.31 4h3.204q.433-.508.904-.979l.459-.458A8.75 8.75 0 0 1 14.064 0M8.938 3.623h-.002l-.458.458c-.76.76-1.437 1.598-2.02 2.5l-1.5 2.317 2.143 2.143 2.317-1.5c.902-.583 1.74-1.26 2.499-2.02l.459-.458a7.25 7.25 0 0 0 2.123-5.127V1.75a.25.25 0 0 0-.25-.25h-.186a7.25 7.25 0 0 0-5.125 2.123M3.56 14.56c-.732.732-2.334 1.045-3.005 1.148a.23.23 0 0 1-.201-.064.23.23 0 0 1-.064-.201c.103-.671.416-2.273 1.15-3.003a1.502 1.502 0 1 1 2.12 2.12m6.94-3.935q-.132.09-.266.175l-2.35 1.521.548 1.783 1.949-1.2a.25.25 0 0 0 .119-.213ZM3.678 8.116 5.2 5.766q.087-.135.176-.266H3.309a.25.25 0 0 0-.213.119l-1.2 1.95ZM12 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/></svg></span> Running a release<a class="headerlink" href="#running-a-release" title="Permanent link">link</a></h2>
-<p>A pinned issue tracking the next release should be filed like
-<a href="https://github.com/iree-org/iree/issues/18380">https://github.com/iree-org/iree/issues/18380</a>. Developers authoring patches
-that include major or breaking changes should coordinate merge timing and
-contribute release notes on those issues.</p>
+<p>Developers authoring patches that include major or breaking changes should
+coordinate merge timing and contribute release notes on the pinned issue that
+tracks the next release. A pinned issue tracking the release should be filed,
+based on
+<a href="https://github.com/iree-org/iree/blob/main/docs/website/docs/developers/general/release-tracker-template.md">release-tracker-template.md</a>:
+copy it, replace the placeholders, and file it with the GitHub CLI:</p>
+<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>docs/website/docs/developers/general/release-tracker-template.md<span class="w"> </span>/tmp/release-tracker.md
+<span class="c1"># Fill in the version, release date and previous release in /tmp/release-tracker.md.</span>
+gh<span class="w"> </span>issue<span class="w"> </span>create<span class="w"> </span>--repo<span class="w"> </span>iree-org/iree<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--title<span class="w"> </span><span class="s2">"Release Tracker vX.Y.Z - (YYYY-MM-DD)"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--body-file<span class="w"> </span>/tmp/release-tracker.md
+gh<span class="w"> </span>issue<span class="w"> </span>pin<span class="w"> </span>&lt;issue<span class="w"> </span>number&gt;<span class="w"> </span>--repo<span class="w"> </span>iree-org/iree
+</code></pre></div>
+<p>Until the release, watch for major or breaking changes and decide whether to
+batch them with this release or defer them until the next one.</p>
 <h3 id="picking-a-candidate-to-promote"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M.41 13.41 6 19l1.41-1.42L1.83 12m20.41-6.42L11.66 16.17 7.5 12l-1.43 1.41L11.66 19l12-12M18 7l-1.41-1.42-6.35 6.35 1.42 1.41z"/></svg></span> Picking a candidate to promote<a class="headerlink" href="#picking-a-candidate-to-promote" title="Permanent link">link</a></h3>
 <p>After approximately one month since the previous release, a new release should
 be promoted from nightly release candidates.</p>
@@ -6807,25 +6840,66 @@ be promoted from nightly release candidates.</p>
 <p>When you've identified a potential candidate, comment on the tracking issue with
 the proposal and solicit feedback. People may point out known regressions or
 request that some feature make the cut.</p>
+<h3 id="compiling-release-notes"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 3.75C0 2.784.784 2 1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25Zm1.75-.25a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25ZM3.5 6.25a.75.75 0 0 1 .75-.75h7a.75.75 0 0 1 0 1.5h-7a.75.75 0 0 1-.75-.75m.75 2.25h4a.75.75 0 0 1 0 1.5h-4a.75.75 0 0 1 0-1.5"/></svg></span> Compiling release notes<a class="headerlink" href="#compiling-release-notes" title="Permanent link">link</a></h3>
+<p>Release notes are collected on the tracking issue, where either contributors add
+announcements and notable changes as they land, or they are collected on release
+day.</p>
+<p>Generate the "New contributors" list and the full changelog for the range from
+the previous stable release to the candidate, e.g. with the "Generate release
+notes" button when drafting a GitHub release, or:</p>
+<div class="highlight"><pre><span></span><code>gh<span class="w"> </span>api<span class="w"> </span>repos/iree-org/iree/releases/generate-notes<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-f<span class="w"> </span><span class="nv">tag_name</span><span class="o">=</span>v3.12.0<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-f<span class="w"> </span><span class="nv">target_commitish</span><span class="o">=</span>iree-3.12.0rc20260917<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-f<span class="w"> </span><span class="nv">previous_tag_name</span><span class="o">=</span>v3.11.0<span class="w"> </span>--jq<span class="w"> </span>.body
+</code></pre></div>
+<p>The "Release notes" section of the
+<a href="https://github.com/iree-org/iree/blob/main/docs/website/docs/developers/general/release-tracker-template.md">release tracker template</a>
+has the expected structure.</p>
+<p>The header of the release notes lists the VMFB bytecode version and the HAL
+module version, and whether they changed since the previous release:</p>
+<ul>
+<li>VMFB bytecode version: <code>IREE_VM_BYTECODE_VERSION_MAJOR</code> and
+  <code>IREE_VM_BYTECODE_VERSION_MINOR</code>.</li>
+<li>HAL module version: <code>IREE_HAL_MODULE_VERSION_LATEST</code>.</li>
+</ul>
 <h3 id="promoting-a-candidate-to-stable"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M6.122.392a1.75 1.75 0 0 1 1.756 0l5.25 3.045c.54.313.872.89.872 1.514V7.25a.75.75 0 0 1-1.5 0V5.677L7.75 8.432v6.384a1 1 0 0 1-1.502.865L.872 12.563A1.75 1.75 0 0 1 0 11.049V4.951c0-.624.332-1.2.872-1.514ZM7.125 1.69a.25.25 0 0 0-.25 0l-4.63 2.685L7 7.133l4.755-2.758ZM1.5 11.049a.25.25 0 0 0 .125.216l4.625 2.683V8.432L1.5 5.677Zm10.828 3.684 1.173-1.233H10.25a.75.75 0 0 1 0-1.5h3.251l-1.173-1.233a.75.75 0 1 1 1.087-1.034l2.378 2.5a.75.75 0 0 1 0 1.034l-2.378 2.5a.75.75 0 0 1-1.087-1.034"/></svg></span> Promoting a candidate to stable<a class="headerlink" href="#promoting-a-candidate-to-stable" title="Permanent link">link</a></h3>
 <ol>
 <li>
 <p>(Authorized users only) Push to PyPI using
-    <a href="https://github.com/iree-org/iree/blob/main//build_tools/python_deploy/pypi_deploy.sh">pypi_deploy.sh</a></p>
+    <a href="https://github.com/iree-org/iree/blob/main//build_tools/python_deploy/pypi_deploy.sh">pypi_deploy.sh</a>.
+    The script is a dry run by default. Check its output, then pass
+    <code>--publish</code> to upload. Keep the whl folder for upload to GitHub.</p>
 </li>
 <li>
 <p>Create a new release on GitHub:</p>
 <ul>
 <li>
-<p>Set the tag to be created and select a target commit. For example, if the
-    candidate release was tagged <code>iree-3.1.0rc20241119</code> at commit <code>3ed07da</code>,
-    set the new release tag <code>v3.1.0</code> and use the same commit.</p>
+<p>Create a new GitHub draft release (via the WebUI or CLI). Set the tag to
+    be created and select a target commit. For example, if the candidate
+    release was tagged <code>iree-3.1.0rc20241119</code> at commit <code>3ed07da</code>, set the
+    new release tag <code>v3.1.0</code> and use the same commit. GitHub creates the
+    tag when the release is published, so nothing needs to be pushed
+    beforehand.</p>
 <p><img alt="rename_tag" src="../release-tag.png" /></p>
-<p>If the commit does not appear in the list, create and push a tag
-manually:</p>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>checkout<span class="w"> </span>iree-3.1.0rc20250107
-git<span class="w"> </span>tag<span class="w"> </span>-a<span class="w"> </span>v3.1.0<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Version 3.1.0 release."</span>
-git<span class="w"> </span>push<span class="w"> </span>upstream<span class="w"> </span>v3.1.0
+<p>The target picker only lists recent commits. If the candidate's commit
+does not appear there, create and push the tag yourself, then select it
+as an existing tag:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>tag<span class="w"> </span>-a<span class="w"> </span>v3.1.0<span class="w"> </span>iree-3.1.0rc20241119<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Version 3.1.0 release."</span>
+git<span class="w"> </span>rev-parse<span class="w"> </span><span class="s1">'v3.1.0^{commit}'</span><span class="w">  </span><span class="c1"># Check that this is the candidate's commit.</span>
+git<span class="w"> </span>push<span class="w"> </span>upstream<span class="w"> </span>refs/tags/v3.1.0<span class="w">  </span><span class="c1"># Pushes only the tag.</span>
+</code></pre></div>
+<p>The release can also be created from the command line. <code>gh</code> creates
+the tag on publish, the same way the web UI does. The command also sets
+the title and release notes from the next two steps. The assets are
+uploaded to the draft later. You can extract the release notes
+<code>notes.md</code> from the release tracking issue.</p>
+<div class="highlight"><pre><span></span><code>gh<span class="w"> </span>issue<span class="w"> </span>view<span class="w"> </span>&lt;issue<span class="w"> </span>number&gt;<span class="w"> </span>--repo<span class="w"> </span>iree-org/iree<span class="w"> </span>--json<span class="w"> </span>body<span class="w"> </span>--jq<span class="w"> </span>.body<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="p">|</span><span class="w"> </span>tr<span class="w"> </span>-d<span class="w"> </span><span class="s1">'\r'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">'started { print; next } prev == "---" &amp;&amp; $0 == "---" { started = 1 } { prev = $0 }'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>&gt;<span class="w"> </span>notes.md
+gh<span class="w"> </span>release<span class="w"> </span>create<span class="w"> </span>v3.1.0<span class="w"> </span>--repo<span class="w"> </span>iree-org/iree<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--target<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>git<span class="w"> </span>rev-parse<span class="w"> </span><span class="s1">'iree-3.1.0rc20241119^{commit}'</span><span class="k">)</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--draft<span class="w"> </span>--title<span class="w"> </span><span class="s2">"Release v3.1.0"</span><span class="w"> </span>--notes-file<span class="w"> </span>notes.md
 </code></pre></div>
 </li>
 <li>
@@ -6835,19 +6909,35 @@ git<span class="w"> </span>push<span class="w"> </span>upstream<span class="w"> 
 <p>Paste the release notes from the release tracking issue.</p>
 </li>
 <li>
-<p>Upload the <code>.whl</code> files produced by the <code>pypy_deploy.sh</code> script (look for
-    them in your <code>/tmp/</code> directory). These have the stable release versions
-    in them.</p>
+<p>Upload the <code>iree-dist-*.tar.xz</code> files of the release candidate and
+    <code>.whl</code> files of <code>pypi_deploy.sh</code> to the release draft.</p>
+<p>Download the <code>iree-dist-*.tar.xz</code> files from the candidate release.</p>
+<div class="highlight"><pre><span></span><code><span class="nv">WHEEL_DIR</span><span class="o">=</span>/tmp/iree_pypi_wheels.XXXXX
+gh<span class="w"> </span>release<span class="w"> </span>download<span class="w"> </span>iree-3.1.0rc20241119<span class="w"> </span>--repo<span class="w"> </span>iree-org/iree<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pattern<span class="w"> </span><span class="s1">'iree-dist-*'</span><span class="w"> </span>--dir<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">WHEEL_DIR</span><span class="si">}</span><span class="s2">"</span>
+gh<span class="w"> </span>release<span class="w"> </span>upload<span class="w"> </span>v3.1.0<span class="w"> </span>--repo<span class="w"> </span>iree-org/iree<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"</span><span class="si">${</span><span class="nv">WHEEL_DIR</span><span class="si">}</span><span class="s2">"</span>/*.whl<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">WHEEL_DIR</span><span class="si">}</span><span class="s2">"</span>/iree-dist-*.tar.xz
+</code></pre></div>
 </li>
 <li>
-<p>Download the <code>iree-dist-.*.tar.xz</code> files from the candidate release and
-    upload them to the new stable release.</p>
-</li>
-<li>
-<p>Uncheck the option for "pre-release", and check the option for "latest".</p>
+<p>Publish the release. Uncheck the option for "pre-release", and check the
+    option for "latest" and hit publish.</p>
 <p><img alt="promote_release" src="../release-latest.png" /></p>
+<p>Or via the CLI:
+<code>gh release edit v3.1.0 --repo iree-org/iree --draft=false --latest</code>.</p>
 </li>
 </ul>
+</li>
+<li>
+<p>Release the iree-turbine packages, following
+   <a href="https://github.com/iree-org/iree-turbine/blob/main/docs/infra/releasing.md">iree-turbine's release docs</a>.</p>
+</li>
+<li>
+<p>Increment the versions in source code to the next minor release, so that
+   nightly releases sort after the new stable release (see
+   <a href="../versioning-scheme/">Versioning scheme</a>): set <code>package-version</code> to
+   <code>X.{Y+1}.0.dev</code> in both <code>compiler/version.json</code> and <code>runtime/version.json</code>,
+   e.g. <a href="https://github.com/iree-org/iree/pull/23866">https://github.com/iree-org/iree/pull/23866</a>.</p>
 </li>
 <li>
 <p>Complete any remaining checkbox items on the release tracking issue then
@@ -6861,8 +6951,8 @@ git<span class="w"> </span>push<span class="w"> </span>upstream<span class="w"> 
 <p>Checkout the corresponding stable release and create a branch
 for the patch release:</p>
 <!-- TODO(scotttodd): Does this need a branch, or would just a tag work? -->
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>checkout<span class="w"> </span>v3.0.0
-git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>v3.0.1
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>checkout<span class="w"> </span>v3.12.0
+git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>v3.12.1
 </code></pre></div>
 </li>
 <li>
