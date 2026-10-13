@@ -206,6 +206,49 @@ func.func @group_spanning_row(
 
 // -----
 
+// Each vector along the last dimension is a token with its own scale and zero
+// point. PT2E keeps a unit last dimension in their shape, which is dropped so
+// that LinalgExt indexes them by the leading dimensions.
+// CHECK: #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-LABEL: func.func @per_token(
+// CHECK-NOT: tensor.expand_shape
+// CHECK: %[[SCALES:.+]] = tensor.collapse_shape %{{.+}} {{\[}}[0], [1, 2]]
+// CHECK-SAME: tensor<2x?x1xf64> into tensor<2x?xf64>
+// CHECK: %[[ZERO_POINTS:.+]] = tensor.collapse_shape %{{.+}} {{\[}}[0], [1, 2]]
+// CHECK-SAME: tensor<2x?x1xi64> into tensor<2x?xi64>
+// CHECK: %[[QUANTIZED:.+]] = iree_linalg_ext.quantize_affine
+// CHECK-SAME: indexing_maps = [#map, #map1, #map1, #map]
+// CHECK-SAME: ins(%{{.+}}, %[[SCALES]], %[[ZERO_POINTS]] : tensor<2x?x8xf32>,
+// CHECK-SAME: tensor<2x?xf64>, tensor<2x?xi64>)
+// CHECK: iree_linalg_ext.dequantize_affine
+// CHECK-SAME: indexing_maps = [#map, #map1, #map1, #map]
+// CHECK-SAME: ins(%[[QUANTIZED]], %{{.+}}, %{{.+}} : tensor<2x?x8xi8>,
+// CHECK-SAME: tensor<2x?xf64>, tensor<2x?xi64>)
+func.func @per_token(
+    %input: !torch.vtensor<[2,?,8],f32>,
+    %scales: !torch.vtensor<[2,?,1],f64>,
+    %zero_points: !torch.vtensor<[2,?,1],si64>) -> !torch.vtensor<[2,?,8],f32> {
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %dtype = torch.constant.int 1
+  %out_dtype = torch.constant.int 6
+  %quantized = torch.quantized_decomposed.quantize_per_token
+      %input, %scales, %zero_points, %minimum, %maximum, %dtype
+      : !torch.vtensor<[2,?,8],f32>, !torch.vtensor<[2,?,1],f64>,
+        !torch.vtensor<[2,?,1],si64>, !torch.int, !torch.int, !torch.int
+        -> !torch.vtensor<[2,?,8],si8>
+  %result = torch.quantized_decomposed.dequantize_per_token
+      %quantized, %scales, %zero_points, %minimum, %maximum, %dtype,
+      %out_dtype
+      : !torch.vtensor<[2,?,8],si8>, !torch.vtensor<[2,?,1],f64>,
+        !torch.vtensor<[2,?,1],si64>, !torch.int, !torch.int, !torch.int,
+        !torch.int -> !torch.vtensor<[2,?,8],f32>
+  return %result : !torch.vtensor<[2,?,8],f32>
+}
+
+// -----
+
 // Dynamic bounds cannot be represented as LinalgExt attributes. The pass
 // leaves this op for the general Torch-to-Linalg lowering that follows it.
 // CHECK-LABEL: func.func @dynamic_bounds(
