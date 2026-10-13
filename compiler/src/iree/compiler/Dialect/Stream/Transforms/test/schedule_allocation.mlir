@@ -285,8 +285,8 @@ util.func public @tiedOperands(%operand: !stream.resource<transient>, %size: ind
 // CHECK-SAME:  %[[SIZE:.+]]: index, %[[OFFSET0:.+]]: index, %[[OFFSET1:.+]]: index, %[[OFFSET2:.+]]: index, %[[LENGTH0:.+]]: index, %[[LENGTH1:.+]]: index, %[[LENGTH2:.+]]: index)
 util.func public @tiedOperandSubviews(%operand: !stream.resource<external>, %size: index, %offset0: index, %offset1: index, %offset2: index, %length0: index, %length1: index, %length2: index) {
   %c0 = arith.constant 0 : index
-  // CHECK: %[[SUBVIEW_OFFSET:.+]] = arith.addi %[[OFFSET0]], %[[OFFSET1]]
-  // CHECK: %[[SUBVIEW:.+]] = stream.resource.subview %[[OPERAND]][%[[SUBVIEW_OFFSET]]] {{.*}} -> !stream.resource<external>{%[[LENGTH1]]}
+  // CHECK-DAG: %[[SUBVIEW:.+]] = stream.resource.subview %[[OPERAND]][%[[SUBVIEW_OFFSET:.+]]] {{.*}} -> !stream.resource<external>{%[[LENGTH1]]}
+  // CHECK-DAG: %[[SUBVIEW_OFFSET]] = arith.addi %[[OFFSET0]], %[[OFFSET1]]
   // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<external>{%[[SIZE]]})
   // CHECK-NEXT: } => !stream.timepoint
   %result0, %result0_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<external>{%size}) -> (%operand as !stream.resource<external>{%length1}) {
