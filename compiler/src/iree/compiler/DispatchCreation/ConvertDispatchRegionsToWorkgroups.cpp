@@ -20,6 +20,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LLVM.h"
@@ -249,6 +250,39 @@ convertDispatchRegionWithSortWorkspaces(IREE::Flow::DispatchRegionOp &regionOp,
   }
 
   if (!workspaceResults.empty()) {
+    // A hidden workspace represents the last uniquely updated version, not an
+    // earlier value that bufferization would have to preserve with a copy.
+    for (Value &result : workspaceResults) {
+      while (true) {
+        OpOperand *update = nullptr;
+        for (OpOperand &use : result.getUses()) {
+          if (isa<tensor::DimOp>(use.getOwner())) {
+            continue;
+          }
+          if (update) {
+            update = nullptr;
+            break;
+          }
+          update = &use;
+        }
+        if (!update) {
+          break;
+        }
+        auto dps = dyn_cast<DestinationStyleOpInterface>(update->getOwner());
+        auto tied = dyn_cast<IREE::Util::TiedOpInterface>(update->getOwner());
+        if (!dps || !tied || !dps.hasPureTensorSemantics() ||
+            !dps.isDpsInit(update) ||
+            update->getOwner()->getBlock() != &regionOp.getBody().front()) {
+          break;
+        }
+        Value next = dps.getTiedOpResult(update);
+        if (next.getType() != result.getType() ||
+            tied.getTiedResultOperand(next) != result) {
+          break;
+        }
+        result = next;
+      }
+    }
     auto dialectAttrs = llvm::to_vector(regionOp->getDialectAttrs());
     Region workgroupCount;
     workgroupCount.takeBody(regionOp.getWorkgroupCount());

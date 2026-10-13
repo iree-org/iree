@@ -25,6 +25,7 @@ iree_lit_test_suite(
     "globals.mlir"
     "libm_linking.mlir"
     "scalar.mlir"
+    "sort_preserve_intermediate_version.mlir"
     "trace_dispatch_tensors.mlir"
     "transients_test.mlir"
     "two_sorts_original_version.mlir"

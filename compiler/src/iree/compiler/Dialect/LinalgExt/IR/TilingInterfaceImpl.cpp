@@ -854,6 +854,20 @@ LogicalResult MapStoreOp::generateScalarImplementation(OpBuilder &b,
 // SortOp
 //===----------------------------------------------------------------------===//
 
+// A sort cannot be partitioned along its sorting dimension, including when
+// buffer semantics provide no SSA results for result-position validation.
+static bool isFullSortTile(SortOp sortOp, ArrayRef<OpFoldResult> offsets,
+                           ArrayRef<OpFoldResult> sizes) {
+  int64_t dimension = sortOp.getDimension();
+  if (!isConstantIntValue(offsets[dimension], 0)) {
+    return false;
+  }
+  auto coversSortDimension = ValueBoundsConstraintSet::areEqual(
+      ValueBoundsConstraintSet::Variable(sizes[dimension]),
+      ValueBoundsConstraintSet::Variable(sortOp.getOperand(0), dimension));
+  return succeeded(coversSortDimension) && *coversSortDimension;
+}
+
 SmallVector<utils::IteratorType> SortOp::getLoopIteratorTypes() {
   // All loops except the dimension to sort along are parallel.
   SmallVector<utils::IteratorType> iteratorTypes(getOperandRank(),
@@ -884,6 +898,12 @@ SortOp::getTiledImplementation(OpBuilder &builder,
   int64_t rank = getOperandRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
          sizes.size() == static_cast<size_t>(rank));
+  // Buffer tiling retains the original operands. Tensor tiling may instead
+  // receive iter_args of an unfinished loop; validate it on the original op
+  // in getResultTilePosition.
+  if (hasPureBufferSemantics() && !isFullSortTile(*this, offsets, sizes)) {
+    return failure();
+  }
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
   SmallVector<Operation *> slices;
@@ -909,16 +929,7 @@ LogicalResult SortOp::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
-  // Sorting independent slices is not a sort of the entire dimension. Only
-  // parallel dimensions may be partitioned, including when fusing a consumer.
-  int64_t dimension = getDimension();
-  if (!isConstantIntValue(offsets[dimension], 0)) {
-    return failure();
-  }
-  auto coversSortDimension = ValueBoundsConstraintSet::areEqual(
-      ValueBoundsConstraintSet::Variable(sizes[dimension]),
-      ValueBoundsConstraintSet::Variable(getOperand(0), dimension));
-  if (failed(coversSortDimension) || !*coversSortDimension) {
+  if (!isFullSortTile(*this, offsets, sizes)) {
     return failure();
   }
   resultOffsets = llvm::to_vector(offsets);

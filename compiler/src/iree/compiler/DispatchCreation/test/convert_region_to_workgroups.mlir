@@ -514,3 +514,141 @@ util.func public @sort_scalar_initializer_use(%indices: tensor<4xi64>) -> tensor
   }
   util.return %result : tensor<4xi64>
 }
+
+// -----
+
+// A dependent Sort updates the hidden role; only its final version is stored.
+// CHECK-LABEL: util.func public @sort_dependent_workspace
+// CHECK: %[[DISPATCH:.+]]:2 = flow.dispatch.workgroups
+// CHECK: %[[ASCENDING:.+]]:2 = iree_linalg_ext.sort
+// CHECK: %[[DESCENDING:.+]]:2 = iree_linalg_ext.sort
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[DESCENDING]]#1
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[DESCENDING]]#0
+// CHECK-NOT: iree_tensor_ext.dispatch.tensor.store %[[ASCENDING]]#0
+// CHECK: util.return %[[DISPATCH]]#0
+util.func public @sort_dependent_workspace(%keys: tensor<?xi64>, %labels: tensor<?xi64>)
+    -> (tensor<?xi64>, tensor<?xi64>, tensor<?xi64>) {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %keys, %c0 : tensor<?xi64>
+  %result = flow.dispatch.region -> (tensor<?xi64>{%n}) {
+    %ascending:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %labels : tensor<?xi64>, tensor<?xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sle, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<?xi64>, tensor<?xi64>
+    %descending:2 = iree_linalg_ext.sort dimension(0)
+        outs(%ascending#0, %ascending#1 : tensor<?xi64>, tensor<?xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sge, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<?xi64>, tensor<?xi64>
+    flow.return %descending#1 : tensor<?xi64>
+  }
+  util.return %result, %keys, %labels : tensor<?xi64>, tensor<?xi64>, tensor<?xi64>
+}
+
+// -----
+
+// Shape reads permit forwarding through an intervening destination update.
+// CHECK-LABEL: util.func public @sort_local_workspace_update
+// CHECK: %[[KEYS:.+]] = flow.dispatch.workgroups
+// CHECK: %[[DISPATCH:.+]]:3 = flow.dispatch.workgroups
+// CHECK: %[[ASCENDING:.+]]:2 = iree_linalg_ext.sort
+// CHECK: %[[NEGATED:.+]] = linalg.generic
+// CHECK: %[[DESCENDING:.+]]:2 = iree_linalg_ext.sort
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[DESCENDING]]#1
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[DESCENDING]]#0
+// CHECK-NOT: iree_tensor_ext.dispatch.tensor.store %[[ASCENDING]]#0
+// CHECK: util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1
+#identity = affine_map<(d0) -> (d0)>
+util.func public @sort_local_workspace_update(%labels: tensor<?xi64>)
+    -> (tensor<?xi64>, tensor<?xi64>, tensor<?xi64>) {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %labels, %c0 : tensor<?xi64>
+  %results:2 = flow.dispatch.region -> (tensor<?xi64>{%n}, tensor<?xi64>{%n}) {
+    %empty = tensor.empty(%n) : tensor<?xi64>
+    %keys = linalg.generic {indexing_maps = [#identity], iterator_types = ["parallel"]}
+        outs(%empty : tensor<?xi64>) {
+    ^bb0(%out: i64):
+      %zero = arith.constant 0 : i64
+      %i = linalg.index 0 : index
+      %value = arith.index_cast %i : index to i64
+      %key = arith.subi %zero, %value : i64
+      linalg.yield %key : i64
+    } -> tensor<?xi64>
+    %ascending:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %labels : tensor<?xi64>, tensor<?xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sle, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<?xi64>, tensor<?xi64>
+    %size = tensor.dim %ascending#0, %c0 : tensor<?xi64>
+    %shape_empty = tensor.empty(%size) : tensor<?xi64>
+    %seven = arith.constant 7 : i64
+    %filled = linalg.fill ins(%seven : i64) outs(%shape_empty : tensor<?xi64>) -> tensor<?xi64>
+    %negated = linalg.generic {indexing_maps = [#identity], iterator_types = ["parallel"]}
+        outs(%ascending#0 : tensor<?xi64>) {
+    ^bb0(%key: i64):
+      %zero = arith.constant 0 : i64
+      %negative = arith.subi %zero, %key : i64
+      linalg.yield %negative : i64
+    } -> tensor<?xi64>
+    %descending:2 = iree_linalg_ext.sort dimension(0)
+        outs(%negated, %ascending#1 : tensor<?xi64>, tensor<?xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sge, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<?xi64>, tensor<?xi64>
+    flow.return %descending#1, %filled : tensor<?xi64>, tensor<?xi64>
+  }
+  util.return %results#0, %results#1, %labels : tensor<?xi64>, tensor<?xi64>, tensor<?xi64>
+}
+
+// -----
+
+// Another data user observes the earlier version; keep that workspace export.
+// CHECK-LABEL: util.func public @sort_workspace_earlier_data_use
+// CHECK: %[[DISPATCH:.+]]:3 = flow.dispatch.workgroups
+// CHECK: %[[ASCENDING:.+]]:2 = iree_linalg_ext.sort
+// CHECK: %[[DESCENDING:.+]]:2 = iree_linalg_ext.sort
+// CHECK: linalg.generic
+// CHECK-NOT: iree_tensor_ext.dispatch.tensor.store %[[DESCENDING]]#0
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[ASCENDING]]#0
+// CHECK: util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1
+#identity = affine_map<(d0) -> (d0)>
+#scalar = affine_map<(d0) -> ()>
+util.func public @sort_workspace_earlier_data_use(%keys: tensor<4xi64>, %labels: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<i64>, tensor<4xi64>, tensor<4xi64>) {
+  %zero = arith.constant 0 : i64
+  %sum_empty = tensor.empty() : tensor<i64>
+  %sum_init = linalg.fill ins(%zero : i64) outs(%sum_empty : tensor<i64>) -> tensor<i64>
+  %results:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<i64>) {
+    %ascending:2 = iree_linalg_ext.sort dimension(0)
+        outs(%keys, %labels : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sle, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    %descending:2 = iree_linalg_ext.sort dimension(0)
+        outs(%ascending#0, %ascending#1 : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sge, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    %sum = linalg.generic {indexing_maps = [#identity, #scalar], iterator_types = ["reduction"]}
+        ins(%ascending#0 : tensor<4xi64>) outs(%sum_init : tensor<i64>) {
+    ^bb0(%key: i64, %acc: i64):
+      %position = linalg.index 0 : index
+      %position_i64 = arith.index_cast %position : index to i64
+      %one = arith.constant 1 : i64
+      %weight = arith.addi %position_i64, %one : i64
+      %weighted = arith.muli %weight, %key : i64
+      %next = arith.addi %weighted, %acc : i64
+      linalg.yield %next : i64
+    } -> tensor<i64>
+    flow.return %descending#1, %sum : tensor<4xi64>, tensor<i64>
+  }
+  util.return %results#0, %results#1, %keys, %labels
+      : tensor<4xi64>, tensor<i64>, tensor<4xi64>, tensor<4xi64>
+}

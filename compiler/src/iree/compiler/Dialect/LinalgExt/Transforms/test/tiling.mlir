@@ -4516,3 +4516,24 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+// Buffer-form Sort has no result positions through which to reject this tile.
+func.func @sort_partial_axis_memref(%arg0: memref<4xi32>) {
+  // expected-error @+2 {{failed to tile operation}}
+  // expected-error @+1 {{failed to generate tiling loops}}
+  iree_linalg_ext.sort dimension(0) outs(%arg0 : memref<4xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_for %sort tile_sizes [2] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
