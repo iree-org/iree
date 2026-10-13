@@ -1,6 +1,6 @@
 // RUN: iree-run-mlir --Xcompiler,iree-hal-target-backends=llvm-cpu --Xcompiler,iree-llvmcpu-target-cpu=generic %s --function=two_sorts_original_version --input="3xi64=[3 1 2]" | FileCheck %s
 // RUN: iree-run-mlir --Xcompiler,iree-hal-target-backends=llvm-cpu --Xcompiler,iree-llvmcpu-target-cpu=generic %s --function=two_sorts_dependent --input="3xi64=[3 1 2]" --input="3xi64=[7 -3 9]" | FileCheck %s --check-prefix=DEPENDENT
-// RUN: iree-run-mlir --Xcompiler,iree-hal-target-backends=llvm-cpu --Xcompiler,iree-llvmcpu-target-cpu=generic %s --function=two_sorts_local_update --input="3xi64=[7 -3 9]" | FileCheck %s --check-prefix=LOCAL
+// RUN: iree-run-mlir --Xcompiler,iree-hal-target-backends=llvm-cpu --Xcompiler,iree-llvmcpu-target-cpu=generic %s --function=sort_workspace_shape_chain --input="3xi64=[7 -3 9]" | FileCheck %s --check-prefix=LOCAL
 // CHECK-LABEL: EXEC @two_sorts_original_version
 // CHECK: 3xi64=1 2 0
 // CHECK: 3xi64=100 102 101
@@ -68,8 +68,8 @@ func.func @two_sorts_dependent(%keys: tensor<?xi64>, %labels: tensor<?xi64>)
 // DEPENDENT: 3xi64=3 1 2
 // DEPENDENT: 3xi64=7 -3 9
 
-// A shape observation does not pin the tensor version across a tied update.
-func.func @two_sorts_local_update(%labels: tensor<?xi64>)
+// A shape observation does not pin the tensor version across tied updates.
+func.func @sort_workspace_shape_chain(%labels: tensor<?xi64>)
     -> (tensor<?xi64>, tensor<?xi64>, tensor<?xi64>) {
   %c0 = arith.constant 0 : index
   %n = tensor.dim %labels, %c0 : tensor<?xi64>
@@ -94,24 +94,23 @@ func.func @two_sorts_local_update(%labels: tensor<?xi64>)
     %shape_empty = tensor.empty(%size) : tensor<?xi64>
     %seven = arith.constant 7 : i64
     %filled = linalg.fill ins(%seven : i64) outs(%shape_empty : tensor<?xi64>) -> tensor<?xi64>
-    %negated = linalg.generic {indexing_maps = [#identity], iterator_types = ["parallel"]}
-        outs(%ascending#0 : tensor<?xi64>) {
-    ^bb0(%key: i64):
-      %zero = arith.constant 0 : i64
-      %negative = arith.subi %zero, %key : i64
-      linalg.yield %negative : i64
-    } -> tensor<?xi64>
     %descending:2 = iree_linalg_ext.sort dimension(0)
-        outs(%negated, %ascending#1 : tensor<?xi64>, tensor<?xi64>) {
+        outs(%ascending#0, %ascending#1 : tensor<?xi64>, tensor<?xi64>) {
     ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
       %cmp = arith.cmpi sge, %lhs, %rhs : i64
       iree_linalg_ext.yield %cmp : i1
     } -> tensor<?xi64>, tensor<?xi64>
-    flow.return %descending#1, %filled : tensor<?xi64>, tensor<?xi64>
+    %final:2 = iree_linalg_ext.sort dimension(0)
+        outs(%descending#0, %descending#1 : tensor<?xi64>, tensor<?xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sle, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<?xi64>, tensor<?xi64>
+    flow.return %final#1, %filled : tensor<?xi64>, tensor<?xi64>
   }
   return %results#0, %results#1, %labels : tensor<?xi64>, tensor<?xi64>, tensor<?xi64>
 }
-// LOCAL-LABEL: EXEC @two_sorts_local_update
+// LOCAL-LABEL: EXEC @sort_workspace_shape_chain
 // LOCAL: 3xi64=9 -3 7
 // LOCAL: 3xi64=7 7 7
 // LOCAL: 3xi64=7 -3 9
