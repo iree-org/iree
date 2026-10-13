@@ -639,11 +639,10 @@ static bool isDataTiledResultUnpack(linalg::UnPackOp unpack, Operation *root) {
 }
 
 /// Returns true if `unpack` can join `group`, whose root is a data-tiled
-/// contraction, as the final operation of the group.
+/// contraction.
 static bool canFuseDataTiledResultUnpack(linalg::UnPackOp unpack,
                                          const FusionGroup &group) {
   return isDataTiledResultUnpack(unpack, group.getRoot()) &&
-         !llvm::any_of(group.getFusedOperations(), isPackLikeOp) &&
          !group.wouldExceedOperandLimit(unpack);
 }
 
@@ -666,17 +665,18 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
   const FusionGroup &group = tracker.getFusionGroup(producer);
   Operation *groupRoot = group.getRoot();
   if (isDataTiledFusionEnabled(groupRoot, options)) {
-    // The result unpack is the final operation in a data-tiled group.
-    if (isUnpackLikeOp(producer)) {
+    // Only a pack that relayouts the result unpack for the next packed
+    // contraction follows it, as unset_encoding -> set_encoding fuses in
+    // dispatch-time data tiling, and the pack ends the group. Dynamic inner
+    // tiles are excluded as in producer fusion (#12746).
+    if (isa<linalg::PackOp>(producer)) {
       return false;
     }
-    // A data-tiled group holds pack-like ops or its result unpack, but not
-    // both. This rejects the pack-like op if the unpack joined first, and
-    // canFuseDataTiledResultUnpack rejects the unpack otherwise.
-    if (isPackLikeOp(consumer) &&
-        llvm::any_of(group.getFusedOperations(),
-                     llvm::IsaPred<linalg::UnPackOp>)) {
-      return false;
+    if (isUnpackLikeOp(producer)) {
+      auto pack = dyn_cast<linalg::PackOp>(consumer);
+      return pack && isa<linalg::UnPackOp>(producer) &&
+             pack.getInnerTiles().empty() &&
+             !group.wouldExceedOperandLimit(pack);
     }
     if (auto unpack = dyn_cast<linalg::UnPackOp>(consumer)) {
       return canFuseDataTiledResultUnpack(unpack, group);
@@ -694,7 +694,7 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
     // Default fusion never adds consumers to mmt4d ops, so their groups only
     // gain layout-preserving epilogues. Data-tiled convolutions are generic
     // ops that the rules below already fuse with their consumers; keep those
-    // decisions so that the option only adds the result unpack.
+    // decisions so that the option only adds the result unpack and its pack.
     if (isa<linalg::Mmt4DOp, linalg::BatchMmt4DOp>(groupRoot) &&
         !isDataTiledEpilogueOperand(fusedOperand)) {
       return false;

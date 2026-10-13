@@ -370,3 +370,39 @@ util.func public @no_fuse_multi_use_result(%lhs: tensor<8x128x8x1xf32>, %rhs: te
   } -> tensor<64x64xf32>
   util.return %neg, %mmt4d : tensor<64x64xf32>, tensor<8x8x8x8xf32>
 }
+
+// -----
+
+// Between chained contractions, the pack that relayouts the result unpack for
+// the next mmt4d joins the first dispatch and ends it.
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+// CHECK-LABEL: util.func public @mmt4d_unpack_pack_mmt4d(
+// CHECK-SAME:    %[[RHS2:[a-zA-Z0-9]+]]: tensor<8x64x8x1xf32>
+// CHECK:         %[[PACK_DISPATCH:.+]] = flow.dispatch.region -> (tensor<8x64x8x1xf32>)
+// CHECK:           %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK:           %[[RELU:.+]] = linalg.generic
+// CHECK-SAME:        ins(%[[MMT4D]] : tensor<8x8x8x8xf32>)
+// CHECK:           %[[UNPACK:.+]] = linalg.unpack %[[RELU]]
+// CHECK:           %[[PACK:.+]] = linalg.pack %[[UNPACK]]
+// CHECK:           flow.return %[[PACK]]
+// CHECK:         %[[RESULT:.+]] = flow.dispatch.region -> (tensor<8x8x8x8xf32>)
+// CHECK:           linalg.mmt4d ins(%[[PACK_DISPATCH]], %[[RHS2]]
+// CHECK:         util.return %[[RESULT]]
+util.func public @mmt4d_unpack_pack_mmt4d(%lhs: tensor<8x128x8x1xf32>, %rhs: tensor<8x128x8x1xf32>, %rhs2: tensor<8x64x8x1xf32>) -> tensor<8x8x8x8xf32> {
+  %zero = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<8x8x8x8xf32>
+  %fill = linalg.fill ins(%zero : f32) outs(%empty : tensor<8x8x8x8xf32>) -> tensor<8x8x8x8xf32>
+  %mmt4d = linalg.mmt4d ins(%lhs, %rhs : tensor<8x128x8x1xf32>, tensor<8x128x8x1xf32>) outs(%fill : tensor<8x8x8x8xf32>) -> tensor<8x8x8x8xf32>
+  %relu = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%mmt4d : tensor<8x8x8x8xf32>) outs(%empty : tensor<8x8x8x8xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %max = arith.maximumf %in, %zero : f32
+    linalg.yield %max : f32
+  } -> tensor<8x8x8x8xf32>
+  %dest = tensor.empty() : tensor<64x64xf32>
+  %unpack = linalg.unpack %relu outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %dest : tensor<8x8x8x8xf32> -> tensor<64x64xf32>
+  %lhs2_dest = tensor.empty() : tensor<8x64x8x1xf32>
+  %pack = linalg.pack %unpack outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %lhs2_dest : tensor<64x64xf32> -> tensor<8x64x8x1xf32>
+  %fill2 = linalg.fill ins(%zero : f32) outs(%empty : tensor<8x8x8x8xf32>) -> tensor<8x8x8x8xf32>
+  %mmt4d2 = linalg.mmt4d ins(%pack, %rhs2 : tensor<8x64x8x1xf32>, tensor<8x64x8x1xf32>) outs(%fill2 : tensor<8x8x8x8xf32>) -> tensor<8x8x8x8xf32>
+  util.return %mmt4d2 : tensor<8x8x8x8xf32>
+}
