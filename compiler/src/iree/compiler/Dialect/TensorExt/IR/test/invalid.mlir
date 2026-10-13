@@ -64,6 +64,17 @@ util.func public @test(memref<?xf32, #iree_tensor_ext.ragged_shape<0>>) {
 // iree_tensor_ext.cast_to_ragged_shape
 //===----------------------------------------------------------------------===//
 
+// Error if the ragged_dim value is negative.
+util.func public @raggedDimNegative(%source : tensor<10x20x30xf32>,
+    %columnLengths : tensor<4xindex>) -> tensor<10x3x8x30xf32, #iree_tensor_ext.ragged_shape<1>> {
+  // expected-error @+1 {{expected `ragged_dim` to be non-negative, but got -1}}
+  %0 = iree_tensor_ext.cast_to_ragged_shape %source ragged_dim(-1) column_lengths(%columnLengths)
+      : (tensor<10x20x30xf32>, tensor<4xindex>) -> tensor<10x3x8x30xf32, #iree_tensor_ext.ragged_shape<1>>
+  util.return %0 : tensor<10x3x8x30xf32, #iree_tensor_ext.ragged_shape<1>>
+}
+
+// -----
+
 // Error if the ragged_dim value is greater than the rank of the source.
 util.func public @raggedDimError(%source : tensor<10x20x30xf32>,
     %columnLengths : tensor<4xindex>) -> tensor<10x3x8x30xf32, #iree_tensor_ext.ragged_shape<1>> {
