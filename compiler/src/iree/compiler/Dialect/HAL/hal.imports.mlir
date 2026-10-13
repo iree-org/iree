@@ -309,6 +309,18 @@ vm.import private @command_buffer.copy_buffer(
   %flags : i64
 )
 
+// Flushes a range of a buffer so that completed writes to it are made available
+// to consumers outside of the device. Does not order itself with respect to
+// other commands.
+// NOTE: order slightly differs from op in order to get better arg alignment.
+vm.import private @command_buffer.flush_buffer(
+  %command_buffer : !vm.ref<!hal.command_buffer>,
+  %target_buffer_slot : i32,
+  %target_buffer : !vm.ref<!hal.buffer>,
+  %target_offset : i64,
+  %length : i64
+)
+
 // Dispatches a collective operation defined by |op| using the given buffers.
 // NOTE: order slightly differs from op in order to get better arg alignment.
 vm.import private @command_buffer.collective(

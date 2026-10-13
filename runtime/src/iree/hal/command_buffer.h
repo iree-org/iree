@@ -973,6 +973,21 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_ref_t source_ref,
     iree_hal_buffer_ref_t target_ref, iree_hal_copy_flags_t flags);
 
+// Flushes a range of the target buffer so that writes to it that have completed
+// by the time the flush executes are made available to consumers outside of
+// the device (other devices or the host). Consumers must still make the writes
+// visible on their side, e.g. with iree_hal_buffer_mapping_invalidate_range on
+// the host for memory without IREE_HAL_MEMORY_TYPE_HOST_COHERENT.
+//
+// A flush only performs cache maintenance and does not order itself with
+// respect to other commands: as with any command within the same
+// barrier-defined sequence it may execute overlapped with them. Callers must
+// record an execution barrier between the writes and the flush to ensure the
+// writes have completed before the flush executes.
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_ref_t target_ref);
+
 // Dispatches a collective operation defined by |op| using the given buffers.
 // |param| must be specified for operations that require a root/peer rank
 // identifier and is otherwise ignored.
@@ -1158,6 +1173,10 @@ typedef struct iree_hal_command_buffer_vtable_t {
       iree_hal_command_buffer_t* command_buffer,
       iree_hal_buffer_ref_t source_ref, iree_hal_buffer_ref_t target_ref,
       iree_hal_copy_flags_t flags);
+
+  iree_status_t(IREE_API_PTR* flush_buffer)(
+      iree_hal_command_buffer_t* command_buffer,
+      iree_hal_buffer_ref_t target_ref);
 
   iree_status_t(IREE_API_PTR* collective)(
       iree_hal_command_buffer_t* command_buffer, iree_hal_channel_t* channel,

@@ -247,6 +247,43 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
+class CommandBufferFlushBufferOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferFlushBufferOp> {
+public:
+  CommandBufferFlushBufferOpConversion(MLIRContext *context,
+                                       SymbolTable &importSymbols,
+                                       TypeConverter &typeConverter,
+                                       StringRef importName)
+      : OpConversionPattern(typeConverter, context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+
+  LogicalResult
+  matchAndRewrite(IREE::HAL::CommandBufferFlushBufferOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto importType = importOp.getFunctionType();
+    auto [targetBufferSlot, targetBuffer] =
+        splitBufferSlot(op.getLoc(), adaptor.getTargetBuffer(), rewriter);
+    SmallVector<Value, 8> callOperands = {
+        adaptor.getCommandBuffer(),
+        targetBufferSlot,
+        targetBuffer,
+        castToImportType(adaptor.getTargetOffset(), rewriter.getI64Type(),
+                         rewriter),
+        castToImportType(adaptor.getLength(), rewriter.getI64Type(), rewriter),
+    };
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
+        op, SymbolRefAttr::get(importOp), importType.getResults(),
+        callOperands);
+    copyImportAttrs(importOp, callOp);
+    return success();
+  }
+
+private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
 class CommandBufferCollectiveOpConversion
     : public OpConversionPattern<IREE::HAL::CommandBufferCollectiveOp> {
 public:
@@ -499,6 +536,8 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
       "hal.command_buffer.update_buffer");
   patterns.insert<CommandBufferCopyBufferOpConversion>(
       context, importSymbols, typeConverter, "hal.command_buffer.copy_buffer");
+  patterns.insert<CommandBufferFlushBufferOpConversion>(
+      context, importSymbols, typeConverter, "hal.command_buffer.flush_buffer");
   patterns.insert<CommandBufferCollectiveOpConversion>(
       context, importSymbols, typeConverter, "hal.command_buffer.collective");
   patterns.insert<CommandBufferDispatchOpConversion>(

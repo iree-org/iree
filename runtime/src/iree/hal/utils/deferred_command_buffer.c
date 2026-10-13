@@ -22,6 +22,7 @@ typedef enum iree_hal_command_type_e {
   IREE_HAL_CMD_FILL_BUFFER,
   IREE_HAL_CMD_UPDATE_BUFFER,
   IREE_HAL_CMD_COPY_BUFFER,
+  IREE_HAL_CMD_FLUSH_BUFFER,
   IREE_HAL_CMD_COLLECTIVE,
   IREE_HAL_CMD_DISPATCH,
 } iree_hal_cmd_type_t;
@@ -625,6 +626,43 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_copy_buffer(
 }
 
 //===----------------------------------------------------------------------===//
+// IREE_HAL_CMD_FLUSH_BUFFER
+//===----------------------------------------------------------------------===//
+
+typedef struct iree_hal_cmd_flush_buffer_t {
+  iree_hal_cmd_header_t header;
+  iree_hal_buffer_ref_t target_ref;
+} iree_hal_cmd_flush_buffer_t;
+
+static iree_status_t iree_hal_deferred_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  iree_hal_deferred_command_buffer_t* command_buffer =
+      iree_hal_deferred_command_buffer_cast(base_command_buffer);
+  iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
+  if (target_ref.buffer) {
+    IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+        command_buffer->resource_set, 1, &target_ref.buffer));
+  }
+  iree_hal_cmd_flush_buffer_t* cmd = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
+      cmd_list, IREE_HAL_CMD_FLUSH_BUFFER, sizeof(*cmd), (void**)&cmd));
+  cmd->target_ref = target_ref;
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_deferred_command_buffer_apply_flush_buffer(
+    iree_hal_command_buffer_t* target_command_buffer,
+    iree_hal_buffer_binding_table_t binding_table,
+    const iree_hal_cmd_flush_buffer_t* cmd) {
+  iree_hal_buffer_ref_t target_ref;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
+      binding_table, cmd->target_ref, &target_ref));
+  return iree_hal_command_buffer_flush_buffer(target_command_buffer,
+                                              target_ref);
+}
+
+//===----------------------------------------------------------------------===//
 // IREE_HAL_CMD_COLLECTIVE
 //===----------------------------------------------------------------------===//
 
@@ -793,6 +831,8 @@ static const iree_hal_cmd_apply_fn_t iree_hal_cmd_apply_table[] = {
         iree_hal_deferred_command_buffer_apply_update_buffer,
     [IREE_HAL_CMD_COPY_BUFFER] = (iree_hal_cmd_apply_fn_t)
         iree_hal_deferred_command_buffer_apply_copy_buffer,
+    [IREE_HAL_CMD_FLUSH_BUFFER] = (iree_hal_cmd_apply_fn_t)
+        iree_hal_deferred_command_buffer_apply_flush_buffer,
     [IREE_HAL_CMD_COLLECTIVE] = (iree_hal_cmd_apply_fn_t)
         iree_hal_deferred_command_buffer_apply_collective,
     [IREE_HAL_CMD_DISPATCH] = (iree_hal_cmd_apply_fn_t)
@@ -849,6 +889,7 @@ static const iree_hal_command_buffer_vtable_t
         .fill_buffer = iree_hal_deferred_command_buffer_fill_buffer,
         .update_buffer = iree_hal_deferred_command_buffer_update_buffer,
         .copy_buffer = iree_hal_deferred_command_buffer_copy_buffer,
+        .flush_buffer = iree_hal_deferred_command_buffer_flush_buffer,
         .collective = iree_hal_deferred_command_buffer_collective,
         .dispatch = iree_hal_deferred_command_buffer_dispatch,
 };
