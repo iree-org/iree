@@ -20,7 +20,10 @@ func.func @sort_1d(%arg0: memref<128xi32>) {
 // CHECK:             %[[T1:.+]] = arith.addi %[[ARG2]], %[[C1]] : index
 // CHECK:             %[[V1:.+]] = memref.load %[[BUF]][%[[ARG2]]]
 // CHECK:             %[[V2:.+]] = memref.load %[[BUF]][%[[T1]]]
-// CHECK:             %[[COND:.+]] = arith.cmpi sgt, %[[V1]], %[[V2]] : i32
+// CHECK:             %[[CMP:.+]] = arith.cmpi sgt, %[[V1]], %[[V2]] : i32
+// CHECK:             %[[REV_CMP:.+]] = arith.cmpi sgt, %[[V2]], %[[V1]] : i32
+// CHECK:             %[[EQ:.+]] = arith.cmpi eq, %[[CMP]], %[[REV_CMP]] : i1
+// CHECK:             %[[COND:.+]] = arith.ori %[[CMP]], %[[EQ]] : i1
 // CHECK:             %[[NEW1:.+]] = arith.select %[[COND]], %[[V1]], %[[V2]] : i32
 // CHECK:             %[[NEW2:.+]] = arith.select %[[COND]], %[[V2]], %[[V1]] : i32
 // CHECK:             memref.store %[[NEW1]], %[[BUF]][%[[ARG2]]]
@@ -50,7 +53,10 @@ func.func @sort_2d(%arg0: memref<16x32xi32>) {
 // CHECK:               %[[T1:.+]] = arith.addi %[[ARG3]], %[[C1]] : index
 // CHECK:               %[[V1:.+]] = memref.load %[[BUF]][%[[ARG3]], %[[ARG2]]]
 // CHECK:               %[[V2:.+]] = memref.load %[[BUF]][%[[T1]], %[[ARG2]]]
-// CHECK:               %[[COND:.+]] = arith.cmpi sgt, %[[V1]], %[[V2]] : i32
+// CHECK:               %[[CMP:.+]] = arith.cmpi sgt, %[[V1]], %[[V2]] : i32
+// CHECK:               %[[REV_CMP:.+]] = arith.cmpi sgt, %[[V2]], %[[V1]] : i32
+// CHECK:               %[[EQ:.+]] = arith.cmpi eq, %[[CMP]], %[[REV_CMP]] : i1
+// CHECK:               %[[COND:.+]] = arith.ori %[[CMP]], %[[EQ]] : i1
 // CHECK:               %[[NEW1:.+]] = arith.select %[[COND]], %[[V1]], %[[V2]] : i32
 // CHECK:               %[[NEW2:.+]] = arith.select %[[COND]], %[[V2]], %[[V1]] : i32
 // CHECK:               memref.store %[[NEW1]], %[[BUF]][%[[ARG3]], %[[ARG2]]]
@@ -82,7 +88,10 @@ func.func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
 // CHECK:             %[[V2:.+]] = memref.load %[[BUF1]][%[[T1]]]
 // CHECK:             %[[V3:.+]] = memref.load %[[BUF2]][%[[ARG2]]]
 // CHECK:             %[[V4:.+]] = memref.load %[[BUF2]][%[[T1]]]
-// CHECK:             %[[COND:.+]] = arith.cmpf ogt, %[[V1]], %[[V2]] : f32
+// CHECK:             %[[CMP:.+]] = arith.cmpf ogt, %[[V1]], %[[V2]] : f32
+// CHECK:             %[[REV_CMP:.+]] = arith.cmpf ogt, %[[V2]], %[[V1]] : f32
+// CHECK:             %[[EQ:.+]] = arith.cmpi eq, %[[CMP]], %[[REV_CMP]] : i1
+// CHECK:             %[[COND:.+]] = arith.ori %[[CMP]], %[[EQ]] : i1
 // CHECK:             %[[NEW1:.+]] = arith.select %[[COND]], %[[V1]], %[[V2]] : f32
 // CHECK:             %[[NEW2:.+]] = arith.select %[[COND]], %[[V2]], %[[V1]] : f32
 // CHECK:             memref.store %[[NEW1]], %[[BUF1]][%[[ARG2]]]
