@@ -138,11 +138,11 @@ them.
         dynamic_shapes.mlir -o dynamic_shapes_cpu.vmfb
     ```
 
-4. Build the `iree_samples_dynamic_shapes` CMake target
+4. Build the `samples/dynamic_shapes/all` CMake target
 
     ```
     cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_COMPILER=OFF .
-    cmake --build ../iree-build/ --target iree_samples_dynamic_shapes
+    cmake --build ../iree-build/ --target samples/dynamic_shapes/all
     ```
 
     Alternatively if using a non-CMake build system the `Makefile` provided can
@@ -152,6 +152,6 @@ them.
 5. Run the sample binary:
 
    ```
-   ../iree-build/samples/dynamic_shapes/dynamic-shapes \
+   ../iree-build/samples/dynamic_shapes/dynamic_shapes \
        /path/to/dynamic_shapes_cpu.vmfb local-task
    ```

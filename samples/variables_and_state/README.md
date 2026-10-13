@@ -61,19 +61,19 @@ functions in the compiled programs.
 1. Run the Colab notebook and download the `counter.mlir` and
    `counter_vmvx.vmfb` files it generates
 
-2. Build the `iree_samples_variables_and_state` CMake target (see
+2. Build the `samples/variables_and_state/all` CMake target (see
     [here](https://iree.dev/building-from-source/getting-started/)
     for general instructions on building using CMake)
 
     ```
     cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo .
-    cmake --build ../iree-build/ --target iree_samples_variables_and_state
+    cmake --build ../iree-build/ --target samples/variables_and_state/all
     ```
 
 3. Run the sample binary:
 
    ```
-   ../iree-build/samples/variables_and_state/variables-and-state \
+   ../iree-build/samples/variables_and_state/variables_and_state \
        /path/to/counter_vmvx.vmfb local-task
    ```
 
@@ -101,6 +101,6 @@ and compile the imported `counter.mlir` file using `iree-compile`:
 then run the program with that new VM bytecode module:
 
 ```
-../iree-build/samples/variables_and_state/variables-and-state \
+../iree-build/samples/variables_and_state/variables_and_state \
     /path/to/counter_cpu.vmfb local-task
 ```
