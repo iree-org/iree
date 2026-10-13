@@ -501,12 +501,12 @@ static bool isDataTiledEpilogueOperand(OpOperand &operand) {
              .isIdentity();
 }
 
-// TODO: The matchers for data-tiled roots and their result unpacks hardcode the
-// ops and layouts that CPU data-tiling materialization produces: mmt4d,
-// data-tiled convolution generics, the narrow-N transposition and the
+// TODO(#25031): The matchers for data-tiled roots and their result unpacks
+// hardcode the ops and layouts that CPU data-tiling materialization produces:
+// mmt4d, data-tiled convolution generics, the narrow-N transposition and the
 // convolution layouts of getEncodingInfoForConv. The layout decision should be
-// its own component that materialization and dispatch formation both query, for
-// example by marking the ops it materializes, instead of dispatch formation
+// its own component that materialization and dispatch formation both query,
+// for example by marking the ops it materializes, instead of dispatch formation
 // re-deriving the layouts. That would also drop the dependency on
 // Codegen/Dialect/Codegen/Utils.
 static bool isDataTiledRoot(Operation *op) {
