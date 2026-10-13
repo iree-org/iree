@@ -144,10 +144,12 @@ public:
   /// group. This means that some transitive dependency of `consumerOp` (not in
   /// the fusion group) itself uses an operation in the fusion group. This is
   /// required for fusion because it must be legal to take a program slice that
-  /// contains only the ops in the fusion group.
+  /// contains only the ops in the fusion group. A non-null `pendingOp` is
+  /// treated as a member of the group, for a consumer that joins with it.
   bool
   hasTransitiveDependencyOnFusionGroup(Operation *consumerOp,
-                                       DominanceInfo const &dominance) const {
+                                       DominanceInfo const &dominance,
+                                       Operation *pendingOp = nullptr) const {
     BackwardSliceOptions options;
     options.inclusive = true;
     options.omitUsesFromAbove = false;
@@ -163,7 +165,9 @@ public:
     auto populateSlice = [&](OpOperand *operand) {
       // It's okay if the consumer directly uses an operation in the fusion
       // group.
-      if (loopMaps.contains(operand->get().getDefiningOp())) {
+      Operation *definingOp = operand->get().getDefiningOp();
+      if (loopMaps.contains(definingOp) ||
+          (pendingOp && definingOp == pendingOp)) {
         return;
       }
       LogicalResult result = getBackwardSlice(operand->get(), &slice, options);
@@ -650,6 +654,7 @@ static bool canFuseDataTiledResultUnpack(linalg::UnPackOp unpack,
 /// consumer.
 static bool
 isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
+                      DominanceInfo const &dominanceInfo,
                       FormDispatchRegionsPassOptions const &options) {
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
@@ -682,13 +687,18 @@ isFusableWithConsumer(OpOperand &fusedOperand, const FusionTracker &tracker,
       return canFuseDataTiledResultUnpack(unpack, group);
     }
     // A unit-batch collapse only joins together with the unpack that consumes
-    // it, so that a group never ends in the collapse. The unpack adds no
+    // it, so that a group never ends in the collapse. Check the unpack as
+    // fuseRootsWithConsumers will once the collapse joined. The unpack adds no
     // operands, so it passes the operand limit whenever the collapse does.
     if (auto collapse = dyn_cast<tensor::CollapseShapeOp>(consumer);
         collapse && isa<linalg::GenericOp>(groupRoot) &&
         isUnitBatchCollapse(collapse) && collapse->hasOneUse()) {
       auto unpack = dyn_cast<linalg::UnPackOp>(*collapse->getUsers().begin());
-      return unpack && canFuseDataTiledResultUnpack(unpack, group) &&
+      return unpack && unpack->getBlock() == collapse->getBlock() &&
+             !tracker.isFusedOp(unpack) &&
+             !group.hasTransitiveDependencyOnFusionGroup(unpack, dominanceInfo,
+                                                         collapse) &&
+             canFuseDataTiledResultUnpack(unpack, group) &&
              !group.wouldExceedOperandLimit(consumer);
     }
     // Default fusion never adds consumers to mmt4d ops, so their groups only
@@ -894,7 +904,8 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
         }
 
         if (!llvm::all_of(operands, [&](OpOperand *use) {
-              return isFusableWithConsumer(*use, tracker, options);
+              return isFusableWithConsumer(*use, tracker, dominanceInfo,
+                                           options);
             })) {
           continue;
         }

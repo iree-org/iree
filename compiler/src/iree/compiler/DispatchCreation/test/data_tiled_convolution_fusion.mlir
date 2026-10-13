@@ -314,3 +314,117 @@ util.func public @no_fuse_multi_use_collapse(%input: tensor<1x1x16x16x8xf32>, %f
   %unpack = linalg.unpack %collapsed outer_dims_perm = [2, 0, 1] inner_dims_pos = [2] inner_tiles = [8] into %dest : tensor<2x14x14x8xf32> -> tensor<14x14x16xf32>
   util.return %unpack, %barrier : tensor<14x14x16xf32>, tensor<2x14x14x8xf32>
 }
+
+// -----
+
+// The unpack is nested in an scf.if, where the convolution dispatch cannot
+// reach it, so the collapse does not join either.
+#input = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (n, ic, h + kh, w + kw, i)>
+#filter = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (oc, ic, kh, kw, i, o)>
+#output = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (n, oc, h, w, o)>
+// CHECK-LABEL: util.func public @no_fuse_collapse_of_nested_unpack(
+// CHECK:         %[[CONV_DISPATCH:.+]] = flow.dispatch.region
+// CHECK:           %[[CONV:.+]] = linalg.generic
+// CHECK:           flow.return %[[CONV]]
+// CHECK:         %[[COLLAPSE:.+]] = tensor.collapse_shape %[[CONV_DISPATCH]]
+// CHECK:         scf.if
+// CHECK:           flow.dispatch.region
+// CHECK:             linalg.unpack %[[COLLAPSE]]
+util.func public @no_fuse_collapse_of_nested_unpack(%input: tensor<1x1x16x16x8xf32>, %filter: tensor<2x1x3x3x8x8xf32>, %cond: i1) -> tensor<14x14x16xf32> {
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<1x2x14x14x8xf32>
+  %init = linalg.fill ins(%zero : f32) outs(%empty : tensor<1x2x14x14x8xf32>) -> tensor<1x2x14x14x8xf32>
+  %conv = linalg.generic {indexing_maps = [#input, #filter, #output],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]}
+    ins(%input, %filter : tensor<1x1x16x16x8xf32>, tensor<2x1x3x3x8x8xf32>) outs(%init : tensor<1x2x14x14x8xf32>) {
+  ^bb0(%lhs: f32, %rhs: f32, %acc: f32):
+    %mul = arith.mulf %lhs, %rhs : f32
+    %sum = arith.addf %mul, %acc : f32
+    linalg.yield %sum : f32
+  } -> tensor<1x2x14x14x8xf32>
+  %collapsed = tensor.collapse_shape %conv [[0, 1], [2], [3], [4]] : tensor<1x2x14x14x8xf32> into tensor<2x14x14x8xf32>
+  %dest = tensor.empty() : tensor<14x14x16xf32>
+  %result = scf.if %cond -> tensor<14x14x16xf32> {
+    %unpack = linalg.unpack %collapsed outer_dims_perm = [2, 0, 1] inner_dims_pos = [2] inner_tiles = [8] into %dest : tensor<2x14x14x8xf32> -> tensor<14x14x16xf32>
+    scf.yield %unpack : tensor<14x14x16xf32>
+  } else {
+    scf.yield %dest : tensor<14x14x16xf32>
+  }
+  util.return %result : tensor<14x14x16xf32>
+}
+
+// -----
+
+// The unpack destination is another reshape of the convolution result, so the
+// unpack cannot join the dispatch, and the collapse does not join either.
+#input = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (n, ic, h + kh, w + kw, i)>
+#filter = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (oc, ic, kh, kw, i, o)>
+#output = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (n, oc, h, w, o)>
+// AGGRESSIVE-LABEL: util.func public @no_fuse_collapse_of_unpack_with_dependent_dest(
+// AGGRESSIVE:         %[[CONV_DISPATCH:.+]] = flow.dispatch.region
+// AGGRESSIVE:           %[[CONV:.+]] = linalg.generic
+// AGGRESSIVE:           flow.return %[[CONV]]
+// AGGRESSIVE:         %[[COLLAPSE:.+]] = tensor.collapse_shape %[[CONV_DISPATCH]] {{\[}}[0, 1], [2], [3], [4]]
+// AGGRESSIVE:         flow.dispatch.region
+// AGGRESSIVE:           linalg.unpack %[[COLLAPSE]]
+util.func public @no_fuse_collapse_of_unpack_with_dependent_dest(%input: tensor<1x1x16x16x8xf32>, %filter: tensor<2x1x3x3x8x8xf32>) -> tensor<14x14x16xf32> {
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<1x2x14x14x8xf32>
+  %init = linalg.fill ins(%zero : f32) outs(%empty : tensor<1x2x14x14x8xf32>) -> tensor<1x2x14x14x8xf32>
+  %conv = linalg.generic {indexing_maps = [#input, #filter, #output],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]}
+    ins(%input, %filter : tensor<1x1x16x16x8xf32>, tensor<2x1x3x3x8x8xf32>) outs(%init : tensor<1x2x14x14x8xf32>) {
+  ^bb0(%lhs: f32, %rhs: f32, %acc: f32):
+    %mul = arith.mulf %lhs, %rhs : f32
+    %sum = arith.addf %mul, %acc : f32
+    linalg.yield %sum : f32
+  } -> tensor<1x2x14x14x8xf32>
+  %collapsed = tensor.collapse_shape %conv [[0, 1], [2], [3], [4]] : tensor<1x2x14x14x8xf32> into tensor<2x14x14x8xf32>
+  %flat = tensor.collapse_shape %conv [[0, 1, 2, 3, 4]] : tensor<1x2x14x14x8xf32> into tensor<3136xf32>
+  %dest = tensor.expand_shape %flat [[0, 1, 2]] output_shape [14, 14, 16] : tensor<3136xf32> into tensor<14x14x16xf32>
+  %unpack = linalg.unpack %collapsed outer_dims_perm = [2, 0, 1] inner_dims_pos = [2] inner_tiles = [8] into %dest : tensor<2x14x14x8xf32> -> tensor<14x14x16xf32>
+  util.return %unpack : tensor<14x14x16xf32>
+}
+
+// -----
+
+// The permuted consumer joins without the option, so the unpack does not reach
+// the convolution through epilogues and becomes a root of its own. The collapse
+// then does not join the convolution dispatch either.
+#input = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (n, ic, h + kh, w + kw, i)>
+#filter = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (oc, ic, kh, kw, i, o)>
+#output = affine_map<(n, oc, h, w, ic, kh, kw, o, i) -> (n, oc, h, w, o)>
+#id = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+#swap_hw = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d2, d4)>
+// CHECK-LABEL: util.func public @no_fuse_collapse_of_unclaimed_unpack(
+// CHECK:         %[[NEG_DISPATCH:.+]] = flow.dispatch.region
+// CHECK:           %[[CONV:.+]] = linalg.generic
+// CHECK:           %[[NEG:.+]] = linalg.generic
+// CHECK-SAME:        ins(%[[CONV]] : tensor<1x2x14x14x8xf32>)
+// CHECK:           flow.return %[[NEG]]
+// CHECK:         %[[COLLAPSE:.+]] = tensor.collapse_shape %[[NEG_DISPATCH]]
+// CHECK:         flow.dispatch.region
+// CHECK:           linalg.unpack %[[COLLAPSE]]
+util.func public @no_fuse_collapse_of_unclaimed_unpack(%input: tensor<1x1x16x16x8xf32>, %filter: tensor<2x1x3x3x8x8xf32>) -> tensor<14x14x16xf32> {
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<1x2x14x14x8xf32>
+  %init = linalg.fill ins(%zero : f32) outs(%empty : tensor<1x2x14x14x8xf32>) -> tensor<1x2x14x14x8xf32>
+  %conv = linalg.generic {indexing_maps = [#input, #filter, #output],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "parallel", "reduction"]}
+    ins(%input, %filter : tensor<1x1x16x16x8xf32>, tensor<2x1x3x3x8x8xf32>) outs(%init : tensor<1x2x14x14x8xf32>) {
+  ^bb0(%lhs: f32, %rhs: f32, %acc: f32):
+    %mul = arith.mulf %lhs, %rhs : f32
+    %sum = arith.addf %mul, %acc : f32
+    linalg.yield %sum : f32
+  } -> tensor<1x2x14x14x8xf32>
+  %neg = linalg.generic {indexing_maps = [#swap_hw, #id], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
+    ins(%conv : tensor<1x2x14x14x8xf32>) outs(%empty : tensor<1x2x14x14x8xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %0 = arith.negf %in : f32
+    linalg.yield %0 : f32
+  } -> tensor<1x2x14x14x8xf32>
+  %collapsed = tensor.collapse_shape %neg [[0, 1], [2], [3], [4]] : tensor<1x2x14x14x8xf32> into tensor<2x14x14x8xf32>
+  %dest = tensor.empty() : tensor<14x14x16xf32>
+  %unpack = linalg.unpack %collapsed outer_dims_perm = [2, 0, 1] inner_dims_pos = [2] inner_tiles = [8] into %dest : tensor<2x14x14x8xf32> -> tensor<14x14x16xf32>
+  util.return %unpack : tensor<14x14x16xf32>
+}
