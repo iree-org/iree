@@ -190,6 +190,47 @@ convertDispatchRegionWithSortWorkspaces(IREE::Flow::DispatchRegionOp &regionOp,
       OpOperand &init = *sortOp.getDpsInitOperand(index);
       Value source = init.get();
       if (regionOp.getBody().isAncestor(source.getParentRegion())) {
+        auto sourceResult = dyn_cast<OpResult>(source);
+        auto dps = dyn_cast_or_null<DestinationStyleOpInterface>(
+            source.getDefiningOp());
+        auto tied = dyn_cast_or_null<IREE::Util::TiedOpInterface>(
+            source.getDefiningOp());
+        if (sourceResult && dps && tied && dps.hasPureTensorSemantics() &&
+            dps->getBlock() == &regionOp.getBody().front() &&
+            isPure(dps.getOperation()) &&
+            llvm::all_of(source.getUses(), [&](OpOperand &use) {
+              return &use == &init || isa<tensor::DimOp>(use.getOwner());
+            })) {
+          OpOperand *destination = dps.getTiedOpOperand(sourceResult);
+          if (isa_and_nonnull<tensor::EmptyOp>(
+                  destination->get().getDefiningOp()) &&
+              destination->get().getType() == source.getType() &&
+              tied.getTiedResultOperand(source) == destination->get()) {
+            SmallVector<Value> dims;
+            rewriter.setInsertionPoint(sortOp);
+            if (succeeded(IREE::Flow::getOptimizedDynamicResultDims(
+                    rewriter, source, dims)) &&
+                llvm::none_of(dims, [&](Value dim) {
+                  return regionOp.getBody().isAncestor(dim.getParentRegion());
+                })) {
+              // An empty destination has no data to preserve. Keep the
+              // initializer in place and give it storage managed outside
+              // the kernel before Sort updates its result.
+              rewriter.setInsertionPoint(regionOp);
+              auto allocation = IREE::Flow::TensorAllocaOp::create(
+                  rewriter, source.getLoc(),
+                  cast<RankedTensorType>(source.getType()), dims);
+              rewriter.modifyOpInPlace(dps.getOperation(), [&]() {
+                destination->set(allocation.getResult());
+              });
+              if (!yieldedValues.contains(result)) {
+                workspaceResults.push_back(result);
+                workspaceDims.push_back(std::move(dims));
+              }
+              continue;
+            }
+          }
+        }
         auto initialized =
             materializeSortInitializer(regionOp, source, rewriter);
         if (failed(initialized)) {

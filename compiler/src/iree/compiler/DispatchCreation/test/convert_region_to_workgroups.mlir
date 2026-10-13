@@ -234,14 +234,13 @@ util.func public @sort_unused_noncomparator_lane(
 }
 
 // -----
-// Move the pure initializer once; its untied result already owns storage.
+// A local initializer writes directly into its managed workspace.
 // CHECK-LABEL: util.func public @sort_local_keys
-// CHECK: %[[KEYS:.+]] = flow.dispatch.workgroups
-// CHECK: linalg.generic
-// CHECK: iree_tensor_ext.dispatch.tensor.store
+// CHECK: %[[KEYS:.+]] = flow.tensor.alloca
 // CHECK: linalg.copy
 // CHECK-NOT: linalg.copy
 // CHECK: %[[DISPATCH:.+]]:2 = flow.dispatch.workgroups(%[[KEYS]],
+// CHECK: linalg.generic
 // CHECK: iree_linalg_ext.sort dimension(0)
 // CHECK-NOT: linalg.generic
 // CHECK-NOT: linalg.copy
@@ -474,10 +473,10 @@ util.func public @sort_effectful_initializer(%indices: tensor<4xi64>) -> tensor<
 
 // -----
 
-// Dispatch results cannot export a scalar shared by the initializer/consumer.
+// Local initialization keeps a shared scalar in its original dispatch.
 // CHECK-LABEL: util.func public @sort_scalar_initializer_use
+// CHECK: flow.tensor.alloca
 // CHECK: linalg.copy
-// CHECK-NOT: flow.tensor.alloca
 // CHECK: flow.dispatch.workgroups
 // CHECK: linalg.generic
 // CHECK: iree_linalg_ext.sort
@@ -552,7 +551,7 @@ util.func public @sort_dependent_workspace(%keys: tensor<?xi64>, %labels: tensor
 
 // Shape reads permit forwarding through an intervening destination update.
 // CHECK-LABEL: util.func public @sort_local_workspace_update
-// CHECK: %[[KEYS:.+]] = flow.dispatch.workgroups
+// CHECK: %[[KEYS:.+]] = flow.tensor.alloca
 // CHECK: %[[DISPATCH:.+]]:3 = flow.dispatch.workgroups
 // CHECK: %[[ASCENDING:.+]]:2 = iree_linalg_ext.sort
 // CHECK: %[[NEGATED:.+]] = linalg.generic
@@ -651,4 +650,38 @@ util.func public @sort_workspace_earlier_data_use(%keys: tensor<4xi64>, %labels:
   }
   util.return %results#0, %results#1, %keys, %labels
       : tensor<4xi64>, tensor<i64>, tensor<4xi64>, tensor<4xi64>
+}
+
+// -----
+
+// An initialized destination must keep its data when the producer is moved.
+// CHECK-LABEL: util.func public @sort_initialized_local_keys
+// CHECK-SAME: %[[INPUT:[a-zA-Z0-9_]+]]: tensor<4xi64>
+// CHECK: %[[UPDATED:.+]] = flow.dispatch.workgroups(%[[INPUT]])
+// CHECK: %[[LOADED:.+]] = iree_tensor_ext.dispatch.tensor.load
+// CHECK: linalg.generic
+// CHECK-SAME: outs(%[[LOADED]] : tensor<4xi64>)
+// CHECK: linalg.copy
+// CHECK: iree_linalg_ext.sort
+// CHECK: util.return
+util.func public @sort_initialized_local_keys(%keys: tensor<4xi64>, %labels: tensor<4xi64>)
+    -> tensor<4xi64> {
+  %result = flow.dispatch.region -> (tensor<4xi64>) {
+    %updated = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]} outs(%keys : tensor<4xi64>) {
+    ^bb0(%key: i64):
+      %one = arith.constant 1 : i64
+      %next = arith.addi %key, %one : i64
+      linalg.yield %next : i64
+    } -> tensor<4xi64>
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        outs(%updated, %labels : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sle, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    flow.return %sorted#1 : tensor<4xi64>
+  }
+  util.return %result : tensor<4xi64>
 }
