@@ -2,6 +2,81 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-create-dispatch-config, builtin.module(iree-codegen-reconcile-translation-info{distribute-along=y}, iree-codegen-resolve-workgroup-count-hints), iree-codegen-propagate-dispatch-config, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEY --enable-var-scope
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-create-dispatch-config, builtin.module(iree-codegen-reconcile-translation-info{distribute-along=z}, iree-codegen-resolve-workgroup-count-hints), iree-codegen-propagate-dispatch-config, canonicalize)))" --allow-unregistered-dialect --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK-ALL,DISTRIBUTEZ --enable-var-scope
 
+// A static count above the target limit must be clamped, while the generated
+// grid-stride loop still processes every iteration.
+// CHECK-ALL-LABEL: hal.executable private @static_count_above_limit
+// CHECK-ALL: hal.executable.export public @above_limit
+// CHECK-ALL-DAG: %[[LIMIT:.+]] = arith.constant 1024 : index
+// CHECK-ALL-DAG: %[[ONE:.+]] = arith.constant 1 : index
+// CHECK-ALL: hal.return %[[LIMIT]], %[[ONE]], %[[ONE]]
+// CHECK-ALL-LABEL: func.func @above_limit
+// CHECK-ALL-DAG: %[[UPPER:.+]] = arith.constant 2000 : index
+// CHECK-ALL-DAG: %[[START:.+]] = hal.interface.workgroup.id[0] : index
+// CHECK-ALL-DAG: %[[STEP:.+]] = hal.interface.workgroup.count[0] : index
+// CHECK-ALL: scf.for %[[IV:.+]] = %[[START]] to %[[UPPER]] step %[[STEP]]
+// CHECK-ALL: "use"(%[[IV]])
+#layout = #hal.pipeline.layout<bindings = []>
+hal.executable private @static_count_above_limit {
+  hal.executable.variant public @default target(#hal.executable.target<"", "", {
+    iree_codegen.target_info = #iree_codegen.simple_target<max_workgroup_count = [1024, 512, 256]>}>) {
+    hal.executable.export public @above_limit layout(#layout)
+    count(%device: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @above_limit() {
+        %c0 = arith.constant 0 : index
+        %c1 = arith.constant 1 : index
+        %c2000 = arith.constant 2000 : index
+        scf.forall (%i) = (%c0) to (%c2000) step (%c1) {
+          "use"(%i) : (index) -> ()
+          scf.forall.in_parallel {}
+        } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+// The exact-limit fast path should still avoid generating a grid-stride loop.
+// CHECK-ALL-LABEL: hal.executable private @static_count_at_limit
+// CHECK-ALL: hal.executable.export public @at_limit
+// CHECK-ALL-DAG: %[[LIMIT:.+]] = arith.constant 1024 : index
+// CHECK-ALL-DAG: %[[ONE:.+]] = arith.constant 1 : index
+// CHECK-ALL: hal.return %[[LIMIT]], %[[ONE]], %[[ONE]]
+// CHECK-ALL-LABEL: func.func @at_limit
+// CHECK-ALL: %[[ID:.+]] = hal.interface.workgroup.id[0] : index
+// CHECK-ALL-NOT: scf.for
+// CHECK-ALL: "use"(%[[ID]])
+#layout = #hal.pipeline.layout<bindings = []>
+hal.executable private @static_count_at_limit {
+  hal.executable.variant public @default target(#hal.executable.target<"", "", {
+    iree_codegen.target_info = #iree_codegen.simple_target<max_workgroup_count = [1024, 512, 256]>}>) {
+    hal.executable.export public @at_limit layout(#layout)
+    count(%device: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @at_limit() {
+        %c0 = arith.constant 0 : index
+        %c1 = arith.constant 1 : index
+        %c1024 = arith.constant 1024 : index
+        scf.forall (%i) = (%c0) to (%c1024) step (%c1) {
+          "use"(%i) : (index) -> ()
+          scf.forall.in_parallel {}
+        } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+        return
+      }
+    }
+  }
+}
+
+// -----
+
 #pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
     #hal.pipeline.binding<storage_buffer>]>
 hal.executable private @scf_forall_2D_dynamic_tile_size {

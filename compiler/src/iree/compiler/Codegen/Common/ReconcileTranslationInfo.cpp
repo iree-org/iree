@@ -346,8 +346,8 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
               getConstantIntValue(numWorkgroups)) {
         if (numWorkgroupsStatic.value() <= maxCount) {
           generateLoopNest[index] = false;
+          continue;
         }
-        continue;
       }
     }
 
