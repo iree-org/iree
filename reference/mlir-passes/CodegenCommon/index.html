@@ -3996,6 +3996,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-fold-memref-copy-into-dps-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-fold-memref-copy-into-dps-ops
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-fold-reshape-into-interface-tensor" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8380,6 +8391,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-codegen-fold-memref-copy-into-dps-ops" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-codegen-fold-memref-copy-into-dps-ops
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-codegen-fold-reshape-into-interface-tensor" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9703,6 +9725,19 @@ to backends that require linearized access.</p>
 <p><em>Fold <code>affine.min</code> ops in distributed loops</em></p>
 <h3 id="-iree-codegen-fold-memref-alias-ops"><code>-iree-codegen-fold-memref-alias-ops</code><a class="headerlink" href="#-iree-codegen-fold-memref-alias-ops" title="Permanent link">link</a></h3>
 <p><em>Fold memref alias ops with region simplification config</em></p>
+<h3 id="-iree-codegen-fold-memref-copy-into-dps-ops"><code>-iree-codegen-fold-memref-copy-into-dps-ops</code><a class="headerlink" href="#-iree-codegen-fold-memref-copy-into-dps-ops" title="Permanent link">link</a></h3>
+<p><em>Fold temporary output copies into destination-style memref ops</em></p>
+<p>Retargets destination-style operations from private temporaries to their
+final output buffers. For example:</p>
+<p>memref.copy %source, %temporary
+  linalg.generic outs(%temporary)
+  memref.copy %temporary, %target</p>
+<p>becomes:</p>
+<p>memref.copy %source, %target
+  linalg.generic outs(%target)</p>
+<p>The rewrite requires a single copy-in, destination-style writer, and
+copy-out, and rejects potentially aliasing inputs or intervening accesses
+to the final target.</p>
 <h3 id="-iree-codegen-fold-reshape-into-interface-tensor"><code>-iree-codegen-fold-reshape-into-interface-tensor</code><a class="headerlink" href="#-iree-codegen-fold-reshape-into-interface-tensor" title="Permanent link">link</a></h3>
 <p><em>Folds reshape operations into the interface bindings.</em></p>
 <h3 id="-iree-codegen-fold-split-reduction-and-workgroup-mapping-loops"><code>-iree-codegen-fold-split-reduction-and-workgroup-mapping-loops</code><a class="headerlink" href="#-iree-codegen-fold-split-reduction-and-workgroup-mapping-loops" title="Permanent link">link</a></h3>
