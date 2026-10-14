@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "torch-mlir/Conversion/TorchToLinalg/Utils.h"
@@ -30,23 +31,24 @@ namespace TorchConversion = torch::TorchConversion;
 namespace {
 
 // The affine quantization described by a PT2E quantize or dequantize op. It
-// does not depend on the direction of the op, and per-tensor and per-channel
-// quantization differ only in whether `axis` is set.
+// does not depend on the direction of the op, and `blockSize` describes its
+// granularity.
 struct PT2EQuantization {
   // Builtin tensor that is quantized or dequantized.
   Value input;
-  // Builtin scale: an f64 scalar for per-tensor quantization or a rank-one
-  // float tensor for per-channel quantization.
+  // Builtin scale: an f64 scalar for per-tensor quantization or a float tensor
+  // with one value per block.
   Value scale;
-  // Builtin zero point: an i64 scalar or a rank-one integer tensor; null for
-  // symmetric quantization.
+  // Builtin zero point: an i64 scalar or an integer tensor shaped like the
+  // scale; null for symmetric quantization.
   Value zeroPoint;
   // Whether the zero-point elements are unsigned. Read from the Torch type
   // because builtin integer types are signless.
   bool zeroPointUnsigned = false;
-  // Non-negative input dimension indexed by per-channel parameters; nullopt
-  // for per-tensor quantization.
-  std::optional<int64_t> axis;
+  // Number of consecutive input elements along each dimension that share
+  // parameters, as in torchao's `block_size`. A block spanning a dynamic
+  // dimension is `ShapedType::kDynamic`.
+  SmallVector<int64_t> blockSize;
   // Inclusive lower bound of the quantized value range.
   int64_t quantMin = 0;
   // Inclusive upper bound of the quantized value range.
@@ -71,7 +73,8 @@ static LogicalResult matchConstantBounds(Operation *op, Value quantMin,
 }
 
 // LinalgExt indexes per-channel parameters with an affine map, so the axis
-// must be a Torch constant. Requires `quantization.input` to be set.
+// must be a Torch constant. Sets `blockSize` to one along the axis and to the
+// dimension size elsewhere. Requires `quantization.input` to be set.
 static LogicalResult matchConstantAxis(Operation *op, Value axis,
                                        PT2EQuantization &quantization,
                                        ConversionPatternRewriter &rewriter) {
@@ -79,13 +82,49 @@ static LogicalResult matchConstantAxis(Operation *op, Value axis,
   if (!matchPattern(axis, Torch::m_TorchConstantInt(&dimension))) {
     return rewriter.notifyMatchFailure(op, "expected a constant axis");
   }
-  int64_t rank = cast<RankedTensorType>(quantization.input.getType()).getRank();
+  auto inputType = cast<RankedTensorType>(quantization.input.getType());
+  int64_t rank = inputType.getRank();
   int64_t positiveDimension = Torch::toPositiveDim(dimension, rank);
   if (!Torch::isValidDim(positiveDimension, rank)) {
     return rewriter.notifyMatchFailure(op, "expected an axis within the rank");
   }
-  quantization.axis = positiveDimension;
+  quantization.blockSize = llvm::to_vector(inputType.getShape());
+  quantization.blockSize[positiveDimension] = 1;
   return success();
+}
+
+// LinalgExt indexes per-channel-group parameters on the input with its last
+// dimension split into groups, so the group size must be a Torch constant that
+// divides the static last dimension of a rank-2 input. Sets `blockSize` to one
+// along the first dimension and to the group size along the last. Requires
+// `quantization.input` to be set.
+static LogicalResult
+matchConstantGroupSize(Operation *op, Value groupSize,
+                       PT2EQuantization &quantization,
+                       ConversionPatternRewriter &rewriter) {
+  int64_t size;
+  if (!matchPattern(groupSize, Torch::m_TorchConstantInt(&size)) || size <= 1) {
+    return rewriter.notifyMatchFailure(
+        op, "expected a constant group size greater than one");
+  }
+  auto inputType = cast<RankedTensorType>(quantization.input.getType());
+  if (inputType.getRank() != 2 || inputType.isDynamicDim(1)) {
+    return rewriter.notifyMatchFailure(
+        op, "expected a rank-2 input with a static last dimension");
+  }
+  if (inputType.getDimSize(1) % size != 0) {
+    return rewriter.notifyMatchFailure(
+        op, "expected groups that evenly split the last dimension");
+  }
+  quantization.blockSize = {1, size};
+  return success();
+}
+
+// Returns whether the elements of a Torch zero point are unsigned. Bools count
+// as unsigned, since LinalgExt would otherwise sign-extend `true` to -1.
+static bool isUnsignedZeroPoint(Type zeroPointType) {
+  return torch::torch_to_linalg::isUnsignedTorchType(zeroPointType) ||
+         cast<Torch::ValueTensorType>(zeroPointType).getDtype().isInteger(1);
 }
 
 // How each PT2E op class spells its operands is the only thing that differs
@@ -99,6 +138,8 @@ static FailureOr<PT2EQuantization> readPT2EQuantization(
   quantization.input = adaptor.getInput();
   quantization.scale = adaptor.getScale();
   quantization.zeroPoint = adaptor.getZeroPoint();
+  quantization.blockSize = llvm::to_vector(
+      cast<RankedTensorType>(quantization.input.getType()).getShape());
   if (failed(matchConstantBounds(op, op.getQuantMin(), op.getQuantMax(),
                                  quantization, rewriter))) {
     return failure();
@@ -114,6 +155,8 @@ static FailureOr<PT2EQuantization> readPT2EQuantization(
   quantization.input = adaptor.getInput();
   quantization.scale = adaptor.getScale();
   quantization.zeroPoint = adaptor.getZeroPoint();
+  quantization.blockSize = llvm::to_vector(
+      cast<RankedTensorType>(quantization.input.getType()).getShape());
   if (failed(matchConstantBounds(op, op.getQuantMin(), op.getQuantMax(),
                                  quantization, rewriter))) {
     return failure();
@@ -130,7 +173,7 @@ static FailureOr<PT2EQuantization> readPT2EQuantization(
   quantization.scale = adaptor.getScales();
   quantization.zeroPoint = adaptor.getZeroPoints();
   quantization.zeroPointUnsigned =
-      torch::torch_to_linalg::isUnsignedTorchType(op.getZeroPoints().getType());
+      isUnsignedZeroPoint(op.getZeroPoints().getType());
   if (failed(matchConstantAxis(op, op.getAxis(), quantization, rewriter)) ||
       failed(matchConstantBounds(op, op.getQuantMin(), op.getQuantMax(),
                                  quantization, rewriter))) {
@@ -150,8 +193,7 @@ static FailureOr<PT2EQuantization> readPT2EQuantization(
   if (!isa<Torch::NoneType>(op.getZeroPoints().getType())) {
     quantization.zeroPoint = adaptor.getZeroPoints();
     quantization.zeroPointUnsigned =
-        torch::torch_to_linalg::isUnsignedTorchType(
-            op.getZeroPoints().getType());
+        isUnsignedZeroPoint(op.getZeroPoints().getType());
   }
   if (failed(matchConstantAxis(op, op.getAxis(), quantization, rewriter)) ||
       failed(matchConstantBounds(op, op.getQuantMin(), op.getQuantMax(),
@@ -159,6 +201,104 @@ static FailureOr<PT2EQuantization> readPT2EQuantization(
     return failure();
   }
   return quantization;
+}
+
+static FailureOr<PT2EQuantization> readPT2EQuantization(
+    Torch::QuantizedDecomposedQuantizePerChannelGroupOp op,
+    Torch::QuantizedDecomposedQuantizePerChannelGroupOp::Adaptor adaptor,
+    ConversionPatternRewriter &rewriter) {
+  PT2EQuantization quantization;
+  quantization.input = adaptor.getInput();
+  quantization.scale = adaptor.getScales();
+  quantization.zeroPoint = adaptor.getZeroPoints();
+  quantization.zeroPointUnsigned =
+      isUnsignedZeroPoint(op.getZeroPoints().getType());
+  if (failed(matchConstantGroupSize(op, op.getGroupSize(), quantization,
+                                    rewriter)) ||
+      failed(matchConstantBounds(op, op.getQuantMin(), op.getQuantMax(),
+                                 quantization, rewriter))) {
+    return failure();
+  }
+  return quantization;
+}
+
+static FailureOr<PT2EQuantization> readPT2EQuantization(
+    Torch::QuantizedDecomposedDequantizePerChannelGroupOp op,
+    Torch::QuantizedDecomposedDequantizePerChannelGroupOp::Adaptor adaptor,
+    ConversionPatternRewriter &rewriter) {
+  PT2EQuantization quantization;
+  quantization.input = adaptor.getInput();
+  quantization.scale = adaptor.getScales();
+  // A None zero point denotes symmetric quantization.
+  if (!isa<Torch::NoneType>(op.getZeroPoints().getType())) {
+    quantization.zeroPoint = adaptor.getZeroPoints();
+    quantization.zeroPointUnsigned =
+        isUnsignedZeroPoint(op.getZeroPoints().getType());
+  }
+  if (failed(matchConstantGroupSize(op, op.getGroupSize(), quantization,
+                                    rewriter)) ||
+      failed(matchConstantBounds(op, op.getQuantMin(), op.getQuantMax(),
+                                 quantization, rewriter))) {
+    return failure();
+  }
+  return quantization;
+}
+
+// Returns, for each input dimension, its dimensions in the blocked type. A
+// dimension with several blocks of several elements is split into the block
+// and the position within it, so that LinalgExt can index the block.
+static SmallVector<ReassociationIndices>
+getBlockedReassociation(const PT2EQuantization &quantization) {
+  ArrayRef<int64_t> inputShape =
+      cast<RankedTensorType>(quantization.input.getType()).getShape();
+  SmallVector<ReassociationIndices> reassociation;
+  int64_t dim = 0;
+  for (auto [size, block] :
+       llvm::zip_equal(inputShape, quantization.blockSize)) {
+    if (block == 1 || block == size) {
+      reassociation.push_back({dim++});
+    } else {
+      reassociation.push_back({dim, dim + 1});
+      dim += 2;
+    }
+  }
+  return reassociation;
+}
+
+// Returns the type the LinalgExt op works on: the input type, split as
+// `getBlockedReassociation` describes.
+static RankedTensorType getBlockedType(const PT2EQuantization &quantization) {
+  auto inputType = cast<RankedTensorType>(quantization.input.getType());
+  SmallVector<int64_t> shape;
+  for (auto [dims, size, block] :
+       llvm::zip_equal(getBlockedReassociation(quantization),
+                       inputType.getShape(), quantization.blockSize)) {
+    if (dims.size() == 1) {
+      shape.push_back(size);
+    } else {
+      shape.append({size / block, block});
+    }
+  }
+  return inputType.clone(shape);
+}
+
+// Returns the dimensions of the blocked type that select a block and so index
+// the scale and zero point: none for per-tensor quantization, the channel
+// dimension for per-channel quantization, and the row and group for
+// per-channel-group quantization.
+static SmallVector<unsigned>
+getParameterDims(const PT2EQuantization &quantization) {
+  ArrayRef<int64_t> inputShape =
+      cast<RankedTensorType>(quantization.input.getType()).getShape();
+  SmallVector<unsigned> parameterDims;
+  for (auto [dims, size, block] :
+       llvm::zip_equal(getBlockedReassociation(quantization), inputShape,
+                       quantization.blockSize)) {
+    if (block != size) {
+      parameterDims.push_back(dims.front());
+    }
+  }
+  return parameterDims;
 }
 
 // Checks whether LinalgExt can use the scale and zero point, reporting why
@@ -169,7 +309,10 @@ static LogicalResult
 checkScaleAndZeroPointSupport(Operation *op, Type realType,
                               const PT2EQuantization &quantization,
                               ConversionPatternRewriter &rewriter) {
-  if (!quantization.axis) {
+  // Only per-tensor scales are scalars. The block size alone cannot identify
+  // per-tensor quantization, since per-channel quantization along a dimension
+  // of size one has the same block size.
+  if (isa<FloatType>(quantization.scale.getType())) {
     return success();
   }
   auto scaleType = dyn_cast<RankedTensorType>(quantization.scale.getType());
@@ -211,14 +354,9 @@ static Value truncateScalarScaleToF32(OpBuilder &builder, Location location,
 // point when present, and output.
 static ArrayAttr getIndexingMaps(Builder &builder,
                                  const PT2EQuantization &quantization) {
-  int64_t rank = cast<RankedTensorType>(quantization.input.getType()).getRank();
-  // The scale and zero point are scalars for per-tensor quantization and are
-  // indexed by the channel dimension for per-channel quantization.
-  AffineMap parameterMap =
-      quantization.axis
-          ? AffineMap::get(rank, 0,
-                           builder.getAffineDimExpr(*quantization.axis))
-          : AffineMap::get(rank, 0, builder.getContext());
+  int64_t rank = getBlockedType(quantization).getRank();
+  AffineMap parameterMap = AffineMap::getMultiDimMapWithTargets(
+      rank, getParameterDims(quantization), builder.getContext());
   AffineMap identity = builder.getMultiDimIdentityMap(rank);
   SmallVector<AffineMap> maps = {identity, parameterMap};
   if (quantization.zeroPoint) {
@@ -228,13 +366,55 @@ static ArrayAttr getIndexingMaps(Builder &builder,
   return builder.getAffineMapArrayAttr(maps);
 }
 
-static Value createInit(OpBuilder &builder, Location location,
-                        const PT2EQuantization &quantization,
+// Returns an empty tensor shaped like `input`, with the element type of
+// `resultType`.
+static Value createInit(OpBuilder &builder, Location location, Value input,
                         RankedTensorType resultType) {
   return tensor::EmptyOp::create(
-      builder, location,
-      tensor::getMixedSizes(builder, location, quantization.input),
+      builder, location, tensor::getMixedSizes(builder, location, input),
       resultType.getElementType());
+}
+
+// Returns `quantization.input`, expanded into the blocked type.
+static Value createBlockedInput(OpBuilder &builder, Location location,
+                                const PT2EQuantization &quantization) {
+  RankedTensorType blockedType = getBlockedType(quantization);
+  if (blockedType == quantization.input.getType()) {
+    return quantization.input;
+  }
+  return tensor::ExpandShapeOp::create(builder, location, blockedType,
+                                       quantization.input,
+                                       getBlockedReassociation(quantization));
+}
+
+// Collapses a `result` with the blocked shape back into the input shape.
+static Value collapseBlockedResult(OpBuilder &builder, Location location,
+                                   Value result,
+                                   const PT2EQuantization &quantization) {
+  if (getBlockedType(quantization) == quantization.input.getType()) {
+    return result;
+  }
+  return tensor::CollapseShapeOp::create(builder, location, result,
+                                         getBlockedReassociation(quantization));
+}
+
+// Drops the static unit dimensions of a tensor `parameter`, since LinalgExt
+// does not index them, and returns scalars and an absent zero point unchanged.
+static Value collapseParameter(OpBuilder &builder, Location location,
+                               Value parameter) {
+  auto parameterType =
+      parameter ? dyn_cast<RankedTensorType>(parameter.getType()) : nullptr;
+  if (!parameterType) {
+    return parameter;
+  }
+  llvm::SmallBitVector unitDims(parameterType.getRank());
+  for (auto [dim, size] : llvm::enumerate(parameterType.getShape())) {
+    unitDims[dim] = size == 1;
+  }
+  if (unitDims.none()) {
+    return parameter;
+  }
+  return tensor::dropGivenUnitDims(builder, location, parameter, unitDims);
 }
 
 static Value createQuantizeAffine(OpBuilder &builder, Location location,
@@ -243,41 +423,52 @@ static Value createQuantizeAffine(OpBuilder &builder, Location location,
                                   bool storageUnsigned) {
   // The PT2E reference upcasts f16 and bf16 inputs and computes in f32. It
   // multiplies by `1.0 / scale` rounded to f32, whereas LinalgExt divides by
-  // the scale, so results can differ by one ulp before rounding.
+  // the scale, so results can differ by one ulp before rounding. The
+  // per-channel-group reference also adds the zero point before rounding, so
+  // ties with odd zero points differ, as in Torch-to-Linalg.
+  Value input = createBlockedInput(builder, location, quantization);
   Value scale = truncateScalarScaleToF32(builder, location, quantization.scale);
+  scale = collapseParameter(builder, location, scale);
+  Value zeroPoint =
+      collapseParameter(builder, location, quantization.zeroPoint);
+  Value init = createInit(builder, location, input, resultType);
   auto quantize = IREE::LinalgExt::QuantizeAffineOp::create(
-      builder, location, resultType, quantization.input, scale,
-      quantization.zeroPoint,
-      createInit(builder, location, quantization, resultType),
+      builder, location, init.getType(), input, scale, zeroPoint, init,
       getIndexingMaps(builder, quantization),
       builder.getI64IntegerAttr(quantization.quantMin),
       builder.getI64IntegerAttr(quantization.quantMax),
       storageUnsigned ? builder.getUnitAttr() : nullptr,
       quantization.zeroPointUnsigned ? builder.getUnitAttr() : nullptr);
-  return quantize->getResult(0);
+  return collapseBlockedResult(builder, location, quantize->getResult(0),
+                               quantization);
 }
 
 static Value createDequantizeAffine(OpBuilder &builder, Location location,
                                     RankedTensorType resultType,
                                     const PT2EQuantization &quantization,
                                     bool inputUnsigned) {
+  Value input = createBlockedInput(builder, location, quantization);
   Value scale = truncateScalarScaleToF32(builder, location, quantization.scale);
+  scale = collapseParameter(builder, location, scale);
+  Value zeroPoint =
+      collapseParameter(builder, location, quantization.zeroPoint);
+  Value init = createInit(builder, location, input, resultType);
   auto dequantize = IREE::LinalgExt::DequantizeAffineOp::create(
-      builder, location, resultType, quantization.input, scale,
-      quantization.zeroPoint,
-      createInit(builder, location, quantization, resultType),
+      builder, location, init.getType(), input, scale, zeroPoint, init,
       getIndexingMaps(builder, quantization),
       builder.getI64IntegerAttr(quantization.quantMin),
       builder.getI64IntegerAttr(quantization.quantMax),
       inputUnsigned ? builder.getUnitAttr() : nullptr,
       quantization.zeroPointUnsigned ? builder.getUnitAttr() : nullptr);
-  return dequantize->getResult(0);
+  return collapseBlockedResult(builder, location, dequantize->getResult(0),
+                               quantization);
 }
 
 namespace {
 
-// Converts `quantize_per_tensor` or `quantize_per_channel`, whose input holds
-// the real values and whose result holds the quantized storage.
+// Converts `quantize_per_tensor`, `quantize_per_channel` or
+// `quantize_per_channel_group`, whose input holds the real values and whose
+// result holds the quantized storage.
 template <typename OpTy>
 struct ConvertQuantize final : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
@@ -320,8 +511,9 @@ struct ConvertQuantize final : OpConversionPattern<OpTy> {
   }
 };
 
-// Converts `dequantize_per_tensor` or `dequantize_per_channel`, whose input
-// holds the quantized storage and whose result holds the real values.
+// Converts `dequantize_per_tensor`, `dequantize_per_channel` or
+// `dequantize_per_channel_group`, whose input holds the quantized storage and
+// whose result holds the real values.
 template <typename OpTy>
 struct ConvertDequantize final : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
@@ -389,8 +581,11 @@ class ConvertTorchQuantizationToLinalgExtPass final
     patterns.add<
         ConvertQuantize<Torch::QuantizedDecomposedQuantizePerTensorOp>,
         ConvertQuantize<Torch::QuantizedDecomposedQuantizePerChannelOp>,
+        ConvertQuantize<Torch::QuantizedDecomposedQuantizePerChannelGroupOp>,
         ConvertDequantize<Torch::QuantizedDecomposedDequantizePerTensorOp>,
-        ConvertDequantize<Torch::QuantizedDecomposedDequantizePerChannelOp>>(
+        ConvertDequantize<Torch::QuantizedDecomposedDequantizePerChannelOp>,
+        ConvertDequantize<
+            Torch::QuantizedDecomposedDequantizePerChannelGroupOp>>(
         typeConverter, context);
     // The PT2E ops are deliberately not marked illegal: ops whose metadata
     // LinalgExt cannot represent remain for the Torch-to-Linalg lowering.
