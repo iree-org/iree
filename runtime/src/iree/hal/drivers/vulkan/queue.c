@@ -2893,8 +2893,7 @@ static iree_status_t iree_hal_vulkan_queue_validate_host_call(
 // Foreign semaphores are explicitly allowed
 // see resolve_waits and publish_signals for how they are handled
 static iree_status_t iree_hal_vulkan_queue_validate_semaphore_list(
-    iree_hal_vulkan_queue_t* queue, iree_hal_semaphore_list_t semaphore_list,
-    iree_string_view_t usage) {
+    iree_hal_semaphore_list_t semaphore_list, iree_string_view_t usage) {
   if (semaphore_list.count != 0 &&
       (!semaphore_list.semaphores || !semaphore_list.payload_values)) {
     return iree_make_status(
@@ -6499,10 +6498,10 @@ static iree_status_t iree_hal_vulkan_queue_submit_barrier_with_action(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_status_t status = iree_hal_vulkan_queue_validate_semaphore_list(
-      queue, wait_semaphore_list, IREE_SV("wait"));
+      wait_semaphore_list, IREE_SV("wait"));
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, signal_semaphore_list, IREE_SV("signal"));
+        signal_semaphore_list, IREE_SV("signal"));
   }
 
   iree_hal_vulkan_queue_pending_submission_t* submission = NULL;
@@ -6611,12 +6610,12 @@ iree_status_t iree_hal_vulkan_queue_submit_alloca(
     }
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, wait_semaphore_list, IREE_SV("wait"));
+    status = iree_hal_vulkan_queue_validate_semaphore_list(wait_semaphore_list,
+                                                           IREE_SV("wait"));
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, signal_semaphore_list, IREE_SV("signal"));
+        signal_semaphore_list, IREE_SV("signal"));
   }
 
   iree_hal_buffer_t* buffer = NULL;
@@ -6706,10 +6705,10 @@ iree_status_t iree_hal_vulkan_queue_submit_dealloca(
   }
 
   iree_status_t status = iree_hal_vulkan_queue_validate_semaphore_list(
-      queue, wait_semaphore_list, IREE_SV("wait"));
+      wait_semaphore_list, IREE_SV("wait"));
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, signal_semaphore_list, IREE_SV("signal"));
+        signal_semaphore_list, IREE_SV("signal"));
   }
 
   iree_hal_vulkan_queue_pending_submission_t* submission = NULL;
@@ -6779,12 +6778,12 @@ iree_status_t iree_hal_vulkan_queue_submit_sparse_bind(
                               "too many Vulkan sparse buffer binds");
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, wait_semaphore_list, IREE_SV("wait"));
+    status = iree_hal_vulkan_queue_validate_semaphore_list(wait_semaphore_list,
+                                                           IREE_SV("wait"));
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, signal_semaphore_list, IREE_SV("signal"));
+        signal_semaphore_list, IREE_SV("signal"));
   }
 
   VkSparseMemoryBind* copied_binds = NULL;
@@ -6874,12 +6873,12 @@ iree_status_t iree_hal_vulkan_queue_submit_fill(
         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, wait_semaphore_list, IREE_SV("wait"));
+    status = iree_hal_vulkan_queue_validate_semaphore_list(wait_semaphore_list,
+                                                           IREE_SV("wait"));
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, signal_semaphore_list, IREE_SV("signal"));
+        signal_semaphore_list, IREE_SV("signal"));
   }
 
   iree_hal_vulkan_queue_pending_submission_t* submission = NULL;
@@ -6971,12 +6970,12 @@ static iree_status_t iree_hal_vulkan_queue_submit_copy_with_action(
         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, wait_semaphore_list, IREE_SV("wait"));
+    status = iree_hal_vulkan_queue_validate_semaphore_list(wait_semaphore_list,
+                                                           IREE_SV("wait"));
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, signal_semaphore_list, IREE_SV("signal"));
+        signal_semaphore_list, IREE_SV("signal"));
   }
 
   iree_hal_vulkan_queue_pending_submission_t* submission = NULL;
@@ -7870,12 +7869,12 @@ iree_status_t iree_hal_vulkan_queue_submit_update(
         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, wait_semaphore_list, IREE_SV("wait"));
+    status = iree_hal_vulkan_queue_validate_semaphore_list(wait_semaphore_list,
+                                                           IREE_SV("wait"));
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, signal_semaphore_list, IREE_SV("signal"));
+        signal_semaphore_list, IREE_SV("signal"));
   }
   if (iree_status_is_ok(status) && length != 0) {
     status = iree_hal_vulkan_queue_validate_recordable_backing(
@@ -7985,12 +7984,12 @@ iree_status_t iree_hal_vulkan_queue_submit_read(
         source_file, source_offset, length, IREE_SV("read"));
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, wait_semaphore_list, IREE_SV("wait"));
+    status = iree_hal_vulkan_queue_validate_semaphore_list(wait_semaphore_list,
+                                                           IREE_SV("wait"));
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, signal_semaphore_list, IREE_SV("signal"));
+        signal_semaphore_list, IREE_SV("signal"));
   }
   if (iree_status_is_ok(status) && length == 0) {
     IREE_TRACE_ZONE_END(z0);
@@ -8079,12 +8078,12 @@ iree_status_t iree_hal_vulkan_queue_submit_write(
         target_file, target_offset, length, IREE_SV("write"));
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, wait_semaphore_list, IREE_SV("wait"));
+    status = iree_hal_vulkan_queue_validate_semaphore_list(wait_semaphore_list,
+                                                           IREE_SV("wait"));
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, signal_semaphore_list, IREE_SV("signal"));
+        signal_semaphore_list, IREE_SV("signal"));
   }
   if (iree_status_is_ok(status) && length == 0) {
     IREE_TRACE_ZONE_END(z0);
@@ -8989,12 +8988,12 @@ iree_status_t iree_hal_vulkan_queue_submit_dispatch(
         &config.workgroup_count_ref);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, wait_semaphore_list, IREE_SV("wait"));
+    status = iree_hal_vulkan_queue_validate_semaphore_list(wait_semaphore_list,
+                                                           IREE_SV("wait"));
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, signal_semaphore_list, IREE_SV("signal"));
+        signal_semaphore_list, IREE_SV("signal"));
   }
 
   iree_host_size_t dispatch_payload_storage_length = 0;
@@ -9186,12 +9185,12 @@ iree_status_t iree_hal_vulkan_queue_submit_execute(
         "Vulkan queue execute requires a concrete profile event type");
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, wait_semaphore_list, IREE_SV("wait"));
+    status = iree_hal_vulkan_queue_validate_semaphore_list(wait_semaphore_list,
+                                                           IREE_SV("wait"));
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, signal_semaphore_list, IREE_SV("signal"));
+        signal_semaphore_list, IREE_SV("signal"));
   }
   if (iree_status_is_ok(status) &&
       binding_table.count < command_buffer->binding_count) {
@@ -9305,12 +9304,12 @@ iree_status_t iree_hal_vulkan_queue_submit_host_call(
   iree_status_t status =
       iree_hal_vulkan_queue_validate_host_call(call, args, flags);
   if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, wait_semaphore_list, IREE_SV("wait"));
+    status = iree_hal_vulkan_queue_validate_semaphore_list(wait_semaphore_list,
+                                                           IREE_SV("wait"));
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_queue_validate_semaphore_list(
-        queue, signal_semaphore_list, IREE_SV("signal"));
+        signal_semaphore_list, IREE_SV("signal"));
   }
   if (iree_status_is_ok(status) && wait_semaphore_list.count > UINT32_MAX) {
     status = iree_make_status(IREE_STATUS_OUT_OF_RANGE,
