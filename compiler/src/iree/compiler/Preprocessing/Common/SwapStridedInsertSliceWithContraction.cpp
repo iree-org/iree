@@ -117,6 +117,12 @@ public:
     Value source = insertOp.getSource();
     auto sourceTy = cast<RankedTensorType>(source.getType());
     auto scatteredTy = cast<RankedTensorType>(insertOp.getResult().getType());
+    // The strided dims below index the source and the scattered result by the
+    // same dim index. A rank-reduced insert_slice source (unit slice dims
+    // dropped) would make that index run past the source, so decline it.
+    if (sourceTy.getRank() != scatteredTy.getRank()) {
+      return failure();
+    }
     auto resultTy = cast<RankedTensorType>(genericOp.getResultTypes()[0]);
     AffineMap scatterMap = genericOp.getMatchingIndexingMap(scatterOperand);
     AffineMap resultMap = genericOp.getIndexingMapsArray().back();
