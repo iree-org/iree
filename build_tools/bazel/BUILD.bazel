@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 
 package(
@@ -75,8 +76,27 @@ config_setting(
 )
 
 config_setting(
-    name = "iree_is_wasm",
+    name = "iree_is_wasm32",
     constraint_values = ["@platforms//cpu:wasm32"],
+)
+
+config_setting(
+    name = "iree_is_wasm64",
+    constraint_values = ["@platforms//cpu:wasm64"],
+)
+
+config_setting(
+    name = "iree_is_emscripten",
+    constraint_values = ["@platforms//os:emscripten"],
+)
+
+selects.config_setting_group(
+    name = "iree_is_wasm",
+    match_any = [
+        ":iree_is_wasm32",
+        ":iree_is_wasm64",
+        ":iree_is_emscripten",
+    ],
 )
 
 # Selects a user-provided system allocator. Users must provide
