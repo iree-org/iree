@@ -14,6 +14,9 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "early_data_tiling.mlir"
+    "early_data_tiling_convolution.mlir"
+    "early_data_tiling_dynamic.mlir"
     "hal_target_device_attributes.mlir"
     "materialize_homogeneous_encodings.mlir"
     "smoketest_embedded.mlir"

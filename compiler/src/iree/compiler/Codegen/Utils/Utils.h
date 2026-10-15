@@ -116,6 +116,10 @@ bool hasLlvmUkernel(DictionaryAttr attr, StringRef ukernelCategory = "");
 /// Returns true if `attr` has `feature` in its CPU features.
 bool hasFeature(DictionaryAttr targetConfig, StringRef feature);
 
+/// Returns true if the CPU target configuration enables inner-tiled data-tiling
+/// layouts (`enable_inner_tiled`).
+bool isInnerTiledEnabled(DictionaryAttr targetConfig);
+
 /// Architecture identification.
 bool isX86(DictionaryAttr targetConfig);
 bool isX86_64(DictionaryAttr targetConfig);
