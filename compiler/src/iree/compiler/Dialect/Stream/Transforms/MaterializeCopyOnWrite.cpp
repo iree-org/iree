@@ -142,12 +142,52 @@ static bool materializeTiedOpCOW(IREE::Util::TiedOpInterface tiedOp) {
   return didChange;
 }
 
+// Materializes a copy for a resource stored into a mutable global if required.
+// Mutable globals are updated in place after being loaded, so each must own
+// its storage: the stored value may be deemed unsafe for copy elision, which
+// would mean there's a risk that it gets stored into another mutable global
+// that would also get overwritten.
+// Returns true if a copy was materialized.
+static bool
+materializeGlobalStoreCOW(IREE::Util::GlobalStoreOpInterface storeOp) {
+  Value value = storeOp.getStoredGlobalValue();
+  auto resourceType = dyn_cast<IREE::Stream::ResourceType>(value.getType());
+  if (!resourceType) {
+    return false;
+  }
+  auto globalOp =
+      SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
+          storeOp, storeOp.getGlobalAttr());
+  if (!globalOp || !globalOp.isGlobalMutable()) {
+    return false;
+  }
+  if (isSafeToElideCOW(value, resourceType)) {
+    return false;
+  }
+  IREE::Stream::AffinityAttr affinity;
+  if (auto affinityOp = dyn_cast_if_present<IREE::Stream::AffinityOpInterface>(
+          value.getDefiningOp())) {
+    affinity = affinityOp.getAffinityAttr();
+  }
+  OpBuilder builder(storeOp);
+  auto sizeAwareType = cast<IREE::Util::SizeAwareTypeInterface>(resourceType);
+  auto size = sizeAwareType.queryValueSize(storeOp.getLoc(), value, builder);
+  Value clone = IREE::Stream::AsyncCloneOp::create(
+      builder, storeOp.getLoc(), resourceType, value, size, size, affinity);
+  storeOp.setStoredGlobalValue(clone);
+  return true;
+}
+
 // Materializes copies on writes within |region|.
 // Returns true if any copy was required and materialized.
 static bool materializeRegionCOW(Region &region) {
   bool didChange = false;
   for (auto &block : region.getBlocks()) {
     for (auto &op : block) {
+      if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
+        didChange |= materializeGlobalStoreCOW(storeOp);
+        continue;
+      }
       if (!op.hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>()) {
         continue;
       }
