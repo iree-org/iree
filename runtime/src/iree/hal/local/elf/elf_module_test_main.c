@@ -30,6 +30,10 @@ static iree_status_t query_arch_test_file_data(
   pattern = iree_make_cstring_view("*_x86_32.so");
 #elif defined(IREE_ARCH_X86_64)
   pattern = iree_make_cstring_view("*_x86_64.so");
+#elif defined(IREE_ARCH_MIPS_64)
+  // No native MIPS tests, just return empty
+  *out_file_data = iree_const_byte_span_empty();
+  return iree_ok_status();
 #else
 #warning "No architecture pattern specified; ELF linker will not be tested"
 #endif  // IREE_ARCH_*
