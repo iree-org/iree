@@ -95,7 +95,7 @@ ClientAPI deduceClientAPI(StringRef backend) {
   return llvm::StringSwitch<ClientAPI>(backend)
       .Case("vulkan", ClientAPI::Vulkan)
       .Case("metal", ClientAPI::Metal)
-      .Case("webgpu", ClientAPI::WebGPU)
+      .Cases({"webgpu", "webgpu-spirv"}, ClientAPI::WebGPU)
       .Case("opencl", ClientAPI::OpenCL)
       .Default(ClientAPI::Unknown);
 }
