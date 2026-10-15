@@ -437,7 +437,14 @@ getMmaIntrinsicRequiredFeatures(IREE::CPU::MMAIntrinsic intr) {
     return {"+v"};
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACC_1x8VLsx1_F32_F16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACC_8VLsx1x1_F32_F16:
     return {"+v", "+zvfh"};
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32:
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32:
+    return {"+v", "+zvfhmin"};
   default:
     return {};
   }
@@ -569,8 +576,13 @@ checkIntrinsicRequiredFeatures(DictionaryAttr config,
     if (required.empty()) {
       continue;
     }
-    if (llvm::all_of(required,
-                     [&](StringRef f) { return hasFeature(config, f); })) {
+    if (llvm::all_of(required, [&](StringRef f) {
+          if (hasFeature(config, f)) {
+            return true;
+          }
+          // Zvfh includes Zvfhmin; IREE matches feature strings exactly.
+          return f == "+zvfhmin" && hasFeature(config, "+zvfh");
+        })) {
       out.push_back(intr);
     }
   }
@@ -624,6 +636,12 @@ getMmaIntrinsicsForTargetConfig(DictionaryAttr config) {
         MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32,
         MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16,
         MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16,
+        MMAIntrinsic::MMA_RISCV_V_VFWMACC_1x8VLsx1_F32_F16,
+        MMAIntrinsic::MMA_RISCV_V_VFWMACC_8VLsx1x1_F32_F16,
+        MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32,
+        MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32,
+        MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32,
+        MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32,
     };
     checkIntrinsicRequiredFeatures(config, kAllRiscvV, out);
   }
@@ -685,6 +703,29 @@ getIntrinsicInfo(MLIRContext *ctx, ArrayRef<Type> elementTypes,
   info.lhsBits = lhsTy.getIntOrFloatBitWidth();
   info.rhsBits = rhsTy.getIntOrFloatBitWidth();
   info.accBits = accTy.getIntOrFloatBitWidth();
+  // The vector operand is extf'd to f32 before vfmacc.vf, so it occupies an
+  // LMUL=4 group. WIDENF32 also keeps the accumulator at f32 across K.
+  bool billVectorAsF32 = false;
+  switch (intr) {
+  case IREE::CPU::MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32:
+  case IREE::CPU::MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32:
+    billVectorAsF32 = true;
+    break;
+  case IREE::CPU::MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32:
+  case IREE::CPU::MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32:
+    billVectorAsF32 = true;
+    info.accBits = 32;
+    break;
+  default:
+    break;
+  }
+  if (billVectorAsF32) {
+    if (IREE::CPU::isMNSwapped(intr)) {
+      info.lhsBits = 32;
+    } else {
+      info.rhsBits = 32;
+    }
+  }
   return info;
 }
 
