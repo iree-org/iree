@@ -3,7 +3,7 @@
 Cross-compile the IREE **runtime** for MIPS64 little-endian (`mips64el`) on an
 x86-64 host and run a model under the QEMU emulator. The model is compiled to
 architecture-independent VMVX bytecode on the host; only the runtime is
-cross-compiled — there is **no native MIPS code generation** (that is future work;
+cross-compiled - there is **no native MIPS code generation** (that is future work;
 see the end).
 
 This is the MIPS analog of IREE's
@@ -17,7 +17,7 @@ Run all commands from the repository root.
 You should already be able to
 [build IREE from source](https://iree.dev/building-from-source/getting-started/).
 The host build provides `iree-compile`, which turns a model into a VMVX bytecode
-module — no MIPS backend is needed on the host.
+module - no MIPS backend is needed on the host.
 
 ### MIPS toolchain and emulator
 
@@ -112,13 +112,13 @@ qemu-mips64el -cpu MIPS64R2-generic -L /usr/mips64el-linux-gnuabi64/ \
 
 `-L` points QEMU's loader at the MIPS sysroot so it can find `libc`/`libm`.
 
-> If QEMU prints a flood of syscall traces, `unset QEMU_STRACE` — QEMU enables
+> If QEMU prints a flood of syscall traces, `unset QEMU_STRACE` - QEMU enables
 > strace whenever that variable is set to *anything*, including `QEMU_STRACE=0`.
 
 ### Real model, cross-checked against the host
 
 To confirm real compute (matmul, activation, softmax), compile MNIST and compare
-the MIPS output against the host output for the same input — they must match:
+the MIPS output against the host output for the same input - they must match:
 
 ```bash
 ../iree-build/install/bin/iree-compile \
@@ -150,15 +150,16 @@ run.
 
 > **Host-tools path.** This guide uses the out-of-tree layout
 > (`../iree-build/install/bin/…`). An in-tree build with no install step puts the
-> host tools in `build/tools/` instead — adjust the paths accordingly (they may
+> host tools in `build/tools/` instead - adjust the paths accordingly (they may
 > already be on your `PATH`).
 
 ## Future work (not implemented)
 
 This build is VMVX only. The following are intentionally left for a future effort:
 
-- **Native MIPS code generation** — enabling the LLVM `Mips` backend so
+- **Native MIPS code generation** - enabling the LLVM `Mips` backend so
   `iree-compile` emits native machine code (`--iree-hal-local-target-device-backends=llvm-cpu`
   with a `mips64el` triple), including the real ELF relocation implementation.
 - **MSA vectorization** and **microkernels / data tiling** for performance.
-- A **MIPS CI workflow** and a website `building-from-source/mips.md` page.
+- A website `building-from-source/mips.md` page (CI already runs the mips64el
+  runtime suite under QEMU; see the `pkgci_test_mips64` workflow).
