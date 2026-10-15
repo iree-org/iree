@@ -560,9 +560,12 @@ TEST_P(SequenceTest, LinkedConnectFailurePropagates) {
   IREE_ASSERT_OK(iree_async_proactor_submit(proactor_, list));
 
   // Wait for both operations. Connect will fail, send will be cancelled.
-  // Use a shorter timeout since we know the connect will fail quickly.
-  PollUntil(/*min_completions=*/2,
-            /*total_budget=*/iree_make_duration_ms(5000));
+  // Windows may take multiple seconds to surface the refusal (see
+  // kRefusedConnectBudget). Reap in submission order afterwards so a timed-
+  // out connect cannot outlive the proactor.
+  PollUntil(/*min_completions=*/2, /*total_budget=*/kRefusedConnectBudget);
+  ReapIfPending(&connect_op.base, &connect_tracker);
+  ReapIfPending(&send_op.base, &send_tracker);
 
   // Connect should have failed (not OK).
   EXPECT_EQ(connect_tracker.call_count, 1);
