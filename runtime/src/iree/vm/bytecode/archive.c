@@ -6,6 +6,7 @@
 
 #include "iree/vm/bytecode/archive.h"
 
+#include "iree/base/alignment.h"
 #include "iree/vm/bytecode/isa/isa.h"
 
 // ZIP local file header (comes immediately before each file in the archive).
@@ -44,7 +45,7 @@ typedef struct {
 #endif  // IREE_COMPILER_MSVC
 static_assert(sizeof(zip_local_file_header_t) == 30, "bad packing");
 #if !defined(IREE_ENDIANNESS_LITTLE) || !IREE_ENDIANNESS_LITTLE
-#error "little endian required for zip header parsing"
+// [BE spike] #error "little endian required for zip header parsing"
 #endif  // IREE_ENDIANNESS_LITTLE
 
 // Strips any ZIP local file header from |contents| and stores the remaining
@@ -63,7 +64,13 @@ static iree_status_t iree_vm_bytecode_module_strip_zip_header(
   // For a compliant zip file this is expected to start at offset 0.
   const zip_local_file_header_t* header =
       (const zip_local_file_header_t*)contents.data;
-  if (header->signature != ZIP_LOCAL_FILE_HEADER_SIGNATURE) {
+  // [BE spike] Form the pointer via a byte offset rather than &header->field
+  // to avoid -Waddress-of-packed-member; the LE accessor handles the unaligned
+  // read (and byte-swap on big-endian hosts).
+  const uint8_t* header_bytes = (const uint8_t*)header;
+  if (iree_unaligned_load_le_u32((const uint32_t*)(header_bytes +
+          offsetof(zip_local_file_header_t, signature))) !=
+      ZIP_LOCAL_FILE_HEADER_SIGNATURE) {
     // No signature found, probably not a ZIP.
     memmove(out_stripped, &contents, sizeof(contents));
     return iree_ok_status();
@@ -72,8 +79,13 @@ static iree_status_t iree_vm_bytecode_module_strip_zip_header(
   // Compute the starting offset of the file.
   // Note that we still don't know (or care) if it's the file we want; actual
   // FlatBuffer verification happens later on.
+  // [BE spike] Byte-offset pointers (see above) avoid -Waddress-of-packed-member.
   const uint32_t offset =
-      sizeof(*header) + header->file_name_length + header->extra_field_length;
+      sizeof(*header) +
+      iree_unaligned_load_le_u16((const uint16_t*)(header_bytes +
+          offsetof(zip_local_file_header_t, file_name_length))) +
+      iree_unaligned_load_le_u16((const uint16_t*)(header_bytes +
+          offsetof(zip_local_file_header_t, extra_field_length)));
   if (offset > contents.data_length) {
     // Is a ZIP but doesn't have enough data; error out with something more
     // useful than the FlatBuffer verification failing later on given that here

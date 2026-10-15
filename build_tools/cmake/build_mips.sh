@@ -29,6 +29,10 @@ IREE_HOST_BIN_DIR="$(realpath "${IREE_HOST_BIN_DIR:-build/install/bin}")"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 # Enable building the `iree-test-deps` target.
 IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"
+# Target endianness. Set to "big" for the big-endian (mips64) build so that
+# rodata (embedded constants) is serialized in big-endian byte order to match
+# the device; defaults to "little" (mips64el).
+MIPS_ENDIAN="${MIPS_ENDIAN:-little}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -67,6 +71,12 @@ args=(
 
 
 )
+
+# Big-endian targets need rodata (embedded constants) emitted in big-endian
+# byte order so the device reads it natively.
+if [[ "${MIPS_ENDIAN}" == "big" ]]; then
+  args+=("-DIREE_VM_BYTECODE_RODATA_BIG_ENDIAN=ON")
+fi
 
 "${CMAKE_BIN}" "${args[@]}"
 echo "Building all"

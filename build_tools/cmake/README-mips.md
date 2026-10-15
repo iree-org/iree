@@ -1,14 +1,15 @@
 # MIPS64 (VMVX) cross-compilation
 
-Cross-compile the IREE **runtime** for MIPS64 little-endian (`mips64el`) on an
-x86-64 host and run a model under the QEMU emulator. The model is compiled to
-architecture-independent VMVX bytecode on the host; only the runtime is
-cross-compiled - there is **no native MIPS code generation** (that is future work;
-see the end).
+Cross-compile the IREE **runtime** for MIPS64 - little-endian (`mips64el`) or
+big-endian (`mips64`) - on an x86-64 host and run a model under the QEMU
+emulator. The model is compiled to architecture-independent VMVX bytecode on the
+host; only the runtime is cross-compiled - there is **no native MIPS code
+generation** (that is future work; see the end).
 
 This is the MIPS analog of IREE's
 [RISC-V cross-compilation guide](https://iree.dev/building-from-source/riscv/).
-Run all commands from the repository root.
+Run all commands from the repository root. The little-endian flow is described
+first; see [Big-endian (mips64)](#big-endian-mips64) for the big-endian deltas.
 
 ## Prerequisites
 
@@ -153,6 +154,75 @@ run.
 > host tools in `build/tools/` instead - adjust the paths accordingly (they may
 > already be on your `PATH`).
 
+## Big-endian (mips64)
+
+The runtime also cross-compiles for big-endian MIPS64 (`mips64`, n64). The flow
+mirrors the little-endian steps above with a different toolchain and QEMU binary,
+plus one extra consideration: embedded constants.
+
+IREE's serialized formats are little-endian-canonical. The runtime byte-swaps
+little-endian metadata/bytecode when running on a big-endian host, but bulk
+constant data (rodata) is read with native typed loads, so the **compiler** must
+emit it in the target's byte order. The `--iree-vm-bytecode-rodata-big-endian`
+flag does this; `build_mips.sh` sets it automatically when `MIPS_ENDIAN=big`.
+
+### Toolchain and emulator
+
+```bash
+sudo apt install \
+  gcc-mips64-linux-gnuabi64 \
+  g++-mips64-linux-gnuabi64 \
+  qemu-user
+```
+
+The sysroot lands at `/usr/mips64-linux-gnuabi64` and the emulator is
+`qemu-mips64` (big-endian; the little-endian flow uses `qemu-mips64el`).
+
+### Build and test
+
+```bash
+export IREE_HOST_BIN_DIR=$(realpath ../iree-build/install/bin)
+
+MIPS_ENDIAN=big \
+CMAKE_TOOLCHAIN_FILE="$(realpath build_tools/cmake/linux_mips64_be_gcc.cmake)" \
+MIPS_TOOLCHAIN_PREFIX=mips64-linux-gnuabi64- \
+  ./build_tools/cmake/build_mips.sh build-mips-be
+
+file build-mips-be/tools/iree-run-module   # expect: ELF 64-bit MSB, MIPS, N64
+
+MIPS_ENDIAN=big QEMU_BIN=qemu-mips64 QEMU_LD_PREFIX=/usr/mips64-linux-gnuabi64 \
+  ./build_tools/cmake/test_mips.sh build-mips-be
+```
+
+To run a model, compile it on the host **with the big-endian rodata flag** and
+run it under `qemu-mips64`:
+
+```bash
+../iree-build/install/bin/iree-compile \
+  --iree-hal-target-device=local \
+  --iree-hal-local-target-device-backends=vmvx \
+  --iree-vm-bytecode-rodata-big-endian \
+  samples/models/mnist.mlir -o /tmp/mnist_vmvx_be.vmfb
+
+qemu-mips64 -cpu MIPS64R2-generic -L /usr/mips64-linux-gnuabi64/ \
+  build-mips-be/tools/iree-run-module \
+  --device=local-task --module=/tmp/mnist_vmvx_be.vmfb \
+  --function=predict --input=1x28x28x1xf32=0.3
+```
+
+The big-endian output matches the host (and little-endian) output bit for bit.
+
+### Known limitations on big-endian
+
+- **LE-only serialization features return `UNIMPLEMENTED`.** The HAL replay and
+  profile file formats and the FatELF writer are defined as little-endian and
+  are not supported on big-endian hosts. All are off the VMVX inference path.
+- **Little-endian-hardcoded test fixtures are skipped on big-endian.** A handful
+  of unit tests assert specific little-endian byte layouts (e.g. buffer fill
+  patterns, opaque hex formatting). The runtime behaves correctly (native byte
+  order); only those fixtures' expectations assume little-endian, so
+  `test_mips.sh` skips them when `MIPS_ENDIAN=big`.
+
 ## Future work (not implemented)
 
 This build is VMVX only. The following are intentionally left for a future effort:
@@ -161,5 +231,6 @@ This build is VMVX only. The following are intentionally left for a future effor
   `iree-compile` emits native machine code (`--iree-hal-local-target-device-backends=llvm-cpu`
   with a `mips64el` triple), including the real ELF relocation implementation.
 - **MSA vectorization** and **microkernels / data tiling** for performance.
-- A website `building-from-source/mips.md` page (CI already runs the mips64el
-  runtime suite under QEMU; see the `pkgci_test_mips64` workflow).
+- A website `building-from-source/mips.md` page (CI already runs the
+  little- and big-endian runtime suites under QEMU; see the `pkgci_test_mips64`
+  and `pkgci_test_mips64_be` workflows).

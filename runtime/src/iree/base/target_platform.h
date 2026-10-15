@@ -153,10 +153,16 @@ enum iree_arch_enum_e {
 #error IREE endian detection needs to be set up for your compiler
 #endif  // __BYTE_ORDER__
 
-#if defined(IREE_ARCH_MIPS_64) && defined(IREE_ENDIANNESS_BIG)
-#error Big-endian MIPS is not supported by IREE. Use a little-endian target
-#error (mips64el).
-#endif
+// Big-endian MIPS (mips64, n64) bring-up [SPIKE]: the gate below is lifted to
+// let the runtime compile big-endian. Serialized data (bytecode operands, etc.)
+// is little-endian and must be read through the iree_unaligned_*_le_* accessors
+// in base/alignment.h, whose big-endian byte-swapping is implemented as part of
+// this bring-up. Bulk tensor/constant data endianness is handled on the data
+// path separately.
+// #if defined(IREE_ARCH_MIPS_64) && defined(IREE_ENDIANNESS_BIG)
+// #error Big-endian MIPS is not supported by IREE. Use a little-endian target
+// #error (mips64el).
+// #endif
 
 //==============================================================================
 // IREE_MEMORY_ACCESS_*
