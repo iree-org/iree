@@ -51,6 +51,10 @@ namespace mlir::iree_compiler::DispatchCreation {
 
 enum class EncodingOptions { Padding, Generic };
 
+/// Returns the operation families that are data-tiled by default. Flags and
+/// pass options that select the data-tiled operation families default to it.
+ArrayRef<IREE::Encoding::EncodingOpType> getDefaultDataTilingOpTypes();
+
 //===----------------------------------------------------------------------===//
 // Pipelines
 //===----------------------------------------------------------------------===//
@@ -125,6 +129,20 @@ struct TransformOptions : PassPipelineOptions<TransformOptions> {
 
 void buildDispatchCreationPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions);
+
+/// Configuration of `buildDataTilingEncodingPassPipeline`.
+struct DataTilingEncodingOptions {
+  /// Operation families eligible for data tiling.
+  SmallVector<IREE::Encoding::EncodingOpType> opTypes =
+      llvm::to_vector(getDefaultDataTilingOpTypes());
+  /// Encoding strategy of iree-dispatch-creation-set-encoding.
+  EncodingOptions encodingOption = EncodingOptions::Generic;
+};
+
+/// Assigns data-tiling encodings on every function-like op, as configured by
+/// `options`.
+void buildDataTilingEncodingPassPipeline(
+    OpPassManager &passManager, const DataTilingEncodingOptions &options);
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
