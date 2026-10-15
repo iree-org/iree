@@ -1399,8 +1399,9 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
         intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32;
     auto legalizeAcc = [widenF16Acc](OpBuilder &b, Location loc,
                                      Value v) -> Value {
-      // Zvfhmin has no f16 MAC. extf here and truncf in restoreAcc are
-      // inverses, so the f32 accumulator hoists across K.
+      // Zvfhmin has no f16 MAC. This pair is lossy (extf(truncf(x)) != x):
+      // hoisting keeps the acc in f32 across K and skips per-K f16 rounding.
+      // TODO(#25058): honor --iree-llvmcpu-skip-intermediate-roundings=false.
       if (widenF16Acc) {
         Type f32 = b.getF32Type();
         auto vt = cast<VectorType>(v.getType());
