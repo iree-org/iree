@@ -11,9 +11,19 @@
 
 #include "iree/io/stream.h"
 
-#if !defined(IREE_ENDIANNESS_LITTLE) || !IREE_ENDIANNESS_LITTLE
-#error "IREE HAL profile bundle serialization requires little-endian hosts"
-#endif  // !IREE_ENDIANNESS_LITTLE
+// Profile bundle serialization reads/writes multi-byte fields in host-native
+// order and the on-disk format is defined as little-endian. Rather than
+// silently producing/consuming incompatible files on big-endian hosts (or
+// failing to build), the public entry points below fail at runtime. This
+// feature is off the VMVX inference path and is opt-in (--device_profiling).
+#if defined(IREE_ENDIANNESS_BIG)
+#define IREE_HAL_PROFILE_REQUIRE_LITTLE_ENDIAN()                           \
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,                       \
+                          "IREE HAL profile bundle serialization is only " \
+                          "supported on little-endian hosts")
+#else
+#define IREE_HAL_PROFILE_REQUIRE_LITTLE_ENDIAN()
+#endif  // IREE_ENDIANNESS_BIG
 
 typedef struct iree_hal_profile_file_sink_t {
   // HAL resource header for the sink.
@@ -174,6 +184,7 @@ IREE_API_EXPORT iree_status_t iree_hal_profile_file_sink_create(
   IREE_ASSERT_ARGUMENT(file_handle);
   IREE_ASSERT_ARGUMENT(out_sink);
   *out_sink = NULL;
+  IREE_HAL_PROFILE_REQUIRE_LITTLE_ENDIAN();
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_io_stream_t* stream = NULL;
@@ -212,6 +223,7 @@ iree_hal_profile_file_parse_header(iree_const_byte_span_t file_contents,
   IREE_ASSERT_ARGUMENT(out_record_offset);
   memset(out_header, 0, sizeof(*out_header));
   *out_record_offset = 0;
+  IREE_HAL_PROFILE_REQUIRE_LITTLE_ENDIAN();
 
   if (IREE_UNLIKELY(file_contents.data_length > 0 && !file_contents.data)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -269,6 +281,7 @@ IREE_API_EXPORT iree_status_t iree_hal_profile_file_parse_record(
   IREE_ASSERT_ARGUMENT(out_next_record_offset);
   memset(out_record, 0, sizeof(*out_record));
   *out_next_record_offset = record_offset;
+  IREE_HAL_PROFILE_REQUIRE_LITTLE_ENDIAN();
 
   if (IREE_UNLIKELY(file_contents.data_length > 0 && !file_contents.data)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

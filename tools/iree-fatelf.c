@@ -157,11 +157,11 @@ static iree_status_t fatelf_parse_elf_metadata(
   if (ehdr->e_ident[IREE_ELF_EI_DATA] == IREE_ELF_ELFDATA2LSB) {
     *out_machine = iree_unaligned_load_le_u16(&ehdr->e_machine);
   } else {
-#if IREE_ENDIANNESS_BIG
-// TODO(benvanik): helpers for big<->little endian
-// *out_machine = iree_unaligned_load_be_u16(&ehdr->e_machine);
-#error "ELF parsing support only available on little-endian systems today"
-#endif  // IREE_ENDIANNESS_BIG
+    // Big-endian ELF data: reading multibyte fields in big-endian order is not
+    // implemented (TODO(benvanik): big<->little endian helpers). Fail rather
+    // than leaving out_machine uninitialized.
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                            "parsing big-endian ELF files is not supported");
   }
 
   return iree_ok_status();
@@ -177,8 +177,13 @@ typedef struct {
 static iree_status_t fatelf_join(int argc, char** argv) {
   IREE_IO_SET_BINARY_MODE(stdout);  // ensure binary output mode
 
-#if IREE_ENDIANNESS_BIG
-#error "FatELF writing support only available on little-endian systems today"
+  // FatELF writing emits multibyte header fields in host-native order and the
+  // format is defined as little-endian; fail on big-endian hosts rather than
+  // producing an incompatible file.
+#if defined(IREE_ENDIANNESS_BIG)
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "FatELF writing is only supported on little-endian hosts");
 #endif  // IREE_ENDIANNESS_BIG
 
   // Load all source files.

@@ -91,7 +91,8 @@ static StringRef mimeTypeToFileExtension(StringRef mimeType) {
 // to the uint8 vec containing the data.
 static flatbuffers_uint8_vec_ref_t
 serializeEmbeddedData(Location loc, Attribute valueAttr, uint64_t alignment,
-                      uint64_t totalSize, FlatbufferBuilder &fbb) {
+                      uint64_t totalSize, llvm::endianness rodataEndian,
+                      FlatbufferBuilder &fbb) {
   flatcc_builder_start_vector(fbb, 1, alignment, FLATBUFFERS_COUNT_MAX(1));
 
   if (totalSize > SIZE_MAX) {
@@ -107,9 +108,11 @@ serializeEmbeddedData(Location loc, Attribute valueAttr, uint64_t alignment,
   uint8_t *bytePtr =
       flatbuffers_uint8_vec_extend(fbb, static_cast<size_t>(totalSize));
 
-  // Serialize the constant into the reserved memory.
+  // Serialize the constant into the reserved memory. [BE spike] rodata is read
+  // by native typed loads on the device, so it is emitted in the target's
+  // endianness rather than the format-canonical little-endian.
   if (failed(value.serializeToBuffer(
-          loc, llvm::endianness::little,
+          loc, rodataEndian,
           ArrayRef<char>(reinterpret_cast<char *>(bytePtr),
                          static_cast<size_t>(totalSize))))) {
     mlir::emitError(loc) << "constant attribute failed to serialize: "
@@ -390,9 +393,13 @@ static LogicalResult buildFlatBufferModule(
       rodataSegmentRefs.push_back(iree_vm_RodataSegmentDef_end(fbb));
     } else {
       // Serialize the embedded data first so that we can reference it.
+      // [BE spike] rodata endianness follows the target device, not the format.
       flatbuffers_uint8_vec_ref_t embeddedRef = serializeEmbeddedData(
           rodataRef.rodataOp.getLoc(), rodataRef.rodataOp.getValue(),
-          rodataRef.alignment, rodataRef.totalSize, fbb);
+          rodataRef.alignment, rodataRef.totalSize,
+          bytecodeOptions.targetBigEndianRodata ? llvm::endianness::big
+                                                : llvm::endianness::little,
+          fbb);
       if (!embeddedRef) {
         return failure();
       }
@@ -653,8 +660,12 @@ translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
       rodataRef.archiveFile = archiveWriter->declareFile(
           fileName, rodataRef.alignment, rodataRef.totalSize,
           [=](llvm::raw_ostream &os) {
-            return rodataValue.serializeToStream(rodataLoc,
-                                                 llvm::endianness::little, os);
+            // [BE spike] rodata endianness follows the target device.
+            return rodataValue.serializeToStream(
+                rodataLoc,
+                bytecodeOptions.targetBigEndianRodata ? llvm::endianness::big
+                                                      : llvm::endianness::little,
+                os);
           });
     }
     rodataRefs[ordinalAnalysis.getOrdinal(rodataOp)] = rodataRef;
@@ -726,6 +737,13 @@ void BytecodeTargetOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc(
           "Enables output files to be viewed as zip files for debugging "
           "(only applies to binary targets)"));
+  // [BE spike]
+  binder.opt<bool>(
+      "iree-vm-bytecode-rodata-big-endian", targetBigEndianRodata,
+      llvm::cl::cat(vmBytecodeOptionsCategory),
+      llvm::cl::desc(
+          "Emits rodata (embedded constants) in big-endian byte order to "
+          "match a big-endian target device (e.g. mips64 BE)"));
 }
 
 } // namespace mlir::iree_compiler::IREE::VM

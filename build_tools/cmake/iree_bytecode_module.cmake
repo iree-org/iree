@@ -81,6 +81,13 @@ function(iree_bytecode_module)
   # Users can add their own additional directories as needed.
   list(APPEND _ARGS "--iree-hal-executable-object-search-path=\"${IREE_BINARY_DIR}\"")
 
+  # [BE spike] When building for a big-endian target device, emit rodata
+  # (embedded constants) in big-endian byte order so the device reads it
+  # natively. Set by the big-endian toolchain/build configuration.
+  if(IREE_VM_BYTECODE_RODATA_BIG_ENDIAN)
+    list(APPEND _ARGS "--iree-vm-bytecode-rodata-big-endian")
+  endif()
+
   set(_OUTPUT_FILES "${_MODULE_FILE_NAME}")
 
   # If the llvm-cpu backend is used, pass build-system-dependent flags.

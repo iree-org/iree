@@ -62,8 +62,38 @@ iree_status_t iree_hal_cmd_build_fill(iree_hal_cmd_block_builder_t* builder,
   cmd->pattern_length = (uint8_t)pattern_length;
   cmd->params.direct.target_offset = 0;
   cmd->params.direct.length = length;
-  cmd->params.direct.pattern = 0;
-  memcpy(&cmd->params.direct.pattern, pattern, pattern_length);
+  // [BE spike] |pattern| is pattern_length bytes in target-native order. The
+  // processor reads params.direct.pattern as a zero-extended integer value and
+  // extracts the low bits via a cast, so load the bytes as a native integer of
+  // the correct width rather than memcpy'ing them to the low address (which
+  // only lands them in the low-order bits on little-endian hosts).
+  uint64_t pattern_value = 0;
+  switch (pattern_length) {
+    case 1: {
+      uint8_t v = 0;
+      memcpy(&v, pattern, sizeof(v));
+      pattern_value = v;
+      break;
+    }
+    case 2: {
+      uint16_t v = 0;
+      memcpy(&v, pattern, sizeof(v));
+      pattern_value = v;
+      break;
+    }
+    case 4: {
+      uint32_t v = 0;
+      memcpy(&v, pattern, sizeof(v));
+      pattern_value = v;
+      break;
+    }
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "fill patterns must be 1, 2, or 4 bytes (got %"
+                              PRIhsz ")",
+                              pattern_length);
+  }
+  cmd->params.direct.pattern = pattern_value;
 
   // Pre-fill fixup data_index. Caller sets span.
   fixups[0].data_index = binding_data_base;
