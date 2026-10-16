@@ -126,6 +126,10 @@ void registerLinalgExtExternalModels(DialectRegistry &registry) {
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     IREE::LinalgExt::registerConcatOpTilingInterfaceExternalModel(ctx);
   });
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+        IREE::LinalgExt::registerGroupMatmulTilingInterfaceExternalModel(ctx);
+      });
 }
 
 } // namespace mlir::iree_compiler
