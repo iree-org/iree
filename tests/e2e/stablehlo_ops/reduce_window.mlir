@@ -96,3 +96,89 @@ func.func @cumsum_f32() {
   check.expect_almost_eq_const(%res, dense<[[[1.0, 1.0], [1.0, 1.0]], [[2.0, 2.0], [2.0, 2.0]]]> : tensor<2x2x2xf32>) : tensor<2x2x2xf32>
   return
 }
+
+// Empty inputs must produce empty results.
+func.func @dynamic_reduce_window_n0_w3_s2() {
+  %a = flow.tensor.dynamic_constant dense<> : tensor<0xf32> -> tensor<?xf32>
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %r = "stablehlo.reduce_window"(%a, %init) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %sum = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%sum) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 3>, window_strides = array<i64: 2>} : (tensor<?xf32>, tensor<f32>) -> tensor<?xf32>
+  %size = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?xf32>) -> tensor<i32>
+  check.expect_eq_const(%size, dense<0> : tensor<i32>) : tensor<i32>
+  return
+}
+
+// A window larger than the input must produce an empty result.
+func.func @dynamic_reduce_window_n1_w3_s2() {
+  %a = flow.tensor.dynamic_constant dense<[1.0]> : tensor<1xf32> -> tensor<?xf32>
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %r = "stablehlo.reduce_window"(%a, %init) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %sum = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%sum) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 3>, window_strides = array<i64: 2>} : (tensor<?xf32>, tensor<f32>) -> tensor<?xf32>
+  %size = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?xf32>) -> tensor<i32>
+  check.expect_eq_const(%size, dense<0> : tensor<i32>) : tensor<i32>
+  return
+}
+
+// Truncating a negative span must not count a partial window.
+func.func @dynamic_reduce_window_n2_w3_s2() {
+  %a = flow.tensor.dynamic_constant dense<[1.0, 2.0]> : tensor<2xf32> -> tensor<?xf32>
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %r = "stablehlo.reduce_window"(%a, %init) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %sum = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%sum) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 3>, window_strides = array<i64: 2>} : (tensor<?xf32>, tensor<f32>) -> tensor<?xf32>
+  %size = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?xf32>) -> tensor<i32>
+  check.expect_eq_const(%size, dense<0> : tensor<i32>) : tensor<i32>
+  return
+}
+
+// A window that exactly fits must produce one result.
+func.func @dynamic_reduce_window_n3_w3_s2() {
+  %a = flow.tensor.dynamic_constant dense<[1.0, 2.0, 3.0]> : tensor<3xf32> -> tensor<?xf32>
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %r = "stablehlo.reduce_window"(%a, %init) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %sum = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%sum) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 3>, window_strides = array<i64: 2>} : (tensor<?xf32>, tensor<f32>) -> tensor<?xf32>
+  %expected = arith.constant dense<[6.0]> : tensor<1xf32>
+  %expected_dynamic = tensor.cast %expected : tensor<1xf32> to tensor<?xf32>
+  check.expect_eq(%r, %expected_dynamic) : tensor<?xf32>
+  return
+}
+
+// A trailing partial window must not contribute to the result.
+func.func @dynamic_reduce_window_n6_w3_s2() {
+  %a = flow.tensor.dynamic_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]> : tensor<6xf32> -> tensor<?xf32>
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %r = "stablehlo.reduce_window"(%a, %init) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %sum = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%sum) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 3>, window_strides = array<i64: 2>} : (tensor<?xf32>, tensor<f32>) -> tensor<?xf32>
+  %expected = arith.constant dense<[6.0, 12.0]> : tensor<2xf32>
+  %expected_dynamic = tensor.cast %expected : tensor<2xf32> to tensor<?xf32>
+  check.expect_eq(%r, %expected_dynamic) : tensor<?xf32>
+  return
+}
+
+// A span below minus one stride must not produce a negative extent.
+func.func @dynamic_reduce_window_n2_w5_s1() {
+  %a = flow.tensor.dynamic_constant dense<[1.0, 2.0]> : tensor<2xf32> -> tensor<?xf32>
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %r = "stablehlo.reduce_window"(%a, %init) ({
+  ^bb0(%x: tensor<f32>, %y: tensor<f32>):
+    %sum = stablehlo.add %x, %y : tensor<f32>
+    "stablehlo.return"(%sum) : (tensor<f32>) -> ()
+  }) {window_dimensions = array<i64: 5>, window_strides = array<i64: 1>} : (tensor<?xf32>, tensor<f32>) -> tensor<?xf32>
+  %size = stablehlo.get_dimension_size %r, dim = 0 : (tensor<?xf32>) -> tensor<i32>
+  check.expect_eq_const(%size, dense<0> : tensor<i32>) : tensor<i32>
+  return
+}
