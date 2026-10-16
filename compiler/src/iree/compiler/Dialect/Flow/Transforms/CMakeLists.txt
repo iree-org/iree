@@ -36,6 +36,7 @@ iree_cc_library(
     "ConvertRegionToWorkgroups.cpp"
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
+    "GeneralizeExecutables.cpp"
     "DumpDispatchGraph.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FormDispatchRegions.cpp"
