@@ -698,3 +698,13 @@ util.func public @conv_2d_nchw_fchw_f16f16f16(%arg0 : tensor<1x16x130x130xf16>, 
 // F16-CONV-SAME:      outs(%[[EMPTY_F16]] : tensor<1x512x128x128xf16>)
 // F16-CONV:           arith.truncf %{{.+}} : f32 to f16
 // F16-CONV:         util.return %[[TRUNCF]]
+
+// -----
+
+// F16-CONV-LABEL: @preserve_conv_strides
+// F16-CONV: linalg.conv_2d_nhwc_hwcf
+// F16-CONV-SAME: strides = dense<2> : vector<2xi64>
+util.func public @preserve_conv_strides(%input: tensor<1x8x8x4xf16>, %filter: tensor<3x3x4x8xf16>, %init: tensor<1x3x3x8xf16>) -> tensor<1x3x3x8xf16> {
+  %result = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>} ins(%input, %filter : tensor<1x8x8x4xf16>, tensor<3x3x4x8xf16>) outs(%init : tensor<1x3x3x8xf16>) -> tensor<1x3x3x8xf16>
+  util.return %result : tensor<1x3x3x8xf16>
+}

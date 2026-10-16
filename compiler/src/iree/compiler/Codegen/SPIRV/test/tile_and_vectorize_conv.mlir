@@ -11,10 +11,7 @@
 ]>
 hal.executable private @nhwc_conv_static_shape_f32 {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @nhwc_conv_static_shape_f32 layout(#pipeline_layout) attributes {
-      workgroup_size = [4: index, 4: index, 1: index],
-      translation_info = #translation
-    }
+    hal.executable.export public @nhwc_conv_static_shape_f32 layout(#pipeline_layout) <workgroup_size = [4: index, 4: index, 1: index]> attributes {translation_info = #translation}
     builtin.module  {
       func.func @nhwc_conv_static_shape_f32() {
         %c112 = arith.constant 112 : index
@@ -83,10 +80,7 @@ hal.executable private @nhwc_conv_static_shape_f32 {
 ]>
 hal.executable private @nhwc_nhwc_depthwise_conv_static_shape_f32 {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @nhwc_nhwc_depthwise_conv_static_shape_f32 layout(#pipeline_layout) attributes {
-      workgroup_size = [4: index, 4: index, 4: index],
-      translation_info = #translation
-    }
+    hal.executable.export public @nhwc_nhwc_depthwise_conv_static_shape_f32 layout(#pipeline_layout) <workgroup_size = [4: index, 4: index, 4: index]> attributes {translation_info = #translation}
     builtin.module  {
       func.func @nhwc_nhwc_depthwise_conv_static_shape_f32() {
         %c56 = arith.constant 56 : index
@@ -158,10 +152,7 @@ hal.executable private @low_padded_conv {
       %c28 = arith.constant 28 : index
       %c112 = arith.constant 112 : index
       hal.return %c1, %c28, %c112 : index, index, index
-    } attributes {
-      workgroup_size = [8: index, 2: index, 1: index],
-      translation_info = #translation
-    }
+    } <workgroup_size = [8: index, 2: index, 1: index]> attributes {translation_info = #translation}
     builtin.module {
       func.func @low_padded_conv() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -272,10 +263,7 @@ hal.executable private @low_high_padded_nhwc_depthwise_conv {
       %c28 = arith.constant 28 : index
       %c112 = arith.constant 112 : index
       hal.return %c1, %c28, %c112 : index, index, index
-    } attributes {
-      workgroup_size = [8: index, 2: index, 1: index],
-      translation_info = #translation
-    }
+    } <workgroup_size = [8: index, 2: index, 1: index]> attributes {translation_info = #translation}
     builtin.module {
       func.func @low_high_padded_nhwc_depthwise_conv() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -384,10 +372,7 @@ hal.executable private @low_high_padded_nhwc_depthwise_conv {
 
 hal.executable private @nchw_conv_static_shape_f32 {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @nchw_conv_static_shape_f32 layout(#pipeline_layout) attributes {
-      workgroup_size = [4: index, 4: index, 1: index],
-      translation_info = #translation
-    }
+    hal.executable.export public @nchw_conv_static_shape_f32 layout(#pipeline_layout) <workgroup_size = [4: index, 4: index, 1: index]> attributes {translation_info = #translation}
     builtin.module  {
       func.func @nchw_conv_static_shape_f32() {
         %c1280 = arith.constant 1280 : index
@@ -457,10 +442,7 @@ hal.executable private @nchw_conv_static_shape_f32 {
 
 hal.executable private @nhwc_conv_static_shape_f16_batch2 {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @nhwc_conv_static_shape_f16_batch2 layout(#pipeline_layout) attributes {
-      workgroup_size = [8: index, 8: index, 1: index],
-      translation_info = #translation
-    }
+    hal.executable.export public @nhwc_conv_static_shape_f16_batch2 layout(#pipeline_layout) <workgroup_size = [8: index, 8: index, 1: index]> attributes {translation_info = #translation}
     builtin.module  {
       func.func @nhwc_conv_static_shape_f16_batch2() {
         %c64 = arith.constant 64 : index

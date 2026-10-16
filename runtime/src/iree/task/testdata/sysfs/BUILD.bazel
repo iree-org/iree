@@ -1,0 +1,40 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# bazel-to-cmake: skip
+# This package uses the custom expanded_sysfs_snapshots rule which
+# bazel_to_cmake cannot convert. Keep the manifests list below
+# in sync with cmake.
+
+load(":expanded_snapshots.bzl", "expanded_sysfs_snapshots")
+
+package(
+    default_visibility = ["//runtime/src/iree/task:__pkg__"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+# sysfs snapshots expanded into directory trees at build
+# time via `capture_sysfs.sh --expand`.
+expanded_sysfs_snapshots(
+    name = "expanded_sysfs_snapshots",
+    expand_tool = "capture_sysfs.sh",
+    manifests = [
+        "arm64_pixel6_tensor.sysfs.txt",
+        "synthetic_big_little.sysfs.txt",
+        "synthetic_dual_socket.sysfs.txt",
+        "synthetic_dual_socket_no_siblings.sysfs.txt",
+        "synthetic_fragmented_cpulist.sysfs.txt",
+        "synthetic_invalid_package.sysfs.txt",
+        "synthetic_memory_only_node.sysfs.txt",
+        "synthetic_meteor_lake.sysfs.txt",
+        "synthetic_raptor_lake.sysfs.txt",
+        "synthetic_snc.sysfs.txt",
+        "synthetic_sparse_node_ids.sysfs.txt",
+        "synthetic_too_many_nodes.sysfs.txt",
+        "x86_64_ryzen9_7950x.sysfs.txt",
+    ],
+)

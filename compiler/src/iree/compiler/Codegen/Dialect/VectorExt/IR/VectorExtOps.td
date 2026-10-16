@@ -65,7 +65,7 @@ def IREEVectorExt_ToLayoutOp : IREEVectorExt_PureOp<"to_layout", [
       return isa<RankedTensorType>(getOutput().getType());
     }
   }];
-  let assemblyFormat = "$input `to` `layout` `(` $layout `)` attr-dict `:` type($input)";
+  let assemblyFormat = "$input `to` `layout` `(` $layout `)` prop-dict attr-dict `:` type($input)";
   let hasVerifier = 1;
 }
 
@@ -170,7 +170,7 @@ def IREEVectorExt_TransferGatherOp : IREEVectorExt_PureOp<"transfer_gather", [
     ```
   }];
 
-  let assemblyFormat = "$base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? `,` $padding (`,` $mask^)? attr-dict `:` type($base) `,` type($vector) (`,` type($mask)^)?";
+  let assemblyFormat = "$base `[` $offsets `]` (`[` $index_vecs^ `:` type($index_vecs) `]`)? `,` $padding (`,` $mask^)? prop-dict attr-dict `:` type($base) `,` type($vector) (`,` type($mask)^)?";
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -238,7 +238,7 @@ def IREEVectorExt_TransferScatterOp : IREEVectorExt_PureOp<"transfer_scatter", [
     $vector `into` $base `[` $offsets `]`
     (`[` $index_vecs^ `:` type($index_vecs) `]`)?
     (`,` $mask^)?
-    attr-dict `:` type($vector) `,` type($base)
+    prop-dict attr-dict `:` type($vector) `,` type($base)
     (`,` type($mask)^)?
     (`->` type($result)^)?
   }];

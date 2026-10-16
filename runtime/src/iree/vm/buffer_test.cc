@@ -52,6 +52,42 @@ TEST_F(VMBufferTest, Initialize) {
   ASSERT_TRUE(did_free);
 }
 
+// Buffers initialized in-place may use their allocator as a destruction
+// callback for wrapping storage and must not take the aligned free path.
+TEST_F(VMBufferTest, InitializedBufferDestroyNotifiesAllocator) {
+  void* freed_ptr = nullptr;
+  iree_allocator_t test_allocator = {
+      /*.self=*/&freed_ptr,
+      /*.ctl=*/
+      +[](void* self, iree_allocator_command_t command, const void* params,
+          void** inout_ptr) {
+        if (command == IREE_ALLOCATOR_COMMAND_FREE) {
+          *(void**)self = *inout_ptr;
+        }
+        return iree_ok_status();
+      },
+  };
+
+  uint32_t data[] = {0, 1, 2, 3};
+  // Mimic the inline HAL wrapper. The zeroed prefix makes an incorrect
+  // iree_allocator_free_aligned call read a null base pointer and skip the
+  // free.
+  struct {
+    void* prefix[2];
+    iree_vm_buffer_t buffer;
+  } storage;
+  memset(&storage, 0, sizeof(storage));
+  iree_vm_buffer_initialize(
+      IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_HOST,
+      iree_make_byte_span(data, sizeof(data)), test_allocator, &storage.buffer);
+
+  ASSERT_EQ(freed_ptr, nullptr);
+  iree_vm_buffer_release(&storage.buffer);
+  // The destroy path passes the non-NULL buffer handle so wrapper allocators
+  // are notified even when the buffer data is empty.
+  ASSERT_EQ(freed_ptr, &storage.buffer);
+}
+
 typedef struct test_module_t {
   // VM module interface used for retain/release testing.
   iree_vm_module_t interface;

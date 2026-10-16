@@ -413,6 +413,7 @@ class BindSymbolicShapesPass final
 
     llvm::SmallVector<Operation *> cleanupOpList;
     llvm::SmallVector<TensorBinding> bindings;
+    llvm::DenseMap<Value, Torch::BindSymbolicShapeOp> boundValues;
     // Mapping of SSA value for a torch.symbolic_int (or related op) to its
     // info.
     llvm::DenseMap<Value, SymbolInfo> symbolInfos;
@@ -426,6 +427,22 @@ class BindSymbolicShapesPass final
       } else if (auto bindOp = dyn_cast<Torch::BindSymbolicShapeOp>(childOp)) {
         cleanupOpList.push_back(bindOp);
         if (!isEligibleBinding(bindOp)) {
+          return;
+        }
+        auto [it, inserted] =
+            boundValues.try_emplace(bindOp.getOperand(), bindOp);
+        if (!inserted) {
+          auto previousBindOp = it->second;
+          if (bindOp.getShapeExpressions() !=
+                  previousBindOp.getShapeExpressions() ||
+              !llvm::equal(bindOp.getShapeSymbols(),
+                           previousBindOp.getShapeSymbols())) {
+            auto diagnostic = bindOp.emitError(
+                "conflicting symbolic shape bindings for the same value");
+            diagnostic.attachNote(previousBindOp.getLoc())
+                << "previous binding is here";
+            return signalPassFailure();
+          }
           return;
         }
         auto torchType =

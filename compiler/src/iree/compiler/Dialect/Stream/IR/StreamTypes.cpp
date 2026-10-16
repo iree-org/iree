@@ -560,7 +560,8 @@ bool ResourceType::isAccessStorageCompatible(Type accessType) const {
 Value ResourceType::inferSizeFromValue(Location loc, Value value,
                                        OpBuilder &builder) const {
   return builder.createOrFold<IREE::Stream::ResourceSizeOp>(
-      loc, builder.getIndexType(), value);
+      loc, builder.getIndexType(), value,
+      /*affinity=*/IREE::Stream::AffinityAttr{});
 }
 
 Value ResourceType::createSubrangeOp(Location loc, Value resource,

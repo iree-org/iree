@@ -17,7 +17,7 @@ jobs:
   macos_arm64_clang:
     # Prevent scheduled runs in forks (only allow for iree-org or non-schedule triggers).
     if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       BUILD_DIR: build-macos
     defaults:

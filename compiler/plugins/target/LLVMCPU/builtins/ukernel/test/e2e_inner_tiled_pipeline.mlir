@@ -69,7 +69,7 @@ hal.executable private @bf16_inner_tiled_ukernel {
         %acc_t = iree_tensor_ext.dispatch.tensor.load %out,
             offsets = [0, 0, 0, 0], sizes = [2, 2, 1, 16], strides = [1, 1, 1, 1]
             : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<2x2x1x16xf32>> -> tensor<2x2x1x16xf32>
-        %res = iree_codegen.inner_tiled ins(%lhs_t, %rhs_t) outs(%acc_t) {
+        %res = iree_codegen.inner_tiled ins(%lhs_t, %rhs_t) outs(%acc_t) <
           indexing_maps = [
             affine_map<(d0, d1, d2) -> (d0, d2)>,
             affine_map<(d0, d1, d2) -> (d1, d2)>,
@@ -80,7 +80,7 @@ hal.executable private @bf16_inner_tiled_ukernel {
                             #linalg.iterator_type<reduction>],
           kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512BF16_1x16x2_F32_BF16>,
           semantics = #iree_cpu.mma_semantics<>
-        } : tensor<2x4x1x2xbf16>, tensor<2x4x16x2xbf16> into tensor<2x2x1x16xf32>
+        > : tensor<2x4x1x2xbf16>, tensor<2x4x16x2xbf16> into tensor<2x2x1x16xf32>
         iree_tensor_ext.dispatch.tensor.store %res, %out,
             offsets = [0, 0, 0, 0], sizes = [2, 2, 1, 16], strides = [1, 1, 1, 1]
             : tensor<2x2x1x16xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<2x2x1x16xf32>>

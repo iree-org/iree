@@ -14,6 +14,7 @@
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser/Parser.h"
+#include "mlir/Transforms/InliningUtils.h"
 
 namespace mlir::iree_compiler::IREE::HAL::Inline {
 
@@ -41,11 +42,30 @@ public:
   }
 };
 
+struct HALInlineInlinerInterface : DialectInlinerInterface {
+  using DialectInlinerInterface::DialectInlinerInterface;
+
+  bool isLegalToInline(Operation *call, Operation *callable,
+                       bool wouldBeCloned) const final {
+    return true;
+  }
+
+  bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
+                       IRMapping &valueMapping) const final {
+    return true;
+  }
+
+  bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
+                       IRMapping &valueMapping) const final {
+    return true;
+  }
+};
+
 } // namespace
 
 HALInlineDialect::HALInlineDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<HALInlineDialect>()) {
-  addInterfaces<HALInlineToVMConversionInterface>();
+  addInterfaces<HALInlineToVMConversionInterface, HALInlineInlinerInterface>();
 
 #define GET_OP_LIST
   addOperations<

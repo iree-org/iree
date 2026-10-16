@@ -15,7 +15,7 @@ util.func public @transpose_attention(%arg0: tensor<4x64x32x128xf16>, %arg1: ten
     linalg.yield %in : f16
   } -> tensor<4x32x64x128xf16>
   %4 = tensor.empty() : tensor<4x32x64x128xf16>
-  %5 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]} ins(%1, %2, %3, %arg3 : tensor<4x32x64x128xf16>, tensor<4x32x64x128xf16>, tensor<4x32x64x128xf16>, f16) outs(%4 : tensor<4x32x64x128xf16>) {
+  %5 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]> ins(%1, %2, %3, %arg3 : tensor<4x32x64x128xf16>, tensor<4x32x64x128xf16>, tensor<4x32x64x128xf16>, f16) outs(%4 : tensor<4x32x64x128xf16>) {
     ^bb0(%score: f16):
       iree_linalg_ext.yield %score: f16
   } -> tensor<4x32x64x128xf16>
@@ -63,7 +63,7 @@ util.func public @transposed_attention_masked(%arg0: tensor<4x64x32x128xf16>, %a
     linalg.yield %in : f16
   } -> tensor<4x32x64x64xf16>
   %5 = tensor.empty() : tensor<4x32x64x128xf16>
-  %6 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]} ins(%1, %2, %3, %arg3, %4 : tensor<4x32x64x128xf16>, tensor<4x32x64x128xf16>, tensor<4x32x64x128xf16>, f16, tensor<4x32x64x64xf16>) outs(%5 : tensor<4x32x64x128xf16>) {
+  %6 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]> ins(%1, %2, %3, %arg3, %4 : tensor<4x32x64x128xf16>, tensor<4x32x64x128xf16>, tensor<4x32x64x128xf16>, f16, tensor<4x32x64x64xf16>) outs(%5 : tensor<4x32x64x128xf16>) {
     ^bb0(%score: f16):
       iree_linalg_ext.yield %score: f16
   } -> tensor<4x32x64x128xf16>
@@ -226,7 +226,7 @@ util.func public @fuse_transpose_attention_to_producer(%q: tensor<2x10x4096x64xf
 
   // Attention-Transpose-V
   %init_attention = tensor.empty() : tensor<2x10x4096x64xf16>
-  %attention = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]} ins(%q, %k, %transpose_v, %scale : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x64x4096xf16>, f16) outs(%init_attention : tensor<2x10x4096x64xf16>) {
+  %attention = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d5, d4)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]> ins(%q, %k, %transpose_v, %scale : tensor<2x10x4096x64xf16>, tensor<2x10x4096x64xf16>, tensor<2x10x64x4096xf16>, f16) outs(%init_attention : tensor<2x10x4096x64xf16>) {
     ^bb0(%score: f16):
       iree_linalg_ext.yield %score: f16
   } -> tensor<2x10x4096x64xf16>
@@ -262,7 +262,7 @@ util.func public @fuse_attention_with_broadcast(%arg0: tensor<4x8x128x?xf16>, %a
   ^bb0(%in: f16, %out: f16):
     linalg.yield %in : f16
   } -> tensor<4x8x4x128x?xf16>
-  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d7, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d5, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5)>]} ins(%arg1, %arg2, %0, %arg3, %arg4 : tensor<4x8x4x?x32x128xf16>, tensor<4x8x4x?x128xf16>, tensor<4x8x4x128x?xf16>, f16, tensor<4x8x4x?x32x?xf16>) outs(%arg5 : tensor<4x8x4x?x32x128xf16>) {
+  %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d7, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d5, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5)>]> ins(%arg1, %arg2, %0, %arg3, %arg4 : tensor<4x8x4x?x32x128xf16>, tensor<4x8x4x?x128xf16>, tensor<4x8x4x128x?xf16>, f16, tensor<4x8x4x?x32x?xf16>) outs(%arg5 : tensor<4x8x4x?x32x128xf16>) {
   ^bb0(%arg7: f32):
     iree_linalg_ext.yield %arg7 : f32
   } -> tensor<4x8x4x?x32x128xf16>
@@ -301,12 +301,12 @@ util.func public @dont_fuse_attention_with_broadcasted_away_n_dim(
     linalg.yield %in : f16
   } -> tensor<4x32x64x128xf16>
   %empty_out = tensor.empty() : tensor<4x32x64x128xf16>
-  %attention = iree_linalg_ext.attention {
+  %attention = iree_linalg_ext.attention <
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
-                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]>
       ins(%q, %k, %v_broadcast, %scale :
           tensor<4x32x64x16xf16>, tensor<4x32x64x16xf16>,
           tensor<4x32x64x128xf16>, f16)
@@ -346,14 +346,14 @@ util.func public @dont_fuse_online_attention_with_broadcasted_away_n_dim(
   %empty_out = tensor.empty() : tensor<4x32x64x128xf16>
   %empty_max = tensor.empty() : tensor<4x32x64xf16>
   %empty_sum = tensor.empty() : tensor<4x32x64xf16>
-  %attention:3 = iree_linalg_ext.online_attention {
+  %attention:3 = iree_linalg_ext.online_attention <
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
-                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>]}
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>]>
       ins(%q, %k, %v_broadcast, %scale :
           tensor<4x32x64x16xf16>, tensor<4x32x64x16xf16>,
           tensor<4x32x64x128xf16>, f16)
@@ -382,7 +382,7 @@ util.func public @fuse_attention_with_broadcast_transpose(%arg0: tensor<4x?x8x12
   ^bb0(%in: f16, %out: f16):
     linalg.yield %in : f16
   } -> tensor<4x8x4x128x?xf16>
-  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d7, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d5, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5)>]} ins(%arg1, %arg2, %0, %arg3, %arg4 : tensor<4x8x4x?x32x128xf16>, tensor<4x8x4x?x128xf16>, tensor<4x8x4x128x?xf16>, f16, tensor<4x8x4x?x32x?xf16>) outs(%arg5 : tensor<4x8x4x?x32x128xf16>) {
+  %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d7, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d5, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5)>]> ins(%arg1, %arg2, %0, %arg3, %arg4 : tensor<4x8x4x?x32x128xf16>, tensor<4x8x4x?x128xf16>, tensor<4x8x4x128x?xf16>, f16, tensor<4x8x4x?x32x?xf16>) outs(%arg5 : tensor<4x8x4x?x32x128xf16>) {
   ^bb0(%arg7: f32):
     iree_linalg_ext.yield %arg7 : f32
   } -> tensor<4x8x4x?x32x128xf16>
@@ -432,12 +432,12 @@ util.func public @skip_non_projected_permutation_producer(
     linalg.yield %in : f16
   } -> tensor<4x32x64x128xf16>
   %empty_out = tensor.empty() : tensor<4x32x64x128xf16>
-  %attention = iree_linalg_ext.attention {
+  %attention = iree_linalg_ext.attention <
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
-                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]>
       ins(%q_prod, %k_transposed, %v, %scale :
           tensor<4x32x64x128xf16>, tensor<4x32x64x128xf16>,
           tensor<4x32x64x128xf16>, f16)

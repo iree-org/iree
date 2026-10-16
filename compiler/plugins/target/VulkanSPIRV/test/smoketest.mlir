@@ -38,9 +38,9 @@ stream.executable public @reduce_dispatch {
 
 }
 
-//      CHECK:   hal.executable.binary public @vulkan_spirv_fb attributes
-// CHECK-SAME:     data = dense
+//      CHECK:   hal.executable.binary public @vulkan_spirv_fb <
 // CHECK-SAME:     format = "vulkan-spirv-fb"
+// CHECK-SAME:     data = dense
 
 // -----
 
@@ -82,6 +82,6 @@ stream.executable public @bda_reduce_dispatch {
 
 }
 
-//      CHECK:   hal.executable.binary public @vulkan_spirv_bda_v1 attributes
-// CHECK-SAME:     data = dense
+//      CHECK:   hal.executable.binary public @vulkan_spirv_bda_v1 <
 // CHECK-SAME:     format = "vulkan-spirv-bda-v1"
+// CHECK-SAME:     data = dense

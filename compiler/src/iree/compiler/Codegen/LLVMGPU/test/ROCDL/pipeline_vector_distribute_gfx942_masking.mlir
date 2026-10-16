@@ -32,16 +32,14 @@ func.func @attention_20x16x63x4096x64() attributes {hal.executable.target = #exe
   %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
   %7 = tensor.empty() : tensor<20x16x64xf32>
   %8 = tensor.empty() : tensor<20x16xf32>
-  %9:3 = iree_linalg_ext.online_attention {
-    decomposition_config = {
+  %9:3 = iree_linalg_ext.online_attention <decomposition_config = {
       pv_attrs = {
         lowering_config = #iree_gpu.lowering_config<{lane_basis = [[1, 1, 1, 1, 64], [1, 0, 4, 3]], subgroup_basis = [[1, 1, 1, 1, 4], [0, 1, 4, 3]], thread = [0, 0, 0, 8]}>
       },
       qk_attrs = {
         lowering_config = #iree_gpu.lowering_config<{lane_basis = [[1, 1, 1, 1, 64], [1, 0, 3, 4]], subgroup_basis = [[1, 1, 1, 1, 4], [0, 1, 2, 4]], thread = [0, 0, 8, 0]}>
       }
-    },
-    indexing_maps = [
+    }, indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
@@ -49,9 +47,7 @@ func.func @attention_20x16x63x4096x64() attributes {hal.executable.target = #exe
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
-    ],
-    lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 0, 256, 0], workgroup = [1, 1, 0, 0, 16], reduction = [0, 0, 64, 0, 0]}>
-  } ins(%4, %5, %6, %cst : tensor<20x16x63xf16>, tensor<20x4096x63xf16>, tensor<20x4096x64xf16>, f16) outs(%7, %8, %8 : tensor<20x16x64xf32>, tensor<20x16xf32>, tensor<20x16xf32>) {
+    ]> {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 0, 0, 256, 0], workgroup = [1, 1, 0, 0, 16], reduction = [0, 0, 64, 0, 0]}>} ins(%4, %5, %6, %cst : tensor<20x16x63xf16>, tensor<20x4096x63xf16>, tensor<20x4096x64xf16>, f16) outs(%7, %8, %8 : tensor<20x16x64xf32>, tensor<20x16xf32>, tensor<20x16xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<20x16x64xf32>, tensor<20x16xf32>, tensor<20x16xf32>
@@ -91,15 +87,13 @@ func.func @attention_20x16x64x4080x64() attributes {hal.executable.target = #exe
   %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [20, 4080, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4080x64xf16>> -> tensor<20x4080x64xf16>
   %7 = tensor.empty() : tensor<20x16x64xf32>
   %8 = tensor.empty() : tensor<20x16xf32>
-  %9:3 = iree_linalg_ext.online_attention {
-    decomposition_config = {
+  %9:3 = iree_linalg_ext.online_attention <decomposition_config = {
       pv_attrs = {
         attention_pv_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>, promote_operands = [1], subgroup_basis = [[1, 1, 1, 1, 1], [0, 1, 3, 4]]}>},
       qk_attrs = {
         attention_qk_matmul, lowering_config = #iree_gpu.lowering_config<{mma_kind = #iree_gpu.virtual_mma_layout<VMFMA_F32_16x16x32_F16>, promote_operands = [0, 1], subgroup_basis = [[1, 1, 1, 1, 1], [0, 1, 2, 3]]}>
       }
-    },
-    indexing_maps = [
+    }, indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
@@ -107,9 +101,7 @@ func.func @attention_20x16x64x4080x64() attributes {hal.executable.target = #exe
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
-    ],
-    lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1, 2], reduction = [0, 0, 0, 64, 0], workgroup = [1, 16, 0, 0, 64]}>
-  } ins(%4, %5, %6, %cst : tensor<20x16x64xf16>, tensor<20x4080x64xf16>, tensor<20x4080x64xf16>, f16) outs(%7, %8, %8 : tensor<20x16x64xf32>, tensor<20x16xf32>, tensor<20x16xf32>) {
+    ]> {lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1, 2], reduction = [0, 0, 0, 64, 0], workgroup = [1, 16, 0, 0, 64]}>} ins(%4, %5, %6, %cst : tensor<20x16x64xf16>, tensor<20x4080x64xf16>, tensor<20x4080x64xf16>, f16) outs(%7, %8, %8 : tensor<20x16x64xf32>, tensor<20x16xf32>, tensor<20x16xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<20x16x64xf32>, tensor<20x16xf32>, tensor<20x16xf32>

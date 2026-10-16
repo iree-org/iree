@@ -20,9 +20,45 @@
 extern "C" {
 #endif  // __cplusplus
 
-//===----------------------------------------------------------------------===//
-// NUMA queries
-//===----------------------------------------------------------------------===//
+// Node/partitioning terminology
+// NUMA node
+//   A memory-locality domain. This is what a "node" means by default and what
+//   the affinity group hint feeds to set_mempolicy. Sourced from
+//   /sys/devices/system/node/ (sysfs), falling back to the physical package
+//   when that hierarchy is unavailable.
+//
+// package
+//   A physical socket (topology/physical_package_id). Coarser than a NUMA node
+//   on SNC/NPS systems.
+//
+// cluster
+//   A finer, on-die core grouping.
+//   backend-specific.
+//
+// The task system partitions executors by NUMA node.
+
+// Formats the backend's raw hardware ids for |processor| into |buffer| as a
+// human-readable fragment (e.g. "cluster_id=8, physical_package_id=0") for
+// diagnostics. Returns the number of characters written, or 0 when the backend
+// exposes no additional ids.
+iree_host_size_t iree_task_topology_format_processor_debug_ids(
+    uint32_t processor, iree_host_size_t buffer_capacity, char* buffer);
+
+// Redirects topology discovery to a captured or synthetic snapshot of a
+// machine's topology data instead of the live host, for testing and debugging.
+//
+// Returns UNIMPLEMENTED on backends that read no redirectable data source, and
+// NOT_FOUND if |path| does not hold a snapshot the backend can use.
+iree_status_t iree_task_topology_set_snapshot_path(const char* path);
+
+// Maximum number of nodes the topology system enumerates or a
+// --task_topology_nodes selection can name. Machines with more nodes are
+// rejected.
+//
+// Linux's default MAX_NUMNODES on x86_64 (CONFIG_NODES_SHIFT=6, so
+// 1<<6 nodes). MAXSMP kernels raise NODES_SHIFT to 10 (1024 nodes); such a
+// machine is reported as RESOURCE_EXHAUSTED.
+#define IREE_TASK_TOPOLOGY_MAX_NODES 64
 
 // A NUMA node or processor group ordinal.
 typedef uint32_t iree_task_topology_node_id_t;
@@ -30,11 +66,25 @@ typedef uint32_t iree_task_topology_node_id_t;
 // Use any NUMA node (usually the first).
 #define IREE_TASK_TOPOLOGY_NODE_ID_ANY ((iree_task_topology_node_id_t) - 1)
 
-// Returns the total number of NUMA nodes in the system or 1 if the query is
+// Enumerates the ids of all NUMA nodes, writing up to |capacity| ids into
+// |out_ids| and returning the total node count.
+// Ids may be sparse/non-contiguous.
+// Always reports at least one node; when the query is unavailable that node is
+// id 0.
+iree_host_size_t iree_task_topology_query_node_ids(
+    iree_host_size_t capacity, iree_task_topology_node_id_t* out_ids);
+
+// Returns the total number of NUMA nodes in the system, or 1 if the query is
 // not available on the platform.
 iree_host_size_t iree_task_topology_query_node_count(void);
 
-// Returns the NUMA node ID of the currently executing thread or 0 if the query
+// Writes the dense id range [0, |count|) into |out_ids| (up to |capacity|) and
+// returns |count|. Helper for backends whose node ids are always dense.
+iree_host_size_t iree_task_topology_dense_node_ids(
+    iree_host_size_t count, iree_host_size_t capacity,
+    iree_task_topology_node_id_t* out_ids);
+
+// Returns the NUMA node id of the currently executing thread or 0 if the query
 // is not available on the platform.
 iree_task_topology_node_id_t iree_task_topology_query_current_node(void);
 
@@ -115,9 +165,9 @@ void iree_task_topology_group_initialize(uint8_t group_index,
 // We can add the more common heuristics over time to the core and leave the
 // edge cases for applications to construct.
 typedef struct iree_task_topology_t {
-  // NUMA node this topology was created for, or
-  // IREE_TASK_TOPOLOGY_NODE_ID_ANY if unspecified.
-  iree_task_topology_node_id_t node_id;
+  // NUMA node the workers' memory should be bound to, as passed to
+  // mbind/set_mempolicy, or IREE_TASK_TOPOLOGY_NODE_ID_ANY if unspecified.
+  iree_task_topology_node_id_t numa_node_id;
   iree_host_size_t group_count;
   iree_task_topology_group_t groups[IREE_TASK_TOPOLOGY_MAX_GROUP_COUNT];
 } iree_task_topology_t;
@@ -229,10 +279,10 @@ typedef enum iree_task_topology_distribution_e {
   IREE_TASK_TOPOLOGY_DISTRIBUTION_SCATTER = 1,
 } iree_task_topology_distribution_t;
 
-// Initializes a topology with one group for each physical core with the given
-// NUMA |node_id| (usually package or cluster). Up to |max_core_count| physical
-// cores will be selected from the node and distributed according to
-// |distribution| strategy across cache domains.
+// Initializes a topology with one group for each physical core belonging to
+// NUMA |node_id|, or from every node when IREE_TASK_TOPOLOGY_NODE_ID_ANY is
+// passed. Up to |max_core_count| physical cores are selected and distributed
+// according to the |distribution| strategy across cache domains.
 iree_status_t iree_task_topology_initialize_from_physical_cores(
     iree_task_topology_node_id_t node_id,
     iree_task_topology_performance_level_t performance_level,

@@ -19,7 +19,7 @@ func.func @fuse_fill_into_generic(%arg0: tensor<8x16xf32>, %dest: tensor<8x16xf3
          : (!pcf.sref<8x16xf32, sync(#pcf.test_scope)>)
         -> (tensor<8x16xf32>) {
     %slice = pcf.read_slice %ref[%id0, %id1] [4, 8] [1, 1] : !pcf.sref<8x16xf32, sync(#pcf.test_scope)> to tensor<4x8xf32>
-    %result = linalg.exp ins(%slice : tensor<4x8xf32>) outs(%slice : tensor<4x8xf32>) -> tensor<4x8xf32>
+    %result = linalg.elementwise <exp> ins(%slice : tensor<4x8xf32>) outs(%slice : tensor<4x8xf32>) -> tensor<4x8xf32>
     pcf.write_slice %result into %ref[%id0, %id1] [4, 8] [1, 1] : tensor<4x8xf32> into !pcf.sref<8x16xf32, sync(#pcf.test_scope)>
     pcf.return
   }
@@ -36,7 +36,7 @@ func.func @fuse_fill_into_generic(%arg0: tensor<8x16xf32>, %dest: tensor<8x16xf3
 //  CHECK-NEXT:    execute(%[[REF:.+]] = %[[DEST]])[%[[ID0:[A-Za-z0-9_]+]]: index, %[[ID1:[A-Za-z0-9_]+]]: index
 //       CHECK:    %[[EXTRACT:.+]] = tensor.extract_slice %[[DEST]][%[[ID0]], %[[ID1]]] [4, 8] [1, 1]
 //       CHECK:    %[[TILED_FILL:.+]] = linalg.fill ins(%[[CST]]{{.*}} outs(%[[EXTRACT]] : tensor<4x8xf32>)
-//       CHECK:    %[[EXP:.+]] = linalg.exp ins(%[[TILED_FILL]]{{.*}} outs(%[[TILED_FILL]]
+//       CHECK:    %[[EXP:.+]] = linalg.elementwise <exp> ins(%[[TILED_FILL]]{{.*}} outs(%[[TILED_FILL]]
 //       CHECK:    pcf.write_slice %[[EXP]] into %[[REF]][%[[ID0]], %[[ID1]]] [4, 8] [1, 1]
 //       CHECK:    pcf.return
 //       CHECK:  return %[[GENERIC]]
@@ -52,7 +52,7 @@ func.func @fuse_fill_into_loop(%dest: tensor<8x16xf32>, %n0: index, %n1: index) 
             : (!pcf.sref<8x16xf32, sync(#pcf.test_scope)>)
            -> (tensor<8x16xf32>) {
     %slice = pcf.read_slice %ref[%id0, %id1] [4, 8] [1, 1] : !pcf.sref<8x16xf32, sync(#pcf.test_scope)> to tensor<4x8xf32>
-    %result = linalg.exp ins(%slice : tensor<4x8xf32>) outs(%slice : tensor<4x8xf32>) -> tensor<4x8xf32>
+    %result = linalg.elementwise <exp> ins(%slice : tensor<4x8xf32>) outs(%slice : tensor<4x8xf32>) -> tensor<4x8xf32>
     pcf.write_slice %result into %ref[%id0, %id1] [4, 8] [1, 1] : tensor<4x8xf32> into !pcf.sref<8x16xf32, sync(#pcf.test_scope)>
     pcf.return
   }
@@ -68,7 +68,7 @@ func.func @fuse_fill_into_loop(%dest: tensor<8x16xf32>, %n0: index, %n1: index) 
 //  CHECK-NEXT:    execute(%[[REF:.+]] = %[[DEST]])[%[[ID0:[A-Za-z0-9_]+]]: index, %[[ID1:[A-Za-z0-9_]+]]: index
 //       CHECK:    %[[EXTRACT:.+]] = tensor.extract_slice %[[DEST]][%[[ID0]], %[[ID1]]] [4, 8] [1, 1]
 //       CHECK:    %[[TILED_FILL:.+]] = linalg.fill ins(%[[CST]]{{.*}} outs(%[[EXTRACT]] : tensor<4x8xf32>)
-//       CHECK:    %[[EXP:.+]] = linalg.exp ins(%[[TILED_FILL]]{{.*}} outs(%[[TILED_FILL]]
+//       CHECK:    %[[EXP:.+]] = linalg.elementwise <exp> ins(%[[TILED_FILL]]{{.*}} outs(%[[TILED_FILL]]
 //       CHECK:    pcf.write_slice %[[EXP]] into %[[REF]][%[[ID0]], %[[ID1]]] [4, 8] [1, 1]
 //       CHECK:    pcf.return
 //       CHECK:  return %[[LOOP]]
@@ -85,7 +85,7 @@ func.func @fuse_transpose_into_generic(%input: tensor<16x8xf32>, %dest: tensor<8
          : (!pcf.sref<8x16xf32, sync(#pcf.test_scope)>)
         -> (tensor<8x16xf32>) {
     %slice = pcf.read_slice %ref[%id0, %id1] [4, 8] [1, 1] : !pcf.sref<8x16xf32, sync(#pcf.test_scope)> to tensor<4x8xf32>
-    %result = linalg.exp ins(%slice : tensor<4x8xf32>) outs(%slice : tensor<4x8xf32>) -> tensor<4x8xf32>
+    %result = linalg.elementwise <exp> ins(%slice : tensor<4x8xf32>) outs(%slice : tensor<4x8xf32>) -> tensor<4x8xf32>
     pcf.write_slice %result into %ref[%id0, %id1] [4, 8] [1, 1] : tensor<4x8xf32> into !pcf.sref<8x16xf32, sync(#pcf.test_scope)>
     pcf.return
   }
@@ -106,7 +106,7 @@ func.func @fuse_transpose_into_generic(%input: tensor<16x8xf32>, %dest: tensor<8
 //       CHECK:    %[[INPUT_SLICE:.+]] = tensor.extract_slice %[[INPUT]][%[[ID1]], %[[ID0]]] [8, 4] [1, 1] : tensor<16x8xf32> to tensor<8x4xf32>
 //       CHECK:    %[[OUT_SLICE:.+]] = tensor.extract_slice %[[EMPTY]][%[[ID0]], %[[ID1]]] [4, 8] [1, 1] : tensor<8x16xf32> to tensor<4x8xf32>
 //       CHECK:    %[[TRANSPOSED:.+]] = linalg.transpose ins(%[[INPUT_SLICE]] : tensor<8x4xf32>) outs(%[[OUT_SLICE]] : tensor<4x8xf32>) permutation = [1, 0]
-//       CHECK:    %[[EXP:.+]] = linalg.exp ins(%[[TRANSPOSED]]{{.*}} outs(%[[TRANSPOSED]]
+//       CHECK:    %[[EXP:.+]] = linalg.elementwise <exp> ins(%[[TRANSPOSED]]{{.*}} outs(%[[TRANSPOSED]]
 //       CHECK:    pcf.write_slice %[[EXP]] into %[[REF]][%[[ID0]], %[[ID1]]] [4, 8] [1, 1]
 //       CHECK:    pcf.return
 //       CHECK:  return %[[GENERIC]]
@@ -122,10 +122,10 @@ func.func @fuse_fill_multiple_reads(%dest: tensor<8x16xf32>) -> tensor<8x16xf32>
          : (!pcf.sref<8x16xf32, sync(#pcf.test_scope)>)
         -> (tensor<8x16xf32>) {
     %slice0 = pcf.read_slice %ref[%id0, 0] [4, 8] [1, 1] : !pcf.sref<8x16xf32, sync(#pcf.test_scope)> to tensor<4x8xf32>
-    %result0 = linalg.exp ins(%slice0 : tensor<4x8xf32>) outs(%slice0 : tensor<4x8xf32>) -> tensor<4x8xf32>
+    %result0 = linalg.elementwise <exp> ins(%slice0 : tensor<4x8xf32>) outs(%slice0 : tensor<4x8xf32>) -> tensor<4x8xf32>
     pcf.write_slice %result0 into %ref[%id0, 0] [4, 8] [1, 1] : tensor<4x8xf32> into !pcf.sref<8x16xf32, sync(#pcf.test_scope)>
     %slice1 = pcf.read_slice %ref[%id0, 8] [4, 8] [1, 1] : !pcf.sref<8x16xf32, sync(#pcf.test_scope)> to tensor<4x8xf32>
-    %result1 = linalg.exp ins(%slice1 : tensor<4x8xf32>) outs(%slice1 : tensor<4x8xf32>) -> tensor<4x8xf32>
+    %result1 = linalg.elementwise <exp> ins(%slice1 : tensor<4x8xf32>) outs(%slice1 : tensor<4x8xf32>) -> tensor<4x8xf32>
     pcf.write_slice %result1 into %ref[%id0, 8] [4, 8] [1, 1] : tensor<4x8xf32> into !pcf.sref<8x16xf32, sync(#pcf.test_scope)>
     pcf.return
   }
@@ -141,11 +141,11 @@ func.func @fuse_fill_multiple_reads(%dest: tensor<8x16xf32>) -> tensor<8x16xf32>
 //  CHECK-NEXT:    execute(%[[REF:.+]] = %[[DEST]])[%[[ID0:[A-Za-z0-9_]+]]: index
 //       CHECK:    %[[EXT0:.+]] = tensor.extract_slice %[[DEST]][%[[ID0]], 0] [4, 8] [1, 1]
 //       CHECK:    %[[FILL0:.+]] = linalg.fill ins(%[[CST]]{{.*}} outs(%[[EXT0]]
-//       CHECK:    %[[EXP0:.+]] = linalg.exp ins(%[[FILL0]]
+//       CHECK:    %[[EXP0:.+]] = linalg.elementwise <exp> ins(%[[FILL0]]
 //       CHECK:    pcf.write_slice %[[EXP0]] into %[[REF]][%[[ID0]], 0] [4, 8] [1, 1]
 //       CHECK:    %[[EXT1:.+]] = tensor.extract_slice %[[DEST]][%[[ID0]], 8] [4, 8] [1, 1]
 //       CHECK:    %[[FILL1:.+]] = linalg.fill ins(%[[CST]]{{.*}} outs(%[[EXT1]]
-//       CHECK:    %[[EXP1:.+]] = linalg.exp ins(%[[FILL1]]
+//       CHECK:    %[[EXP1:.+]] = linalg.elementwise <exp> ins(%[[FILL1]]
 //       CHECK:    pcf.write_slice %[[EXP1]] into %[[REF]][%[[ID0]], 8] [4, 8] [1, 1]
 //       CHECK:    pcf.return
 //       CHECK:  return %[[GENERIC]]
@@ -161,7 +161,7 @@ func.func @keep_producer_with_other_uses(%dest: tensor<8x16xf32>) -> (tensor<8x1
          : (!pcf.sref<8x16xf32, sync(#pcf.test_scope)>)
         -> (tensor<8x16xf32>) {
     %slice = pcf.read_slice %ref[%id0, %id1] [4, 8] [1, 1] : !pcf.sref<8x16xf32, sync(#pcf.test_scope)> to tensor<4x8xf32>
-    %result = linalg.exp ins(%slice : tensor<4x8xf32>) outs(%slice : tensor<4x8xf32>) -> tensor<4x8xf32>
+    %result = linalg.elementwise <exp> ins(%slice : tensor<4x8xf32>) outs(%slice : tensor<4x8xf32>) -> tensor<4x8xf32>
     pcf.write_slice %result into %ref[%id0, %id1] [4, 8] [1, 1] : tensor<4x8xf32> into !pcf.sref<8x16xf32, sync(#pcf.test_scope)>
     pcf.return
   }
@@ -193,7 +193,7 @@ func.func @fuse_second_init_only(%arg0: tensor<8x16xf32>, %dest: tensor<4x8xf32>
         -> (tensor<8x16xf32>, tensor<4x8xf32>) {
     %slice0 = pcf.read_slice %ref0[%id0, %id1] [4, 8] [1, 1] : !pcf.sref<8x16xf32, sync(#pcf.test_scope)> to tensor<4x8xf32>
     %slice1 = pcf.read_slice %ref1[0, 0] [4, 8] [1, 1] : !pcf.sref<4x8xf32, sync(#pcf.test_scope)> to tensor<4x8xf32>
-    %add = linalg.add ins(%slice0, %slice1 : tensor<4x8xf32>, tensor<4x8xf32>) outs(%slice1 : tensor<4x8xf32>) -> tensor<4x8xf32>
+    %add = linalg.elementwise <add> ins(%slice0, %slice1 : tensor<4x8xf32>, tensor<4x8xf32>) outs(%slice1 : tensor<4x8xf32>) -> tensor<4x8xf32>
     pcf.write_slice %add into %ref0[%id0, %id1] [4, 8] [1, 1] : tensor<4x8xf32> into !pcf.sref<8x16xf32, sync(#pcf.test_scope)>
     pcf.return
   }
@@ -210,7 +210,7 @@ func.func @fuse_second_init_only(%arg0: tensor<8x16xf32>, %dest: tensor<4x8xf32>
 //  CHECK-NEXT:    execute(%[[REF0:.+]] = %[[ARG0]], %[[REF1:.+]] = %[[DEST]])
 //       CHECK:    pcf.read_slice %[[REF0]][%{{.+}}, %{{.+}}] [4, 8] [1, 1]
 //       CHECK:    %[[TILED_FILL:.+]] = linalg.fill ins(%[[CST]]{{.*}} outs(%[[DEST]] : tensor<4x8xf32>)
-//       CHECK:    linalg.add
+//       CHECK:    linalg.elementwise <add>
 //       CHECK:    pcf.write_slice
 //       CHECK:    pcf.return
 
@@ -264,7 +264,7 @@ func.func @no_fuse_no_sync_scope(%dest: tensor<8x16xf32>) -> tensor<8x16xf32> {
          : (!pcf.sref<8x16xf32, #pcf.test_scope>)
         -> (tensor<8x16xf32>) {
     %slice = pcf.read_slice %ref[%id0, %id1] [4, 8] [1, 1] : !pcf.sref<8x16xf32, #pcf.test_scope> to tensor<4x8xf32>
-    %result = linalg.exp ins(%slice : tensor<4x8xf32>) outs(%slice : tensor<4x8xf32>) -> tensor<4x8xf32>
+    %result = linalg.elementwise <exp> ins(%slice : tensor<4x8xf32>) outs(%slice : tensor<4x8xf32>) -> tensor<4x8xf32>
     pcf.write_slice %result into %ref[%id0, %id1] [4, 8] [1, 1] : tensor<4x8xf32> into !pcf.sref<8x16xf32, #pcf.test_scope>
     pcf.return
   }

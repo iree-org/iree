@@ -10,10 +10,10 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/MathExtras.h"
-#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
+#include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -231,13 +231,17 @@ struct ExpandGPUOpsPass final : impl::ExpandGPUOpsPassBase<ExpandGPUOpsPass> {
     RewritePatternSet patterns(ctx);
     auto execTarget = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
-    StringRef targetArch = target.getArch();
-    auto maybeChipset = amdgpu::Chipset::parse(targetArch);
-    if (succeeded(maybeChipset) && isROCMBackend(execTarget)) {
-      populateGpuLowerSubgroupReduceToDPPPatterns(
-          patterns, *subgroupSize, *maybeChipset, PatternBenefit(2));
-      populateGpuLowerClusteredSubgroupReduceToDPPPatterns(
-          patterns, *subgroupSize, *maybeChipset, PatternBenefit(2));
+    if (isROCMBackend(execTarget)) {
+      // If the target cannot be resolved (e.g. an unknown architecture), skip
+      // the DPP-based lowerings and fall back to the shuffle-based ones.
+      FailureOr<ROCDL::TargetInfo> maybeTargetInfo =
+          ROCDL::TargetInfo::get(target.getArch(), *subgroupSize);
+      if (succeeded(maybeTargetInfo)) {
+        populateGpuLowerSubgroupReduceToDPPPatterns(
+            patterns, *subgroupSize, *maybeTargetInfo, PatternBenefit(2));
+        populateGpuLowerClusteredSubgroupReduceToDPPPatterns(
+            patterns, *subgroupSize, *maybeTargetInfo, PatternBenefit(2));
+      }
     }
 
     populateGpuBreakDownSubgroupReducePatterns(

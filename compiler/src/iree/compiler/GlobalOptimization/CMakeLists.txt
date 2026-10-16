@@ -35,14 +35,46 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    QuantizationUtils
+  HDRS
+    "QuantizationUtils.h"
+  SRCS
+    "QuantizationUtils.cpp"
+  DEPS
+    LLVMSupport
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    QuantizedContraction
+  HDRS
+    "QuantizedContraction.h"
+  SRCS
+    "QuantizedContraction.cpp"
+  DEPS
+    ::QuantizationUtils
+    LLVMSupport
+    MLIRArithDialect
+    MLIRIR
+    MLIRLinalgDialect
+    MLIRSupport
+    iree::compiler::Dialect::LinalgExt::IR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     GlobalOptimization
   HDRS
     "Passes.h"
+    "TransposePropagationPatterns.h"
     "Utils.h"
   SRCS
     "CleanupNumericNarrowing.cpp"
     "ConvertBatchMatmulToMatmul.cpp"
     "ConvertConv2DToImg2Col.cpp"
+    "ConvertQDQToIntegerMath.cpp"
     "ConvertStridedContractionToContraction.cpp"
     "DataLayoutPropagation.cpp"
     "DecomposeConcat.cpp"
@@ -57,17 +89,21 @@ iree_cc_library(
     "MaterializeHomogeneousEncodings.cpp"
     "OptimizeNumerics.cpp"
     "Passes.cpp"
+    "PropagateAffineQuantization.cpp"
     "PropagateLinalgTranspose.cpp"
     "QuantizedConvToConv.cpp"
     "QuantizedMatmulToMatmul.cpp"
     "RaiseSpecialOps.cpp"
     "RemoveZeroExtentTensors.cpp"
     "SimplifyPackUnpack.cpp"
+    "TransposePropagationPatterns.cpp"
     "Utils.cpp"
     "WarnOnUninitializedValues.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    ::QuantizationUtils
+    ::QuantizedContraction
     LLVMSupport
     MLIRAffineDialect
     MLIRArithDialect

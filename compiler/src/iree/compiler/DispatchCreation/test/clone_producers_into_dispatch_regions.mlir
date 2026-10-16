@@ -388,13 +388,13 @@ util.func public @attention_clone_mask(%arg0: tensor<?x?xf16>,
     linalg.yield %7 : i1
   } -> tensor<?x?xi1>
   %3 = flow.dispatch.region -> (tensor<?x?xf16>{%dim, %dim_1}) {
-    %4 = iree_linalg_ext.attention {
+    %4 = iree_linalg_ext.attention <
         indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3)>,
                          affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                          affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
                          affine_map<(d0, d1, d2, d3) -> ()>,
                          affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
-                         affine_map<(d0, d1, d2, d3) -> (d0, d1)>]}
+                         affine_map<(d0, d1, d2, d3) -> (d0, d1)>]>
         ins(%arg0, %arg1, %arg2, %cst, %2 : tensor<?x?xf16>, tensor<?x?xf16>,
             tensor<?x?xf16>, f16, tensor<?x?xi1>) outs(%1 : tensor<?x?xf16>) {
     ^bb0(%arg3: f32):
@@ -429,13 +429,13 @@ util.func public @dont_clone_flow_ops(%arg0: tensor<?x?xf16>, %arg1: tensor<?x?x
   %1 = tensor.empty(%dim, %dim_1) : tensor<?x?xf16>
   %2 = flow.tensor.transfer %arg3 : tensor<?x?xi1>{%dim_2, %dim_3} to #hal.device.promise<@dev_a>
   %3 = flow.dispatch.region -> (tensor<?x?xf16>{%dim, %dim_1}) {
-    %4 = iree_linalg_ext.attention {
+    %4 = iree_linalg_ext.attention <
         indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3)>,
                          affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                          affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
                          affine_map<(d0, d1, d2, d3) -> ()>,
                          affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
-                         affine_map<(d0, d1, d2, d3) -> (d0, d1)>]}
+                         affine_map<(d0, d1, d2, d3) -> (d0, d1)>]>
         ins(%arg0, %arg1, %arg2, %cst, %2 : tensor<?x?xf16>, tensor<?x?xf16>,
             tensor<?x?xf16>, f16, tensor<?x?xi1>) outs(%1 : tensor<?x?xf16>) {
     ^bb0(%in: f32):
@@ -529,12 +529,12 @@ util.func @attention_bitextend_fusion(%arg0: tensor<10x20x30x50xf8E4M3FNUZ>,
   } -> tensor<10x20x40x50xbf16>
   %empty = tensor.empty() : tensor<10x20x30x40xbf16>
   %dispatch = flow.dispatch.region -> (tensor<10x20x30x40xbf16>) {
-    %attention = iree_linalg_ext.attention {
+    %attention = iree_linalg_ext.attention <
         indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
                          affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
                          affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
                          affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
-                         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]}
+                         affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]>
         ins(%query, %key, %value, %cst
             : tensor<10x20x30x50xbf16>, tensor<10x20x40x50xbf16>, tensor<10x20x40x50xbf16>, bf16)
         outs(%empty : tensor<10x20x30x40xbf16>) {
@@ -884,14 +884,14 @@ util.func public @clone_linalg_ext_gather_attention(
   %3 = flow.dispatch.region -> (tensor<8x4x1x128xf16>) {
     %4 = tensor.empty() : tensor<8x4x1x128xf16>
     %cst = arith.constant 8.837890e-02 : f16
-    %5 = iree_linalg_ext.attention {
+    %5 = iree_linalg_ext.attention <
       indexing_maps = [
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d7, d0, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d5, d6, d7, d0, d3)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7)>,
-        affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3)>]}
+        affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3)>]>
       ins(%arg1, %1, %2, %cst, %arg2 : tensor<8x4x1x128xf16>, tensor<1x?x32x8x128xf16>, tensor<1x?x32x8x128xf16>, f16, tensor<8x4x1x?x32xf16>)
       outs(%4 : tensor<8x4x1x128xf16>) {
     ^bb0(%arg6: f32):
@@ -942,13 +942,13 @@ util.func public @dont_clone_gather_like(%arg0: tensor<4x1x4xi64>, %arg1: tensor
   } -> tensor<4x1x4x16x32x128xf16>
   %3 = tensor.empty() : tensor<4x1x32x1x128xf16>
   %4 = flow.dispatch.region -> (tensor<4x1x32x1x128xf16>) {
-    %5 = iree_linalg_ext.attention {
+    %5 = iree_linalg_ext.attention <
       indexing_maps = [
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d2, d4)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d2, d7)>,
         affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> ()>,
-        affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d7)>]}
+        affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d7)>]>
       ins(%arg5, %1, %2, %arg2 : tensor<4x1x32x1x128xf16>, tensor<4x1x4x16x32x128xf16>, tensor<4x1x4x16x32x128xf16>, f16)
       outs(%3 : tensor<4x1x32x1x128xf16>) {
       ^bb0(%score: f16):

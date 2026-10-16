@@ -143,7 +143,7 @@ modern families LLVM documents and the ROCm/TheRock selector vocabulary names:
 | `gfx10.3` RDNA | `gfx1030`, `gfx1031`, `gfx1032`, `gfx1033`, `gfx1034`, `gfx1035`, `gfx1036` | `gfx10-3-generic` |
 | `gfx11` RDNA/APU | `gfx1100`, `gfx1101`, `gfx1102`, `gfx1103`, `gfx1150`, `gfx1151`, `gfx1152`, `gfx1153`, `gfx1170`, `gfx1171`, `gfx1172` | `gfx11-generic` |
 | `gfx12` RDNA | `gfx1200`, `gfx1201` | `gfx12-generic` |
-| `gfx12.5` RDNA | `gfx1250`, `gfx1251` | `gfx12-5-generic` |
+| `gfx12.5` CDNA5 | `gfx1250`, `gfx1251` | `gfx12-5-generic` |
 
 `gfx12-5-generic` is available as an explicit selector, but it is intentionally
 not part of the default checked-in prebuilt set until ROCm/LLVM can link these

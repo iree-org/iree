@@ -17,10 +17,7 @@
 ]>
 hal.executable private @matmul {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @matmul layout(#pipeline_layout) attributes {
-      workgroup_size = [16: index, 8: index, 1: index],
-      translation_info = #translation
-    }
+    hal.executable.export public @matmul layout(#pipeline_layout) <workgroup_size = [16: index, 8: index, 1: index]> attributes {translation_info = #translation}
     builtin.module {
       func.func @matmul() {
         %c0 = arith.constant 0 : index
@@ -85,10 +82,7 @@ hal.executable private @matmul {
 ]>
 hal.executable private @conv_1d {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @conv_1d layout(#pipeline_layout) attributes {
-      workgroup_size = [32: index, 4: index, 1: index],
-      translation_info = #translation
-    }
+    hal.executable.export public @conv_1d layout(#pipeline_layout) <workgroup_size = [32: index, 4: index, 1: index]> attributes {translation_info = #translation}
     builtin.module {
       func.func @conv_1d() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -160,10 +154,7 @@ hal.executable private @conv_1d {
 ]>
 hal.executable private @conv_2d {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @conv_2d layout(#pipeline_layout) attributes {
-      workgroup_size = [32: index, 4: index, 1: index],
-      translation_info = #translation
-    }
+    hal.executable.export public @conv_2d layout(#pipeline_layout) <workgroup_size = [32: index, 4: index, 1: index]> attributes {translation_info = #translation}
     builtin.module {
       func.func @conv_2d() {
         %c0 = arith.constant 0 : index
@@ -273,10 +264,7 @@ hal.executable private @conv_2d {
 ]>
 hal.executable private @conv_3d {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @conv_3d layout(#pipeline_layout) attributes {
-      workgroup_size = [32: index, 4: index, 1: index],
-      translation_info = #translation
-    }
+    hal.executable.export public @conv_3d layout(#pipeline_layout) <workgroup_size = [32: index, 4: index, 1: index]> attributes {translation_info = #translation}
     builtin.module {
       func.func @conv_3d() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -341,10 +329,7 @@ hal.executable private @conv_3d {
 ]>
 hal.executable private @pooling_nhwc_max {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @pooling_nhwc_max layout(#pipeline_layout) attributes {
-      workgroup_size = [32: index, 4: index, 1: index],
-      translation_info = #translation
-    }
+    hal.executable.export public @pooling_nhwc_max layout(#pipeline_layout) <workgroup_size = [32: index, 4: index, 1: index]> attributes {translation_info = #translation}
     builtin.module {
       func.func @pooling_nhwc_max() {
         %c0 = arith.constant 0 : index
@@ -405,10 +390,7 @@ hal.executable private @pooling_nhwc_max {
 
 hal.executable @matvec {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb">) {
-    hal.executable.export public @matvec ordinal(0) layout(#pipeline_layout) attributes {
-      workgroup_size = [32: index, 1: index, 1: index],
-      translation_info = #translation
-    }
+    hal.executable.export public @matvec ordinal(0) layout(#pipeline_layout) <workgroup_size = [32: index, 1: index, 1: index]> attributes {translation_info = #translation}
     builtin.module {
       func.func @matvec() {
         %c250 = arith.constant 250 : index

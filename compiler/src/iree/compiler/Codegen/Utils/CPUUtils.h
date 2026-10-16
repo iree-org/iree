@@ -58,10 +58,46 @@ bool isProducerOfRootOp(Operation *op, Operation *rootOp);
 /// features or any other feature flag that includes them.
 bool hasAnySVEFeature(DictionaryAttr targetConfig);
 
-/// Returns the default vscale range for the given target. Currently only
-/// returns a range for AArch64 targets with SVE/SVE2 enabled.
+/// Returns true if the 'targetAttr' contains '+v' in its cpu features.
+bool hasVFeature(DictionaryAttr targetConfig);
+
+/// Returns true if the 'targetAttr' contains '+zve32x' in its cpu features.
+bool hasZve32xFeature(DictionaryAttr targetConfig);
+
+/// Returns true if the 'targetAttr' contains '+zve32f' in its cpu features.
+bool hasZve32fFeature(DictionaryAttr targetConfig);
+
+/// Returns true if the 'targetAttr' contains '+zve64x' in its cpu features.
+bool hasZve64xFeature(DictionaryAttr targetConfig);
+
+/// Returns true if the 'targetAttr' contains any riscv vector feature in its
+/// cpu features.
+bool hasAnyVFeature(DictionaryAttr targetConfig);
+
+/// Returns true if target supports scalable vector code generation.
+bool targetSupportsScalableVectors(DictionaryAttr targetConfig);
+
+/// Reads the vscale range from the target config, if present.
+std::optional<std::pair<int64_t, int64_t>>
+getConfigVscaleRange(DictionaryAttr targetConfig);
+
+/// Records the `[vscaleMin, vscaleMax]` scalable-vector range on the `config`
+/// list, in vscale units.
+void addConfigVscaleRange(MLIRContext *context, int64_t vscaleMin,
+                          int64_t vscaleMax,
+                          SmallVectorImpl<NamedAttribute> &config);
+
+/// Returns the default vscale range for the given target, independent of any
+/// user-specified range. Currently only returns a range for AArch64 targets
+/// with SVE/SVE2 enabled.
 std::optional<vector::VscaleRange>
 getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+/// Returns the effective scalable-vector range for the given target: a
+/// user-specified range recorded on the target config if present, otherwise the
+/// target's default range, or nullopt if neither exists.
+std::optional<vector::VscaleRange>
+getVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 } // namespace mlir::iree_compiler
 

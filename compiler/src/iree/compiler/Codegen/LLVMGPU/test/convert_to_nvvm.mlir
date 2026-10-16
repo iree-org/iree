@@ -94,8 +94,8 @@ hal.executable @abs_dynamic {
 //   CHECK-DAG: %[[C4096_i32:.+]] = llvm.mlir.constant(4096 : i32) : i32
 //   CHECK-DAG: %[[C0_i32:.+]] = llvm.mlir.constant(0 : i32) : i32
 //   CHECK-DAG: %[[C32_i64:.+]] = llvm.mlir.constant(32 : i64) : i64
-//   CHECK-DAG: %[[C5185728_i64:.+]] = llvm.mlir.constant(5185728 : index) : i64
-//   CHECK-DAG: %[[C4438911803328_i64:.+]] = llvm.mlir.constant(4438911803328 : index) : i64
+//   CHECK-DAG: %[[C5185728_i64:.+]] = llvm.mlir.constant(5185728 : i64) : i64
+//   CHECK-DAG: %[[C4438911803328_i64:.+]] = llvm.mlir.constant(4438911803328 : i64) : i64
 //   CHECK-DAG: %[[OFFSET_LO:.+]] = llvm.zext %[[ARG3]] : i32 to i64
 //   CHECK-DAG: %[[OFFSET_HI:.+]] = llvm.zext %[[ARG4]] : i32 to i64
 //   CHECK-DAG: %[[OFFSET_HI_SHL:.+]] = llvm.shl %[[OFFSET_HI]], %[[C32_i64]] : i64
@@ -194,7 +194,7 @@ hal.executable @mixed_type {
 //  CHECK-SAME:  %{{.*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.nonnull, llvm.noundef})
 //       CHECK:   %[[BYTES_PER_BIT:.+]] = llvm.mlir.constant(8 : i64) : i64
 //       CHECK:   %[[BITS_PER_ELEM:.+]] = llvm.mlir.constant(32 : i64) : i64
-//       CHECK:   %[[BYTE_OFFSET:.+]] = llvm.mlir.constant(128 : index) : i64
+//       CHECK:   %[[BYTE_OFFSET:.+]] = llvm.mlir.constant(128 : i64) : i64
 //       CHECK:   %[[OFFSET_BITS:.+]] = llvm.mul %[[BYTE_OFFSET]], %[[BYTES_PER_BIT]]
 //       CHECK:   %[[OFFSET_ELEMS:.+]] = llvm.udiv %[[OFFSET_BITS]], %[[BITS_PER_ELEM]]
 //       CHECK:   nvvm.read.ptx.sreg.tid.x
@@ -422,8 +422,8 @@ hal.executable @masked_load_store {
 }
 // CHECK-LABEL: llvm.func @masked_load_store
 //       CHECK:   %[[MASK_BIT:.+]] = llvm.icmp "sgt" {{.*}} : vector<1xi64>
-//       CHECK:   llvm.intr.masked.load %{{.*}}, %[[MASK_BIT]]
-//       CHECK:   llvm.intr.masked.store %{{.*}}, %[[MASK_BIT]]
+//       CHECK:   llvm.intr.masked.load(%{{.*}}, %[[MASK_BIT]]
+//       CHECK:   llvm.intr.masked.store(%{{.*}}, %{{.*}}, %[[MASK_BIT]]
 
 // -----
 // Test workgroup size lowering
@@ -434,9 +434,9 @@ hal.executable @masked_load_store {
 ]>
 hal.executable private @interface_wg_size {
   hal.executable.variant @rocm target(<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export public @interface_wg_size layout(#pipeline_layout) attributes {
+    hal.executable.export public @interface_wg_size layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
-    }
+    >
     builtin.module attributes {} {
       func.func @interface_wg_size() {
         %c0 = arith.constant 0.0 : f32

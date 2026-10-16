@@ -101,8 +101,13 @@ static SmallVector<StorageResource> bucketValuesIntoStorageResources(
     uint64_t unpaddedLength = slice.getStorageSize();
     uint64_t paddedLength = IREE::Util::align(
         unpaddedLength, resourceConfig.getMinBufferRangeAlignment());
-    if (offset + unpaddedLength > resourceConfig.getMaxAllocationSize()) {
-      // Spilling buffer; make a new one.
+    // If unpaddedLength is bigger than resourceConfig.getMaxAllocationSize(),
+    // there no way to stay below the threshold. In this case, make sure that
+    // no new storage buffer is allocated if the current one is empty, so check
+    // current offset.
+    if (offset > 0 &&
+        offset + unpaddedLength > resourceConfig.getMaxAllocationSize()) {
+      // Spilling non-empty buffer; make a new one.
       storageBuffers.push_back({UnknownLoc::get(resourceConfig.getContext())});
       currentBuffer = &storageBuffers.back();
       offset = 0;

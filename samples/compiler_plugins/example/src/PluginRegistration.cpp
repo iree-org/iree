@@ -5,9 +5,31 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/PluginAPI/Client.h"
+#include "iree/compiler/PluginAPI/PluginEntryPoint.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
+
+// This source is compiled twice: as the static example plugin and the loadable
+// example_dyn plugin. Distinct IDs keep their registration symbols,
+// command-line options, and categories from colliding when both are in the same
+// process.
+#ifndef IREE_EXAMPLE_PLUGIN_ID
+#define IREE_EXAMPLE_PLUGIN_ID example
+#endif
+
+#define IREE_EXAMPLE_CONCAT_IMPL(a, b) a##b
+#define IREE_EXAMPLE_CONCAT(a, b) IREE_EXAMPLE_CONCAT_IMPL(a, b)
+#define IREE_EXAMPLE_STRINGIFY_IMPL(x) #x
+#define IREE_EXAMPLE_STRINGIFY(x) IREE_EXAMPLE_STRINGIFY_IMPL(x)
+
+#define IREE_EXAMPLE_PLUGIN_ID_STR \
+  IREE_EXAMPLE_STRINGIFY(IREE_EXAMPLE_PLUGIN_ID)
+#define IREE_EXAMPLE_PLUGIN_FLAG "iree-" IREE_EXAMPLE_PLUGIN_ID_STR "-flag"
+#define IREE_EXAMPLE_PLUGIN_CATEGORY \
+  "IREE Example Plugin (" IREE_EXAMPLE_PLUGIN_ID_STR ")"
+#define IREE_EXAMPLE_REGISTER_PLUGIN \
+  IREE_EXAMPLE_CONCAT(iree_register_compiler_plugin_, IREE_EXAMPLE_PLUGIN_ID)
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
@@ -18,8 +40,8 @@ struct MyOptions {
   bool flag = false;
 
   void bindOptions(OptionsBinder& binder) {
-    static llvm::cl::OptionCategory category("IREE Example Plugin");
-    binder.opt<bool>("iree-example-flag", flag,
+    static llvm::cl::OptionCategory category(IREE_EXAMPLE_PLUGIN_CATEGORY);
+    binder.opt<bool>(IREE_EXAMPLE_PLUGIN_FLAG, flag,
                      llvm::cl::desc("Dummy flag for the example plugin"),
                      llvm::cl::cat(category));
   }
@@ -27,6 +49,7 @@ struct MyOptions {
 
 struct MySession : public PluginSession<MySession, MyOptions> {
   LogicalResult onActivate() override {
+    // Both tests assert on this text, so it must not vary by build.
     mlir::emitRemark(mlir::UnknownLoc::get(context))
         << "This remark is from the example plugin activation (flag="
         << options.flag << ")";
@@ -38,8 +61,11 @@ struct MySession : public PluginSession<MySession, MyOptions> {
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(MyOptions);
 
-extern "C" bool iree_register_compiler_plugin_example(
+static bool registerExamplePlugin(
     mlir::iree_compiler::PluginRegistrar* registrar) {
-  registrar->registerPlugin<MySession>("example");
+  registrar->registerPlugin<MySession>(IREE_EXAMPLE_PLUGIN_ID_STR);
   return true;
 }
+
+IREE_DEFINE_COMPILER_PLUGIN(IREE_EXAMPLE_PLUGIN_ID, registerExamplePlugin,
+                            "0.1")

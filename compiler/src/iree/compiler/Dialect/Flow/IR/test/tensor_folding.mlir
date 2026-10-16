@@ -593,39 +593,37 @@ util.func public @sliceConst2DZeroLength01() -> tensor<0x0xi32> {
 util.func public @sliceFromZeroElements(%arg0: tensor<0xi32>) -> tensor<?xi32> {
   %c0 = arith.constant 0 : index
   // CHECK-NOT: flow.tensor.slice
-  // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<0xi32>
-  // CHECK: %[[CAST:.+]] = tensor.cast %[[RET]] : tensor<0xi32> to tensor<?xi32>
+  // CHECK: %[[RET:.+]] = flow.tensor.empty : tensor<?xi32>{%c0}
   %0 = flow.tensor.slice %arg0[%c0 for %c0] : tensor<0xi32> -> tensor<?xi32>{%c0}
-  // CHECK: util.return %[[CAST]]
+  // CHECK: util.return %[[RET]]
   util.return %0 : tensor<?xi32>
 }
 // -----
 
-// Folds a constant dynamic dimension operand into the static result shape.
+// Constant dimensions remain explicit operands: Flow canonicalization must not
+// introduce tensor.cast after Tensor-to-Flow conversion.
 
 // CHECK-LABEL: @emptyFoldConstantDim
 util.func public @emptyFoldConstantDim() -> tensor<?x4xf32> {
   %c8 = arith.constant 8 : index
-  // CHECK: %[[EMPTY:.+]] = flow.tensor.empty : tensor<8x4xf32>
-  // CHECK: %[[CAST:.+]] = tensor.cast %[[EMPTY]] : tensor<8x4xf32> to tensor<?x4xf32>
+  // CHECK: %[[EMPTY:.+]] = flow.tensor.empty : tensor<?x4xf32>{%c8}
   %0 = flow.tensor.empty : tensor<?x4xf32>{%c8}
-  // CHECK: util.return %[[CAST]]
+  // CHECK: util.return %[[EMPTY]]
   util.return %0 : tensor<?x4xf32>
 }
 
 
 // -----
 
-// Folds only the constant dynamic dimension; the non-constant one stays dynamic.
+// Preserve both constant and non-constant dynamic dimensions.
 
 // CHECK-LABEL: @emptyFoldMixedDims
 // CHECK-SAME: (%[[DIM:.+]]: index)
 util.func public @emptyFoldMixedDims(%dim: index) -> tensor<?x8x?xf32> {
   %c4 = arith.constant 4 : index
-  // CHECK: %[[EMPTY:.+]] = flow.tensor.empty : tensor<?x8x4xf32>{%[[DIM]]}
-  // CHECK: %[[CAST:.+]] = tensor.cast %[[EMPTY]] : tensor<?x8x4xf32> to tensor<?x8x?xf32>
+  // CHECK: %[[EMPTY:.+]] = flow.tensor.empty : tensor<?x8x?xf32>{%[[DIM]], %c4}
   %0 = flow.tensor.empty : tensor<?x8x?xf32>{%dim, %c4}
-  // CHECK: util.return %[[CAST]]
+  // CHECK: util.return %[[EMPTY]]
   util.return %0 : tensor<?x8x?xf32>
 }
 
@@ -1022,3 +1020,40 @@ util.func public @innermost_unit_dim(%4: !iree_tensor_ext.dispatch.tensor<readon
 //  CHECK-SAME:     %[[DYNAMIC_DIM:[a-zA-Z0-9]+]]: index)
 //       CHECK:   iree_tensor_ext.dispatch.tensor.load
 //  CHECK-SAME:       sizes = [1, 1, 16, %[[DYNAMIC_DIM]], 1]
+
+// -----
+
+#encoding = #iree_encoding.testing<>
+
+// CHECK-LABEL: @foldTensorEncodeSameType
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<4x4xf32, #encoding>)
+util.func public @foldTensorEncodeSameType(%arg0: tensor<4x4xf32, #encoding>) -> tensor<4x4xf32, #encoding> {
+  // CHECK-NOT: flow.tensor.encode
+  %0 = flow.tensor.encode %arg0 : tensor<4x4xf32, #encoding> -> tensor<4x4xf32, #encoding>
+  // CHECK: util.return %[[ARG0]]
+  util.return %0 : tensor<4x4xf32, #encoding>
+}
+
+// -----
+
+#encoding = #iree_encoding.testing<>
+
+// CHECK-LABEL: @foldTensorEncodeSameTypeDynamic
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x4xf32, #encoding>
+util.func public @foldTensorEncodeSameTypeDynamic(%arg0: tensor<?x4xf32, #encoding>, %dim: index) -> tensor<?x4xf32, #encoding> {
+  // CHECK-NOT: flow.tensor.encode
+  %0 = flow.tensor.encode %arg0 : tensor<?x4xf32, #encoding>{%dim} -> tensor<?x4xf32, #encoding>{%dim}
+  // CHECK: util.return %[[ARG0]]
+  util.return %0 : tensor<?x4xf32, #encoding>
+}
+
+// -----
+
+#encoding = #iree_encoding.testing<>
+
+// CHECK-LABEL: @dontFoldTensorEncodeDifferentEncoding
+util.func public @dontFoldTensorEncodeDifferentEncoding(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32, #encoding> {
+  // CHECK: flow.tensor.encode
+  %0 = flow.tensor.encode %arg0 : tensor<4x4xf32> -> tensor<4x4xf32, #encoding>
+  util.return %0 : tensor<4x4xf32, #encoding>
+}

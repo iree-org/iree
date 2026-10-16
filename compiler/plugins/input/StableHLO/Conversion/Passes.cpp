@@ -74,6 +74,10 @@ void buildStableHLOInputConversionPassPipelineImpl(
     passManager.addPass(createFlattenTuplesInCFG());
   }
 
+  // Runs after the tuple flatteners, which unpack a bounded tensor out of a
+  // tuple argument.
+  passManager.addNestedPass<func::FuncOp>(createLowerBounds());
+
   passManager.addPass(createStableHLOToStableHLOPreprocessing());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
 
@@ -89,6 +93,11 @@ void buildStableHLOInputConversionPassPipelineImpl(
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());
+
+  // A shape operand that arrives through a call is constant only once the
+  // inliner has run.
+  passManager.addNestedPass<func::FuncOp>(
+      ::mlir::stablehlo::createStablehloCanonicalizeDynamismPass());
 
   // Perform initial cleanup. createLegalizeInputTypes could rewrite types. In
   // this context, some operations could be folded away.

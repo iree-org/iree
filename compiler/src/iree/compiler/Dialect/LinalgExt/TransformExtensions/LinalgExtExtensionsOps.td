@@ -29,11 +29,10 @@ def DecomposeAggregateOp : Op<Transform_Dialect, "iree.decompose_aggregate_op",
   );
   let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
-  let assemblyFormat = "attr-dict $target `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
 
   let assemblyFormat = [{
-    $target attr-dict `:` functional-type(operands, results)
+    $target prop-dict attr-dict `:` functional-type(operands, results)
   }];
 
   let extraClassDeclaration = [{

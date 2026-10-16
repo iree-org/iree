@@ -23,6 +23,13 @@ struct Range;
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
+/// Clones a named Linalg op, preserving its metadata and rebuilding its scalar
+/// body for new operand types. Operand and result counts must be unchanged.
+linalg::LinalgOp cloneNamedLinalgOpWithNewTypes(RewriterBase &rewriter,
+                                                linalg::LinalgOp op,
+                                                TypeRange resultTypes,
+                                                ValueRange operands);
+
 /// Helper to compute the product of a list of OpFoldResult inputs with
 /// affine.apply.
 OpFoldResult computeProductUsingAffine(OpBuilder &builder, Location loc,

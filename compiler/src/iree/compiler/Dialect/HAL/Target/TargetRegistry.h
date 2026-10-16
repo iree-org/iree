@@ -17,6 +17,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
 
@@ -127,13 +128,17 @@ struct TargetRegistryRef {
       : value(&value) {}
   TargetRegistryRef(const mlir::iree_compiler::IREE::HAL::TargetRegistry *value)
       : value(value) {}
-  operator bool() const noexcept {
+  explicit operator bool() const noexcept {
     return value->getRegisteredTargetDevices() !=
                mlir::iree_compiler::IREE::HAL::TargetRegistry::getGlobal()
                    .getRegisteredTargetDevices() &&
            value->getRegisteredTargetBackends() !=
                mlir::iree_compiler::IREE::HAL::TargetRegistry::getGlobal()
                    .getRegisteredTargetBackends();
+  }
+  bool isGlobal() const {
+    return value ==
+           &mlir::iree_compiler::IREE::HAL::TargetRegistry::getGlobal();
   }
   const mlir::iree_compiler::IREE::HAL::TargetRegistry *operator->() const {
     return value;
@@ -152,6 +157,7 @@ public:
   void printOptionDiff(const Option &O, TargetRegistryRef V,
                        const OptVal &Default, size_t GlobalWidth) const;
   void anchor() override;
+  static void print(raw_ostream &os, const TargetRegistryRef &value);
 };
 
 } // namespace llvm::cl

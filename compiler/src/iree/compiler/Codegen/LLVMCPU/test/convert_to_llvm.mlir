@@ -182,7 +182,7 @@ module attributes {
 }
 
 // CHECK-LABEL:   llvm.func @negative_no_gather_lowering(
-// CHECK: llvm.intr.masked.gather {{.*}} : (vector<64x!llvm.ptr>, vector<64xi1>, vector<64xf32>) -> vector<64xf32>
+// CHECK: llvm.intr.masked.gather({{.*}}), alignment({{[0-9]+}}) : (vector<64x!llvm.ptr>, vector<64xi1>, vector<64xf32>) -> vector<64xf32>
 
 // -----
 
@@ -208,3 +208,17 @@ llvm.func @sink_f32(%arg0: f32) {
 // CHECK:       llvm.call @sink_f32
 // CHECK-NOT:   free
 // CHECK:       llvm.return
+
+// -----
+
+// CHECK: llvm.func @preserve_abi_properties(!llvm.ptr {llvm.nonnull}, i32)
+// CHECK-SAME: convergent
+// CHECK-SAME: no_unwind
+module {
+  llvm.func @preserve_abi_properties(!llvm.ptr {llvm.nonnull}) attributes {
+    convergent,
+    no_unwind,
+    hal.import.bitcode = true,
+    hal.import.fields = ["processor_id"]
+  }
+}

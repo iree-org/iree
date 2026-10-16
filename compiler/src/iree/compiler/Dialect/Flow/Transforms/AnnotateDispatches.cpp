@@ -519,7 +519,7 @@ struct AnnotateDispatchesPass
 
         exportOp.setSymName(newName);
         exportOp.setFunctionRef(newName);
-        funcOp.setName(newName);
+        funcOp.setSymbolName(newName);
 
         auto newSymbolRefAttr =
             SymbolRefAttr::get(&getContext(), executableOp.getName(),

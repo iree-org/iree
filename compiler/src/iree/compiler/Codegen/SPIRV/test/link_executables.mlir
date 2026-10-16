@@ -41,9 +41,7 @@ hal.executable private @dispatch_1 {
     hal.executable.export public @dispatch_1 ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
-    } attributes {
-      workgroup_size = [64: index, 1: index, 1: index], subgroup_size = 64: index
-    }
+    } <workgroup_size = [64: index, 1: index, 1: index], subgroup_size = 64>
     builtin.module {
       spirv.module Logical GLSL450 requires #spirv.vce<v1.3, [Shader], []> {
         spirv.func @dispatch_1() "None" { spirv.Return }
@@ -126,7 +124,7 @@ util.initializer {
 // CHECK-NEXT:       = arith.constant 2
 //      CHECK:     hal.executable.export public @dispatch_1 ordinal(1)
 //      CHECK:       hal.return %c1, %c1, %c1
-//      CHECK:       attributes {subgroup_size = 64 : index, workgroup_size = [64 : index, 1 : index, 1 : index]}
+//      CHECK:       <workgroup_size = [64 : index, 1 : index, 1 : index], subgroup_size = 64>
 //      CHECK:     hal.executable.export public @dispatch_2 ordinal(2)
 //      CHECK:       hal.return %c4, %c4, %c1
 //      CHECK:     builtin.module {

@@ -1,7 +1,7 @@
 // RUN: iree-compile --split-input-file --compile-mode=vm \
 // RUN: --output-format=vm-c --iree-vm-c-module-optimize=false %s | FileCheck %s
 
-vm.module @main_module attributes { version = 100 : i32 } {
+vm.module @main_module < version = 100 > {
   vm.import public @required.method0() attributes { minimum_version = 4 : i32 }
   vm.import public @required.method1() attributes { minimum_version = 5 : i32 }
   vm.import public optional @required.method2() attributes { minimum_version = 6 : i32 }

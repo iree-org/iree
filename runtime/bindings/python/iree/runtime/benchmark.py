@@ -20,9 +20,11 @@ from typing import Union
 from os import PathLike
 
 from . import VmModule
+import json
 import numpy
 import os
 import subprocess
+import tempfile
 from .dtypes import DTYPE_TO_ABI_TYPE
 
 __all__ = [
@@ -31,12 +33,18 @@ __all__ = [
 ]
 
 BenchmarkResult = namedtuple(
-    "BenchmarkResult", "benchmark_name time cpu_time iterations user_counters"
+    "BenchmarkResult", "benchmark_name time cpu_time iterations report"
 )
+BenchmarkResult.__doc__ = """One benchmark or dispatch row reported by iree-benchmark-module.
+
+time and cpu_time are "<value> <unit>" strings, using % for percentage
+aggregates, and iterations is a string. report is the complete Google Benchmark
+JSON row, including metadata and user counters with their original values.
+"""
 
 
 class BenchmarkToolError(Exception):
-    """Benchmark exception that preserves the command line and error output."""
+    """Failure of the tool or a reported benchmark, with its diagnostics."""
 
     def __init__(self, message):
         self.message = message
@@ -59,9 +67,10 @@ def _build_benchmark_args(
     module: Union[VmModule, PathLike],
     entry_function: str | None = None,
     inputs: list[Union[str, numpy.ndarray]] | None = None,
+    executable: Union[str, PathLike, None] = None,
     **kwargs,
 ) -> tuple[list[str], bytes | None]:
-    args = [benchmark_exe()]
+    args = [os.fspath(executable) if executable is not None else benchmark_exe()]
 
     if isinstance(module, VmModule):
         funcs = [a for a in module.function_names if a != "__init"]
@@ -79,16 +88,20 @@ def _build_benchmark_args(
     else:
         flatbuffer = None
         args.append(f"--module={module}")
-        if entry_function is None:
-            raise ValueError(
-                "When specifying the module as a filepath the entry function must be specified."
-            )
 
-    args.append(f"--function={entry_function}")
+    # Without --function the tool benchmarks every exported function that takes
+    # no inputs.
+    if entry_function is not None:
+        args.append(f"--function={entry_function}")
 
     for k in kwargs:
-        v = kwargs[k]
-        args.append(f"--{k}={v}")
+        # A list or tuple repeats the flag once per value.
+        values = kwargs[k] if isinstance(kwargs[k], (list, tuple)) else [kwargs[k]]
+        for v in values:
+            # IREE flags only parse lowercase booleans.
+            if isinstance(v, bool):
+                v = "true" if v else "false"
+            args.append(f"--{k}={v}")
 
     for inp in inputs or []:
         if isinstance(inp, str):
@@ -107,17 +120,14 @@ def _build_benchmark_args(
     return args, flatbuffer
 
 
-def benchmark_module(
-    module: Union[VmModule, PathLike],
-    entry_function: str | None = None,
-    inputs: list[Union[str, numpy.ndarray]] | None = None,
-    timeout: float | None = None,
-    **kwargs,
-):
-    args, flatbuffer = _build_benchmark_args(
-        module=module, entry_function=entry_function, inputs=inputs, **kwargs
-    )
+def _run_benchmark(
+    args: list[str], flatbuffer: bytes | None = None, timeout: float | None = None
+) -> tuple[str, str]:
+    """Runs a benchmark command line and returns its stdout and stderr.
 
+    Raises BenchmarkTimeoutError if the timeout expires and BenchmarkToolError
+    with both outputs if the tool fails.
+    """
     try:
         benchmark_process = subprocess.run(
             args=args,
@@ -133,42 +143,71 @@ def benchmark_module(
 
     if benchmark_process.returncode != 0:
         raise BenchmarkToolError(f"stderr:\n{err}\nstdout:\n{out}")
+    return out, err
 
-    if "INVALID_ARGUMENT;" in err:
-        raise ValueError("Invalid inputs specified for benchmarking")
 
-    # In the event benchmarking runs but encounters an internal error,
-    # return the internal error instead of benchmark results.
-    if "INTERNAL; CUDA driver error" in out:
-        raise BenchmarkToolError(out)
+def benchmark_module(
+    module: Union[VmModule, PathLike],
+    entry_function: str | None = None,
+    inputs: list[Union[str, numpy.ndarray]] | None = None,
+    timeout: float | None = None,
+    executable: Union[str, PathLike, None] = None,
+    **kwargs,
+) -> list[BenchmarkResult]:
+    """Benchmarks a module with iree-benchmark-module.
 
-    # Grab individual results by line (skip header lines)
-    bench_lines = out.split("\n")[3:]
-    benchmark_results = []
-    for line in bench_lines:
-        split = line.split()
-        if len(split) == 0:
-            continue
-        elif len(split) <= 5:
-            raise ValueError(
-                f"Benchmark standard output is not expected. Line: '{line}' should have at least 6 columns.\nDetails: {args=},\n{out=}"
-            )
+    Keyword arguments are passed to the tool as --key=value flags, once per
+    value of a list or tuple. Without an
+    entry function a module file runs every exported function that takes no
+    inputs. The tool defaults to the one in this package unless an executable
+    is given.
 
-        benchmark_name = split[0]
-        time = " ".join(split[1:3])
-        cpu_time = " ".join(split[3:5])
-        iterations = split[5]
-        user_counters = None
-        if len(split) > 5:
-            user_counters = split[6]
-        benchmark_results.append(
+    Returns a BenchmarkResult with the complete JSON report of every row,
+    including aggregates and dispatch rows. Raises BenchmarkToolError if the
+    tool exits unsuccessfully or a reported benchmark fails.
+    """
+    if "benchmark_out" in kwargs or "benchmark_out_format" in kwargs:
+        raise ValueError("benchmark_module reads results from its own JSON file")
+    with tempfile.TemporaryDirectory() as directory:
+        # A results file keeps console and output processing text on stdout
+        # out of the parsed report.
+        report = os.path.join(directory, "results.json")
+        args, flatbuffer = _build_benchmark_args(
+            module=module,
+            entry_function=entry_function,
+            inputs=inputs,
+            executable=executable,
+            benchmark_out=report,
+            benchmark_out_format="json",
+            **kwargs,
+        )
+        _run_benchmark(args, flatbuffer, timeout)
+        with open(report) as file:
+            return _parse_benchmark_results(file.read())
+
+
+def _parse_benchmark_results(report: str) -> list[BenchmarkResult]:
+    """Parses a Google Benchmark JSON report into benchmark results."""
+    # Google Benchmark leaves the report empty when no benchmarks match.
+    if not report.strip():
+        return []
+    results = []
+    for run in json.loads(report)["benchmarks"]:
+        if run.get("error_occurred"):
+            raise BenchmarkToolError(f"{run['name']}: {run['error_message']}")
+        unit = run["time_unit"]
+        real_time, cpu_time = run["real_time"], run["cpu_time"]
+        if run.get("aggregate_unit") == "percentage":
+            unit = "%"
+            real_time *= 100
+            cpu_time *= 100
+        results.append(
             BenchmarkResult(
-                benchmark_name=benchmark_name,
-                time=time,
-                cpu_time=cpu_time,
-                iterations=iterations,
-                user_counters=user_counters,
+                benchmark_name=run["name"],
+                time=f"{real_time} {unit}",
+                cpu_time=f"{cpu_time} {unit}",
+                iterations=str(run["iterations"]),
+                report=run,
             )
         )
-
-    return benchmark_results
+    return results

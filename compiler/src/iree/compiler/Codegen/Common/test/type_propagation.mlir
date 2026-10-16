@@ -997,3 +997,38 @@ func.func @branch_op() {
 // CHECK:       cf.cond_br %[[TRUNC]], ^bb1(%[[TENSOR0]] : tensor<i1>), ^bb1(%[[TENSOR1]] : tensor<i1>)
 // CHECK:     ^bb1(%[[ARG1:.*]]: tensor<i1>):
 // CHECK:       iree_tensor_ext.dispatch.tensor.store %[[ARG1]], %[[OUT]]
+
+// -----
+
+// CHECK-LABEL: func.func @preserve_pcf_properties()
+// CHECK: %[[INIT:.*]] = tensor.empty() : tensor<4xi1>
+// CHECK: pcf.generic sync true scope(#pcf.test_scope)
+// CHECK: execute(%{{.*}} = %[[INIT]])[%{{.*}}: index, %{{.*}}: index]
+// CHECK: -> (tensor<4xi1>)
+// CHECK: test.discardable = "preserved"
+func.func @preserve_pcf_properties() {
+  %arg0 = tensor.empty() : tensor<4xi1, #iree_encoding.packed_storage>
+  %result = pcf.generic sync true scope(#pcf.test_scope)
+    execute(%ref = %arg0)[%id: index, %n: index]
+         : (!pcf.sref<4xi1, #pcf.test_scope>) -> (tensor<4xi1, #iree_encoding.packed_storage>) {
+    pcf.return
+  } {test.discardable = "preserved"}
+  util.optimization_barrier %result : tensor<4xi1, #iree_encoding.packed_storage>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @preserve_matmul_properties()
+// CHECK: linalg.matmul indexing_maps =
+// CHECK-SAME: test.discardable
+// CHECK-SAME: cast = #linalg.type_fn<cast_unsigned>
+// CHECK-SAME: tensor<2x4xi8>, tensor<3x4xi8>
+func.func @preserve_matmul_properties() {
+  %lhs = tensor.empty() : tensor<2x4xi3>
+  %rhs = tensor.empty() : tensor<3x4xi3>
+  %init = tensor.empty() : tensor<2x3xi32>
+  %result = linalg.matmul indexing_maps = [affine_map<(m, n, k) -> (m, k)>, affine_map<(m, n, k) -> (n, k)>, affine_map<(m, n, k) -> (m, n)>] {cast = #linalg.type_fn<cast_unsigned>, test.discardable} ins(%lhs, %rhs : tensor<2x4xi3>, tensor<3x4xi3>) outs(%init : tensor<2x3xi32>) -> tensor<2x3xi32>
+  util.optimization_barrier %result : tensor<2x3xi32>
+  return
+}

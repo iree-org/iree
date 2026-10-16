@@ -17,7 +17,7 @@ func.func @scatter_tiling_distribution(
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %forall, %tiled_op = transform.structured.tile_using_forall %0 tile_sizes [10, 30, 0] { mapping = [#gpu.thread<y>, #gpu.thread<x>] } : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %forall, %tiled_op = transform.structured.tile_using_forall %0 tile_sizes [10, 30, 0] ( mapping = [#gpu.thread<y>, #gpu.thread<x>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }

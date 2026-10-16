@@ -24,7 +24,7 @@ module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(
       %variant_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.reduce_shared_memory_bank_conflicts %0 { padding_size_bits = 64 } : (!transform.any_op) -> ()
+    transform.iree.reduce_shared_memory_bank_conflicts %0 <{ padding_size_bits = 64 }> : (!transform.any_op) -> ()
     transform.yield
   }
 } // module

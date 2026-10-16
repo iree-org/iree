@@ -8,6 +8,20 @@
 
 #include "iree/base/internal/math.h"
 
+static iree_status_t iree_hal_buffer_view_host_element_count(
+    const iree_hal_buffer_view_t* buffer_view,
+    iree_host_size_t* out_element_count) {
+  iree_device_size_t element_count =
+      iree_hal_buffer_view_element_count(buffer_view);
+  iree_host_size_t host_element_count = (iree_host_size_t)element_count;
+  if (IREE_UNLIKELY((iree_device_size_t)host_element_count != element_count)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "buffer view element count exceeds host size");
+  }
+  *out_element_count = host_element_count;
+  return iree_ok_status();
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_buffer_equality_t
 //===----------------------------------------------------------------------===//
@@ -401,6 +415,10 @@ iree_status_t iree_hal_buffer_view_element_matcher_match(
     return iree_ok_status();
   }
 
+  iree_host_size_t element_count = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_view_host_element_count(matchee, &element_count));
+
   iree_hal_buffer_mapping_t actual_mapping;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
       iree_hal_buffer_view_buffer(matchee), IREE_HAL_MAPPING_MODE_SCOPED,
@@ -410,8 +428,7 @@ iree_status_t iree_hal_buffer_view_element_matcher_match(
 
   iree_host_size_t i = 0;
   const bool all_match = iree_hal_compare_buffer_elements_broadcast(
-      matcher->equality, matcher->value,
-      iree_hal_buffer_view_element_count(matchee), actual_contents, &i);
+      matcher->equality, matcher->value, element_count, actual_contents, &i);
   iree_hal_buffer_element_t actual_element = iree_hal_buffer_element_at(
       iree_hal_buffer_view_element_type(matchee), actual_contents, i);
 
@@ -512,13 +529,15 @@ iree_status_t iree_hal_buffer_view_array_matcher_match(
         iree_string_builder_append_string(builder, IREE_SV(")")));
     *out_matched = false;
     return iree_ok_status();
-  } else if (iree_hal_buffer_view_element_count(matchee) !=
-             matcher->element_count) {
+  }
+  iree_device_size_t element_count =
+      iree_hal_buffer_view_element_count(matchee);
+  if (element_count != matcher->element_count) {
     IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
         builder,
-        "whose element count (%" PRIhsz ") does not match expected (%" PRIhsz
+        "whose element count (%" PRIdsz ") does not match expected (%" PRIhsz
         ")",
-        iree_hal_buffer_view_element_count(matchee), matcher->element_count));
+        element_count, matcher->element_count));
     *out_matched = false;
     return iree_ok_status();
   }
@@ -533,8 +552,7 @@ iree_status_t iree_hal_buffer_view_array_matcher_match(
   iree_host_size_t i = 0;
   const bool all_match = iree_hal_compare_buffer_elements_elementwise(
       matcher->equality, iree_hal_buffer_view_element_type(matchee),
-      iree_hal_buffer_view_element_count(matchee), matcher->elements,
-      actual_contents, &i);
+      matcher->element_count, matcher->elements, actual_contents, &i);
   iree_hal_buffer_element_t actual_element = iree_hal_buffer_element_at(
       iree_hal_buffer_view_element_type(matchee), actual_contents, i);
   iree_hal_buffer_element_t expected_element = iree_hal_buffer_element_at(
@@ -627,6 +645,10 @@ iree_status_t iree_hal_buffer_view_matcher_match(
       matcher->expected, matchee, builder, out_matched));
   if (!*out_matched) return iree_ok_status();
 
+  iree_host_size_t element_count = 0;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_view_host_element_count(matchee, &element_count));
+
   iree_hal_buffer_mapping_t actual_mapping;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
       iree_hal_buffer_view_buffer(matchee), IREE_HAL_MAPPING_MODE_SCOPED,
@@ -648,8 +670,7 @@ iree_status_t iree_hal_buffer_view_matcher_match(
   iree_host_size_t i = 0;
   const bool all_match = iree_hal_compare_buffer_elements_elementwise(
       matcher->equality, iree_hal_buffer_view_element_type(matchee),
-      iree_hal_buffer_view_element_count(matchee), expected_contents,
-      actual_contents, &i);
+      element_count, expected_contents, actual_contents, &i);
   iree_hal_buffer_element_t actual_element = iree_hal_buffer_element_at(
       iree_hal_buffer_view_element_type(matchee), actual_contents, i);
   iree_hal_buffer_element_t expected_element = iree_hal_buffer_element_at(

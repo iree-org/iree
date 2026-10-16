@@ -44,13 +44,9 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
       namedOpCandidates.push_back(linalgOp);
       return;
     }
-    if (isa_and_nonnull<linalg::AbsOp, linalg::AddOp, linalg::BroadcastOp,
-                        linalg::CeilOp, linalg::CopyOp, linalg::DivOp,
-                        linalg::DivUnsignedOp, linalg::ExpOp, linalg::FloorOp,
-                        linalg::LogOp, linalg::MapOp, linalg::MaxOp,
-                        linalg::MulOp, linalg::NegFOp, linalg::ReduceOp,
-                        linalg::SubOp, linalg::TransposeOp>(
-            linalgOp.getOperation()) ||
+    if (isa_and_nonnull<linalg::BroadcastOp, linalg::CopyOp,
+                        linalg::ElementwiseOp, linalg::MapOp, linalg::ReduceOp,
+                        linalg::TransposeOp>(linalgOp.getOperation()) ||
         linalg::isaConvolutionOpInterface(linalgOp)) {
       namedOpCandidates.push_back(linalgOp);
     }
@@ -59,7 +55,7 @@ void GeneralizeLinalgNamedOpsPass::runOnOperation() {
   IRRewriter rewriter(&getContext());
   for (auto linalgOp : namedOpCandidates) {
     rewriter.setInsertionPoint(linalgOp);
-    FailureOr<linalg::GenericOp> generalizedOp =
+    FailureOr<linalg::LinalgOp> generalizedOp =
         linalg::generalizeNamedOp(rewriter, linalgOp);
     if (failed(generalizedOp)) {
       linalgOp->emitOpError("failed to generalize operation");

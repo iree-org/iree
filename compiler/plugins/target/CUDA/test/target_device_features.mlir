@@ -7,11 +7,15 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=cuda},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-cuda-target=sm_89 --iree-cuda-target-features=+ptx80 %s | FileCheck %s --check-prefix=PTX80
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=cuda},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-cuda-target=sm_120 %s | FileCheck %s --check-prefix=SM120
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=cuda},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-cuda-target=sm_121 %s | FileCheck %s --check-prefix=SM121
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=cuda},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-cuda-target=sm_120 --iree-cuda-target-features=+ptx87 %s | FileCheck %s --check-prefix=SM120
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=cuda},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-cuda-target=sm_121 --iree-cuda-target-features=+ptx88 %s | FileCheck %s --check-prefix=SM121
 
-// SM89: target_info = #iree_gpu.target<arch = "sm_89", features = "+ptx78",
+// SM89: target_info = #iree_gpu.target<arch = "sm_89", features = "+ptx84",
 // SM89-SAME: wgp = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
 // SM89-SAME:         subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
 // SM89-SAME:         mma = [<NV_MMA_SYNC_F32_16x8x16_F16>, <NV_MMA_SYNC_F16_16x8x16_F16>, <NV_MMA_SYNC_F32_16x8x16_BF16>, <NV_MMA_SYNC_F32_16x8x32_F8E4M3FN>, <NV_MMA_SYNC_F32_16x8x32_F8E5M2>, <NV_WMMA_F32_16x16x16_F16>, <NV_WMMA_F16_16x16x16_F16>],

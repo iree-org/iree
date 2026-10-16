@@ -341,18 +341,24 @@ static iree_status_t iree_vm_shim_dispatch_v(
     void* IREE_RESTRICT module_state) {
   // TODO(benvanik): support multiple variadic segments in one call.
   // For now we inline what it would do in a very painful way.
+  //
+  // NOTE: sizeof(iree_vm_abi_rIiii_t) may include trailing struct padding
+  // that is not present before the following variadic segment. Size the
+  // fixed prefix through its final field instead.
+  const iree_host_size_t params_size =
+      offsetof(iree_vm_abi_rIiii_t, i4) +
+      IREE_VM_ABI_FIELD_SIZE(iree_vm_abi_rIiii_t, i4);
   bool args_ok = true;
   if (args_storage.data_length <
-      (sizeof(iree_vm_abi_rIiii_t) + sizeof(iree_vm_size_t) +
-       sizeof(iree_vm_size_t))) {
+      (params_size + sizeof(iree_vm_size_t) + sizeof(iree_vm_size_t))) {
     // Can't fit even with zero lengths.
     args_ok = false;
   }
-  iree_hal_loader_dispatch_args_t args = {
-      .params = *(const iree_vm_abi_rIiii_t*)args_storage.data,
-  };
+  iree_hal_loader_dispatch_args_t args;
+  memset(&args, 0, sizeof(args));
   if (args_ok) {
-    const uint8_t* constants_ptr = args_storage.data + sizeof(args.params);
+    memcpy(&args.params, args_storage.data, params_size);
+    const uint8_t* constants_ptr = args_storage.data + params_size;
     args.constant_count = *(const iree_vm_size_t*)constants_ptr;
     args.constants = (const uint32_t*)(constants_ptr + sizeof(iree_vm_size_t));
     const uint8_t* bindings_ptr =

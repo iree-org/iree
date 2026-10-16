@@ -676,7 +676,8 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_buffer_elements(
   iree_host_size_t token_start = IREE_STRING_VIEW_NPOS;
   while (src_i < data_str.size) {
     char c = data_str.data[src_i++];
-    bool is_separator = isspace(c) || c == ',' || c == '[' || c == ']';
+    bool is_separator =
+        isspace((unsigned char)c) || c == ',' || c == '[' || c == ']';
     if (token_start == IREE_STRING_VIEW_NPOS) {
       if (!is_separator) {
         token_start = src_i - 1;

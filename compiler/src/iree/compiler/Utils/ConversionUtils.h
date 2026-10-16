@@ -24,6 +24,10 @@ LogicalResult verifyAllOperationsAreLegal(Operation *op,
 Attribute convertAttribute(Location loc, Attribute oldAttr,
                            const TypeConverter &typeConverter);
 
+// Converts top-level inherent and discardable attributes in place using
+// convertAttribute. Native properties and nested regions are preserved.
+void convertAttributes(Operation *op, const TypeConverter &typeConverter);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_CONVERSIONUTILS_H_

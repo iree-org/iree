@@ -371,7 +371,7 @@ func.func @fold_insert_slice_into_transfer_write_static(%v: vector<4x5xf32>, %t1
 
 // -----
 
-#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
+#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf", vscale_range = [1, 16]}>
 
 func.func @fold_insert_slice_into_transfer_write_scalable(%v: vector<4x[4]xf32>, %t1: tensor<?x?xf32>, %t2: tensor<?x?xf32>, %a: index, %b: index) -> tensor<?x?xf32>
   attributes {hal.executable.target = #aarch64_sve}
@@ -429,7 +429,7 @@ func.func @negative_fold_insert_slice_into_transfer_write_static(%v: vector<3x5x
 
 // -----
 
-#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf"}>
+#aarch64_sve = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", target_triple = "aarch64-none-elf", vscale_range = [1, 16]}>
 
 func.func @negative_fold_insert_slice_into_transfer_write_scalable(%v: vector<4x[2]xf32>, %t1: tensor<?x?xf32>, %t2: tensor<?x?xf32>, %a: index, %b: index) -> tensor<?x?xf32>
   attributes {hal.executable.target = #aarch64_sve}
@@ -527,7 +527,7 @@ func.func @subset_hoisting_invariant_tensor(%init: tensor<64x64xf32>, %t: tensor
   %loop = scf.for %i = %c0 to %c8 step %c1 iter_args(%arg1 = %init) -> tensor<64x64xf32> {
     %slice1 = tensor.extract_slice %arg1[1, 0][8, 1][1, 1] : tensor<64x64xf32> to tensor<8x1xf32>
     %slice2 = tensor.extract_slice %init[0, %i][8, 1][1, 1] : tensor<64x64xf32> to tensor<8x1xf32>
-    %out = linalg.add ins(%slice1, %slice2 : tensor<8x1xf32>, tensor<8x1xf32>) outs(%empty: tensor<8x1xf32>) -> tensor<8x1xf32>
+    %out = linalg.elementwise <add> ins(%slice1, %slice2 : tensor<8x1xf32>, tensor<8x1xf32>) outs(%empty: tensor<8x1xf32>) -> tensor<8x1xf32>
     %td = tensor.insert_slice %out into %t[1, 0][8, 1][1, 1] : tensor<8x1xf32> into tensor<64x64xf32>
     scf.yield %td : tensor<64x64xf32>
   }
@@ -539,7 +539,7 @@ func.func @subset_hoisting_invariant_tensor(%init: tensor<64x64xf32>, %t: tensor
 // CHECK:   scf.for {{.*}} iter_args(%[[IV:.+]] = {{.*}})
 // CHECK:     %[[SLICE:.+]] = tensor.extract_slice
 // CHECK-NOT: tensor.extract_slice
-// CHECK:     linalg.add ins(%[[IV]], %[[SLICE]] : {{.*}})
+// CHECK:     linalg.elementwise <add> ins(%[[IV]], %[[SLICE]] : {{.*}})
 // CHECK:   scf.yield
 // CHECK:   tensor.insert_slice
 
@@ -553,7 +553,7 @@ func.func @subset_hoisting_invariant_tensor_nonequivalent_subset(%init: tensor<6
   %loop = scf.for %i = %c0 to %c8 step %c1 iter_args(%arg1 = %init) -> tensor<64x64xf32> {
     %slice1 = tensor.extract_slice %arg1[1, 0][8, 1][1, 1] : tensor<64x64xf32> to tensor<8x1xf32>
     %slice2 = tensor.extract_slice %init[0, %i][8, 1][1, 1] : tensor<64x64xf32> to tensor<8x1xf32>
-    %out = linalg.add ins(%slice1, %slice2 : tensor<8x1xf32>, tensor<8x1xf32>) outs(%empty: tensor<8x1xf32>) -> tensor<8x1xf32>
+    %out = linalg.elementwise <add> ins(%slice1, %slice2 : tensor<8x1xf32>, tensor<8x1xf32>) outs(%empty: tensor<8x1xf32>) -> tensor<8x1xf32>
     %td = tensor.insert_slice %out into %t[0, 0][8, 1][1, 1] : tensor<8x1xf32> into tensor<64x64xf32>
     scf.yield %td : tensor<64x64xf32>
   }
@@ -1091,19 +1091,19 @@ module {
     %29 = vector.transfer_write %22, %6[%c0, %c0, %c0], %10 {in_bounds = [true, true, true]} : vector<1x8x8xindex>, tensor<1x8x8xindex>
     %30 = vector.broadcast %25 : vector<8xindex> to vector<1x8x8xindex>
     %31 = vector.transfer_write %30, %7[%c0, %c0, %c0], %10 {in_bounds = [true, true, true]} : vector<1x8x8xindex>, tensor<1x8x8xindex>
-    %32 = iree_vector_ext.transfer_gather %arg4[%c0, %c0, %c0, %c0] [%17, %22, %25 : index, vector<1x8x8xindex>, vector<8xindex>], %1 {indexing_maps = [#map, #map1, #map2, #map3]} : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
+    %32 = iree_vector_ext.transfer_gather %arg4[%c0, %c0, %c0, %c0] [%17, %22, %25 : index, vector<1x8x8xindex>, vector<8xindex>], %1 <indexing_maps = [#map, #map1, #map2, #map3]> : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
     %33 = arith.index_cast %32 : vector<1x8x8xi32> to vector<1x8x8xindex>
     %34 = vector.transfer_read %28[%c0, %c0, %c0], %2 {in_bounds = [true, true, true]} : tensor<1x8x8xindex>, vector<1x8x8xindex>
     %35 = vector.transfer_read %29[%c0, %c0, %c0], %2 {in_bounds = [true, true, true]} : tensor<1x8x8xindex>, vector<1x8x8xindex>
     %36 = vector.transfer_read %31[%c0, %c0, %c0], %2 {in_bounds = [true, true, true]} : tensor<1x8x8xindex>, vector<1x8x8xindex>
-    %37 = iree_vector_ext.transfer_gather %arg4[%c0, %c0, %c0, %c1] [%34, %35, %36 : vector<1x8x8xindex>, vector<1x8x8xindex>, vector<1x8x8xindex>], %1 {indexing_maps = [#map, #map2, #map2, #map2]} : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
+    %37 = iree_vector_ext.transfer_gather %arg4[%c0, %c0, %c0, %c1] [%34, %35, %36 : vector<1x8x8xindex>, vector<1x8x8xindex>, vector<1x8x8xindex>], %1 <indexing_maps = [#map, #map2, #map2, #map2]> : tensor<50x32x25x2xi32>, vector<1x8x8xi32>
     %38 = arith.index_cast %37 : vector<1x8x8xi32> to vector<1x8x8xindex>
     %39 = arith.maxsi %33, %cst_1 : vector<1x8x8xindex>
     %40 = arith.minui %39, %cst_0 : vector<1x8x8xindex>
     %41 = arith.maxsi %38, %cst_1 : vector<1x8x8xindex>
     %42 = arith.minui %41, %cst_0 : vector<1x8x8xindex>
     %43 = vector.transfer_read %28[%c0, %c0, %c0], %2 {in_bounds = [true, true, true]} : tensor<1x8x8xindex>, vector<1x8x8xindex>
-    %44 = iree_vector_ext.transfer_gather %arg5[%c0, %c0, %c0] [%43, %40, %42 : vector<1x8x8xindex>, vector<1x8x8xindex>, vector<1x8x8xindex>], %0 {indexing_maps = [#map4, #map2, #map2, #map2]} : tensor<50x40x40xi8>, vector<1x8x8xi8>
+    %44 = iree_vector_ext.transfer_gather %arg5[%c0, %c0, %c0] [%43, %40, %42 : vector<1x8x8xindex>, vector<1x8x8xindex>, vector<1x8x8xindex>], %0 <indexing_maps = [#map4, #map2, #map2, #map2]> : tensor<50x40x40xi8>, vector<1x8x8xi8>
     %45 = vector.transfer_read %26[%c0, %c0, %c0], %3 {in_bounds = [true, true, true]} : tensor<1x8x8xf32>, vector<1x8x8xf32>
     %46 = arith.cmpi ugt, %44, %cst : vector<1x8x8xi8>
     %47 = arith.select %46, %45, %cst_2 : vector<1x8x8xi1>, vector<1x8x8xf32>

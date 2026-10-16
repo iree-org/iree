@@ -637,3 +637,25 @@ module @do_not_hoist_dynamic_string_format {
     util.return %key : !util.buffer
   }
 }
+
+// -----
+
+// Verify that a tensor with an `index` element type (whose bit width cannot
+// be statically deduced) is treated as non-hoistable.
+
+// CHECK-LABEL: @do_not_hoist_index_element_type
+module @do_not_hoist_index_element_type {
+  // CHECK: util.global private @[[HOISTED:.*]] : tensor<4xi32>
+  // CHECK: util.func public @main
+  util.func public @main(%arg0 : tensor<4xi32>) -> tensor<4xindex> {
+    %0 = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
+    %1 = "iree_unregistered.const_expr"(%0) : (tensor<4xi32>) -> tensor<4xi32>
+    // The `arith.index_cast` op, whose result type is not hoistable, must
+    // remain in place rather than being (illegally) folded into the global
+    // initializer.
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED]] : tensor<4xi32>
+    // CHECK: arith.index_cast %[[VAL]]
+    %2 = arith.index_cast %1 : tensor<4xi32> to tensor<4xindex>
+    util.return %2 : tensor<4xindex>
+  }
+}

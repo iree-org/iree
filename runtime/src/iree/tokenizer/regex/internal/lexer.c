@@ -1008,7 +1008,7 @@ static bool iree_tokenizer_regex_lexer_parse_quantifier(
   // Parse min - require at least one digit.
   uint32_t min = 0;
   bool has_min_digit = false;
-  while (isdigit(iree_tokenizer_regex_lexer_peek_char(lexer))) {
+  while (isdigit((unsigned char)iree_tokenizer_regex_lexer_peek_char(lexer))) {
     has_min_digit = true;
     min = min * 10 + (iree_tokenizer_regex_lexer_peek_char(lexer) - '0');
     if (min >= UINT16_MAX) {
@@ -1046,7 +1046,8 @@ static bool iree_tokenizer_regex_lexer_parse_quantifier(
     } else {
       // {n,m}
       max = 0;
-      while (isdigit(iree_tokenizer_regex_lexer_peek_char(lexer))) {
+      while (
+          isdigit((unsigned char)iree_tokenizer_regex_lexer_peek_char(lexer))) {
         max = max * 10 + (iree_tokenizer_regex_lexer_peek_char(lexer) - '0');
         if (max >= UINT16_MAX) {
           // UINT16_MAX (65535) is reserved as the "unbounded" marker.

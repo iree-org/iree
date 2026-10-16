@@ -33,6 +33,17 @@ util.func public @check_no_unrealized_cast(%arg0: tensor<?xf32>) -> tensor<?xf32
 
 // -----
 
+// expected-error@below {{illegal operations still remain}}
+util.func public @check_no_quant(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+  // expected-error@+1 {{illegal op still exists}}
+  %0 = quant.qcast %arg0 : tensor<4xf32> to tensor<4x!quant.uniform<i8:f32, 0.1>>
+  // expected-error@+1 {{illegal op still exists}}
+  %1 = quant.dcast %0 : tensor<4x!quant.uniform<i8:f32, 0.1>> to tensor<4xf32>
+  util.return %1 : tensor<4xf32>
+}
+
+// -----
+
 util.func public @check_linalg_ok(%conv : tensor<1x112x112x16xf32>, %bias : tensor<16xf32>, %init : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32> {
   %result = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,

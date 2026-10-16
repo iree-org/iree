@@ -541,7 +541,7 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
                                                      $target_ordinals,
                                                      $target_objects,
                                                      $target_regions) `}` `)`
-    attr-dict-with-keyword
+    prop-dict attr-dict-with-keyword
   }];
 
   let skipDefaultBuilders = 1;
@@ -1645,6 +1645,51 @@ def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barri
 
 // TODO(benvanik): event ops.
 
+def HAL_CommandBufferFlushBufferOp : HAL_Op<"command_buffer.flush_buffer"> {
+  let summary = [{Makes prior writes available to external consumers.}];
+  let description = [{
+    Makes prior writes to the target buffer range available to external
+    consumers.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length
+  );
+
+  let assemblyFormat = [{
+    `<` $command_buffer `:` type($command_buffer) `>`
+    `target` `(` $target_buffer `:` type($target_buffer) `)`
+    `` `[` $target_offset `,` $length `]`
+    attr-dict-with-keyword
+  }];
+}
+
+def HAL_CommandBufferInvalidateBufferOp
+    : HAL_Op<"command_buffer.invalidate_buffer"> {
+  let summary = [{Makes external writes visible to subsequent consumers.}];
+  let description = [{
+    Makes external writes to the target buffer range visible to subsequent
+    consumers.
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    AnyTypeOf<[Index, HAL_BufferType]>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length
+  );
+
+  let assemblyFormat = [{
+    `<` $command_buffer `:` type($command_buffer) `>`
+    `target` `(` $target_buffer `:` type($target_buffer) `)`
+    `` `[` $target_offset `,` $length `]`
+    attr-dict-with-keyword
+  }];
+}
+
 def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
   let summary = [{Command buffer buffer fill recording operation.}];
   let description = [{
@@ -2615,6 +2660,8 @@ let opDocGroup = OpGroupExecutableOps in {
 def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
   IsolatedFromAbove,
   SingleBlockImplicitTerminator<"IREE::HAL::ExecutableSourceEndOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   SymbolTable,
   Util_ObjectLike,
@@ -2639,7 +2686,7 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
-    attr-dict-with-keyword
+    prop-dict attr-dict-with-keyword
     $body
   }];
 
@@ -2650,11 +2697,11 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
       auto conditionOps = getBody().getOps<IREE::HAL::ExecutableConditionOp>();
       return !conditionOps.empty() ? *conditionOps.begin() : IREE::HAL::ExecutableConditionOp{};
     }
-    iterator_range<Region::op_iterator<IREE::HAL::ExecutableConstantBlockOp>>
+    auto
     getConstantBlockOps() {
       return getBody().getOps<IREE::HAL::ExecutableConstantBlockOp>();
     }
-    iterator_range<Region::op_iterator<IREE::HAL::ExecutableExportOp>>
+    auto
     getExportOps() {
       return getBody().getOps<IREE::HAL::ExecutableExportOp>();
     }
@@ -2684,6 +2731,8 @@ def HAL_ExecutableSourceEndOp : HAL_Op<"executable.source_end", [
 def HAL_ExecutableOp : HAL_Op<"executable", [
   IsolatedFromAbove,
   SingleBlockImplicitTerminator<"IREE::HAL::ExecutableEndOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   SymbolTable,
   Util_ObjectLike,
@@ -2740,6 +2789,8 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
 }
 
 def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   DeclareOpInterfaceMethods<SymbolUserOpInterface>,
   ParentOneOf<[
@@ -2802,7 +2853,7 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     (`condition` `` custom<ExportConditionRegion>($condition)^)?
     (`fallback` `(` $condition_fallback^ `)`)?
     (`count` `` custom<WorkgroupCountRegion>($workgroup_count)^)?
-    attr-dict-with-keyword
+    prop-dict attr-dict-with-keyword
   }];
 
   let builders = [
@@ -2868,6 +2919,8 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
   IsolatedFromAbove,
   HasParent<"IREE::HAL::ExecutableOp">,
   SingleBlockImplicitTerminator<"IREE::HAL::ExecutableVariantEndOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   SymbolTable,
 ]> {
@@ -2917,11 +2970,11 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
       auto conditionOps = getBody().getOps<IREE::HAL::ExecutableConditionOp>();
       return !conditionOps.empty() ? *conditionOps.begin() : IREE::HAL::ExecutableConditionOp{};
     }
-    iterator_range<Region::op_iterator<IREE::HAL::ExecutableConstantBlockOp>>
+    auto
     getConstantBlockOps() {
       return getBody().getOps<IREE::HAL::ExecutableConstantBlockOp>();
     }
-    iterator_range<Region::op_iterator<IREE::HAL::ExecutableExportOp>>
+    auto
     getExportOps() {
       return getBody().getOps<IREE::HAL::ExecutableExportOp>();
     }
@@ -2963,6 +3016,8 @@ def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
 
 def HAL_ExecutableConditionOp : HAL_Op<"executable.condition", [
   IsolatedFromAbove,
+  SymbolName,
+  SymbolVisibility,
   FunctionOpInterface,
   CallableOpInterface,
 ]> {
@@ -2976,6 +3031,8 @@ def HAL_ExecutableConditionOp : HAL_Op<"executable.condition", [
   }];
 
   let arguments = (ins
+    OptionalAttr<SymbolNameAttr>:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
     OptionalAttr<DictArrayAttr>:$res_attrs
@@ -3021,6 +3078,8 @@ def HAL_ExecutableConstantBlockOp : HAL_Op<"executable.constant.block", [
   ]>,
   IsolatedFromAbove,
   CallableOpInterface,
+  SymbolName,
+  SymbolVisibility,
   FunctionOpInterface,
 ]> {
   let summary = [{Executable constant block initializer.}];
@@ -3066,6 +3125,8 @@ def HAL_ExecutableConstantBlockOp : HAL_Op<"executable.constant.block", [
   }];
 
   let arguments = (ins
+    OptionalAttr<SymbolNameAttr>:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
     TypeAttrOf<FunctionType>:$function_type,
     ArrayAttr:$keys,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
@@ -3134,6 +3195,8 @@ def HAL_ExecutableConstantLoadOp : HAL_PureOp<"executable.constant.load"> {
 
 def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   HasParent<"IREE::HAL::ExecutableOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
 ]> {
   let summary = [{Compiled executable binary data.}];
@@ -3154,7 +3217,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
-    attr-dict-with-keyword
+    prop-dict attr-dict-with-keyword
   }];
 
   let skipDefaultBuilders = 1;

@@ -54,7 +54,7 @@ util.initializer {
   %c42 = arith.constant 42 : i32
   %init = tensor.empty() : tensor<256xi32>
   %c42_tensor = linalg.fill ins(%c42 : i32) outs(%init : tensor<256xi32>) -> tensor<256xi32>
-  %added = linalg.add ins(%raw, %c42_tensor : tensor<256xi32>, tensor<256xi32>) outs(%init : tensor<256xi32>) -> tensor<256xi32>
+  %added = linalg.elementwise <add> ins(%raw, %c42_tensor : tensor<256xi32>, tensor<256xi32>) outs(%init : tensor<256xi32>) -> tensor<256xi32>
   util.global.store %added, @transformed : tensor<256xi32>
   util.return
 }

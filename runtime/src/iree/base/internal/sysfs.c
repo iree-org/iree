@@ -17,12 +17,17 @@
 // Configuration
 //===----------------------------------------------------------------------===//
 
+// Process-global sysfs root. NULL indicates the host sysfs root.
+static const char* iree_sysfs_root_path = NULL;
+
+void iree_sysfs_set_root_path(const char* root_path) {
+  iree_sysfs_root_path = root_path;
+}
+
+bool iree_sysfs_host_matches_root(void) { return iree_sysfs_root_path == NULL; }
+
 const char* iree_sysfs_get_root_path(void) {
-#if defined(IREE_SYSFS_ROOT)
-  return IREE_SYSFS_ROOT;
-#else
-  return "/sys/devices/system";
-#endif  // IREE_SYSFS_ROOT
+  return iree_sysfs_root_path ? iree_sysfs_root_path : "/sys/devices/system";
 }
 
 //===----------------------------------------------------------------------===//
@@ -157,6 +162,7 @@ static iree_sysfs_cpu_list_parse_result_t iree_sysfs_parse_cpu_list_impl(
         }
         end_cpu += 1;  // Make exclusive.
       }
+      IREE_ASSERT(end_cpu > start_cpu);
       if (!callback(start_cpu, end_cpu, user_data)) {
         break;  // Callback requested stop.
       }

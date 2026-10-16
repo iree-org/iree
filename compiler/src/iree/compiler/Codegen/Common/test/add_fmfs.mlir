@@ -9,5 +9,5 @@ llvm.func @add_fastmath_flags() -> f32 {
   llvm.return %add : f32
 }
 
-// CHECK: llvm.fmul %{{.*}}, %{{.*}}  {fastmathFlags = #llvm.fastmath<contract>} : f32
-// CHECK: llvm.fadd %{{.*}}, %{{.*}}  {fastmathFlags = #llvm.fastmath<contract>} : f32
+// CHECK: llvm.fmul %{{.*}}, %{{.*}} fastmath<contract> : f32
+// CHECK: llvm.fadd %{{.*}}, %{{.*}} fastmath<contract> : f32

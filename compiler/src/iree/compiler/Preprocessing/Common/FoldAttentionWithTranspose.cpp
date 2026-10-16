@@ -24,11 +24,11 @@ namespace {
 /// Pattern to fold
 ///
 /// ```mlir
-/// %0 = iree_linalg_ext.attention {
+/// %0 = iree_linalg_ext.attention <
 ///     indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
 ///                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
 ///                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
-///                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+///                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
 ///     ins(%query, %key, %value) ....
 /// %1 = tensor.expand_shape %0 into [[0, 1], [2], [3]] ....
 /// %2 = linalg.generic {
@@ -40,13 +40,13 @@ namespace {
 /// to
 ///
 /// ```
-/// %0 = iree_linalg_ext.attention {
+/// %0 = iree_linalg_ext.attention <
 ///     indexing_maps = [affine_map<(d0, d00, d1, d2, d3, d4) -> (d0, d00, d1,
 ///     d2)>,
 ///                      affine_map<(d0, d00, d1, d2, d3, d4) -> (d0, d00, d3,
 ///                      d2)>, affine_map<(d0, d00, d1, d2, d3, d4) -> (d0, d00,
 ///                      d3, d4)>, affine_map<(d0, d00, d1, d2, d3, d4) -> (d0,
-///                      d1, d00, d4)>]}
+///                      d1, d00, d4)>]>
 ///     ins(%expanded_query, %expanded_key, %expanded_value) ....
 /// ```
 ///

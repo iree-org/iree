@@ -46,6 +46,26 @@ def BubbleUpExpandShapesPass :
   ];
 }
 
+def CollapseContractionDimensionsPass :
+    InterfacePass<"iree-dispatch-creation-collapse-contraction-dimensions", "mlir::FunctionOpInterface"> {
+  let summary = "Collapse contiguous dimensions of contractions outside dispatches.";
+  let description = [{
+    Collapse contiguous dimensions of tensor contractions outside dispatches
+    using the same indexing-map and iterator legality as dispatch dimension
+    collapsing. Preserve operand and result shapes with tensor reshapes. This
+    makes collapsible multi-M/N/K/batch contractions eligible for encoding
+    without requiring dispatch formation first. Contractions inside dispatches
+    and contractions with a compilation info or lowering config are left
+    unchanged.
+  }];
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
 def InsertTensorBarriersPass :
     InterfacePass<"iree-dispatch-creation-insert-tensor-barriers",
                   "mlir::FunctionOpInterface"> {
@@ -302,7 +322,11 @@ def FormDispatchRegionsPass :
     Option<"fusePadWithConsumers", "fuse-pad-with-consumers", "bool",
            /*default=*/"false", "Enable fusing pad with consumer">,
     Option<"fusePadWithProducers", "fuse-pad-with-producers", "bool",
-           /*default=*/"false", "Enable fusion of pad with producers">
+           /*default=*/"false", "Enable fusion of pad with producers">,
+    Option<"fuseMmt4d", "fuse-mmt4d", "bool",
+           /*default=*/"false", "Fuse layout-preserving elementwise consumers and the result unpack into mmt4d and batch_mmt4d dispatches">,
+    Option<"fuseDataTiledConvolution", "fuse-data-tiled-convolution", "bool",
+           /*default=*/"false", "Fuse the result unpack, after layout-preserving elementwise consumers, into data-tiled convolution dispatches">
   ];
   let description = [{
     Pass to form dispatch.region ops from Linalg on tensor ops. A dispatch region
@@ -399,6 +423,29 @@ def PropagateEncodingsPass :
     InterfacePass<"iree-dispatch-creation-propagate-encodings", "mlir::FunctionOpInterface"> {
   let summary = "Propagate encodings across other operations.";
   let dependentDialects = [
+    "mlir::tensor::TensorDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+  ];
+}
+
+def PropagateEncodingsThroughGenericOpsPass :
+    InterfacePass<"iree-dispatch-creation-propagate-encodings-through-generic-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Propagates data-tiling encodings through linalg.generic ops outside dispatches.";
+  let description = [{
+    Bubbles set_encoding ops up through bit-extending and broadcasting
+    linalg.generic producers, and sinks unset_encoding ops down through
+    elementwise linalg.generic consumers, for operations that are outside
+    dispatches and in the same block. These are the same encoding rewrites that
+    iree-dispatch-creation-hoist-encoding-ops applies within dispatch regions.
+    Unsupported operations and encodings, multiple uses, existing dispatches and
+    region boundaries remain encoding boundaries. The pass neither hoists out of
+    dispatches nor propagates across calls. Unlike
+    iree-dispatch-creation-propagate-encodings, which only swaps set_encoding
+    ops with tensor.cast producers, it rewrites the generic ops around the
+    encoding ops.
+  }];
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
     "mlir::tensor::TensorDialect",
     "IREE::Encoding::IREEEncodingDialect",
   ];

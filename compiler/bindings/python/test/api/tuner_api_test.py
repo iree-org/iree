@@ -144,7 +144,7 @@ def test_isa_attention_op():
                     %scale : f16,
                     %output : tensor<20x4096x64xf16>
                 ) -> tensor<20x4096x64xf16> {
-                    %result = iree_linalg_ext.attention { root_op = #iree_codegen.root_op<set = 0>,
+                    %result = iree_linalg_ext.attention <
                         indexing_maps = [
                         affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                         affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
@@ -152,7 +152,7 @@ def test_isa_attention_op():
                         affine_map<(d0, d1, d2, d3, d4) -> ()>,
                         affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
                         ]
-                    } ins(%q, %k, %v, %scale : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16)
+                    > {root_op = #iree_codegen.root_op<set = 0>} ins(%q, %k, %v, %scale : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16)
                         outs(%output : tensor<20x4096x64xf16>) {
                     ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32

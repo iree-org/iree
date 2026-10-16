@@ -38,6 +38,6 @@ stream.executable public @reduce_dispatch {
 
 }
 
-// CHECK:        hal.executable.binary public @metal_msl_fb attributes {
-// CHECK-SAME:     data = dense
+// CHECK:        hal.executable.binary public @metal_msl_fb <
 // CHECK-SAME:     format = "metal-msl-fb"
+// CHECK-SAME:     data = dense

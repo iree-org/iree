@@ -169,7 +169,10 @@ class BuildFileFunctions(object):
     def _convert_platform_condition(self, constraint_label):
         """Returns a CMake condition string for a platform constraint label."""
         if constraint_label == "//build_tools/bazel:iree_is_wasm":
-            return 'IREE_ARCH STREQUAL "wasm_32"'
+            return (
+                'EMSCRIPTEN OR IREE_ARCH STREQUAL "wasm_32" '
+                'OR IREE_ARCH STREQUAL "wasm_64"'
+            )
         cmake_name = _PLATFORM_CMAKE_SYSTEM_NAME.get(constraint_label)
         if not cmake_name:
             return None
@@ -943,6 +946,29 @@ class BuildFileFunctions(object):
         target_block = self._convert_single_target_block("TARGET", target)
         self._converter.body += (
             f"iree_compiler_register_plugin(\n"
+            f"{plugin_id_block}"
+            f"{target_block}"
+            f")\n\n"
+        )
+
+    def iree_compiler_register_experimental_dynamic_plugin(
+        self, plugin_id, target, compiler=None, extra_deps=None, linkopts=None, **kwargs
+    ):
+        if self._should_skip_target(**kwargs):
+            return
+        # The CMake rule selects the compiler implicitly and is gated by
+        # IREE_EXPERIMENTAL_COMPILER_DYNAMIC_PLUGINS. It has no parameters
+        # corresponding to extra_deps or linkopts.
+        if extra_deps:
+            self._convert_unimplemented_function("extra_deps", plugin_id)
+        if linkopts:
+            self._convert_unimplemented_function("linkopts", plugin_id)
+        plugin_id_block = self._convert_string_arg_block(
+            "PLUGIN_ID", plugin_id, quote=False
+        )
+        target_block = self._convert_single_target_block("TARGET", target)
+        self._converter.body += (
+            f"iree_compiler_register_dynamic_plugin(\n"
             f"{plugin_id_block}"
             f"{target_block}"
             f")\n\n"

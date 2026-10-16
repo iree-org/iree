@@ -23,8 +23,8 @@ func.func @forward(%arg0: !torch.vtensor<[128,20],f32>) -> !torch.vtensor<[128,3
   %6 = torch.aten.add.Tensor %3, %5, %int1_2 : !torch.vtensor<[128,30],f32>, !torch.vtensor<[30],f32>, !torch.int -> !torch.vtensor<[128,30],f32>
   return %6 : !torch.vtensor<[128,30],f32>
 }
-util.global private @_params.classifier.weight {inlining_policy = #util.inline.never} : tensor<30x20xf32>
-util.global private @_params.classifier.bias {inlining_policy = #util.inline.never} : tensor<30xf32>
+util.global private @_params.classifier.weight <inlining_policy = #util.inline.never> : tensor<30x20xf32>
+util.global private @_params.classifier.bias <inlining_policy = #util.inline.never> : tensor<30xf32>
 
 // -----
 
@@ -48,4 +48,27 @@ func.func @main(%arg0: !torch.vtensor<[2,3,4],f32>) -> (!torch.vtensor<[2,3,4],f
   %false_2 = torch.constant.bool false
   %3 = torch.aten.copy %arg0, %2, %false_2 : !torch.vtensor<[2,3,4],f32>, !torch.vtensor<[2,3,4],f32>, !torch.bool -> !torch.vtensor<[2,3,4],f32>
   return %3, %3 : !torch.vtensor<[2,3,4],f32>, !torch.vtensor<[2,3,4],f32>
+}
+
+// -----
+
+// The pipeline converts PT2E quantization to LinalgExt before Torch-to-Linalg
+// would expand it into generic arithmetic.
+// CHECK-LABEL: util.func public @dequantize$async(
+// CHECK: iree_linalg_ext.dequantize_affine
+func.func @dequantize(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4],f32>) -> !torch.vtensor<[4,8],f32> {
+  %axis = torch.constant.int 0
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %dtype = torch.constant.int 1
+  %none = torch.constant.none
+  %out_dtype = torch.derefine %none : !torch.none to !torch.optional<int>
+  %result = torch.quantized_decomposed.dequantize_per_channel
+      %input, %scales, %none, %axis, %minimum, %maximum, %dtype, %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4],f32>, !torch.none,
+        !torch.int, !torch.int, !torch.int, !torch.int, !torch.optional<int>
+        -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
 }

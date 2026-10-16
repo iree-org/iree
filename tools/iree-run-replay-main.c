@@ -523,7 +523,7 @@ int main(int argc, char** argv) {
         device_list, host_allocator, &device_group);
   }
 
-  iree_hal_profiling_from_flags_t* profiling = NULL;
+  iree_hal_profiling_session_t* profiling = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_begin_device_group_profiling_from_flags(
         device_group, host_allocator, &profiling);
@@ -558,8 +558,7 @@ int main(int argc, char** argv) {
         file_contents->const_buffer, device_group, &options, host_allocator);
   }
 
-  status =
-      iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
+  status = iree_status_join(status, iree_hal_profiling_session_end(profiling));
   iree_tooling_release_replay_executable_substitutions(
       host_allocator, &executable_substitutions);
   iree_allocator_free(host_allocator, file_path_remaps);

@@ -15,6 +15,8 @@ iree_lit_test_suite(
     lit
   SRCS
     "auto_input_conversion.mlir"
+    "canonicalize_dynamism.mlir"
+    "canonicalize_dynamism_invalid.mlir"
     "convert_collectives.mlir"
     "legalize_chlo_decomposition.mlir"
     "legalize_chlo_no_broadcast.mlir"
@@ -22,6 +24,8 @@ iree_lit_test_suite(
     "legalize_composite.mlir"
     "legalize_control_flow.mlir"
     "legalize_shape_computations.mlir"
+    "lower_bounds_pipeline.mlir"
+    "lower_bounds_tuple.mlir"
     "stablehlo_custom_calls.mlir"
     "stablehlo_to_iree_input_dialects.mlir"
     "stablehlo_to_linalg_ext.mlir"

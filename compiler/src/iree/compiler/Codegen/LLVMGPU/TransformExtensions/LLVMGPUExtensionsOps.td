@@ -205,7 +205,7 @@ def VectorToWarpExecuteOnLane0Op : Op<Transform_Dialect, "iree.vector.to_warp_ex
                    DefaultValuedAttr<I64Attr, "{}">:$warp_size);
   let results = (outs TransformHandleTypeInterface:$result);
 
-  let assemblyFormat = "$target attr-dict `:` functional-type($target, $result)";
+  let assemblyFormat = "$target prop-dict attr-dict `:` functional-type($target, $result)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let builders = [
@@ -359,7 +359,7 @@ def VectorToMMAConversionOp : Op<Transform_Dialect, "iree.vector.vector_to_mma_c
 
   let assemblyFormat = [{
     $target
-    attr-dict
+    prop-dict attr-dict
     `:` functional-type($target, results)
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -442,7 +442,7 @@ def PipelineSharedMemoryCopiesOp : Op<
 
   let assemblyFormat = [{
     $for_op
-    attr-dict
+    prop-dict attr-dict
     `:` functional-type(operands, results)}];
 
   let extraClassDeclaration = [{
@@ -514,7 +514,7 @@ def CreateAsyncGroupsOp :
 
   let assemblyFormat = [{
     $target
-    attr-dict
+    prop-dict attr-dict
     `:` functional-type(operands, results)}];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
@@ -702,7 +702,7 @@ def AMDGPUDistributeVectorsOp :
 
     let assemblyFormat = [{
       $target (`test_conversion` $test_conversion^)?
-      attr-dict `:` functional-type(operands, results)
+      prop-dict attr-dict `:` functional-type(operands, results)
     }];
     let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 

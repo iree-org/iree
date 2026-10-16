@@ -45,14 +45,16 @@ void replaceOpOutputs(T op, PatternRewriter &rewriter, Type srcType,
           rewriter, loc, TypeRange{promoteOutputType}, ValueRange{output},
           ValueRange{promoteEmpty}, maps, iteratorTypes,
           [&](OpBuilder &b, Location loc, ValueRange args) {
-            Value result = arith::ExtFOp::create(b, loc, destType, args[0]);
+            Value result = arith::ExtFOp::create(b, loc, destType, args[0],
+                                                 arith::FastMathFlagsAttr{});
             linalg::YieldOp::create(b, loc, result);
           })
           ->getResult(0);
-  auto newLinalgOp =
-      T::create(rewriter, loc, op.getDpsInputs(), ValueRange{promoteOutput},
-                mlir::getPrunedAttributeList(
-                    op, {"operandSegmentSizes", "resultSegmentSizes"}));
+  SmallVector<Value> operands(op.getDpsInputs());
+  operands.push_back(promoteOutput);
+  auto newLinalgOp = IREE::LinalgExt::cloneNamedLinalgOpWithNewTypes(
+      rewriter, cast<linalg::LinalgOp>(op.getOperation()),
+      TypeRange{promoteOutputType}, operands);
   Value truncEmpty =
       tensor::EmptyOp::create(rewriter, loc, mixedSizes, srcType);
   rewriter.replaceOpWithNewOp<linalg::GenericOp>(

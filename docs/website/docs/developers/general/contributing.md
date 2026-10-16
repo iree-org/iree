@@ -152,15 +152,28 @@ track of those who have made significant contributions to the project.
   contributions.
 
 The
-[`.github/CODEOWNERS` file](https://github.com/iree-org/iree/blob/main/.github/CODEOWNERS)
-lets maintainers opt in to PR reviews modifying certain paths.
-
-* Review is not required from a code owner, though it is recommended.
-
-The
 [`MAINTAINERS.md` file](https://github.com/iree-org/iree/blob/main/MAINTAINERS.md)
 documents the Technical Steering Committee (TSC) and official maintainers for
 project components.
+
+The
+[`.github/CODEOWNERS` file](https://github.com/iree-org/iree/blob/main/.github/CODEOWNERS)
+designates reviewers for specific components of the project. Maintainers of the
+project are assigned as reviewers by default, so that they serve as the first
+point of contact and help find a reviewer in case they can't perform the review
+themselves.
+
+A strong, recent history of quality commits to a certain part of the project is
+generally enough to nominate oneself as a CODEOWNER - subject to maintainer
+approval, such participation in the project would be very welcome.
+
+An approval on the PR generally doesn't have to come from a designated code
+owner. A single approval by a project member with write access is technically
+sufficient to merge the change, however authors of larger PRs that affect
+multiple components should allow more time for several code owners and other
+project members to review. In such cases, preceding the change with a RFC and
+aligning with code owners/maintainers on the design is also a recommended
+practice - this allows to minimize time spent in the final PR review stage.
 
 ## :octicons-code-16: Coding policies
 

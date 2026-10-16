@@ -176,7 +176,7 @@ function(iree_native_test)
   endif()
 
   if (NOT DEFINED _RULE_TIMEOUT OR "${_RULE_TIMEOUT}" STREQUAL "")
-    set(_RULE_TIMEOUT 60)
+    set(_RULE_TIMEOUT ${IREE_NATIVE_TEST_TIMEOUT_DEFAULT})
   endif()
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")

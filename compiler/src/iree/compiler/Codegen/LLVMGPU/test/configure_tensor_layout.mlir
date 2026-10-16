@@ -506,8 +506,8 @@ func.func @batch_matmul_block_intrinsic(%lhs: tensor<4x32x4xf16>,
 
 // CHECK-LABEL: func.func @batch_matmul_block_intrinsic
 
-// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED]]) {shared_memory_conversion = #iree_gpu.derived_thread_config}
-// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]]) {shared_memory_conversion = #iree_gpu.use_global_load_dma}
+// CHECK-DAG: %[[LHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED]]) <shared_memory_conversion = #iree_gpu.derived_thread_config>
+// CHECK-DAG: %[[RHS:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED1]]) <shared_memory_conversion = #iree_gpu.use_global_load_dma>
 // CHECK-DAG: %[[ACC:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$NESTED2]])
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[LHS]], %[[RHS]]

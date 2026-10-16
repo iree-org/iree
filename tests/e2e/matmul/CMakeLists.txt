@@ -144,7 +144,7 @@ iree_generated_e2e_runner_test(
     "arm_64:dotprod:+dotprod"
     "arm_64:i8mm:+i8mm"
     "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
-    "riscv_64:ime:+v,+zvl256b,+xsmtvdot"
+    "riscv_64:ime:+m,+a,+f,+d,+c,+v,+zvl256b,+xsmtvdot"
 )
 
 iree_generated_e2e_runner_test(
@@ -345,7 +345,7 @@ iree_generated_e2e_runner_test(
     "arm_64:dotprod:+dotprod"
     "arm_64:i8mm:+i8mm"
     "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
-    "riscv_64:ime:+v,+zvl256b,+xsmtvdot"
+    "riscv_64:ime:+m,+a,+f,+d,+c,+v,+zvl256b,+xsmtvdot"
 )
 
 iree_generated_e2e_runner_test(
@@ -566,7 +566,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-inner-tiled"
   LABELS
-
+    "noriscv"
   TIMEOUT
     300
   TARGET_CPU_FEATURES_VARIANTS
@@ -714,6 +714,30 @@ iree_generated_e2e_runner_test(
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
     "x86_64:avx512bf16:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512bf16"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_dt_inner_tiled_riscv_small_f32_f32
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-inner-tiled"
+  TARGET_CPU_FEATURES_VARIANTS
+    "riscv_64:rvv:+m,+v,+zvl512b"
 )
 
 iree_generated_e2e_runner_test(
@@ -1172,7 +1196,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=none"
   TARGET_CPU_FEATURES_VARIANTS
-    "riscv_64:rvv:+v,+zvl512b"
+    "riscv_64:rvv:+m,+a,+f,+d,+c,+v,+zvl512b"
 )
 
 iree_generated_e2e_runner_test(
@@ -1196,7 +1220,7 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=none"
   TARGET_CPU_FEATURES_VARIANTS
-    "riscv_64:rvv:+v,+zvl512b"
+    "riscv_64:rvv:+m,+a,+f,+d,+c,+v,+zvl512b"
 )
 
 iree_generated_e2e_runner_test(
@@ -1221,7 +1245,7 @@ iree_generated_e2e_runner_test(
     "--iree-llvmcpu-enable-ukernels=none"
     "--iree-global-opt-enable-early-materialization=false"
   TARGET_CPU_FEATURES_VARIANTS
-    "riscv_64:rvv:+v,+zvl512b"
+    "riscv_64:rvv:+m,+a,+f,+d,+c,+v,+zvl512b"
 )
 
 iree_generated_e2e_runner_test(
@@ -1246,7 +1270,7 @@ iree_generated_e2e_runner_test(
     "--iree-llvmcpu-enable-ukernels=none"
     "--iree-global-opt-enable-early-materialization=false"
   TARGET_CPU_FEATURES_VARIANTS
-    "riscv_64:rvv:+v,+zvl512b"
+    "riscv_64:rvv:+m,+a,+f,+d,+c,+v,+zvl512b"
 )
 
 iree_generated_e2e_runner_test(
@@ -3648,6 +3672,8 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-rdna4"
+  TIMEOUT
+    120
 )
 
 iree_generated_e2e_runner_test(
@@ -3806,6 +3832,8 @@ iree_generated_e2e_runner_test(
     "notsan"
     "noubsan"
     "requires-gpu-rdna4"
+  TIMEOUT
+    120
 )
 
 iree_generated_e2e_runner_test(
@@ -4366,4 +4394,84 @@ iree_generated_e2e_runner_test(
     120
 )
 
+endif()
+
+# These complete quickly on hardware but take at least 20 seconds per test (or
+# time out) when every GPU instruction is simulated. The RocJITsu CPU-only
+# suite excludes this label; hardware suites continue to run them.
+if(IREE_HAL_DRIVER_HIP AND IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx94")
+  foreach(_TEST IN ITEMS
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_coalesced_dma_f32_2k_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_coalesced_dma_f32_4k_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_coalesced_dma_f32_8k_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_coalesced_dma_f32_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna3_vecdistmfma_block_f16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna3_tileandfusemfma_block_f16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna3_vecdistmfma_block_bf16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna3_tileandfusemfma_block_bf16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna3_vecdistmfma_block_i8_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna3_tileandfusemfma_block_i8_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_dt_f8E4M3FNUZ_tensor_ukernel_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_tensor_ukernel_f8E4M3FNUZ_large_expanded_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_dt_f32_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_dt_f64_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_pad_f32_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_pad_i8_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_tensor_ukernel_f16f16f32_large_expanded_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_dt_tensor_ukernel_f16f16f32_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_tensor_ukernel_bf16bf16f32_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna3_tensor_ukernel_bf16bf16f32_large_expanded_rocm_hip"
+  )
+    if(TEST "${_TEST}")
+      set_property(TEST "${_TEST}" APPEND PROPERTY LABELS "very-expensive")
+    endif()
+  endforeach()
+elseif(IREE_HAL_DRIVER_HIP AND IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx95")
+  foreach(_TEST IN ITEMS
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_coalesced_dma_f32_2k_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_coalesced_dma_f32_4k_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_coalesced_dma_f32_8k_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_coalesced_dma_f32_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna4_vecdistmfma_block_f16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna4_vecdistmfma_block_bf16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna4_vecdistmfma_block_i8_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_batch_matmul_cdna4_tileandfusemfma_block_i8_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_dt_f8E4M3FN_tensor_ukernel_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_tensor_ukernel_f8E4M3FN_large_expanded_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_dt_f64_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_pad_f32_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_pad_i8_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_tensor_ukernel_f16f16f32_large_expanded_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_dt_tensor_ukernel_f16f16f32_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_tensor_ukernel_bf16bf16f32_large_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_tensor_ukernel_bf16bf16f32_large_expanded_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_mxfp4_llama_0_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_mxfp4_llama_1_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_mxfp4_llama_2_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_cdna4_mxfp4_llama_3_rocm_hip"
+  )
+    if(TEST "${_TEST}")
+      set_property(TEST "${_TEST}" APPEND PROPERTY LABELS "very-expensive")
+    endif()
+  endforeach()
+elseif(IREE_HAL_DRIVER_HIP AND IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx1250")
+  foreach(_TEST IN ITEMS
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_wmma_f16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_tileandfusewmma_f16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_wmma_f16_tb_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_tileandfusewmma_f16_tb_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_wmma_f8E4M3FN_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_tileandfusewmma_f8E4M3FN_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_wmma_f8E4M3FN_tb_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_tileandfusewmma_f8E4M3FN_tb_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_wmma_i8_tb_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_tileandfusewmma_i8_tb_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_dt_f16_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_dt_f8E4M3FN_rocm_hip"
+    "iree/tests/e2e/matmul/e2e_matmul_gfx1250_dt_i8_rocm_hip"
+  )
+    if(TEST "${_TEST}")
+      set_property(TEST "${_TEST}" APPEND PROPERTY LABELS "very-expensive")
+    endif()
+  endforeach()
 endif()

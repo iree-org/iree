@@ -695,9 +695,9 @@ LogicalResult ConflictResolver::applyRenames(
 
       // Rename the operation.
       if (auto funcOp = dyn_cast<FunctionOpInterface>(info->op)) {
-        funcOp.setName(rename.newName);
+        funcOp.setSymbolName(rename.newName);
       } else if (auto symOp = dyn_cast<SymbolOpInterface>(info->op)) {
-        symOp.setName(rename.newName);
+        symOp.setSymbolName(rename.newName);
       }
 
       // Update SymbolInfo's names to reflect the rename.

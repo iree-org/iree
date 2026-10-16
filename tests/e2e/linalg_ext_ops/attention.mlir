@@ -11,11 +11,11 @@ func.func @attention1x3x4() {
                                             [0.5, 0.6, 0.7, 0.8],
                                             [0.9, 1.0, 1.1, 1.2]]]> : tensor<1x3x4xf32>
   %scale = arith.constant 0.5 : f32
-  %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention  <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
                      ins(%query, %key, %value, %scale : tensor<1x3x4xf32>,
         tensor<1x3x4xf32>, tensor<1x3x4xf32>, f32) outs(%init : tensor<1x3x4xf32>) {
           ^bb0(%arg0: f32):
@@ -46,12 +46,12 @@ func.func @causal_attention1x3x4() {
                                            [true, true,   false],
                                            [true, true,   true]]]> : tensor<1x3x3xi1>
   %scale = arith.constant 0.5 : f32
-  %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention  <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
                      ins(%query, %key, %value, %scale, %mask : tensor<1x3x4xf32>,
         tensor<1x3x4xf32>, tensor<1x3x4xf32>, f32, tensor<1x3x3xi1>) outs(%init : tensor<1x3x4xf32>) {
           ^bb0(%arg0: f32):
@@ -88,12 +88,12 @@ func.func @attention1x4x4_i1_mask_all_ones() {
                                            [true, true, true, true]]]> : tensor<1x4x4xi1>
 
   %scale = arith.constant 0.5 : f32
-  %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention  <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
                      ins(%query, %key, %value, %scale, %mask : tensor<1x4x4xf32>,
         tensor<1x4x4xf32>, tensor<1x4x4xf32>, f32, tensor<1x4x4xi1>) outs(%init : tensor<1x4x4xf32>) {
           ^bb0(%arg0: f32):
@@ -122,11 +122,11 @@ func.func @softcap_attention1x3x4() {
                                             [ 0.8195, -0.5137,  0.2178,  0.9182],
                                             [ 0.8644,  0.7615,  0.2934,  0.9721]]]> : tensor<1x3x4xf32>
   %scale = arith.constant 1.0 : f32
-  %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention  <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
                      ins(%query, %key, %value, %scale : tensor<1x3x4xf32>,
         tensor<1x3x4xf32>, tensor<1x3x4xf32>, f32) outs(%init : tensor<1x3x4xf32>) {
           ^bb0(%arg0: f32):
@@ -159,11 +159,11 @@ func.func @attention1x4x4() {
                                             [0.9, 1.0, 1.1, 1.2],
                                             [1.3, 1.4, 1.5, 1.6]]]> : tensor<1x4x4xf32>
   %scale = arith.constant 0.5 : f32
-  %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention  <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
                      ins(%query, %key, %value, %scale : tensor<1x4x4xf32>,
         tensor<1x4x4xf32>, tensor<1x4x4xf32>, f32) outs(%init : tensor<1x4x4xf32>) {
           ^bb0(%arg0: f32):
@@ -209,11 +209,11 @@ func.func @attention3x3x4() {
                                             [-0.5962, -1.0055,  0.4285,  1.4761],
                                             [ 1.6103, -0.7040, -0.1853, -0.9962]]]> : tensor<3x3x4xf32>
   %scale = arith.constant 0.5 : f32
-  %1 = iree_linalg_ext.attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention  <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
                      ins(%query, %key, %value, %scale : tensor<3x3x4xf32>,
         tensor<3x3x4xf32>, tensor<3x3x4xf32>, f32) outs(%init : tensor<3x3x4xf32>) {
           ^bb0(%arg0: f32):
@@ -253,7 +253,7 @@ func.func @online_attention1x3x4() {
   %acc = linalg.fill ins(%cst0 : f32) outs(%acc_e : tensor<1x3x4xf32>) -> tensor<1x3x4xf32>
   %max = linalg.fill ins(%cst_neg_inf : f32) outs(%ms_e : tensor<1x3xf32>) -> tensor<1x3xf32>
   %sum = linalg.fill ins(%cst0 : f32) outs(%ms_e : tensor<1x3xf32>) -> tensor<1x3xf32>
-  %r:3 = iree_linalg_ext.online_attention {
+  %r:3 = iree_linalg_ext.online_attention <
     indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
@@ -261,7 +261,7 @@ func.func @online_attention1x3x4() {
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]
-  } ins(%query, %key, %value, %scale :
+  > ins(%query, %key, %value, %scale :
         tensor<1x3x4xf32>, tensor<1x3x4xf32>, tensor<1x3x4xf32>, f32)
     outs(%acc, %max, %sum :
          tensor<1x3x4xf32>, tensor<1x3xf32>, tensor<1x3xf32>) {
@@ -312,7 +312,7 @@ func.func @causal_online_attention1x3x4() {
   %acc = linalg.fill ins(%cst0 : f32) outs(%acc_e : tensor<1x3x4xf32>) -> tensor<1x3x4xf32>
   %max = linalg.fill ins(%cst_neg_inf : f32) outs(%ms_e : tensor<1x3xf32>) -> tensor<1x3xf32>
   %sum = linalg.fill ins(%cst0 : f32) outs(%ms_e : tensor<1x3xf32>) -> tensor<1x3xf32>
-  %r:3 = iree_linalg_ext.online_attention {
+  %r:3 = iree_linalg_ext.online_attention <
     indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
@@ -321,7 +321,7 @@ func.func @causal_online_attention1x3x4() {
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]
-  } ins(%query, %key, %value, %scale, %mask :
+  > ins(%query, %key, %value, %scale, %mask :
         tensor<1x3x4xf32>, tensor<1x3x4xf32>, tensor<1x3x4xf32>, f32, tensor<1x3x3xi1>)
     outs(%acc, %max, %sum :
          tensor<1x3x4xf32>, tensor<1x3xf32>, tensor<1x3xf32>) {

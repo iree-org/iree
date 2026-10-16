@@ -656,11 +656,11 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create,  //
   }
 
   iree_hal_buffer_view_t* buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
+  iree_status_t status = iree_hal_buffer_view_create(
       subspan_buffer ? subspan_buffer : source_buffer, shape_rank, shape_dims,
-      element_type, encoding_type, state->host_allocator, &buffer_view));
-
+      element_type, encoding_type, state->host_allocator, &buffer_view);
   iree_hal_buffer_release(subspan_buffer);
+  IREE_RETURN_IF_ERROR(status);
 
   rets->r0 = iree_hal_buffer_view_move_ref(buffer_view);
   return iree_ok_status();
@@ -941,6 +941,38 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_advise_buffer,  //
                                                flags, arg0, arg1);
 }
 
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_flush_buffer,  //
+                   iree_hal_module_state_t,                      //
+                   rirII, v) {
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
+  uint32_t target_buffer_slot = (uint32_t)args->i1;
+  iree_device_size_t target_offset = iree_hal_cast_device_size(args->i3);
+  iree_device_size_t length = iree_hal_cast_device_size(args->i4);
+  iree_hal_buffer_ref_t target_ref = iree_hal_make_indirect_buffer_ref(
+      target_buffer_slot, target_offset, length);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_check_deref_or_null(args->r2, &target_ref.buffer));
+  return iree_hal_command_buffer_flush_buffer(command_buffer, target_ref);
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_invalidate_buffer,  //
+                   iree_hal_module_state_t,                           //
+                   rirII, v) {
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_command_buffer_check_deref(args->r0, &command_buffer));
+  uint32_t target_buffer_slot = (uint32_t)args->i1;
+  iree_device_size_t target_offset = iree_hal_cast_device_size(args->i3);
+  iree_device_size_t length = iree_hal_cast_device_size(args->i4);
+  iree_hal_buffer_ref_t target_ref = iree_hal_make_indirect_buffer_ref(
+      target_buffer_slot, target_offset, length);
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_check_deref_or_null(args->r2, &target_ref.buffer));
+  return iree_hal_command_buffer_invalidate_buffer(command_buffer, target_ref);
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_fill_buffer,  //
                    iree_hal_module_state_t,                     //
                    rrIIiIiI, v) {
@@ -1100,6 +1132,14 @@ static iree_status_t iree_hal_module_command_buffer_dispatch(
                                 args->constant_count * sizeof(uint32_t)),
       bindings, (iree_hal_dispatch_flags_t)args->flags);
 }
+// The shim below uses sizeof(iree_vm_abi_rrIiiiI_t) as the offset of the
+// following variadic segment; that is only correct while the struct has no
+// trailing padding as the VM packs cconv arguments unpadded.
+static_assert(sizeof(iree_vm_abi_rrIiiiI_t) ==
+                  offsetof(iree_vm_abi_rrIiiiI_t, i6) +
+                      IREE_VM_ABI_FIELD_SIZE(iree_vm_abi_rrIiiiI_t, i6),
+              "iree_vm_abi_rrIiiiI_t must have no trailing padding; size "
+              "through the final field instead of using sizeof");
 static iree_status_t iree_hal_module_command_buffer_dispatch_shim(
     iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,
@@ -1222,6 +1262,14 @@ static iree_status_t iree_hal_module_command_buffer_dispatch_indirect(
                                 args->constant_count * sizeof(uint32_t)),
       bindings, flags);
 }
+// The shim below uses sizeof(iree_vm_abi_rrIirII_t) as the offset of the
+// following variadic segment; that is only correct while the struct has no
+// trailing padding as the VM packs cconv arguments unpadded.
+static_assert(sizeof(iree_vm_abi_rrIirII_t) ==
+                  offsetof(iree_vm_abi_rrIirII_t, i6) +
+                      IREE_VM_ABI_FIELD_SIZE(iree_vm_abi_rrIirII_t, i6),
+              "iree_vm_abi_rrIirII_t must have no trailing padding; size "
+              "through the final field instead of using sizeof");
 static iree_status_t iree_hal_module_command_buffer_dispatch_indirect_shim(
     iree_vm_stack_t* IREE_RESTRICT stack, iree_vm_native_function_flags_t flags,
     iree_byte_span_t args_storage, iree_byte_span_t rets_storage,

@@ -266,7 +266,7 @@ func.func @gather_attention(
   %fill_acc = linalg.fill ins(%cst_0 : f32) outs(%acc : tensor<32x4x2x32xf32>) -> tensor<32x4x2x32xf32>
   %fill_max = linalg.fill ins(%cst_1 : f32) outs(%max : tensor<32x4x2xf32>) -> tensor<32x4x2xf32>
   %fill_sum = linalg.fill ins(%cst_2 : f32) outs(%max : tensor<32x4x2xf32>) -> tensor<32x4x2xf32>
-  %result:3 = iree_linalg_ext.online_attention {
+  %result:3 = iree_linalg_ext.online_attention <
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d1, d6, d3)>,
@@ -274,7 +274,7 @@ func.func @gather_attention(
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d5, d6)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>,
-                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>]}
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2)>]>
       ins(%query, %k_gather, %v_gather, %cst, %mask
           : tensor<32x4x2x32xf16>, tensor<32x?x4x16x32xf16>,
             tensor<32x?x4x16x32xf16>, f16, tensor<32x4x2x?x16xf16>)

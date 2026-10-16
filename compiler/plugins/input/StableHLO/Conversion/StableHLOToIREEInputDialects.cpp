@@ -406,29 +406,28 @@ struct GenericTypeConvert final : ConversionPattern {
   LogicalResult
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
-    llvm::SmallVector<NamedAttribute> newAttr;
-    llvm::append_range(newAttr, op->getAttrs());
-
     llvm::SmallVector<Type> newResults;
     if (failed(getTypeConverter()->convertTypes(op->getResultTypes(),
                                                 newResults))) {
       return rewriter.notifyMatchFailure(op, "result type conversion failed");
     }
 
-    OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
-                         newResults, newAttr, op->getSuccessors());
-    for (Region &r : op->getRegions()) {
-      Region *newRegion = state.addRegion();
-      rewriter.inlineRegionBefore(r, *newRegion, newRegion->begin());
-      TypeConverter::SignatureConversion result(newRegion->getNumArguments());
+    Operation *newOp = op->clone(
+        Operation::CloneOptions().withResultTypes(llvm::to_vector(newResults)));
+    newOp->setOperands(operands);
+    rewriter.insert(newOp);
+    for (auto [r, newRegion] :
+         llvm::zip_equal(op->getRegions(), newOp->getRegions())) {
+      rewriter.inlineRegionBefore(r, newRegion, newRegion.begin());
+      TypeConverter::SignatureConversion result(newRegion.getNumArguments());
       if (failed(getTypeConverter()->convertSignatureArgs(
-              newRegion->getArgumentTypes(), result))) {
+              newRegion.getArgumentTypes(), result))) {
         return rewriter.notifyMatchFailure(op,
                                            "argument type conversion failed");
       }
-      rewriter.applySignatureConversion(&newRegion->front(), result);
+      rewriter.applySignatureConversion(&newRegion.front(), result);
     }
-    Operation *newOp = rewriter.create(state);
+
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }

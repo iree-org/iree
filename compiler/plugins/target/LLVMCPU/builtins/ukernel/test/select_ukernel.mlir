@@ -26,7 +26,7 @@
 func.func @bf16_inner_tiled_ukernel_enabled(
     %lhs: tensor<2x4x1x2xbf16>, %rhs: tensor<2x4x16x2xbf16>, %acc: tensor<2x2x1x16xf32>
   ) -> tensor<2x2x1x16xf32> attributes {hal.executable.target = #executable_target_enabled} {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = [
       affine_map<(d0, d1, d2) -> (d0, d2)>,
       affine_map<(d0, d1, d2) -> (d1, d2)>,
@@ -37,7 +37,7 @@ func.func @bf16_inner_tiled_ukernel_enabled(
                       #linalg.iterator_type<reduction>],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512BF16_1x16x2_F32_BF16>,
     semantics = #iree_cpu.mma_semantics<>
-  } : tensor<2x4x1x2xbf16>, tensor<2x4x16x2xbf16> into tensor<2x2x1x16xf32>
+  > : tensor<2x4x1x2xbf16>, tensor<2x4x16x2xbf16> into tensor<2x2x1x16xf32>
   return %0 : tensor<2x2x1x16xf32>
 }
 // The reduction (K) dim is left untiled: the ukernel owns the K loop, so the
@@ -71,7 +71,7 @@ func.func @bf16_inner_tiled_ukernel_enabled(
 func.func @bf16_inner_tiled_ukernel_disabled(
     %lhs: tensor<2x4x1x2xbf16>, %rhs: tensor<2x4x16x2xbf16>, %acc: tensor<2x2x1x16xf32>
   ) -> tensor<2x2x1x16xf32> attributes {hal.executable.target = #executable_target_disabled} {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = [
       affine_map<(d0, d1, d2) -> (d0, d2)>,
       affine_map<(d0, d1, d2) -> (d1, d2)>,
@@ -82,7 +82,7 @@ func.func @bf16_inner_tiled_ukernel_disabled(
                       #linalg.iterator_type<reduction>],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512BF16_1x16x2_F32_BF16>,
     semantics = #iree_cpu.mma_semantics<>
-  } : tensor<2x4x1x2xbf16>, tensor<2x4x16x2xbf16> into tensor<2x2x1x16xf32>
+  > : tensor<2x4x1x2xbf16>, tensor<2x4x16x2xbf16> into tensor<2x2x1x16xf32>
   return %0 : tensor<2x2x1x16xf32>
 }
 // Without a ukernel, the reduction (K) dim is tiled normally.
@@ -119,7 +119,7 @@ func.func @bf16_inner_tiled_ukernel_unrolled_accepted(
     %lhs: tensor<2x4x2x1x2xbf16>, %rhs: tensor<2x4x1x16x2xbf16>, %acc: tensor<2x2x2x1x1x16xf32>
   ) -> tensor<2x2x2x1x1x16xf32>
     attributes {hal.executable.target = #executable_target_enabled_unrolled} {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = [
       affine_map<(d0, d1, d2) -> (d0, d2)>,
       affine_map<(d0, d1, d2) -> (d1, d2)>,
@@ -130,7 +130,7 @@ func.func @bf16_inner_tiled_ukernel_unrolled_accepted(
                       #linalg.iterator_type<reduction>],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512BF16_1x16x2_F32_BF16, intrinsics_m = 2>,
     semantics = #iree_cpu.mma_semantics<>
-  } : tensor<2x4x2x1x2xbf16>, tensor<2x4x1x16x2xbf16> into tensor<2x2x2x1x1x16xf32>
+  > : tensor<2x4x2x1x2xbf16>, tensor<2x4x1x16x2xbf16> into tensor<2x2x2x1x1x16xf32>
   return %0 : tensor<2x2x2x1x1x16xf32>
 }
 // CHECK-LABEL: func.func @bf16_inner_tiled_ukernel_unrolled_accepted
@@ -163,7 +163,7 @@ func.func @bf16_inner_tiled_ukernel_unrolled_accepted(
 func.func @bf16_inner_tiled_ukernel_no_bitcode(
     %lhs: tensor<2x4x16x2xbf16>, %rhs: tensor<2x4x1x2xbf16>, %acc: tensor<2x2x16x1xf32>
   ) -> tensor<2x2x16x1xf32> attributes {hal.executable.target = #executable_target_no_bitcode} {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = [
       affine_map<(d0, d1, d2) -> (d0, d2)>,
       affine_map<(d0, d1, d2) -> (d1, d2)>,
@@ -174,7 +174,7 @@ func.func @bf16_inner_tiled_ukernel_no_bitcode(
                       #linalg.iterator_type<reduction>],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512BF16_16x1x2_F32_BF16>,
     semantics = #iree_cpu.mma_semantics<>
-  } : tensor<2x4x16x2xbf16>, tensor<2x4x1x2xbf16> into tensor<2x2x16x1xf32>
+  > : tensor<2x4x16x2xbf16>, tensor<2x4x1x2xbf16> into tensor<2x2x16x1xf32>
   return %0 : tensor<2x2x16x1xf32>
 }
 // CHECK-LABEL: func.func @bf16_inner_tiled_ukernel_no_bitcode

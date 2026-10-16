@@ -55,7 +55,8 @@ Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
   }
 
   if (inputETy.getIntOrFloatBitWidth() < eTy.getIntOrFloatBitWidth()) {
-    return arith::ExtFOp::create(builder, loc, type, inputs[0]);
+    return arith::ExtFOp::create(builder, loc, type, inputs[0],
+                                 arith::FastMathFlagsAttr{});
   }
 
   return nullptr;
@@ -124,34 +125,27 @@ struct GenericTypeConversionPattern : ConversionPattern {
     // them all the ops would become invalid. This may still be too broad,
     // though, if some constant ops include attributes with both the type we
     // want to convert and structural information in the same type.
-    llvm::SmallVector<NamedAttribute> newAttrs;
-    if (op->hasTrait<OpTrait::ConstantLike>() ||
-        isa<IREE::Util::GlobalOpInterface>(op)) {
-      for (auto attr : op->getAttrs()) {
-        auto newAttr = convertAttribute(op->getLoc(), attr.getValue(),
-                                        *getTypeConverter());
-        newAttrs.push_back(NamedAttribute(attr.getName(), newAttr));
-      }
-    } else {
-      newAttrs.append(op->getAttrs().begin(), op->getAttrs().end());
-    }
-
     llvm::SmallVector<Type> newResults;
     (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
 
-    OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
-                         newResults, newAttrs, op->getSuccessors());
-
-    for (Region &r : op->getRegions()) {
-      Region *newRegion = state.addRegion();
-      rewriter.inlineRegionBefore(r, *newRegion, newRegion->begin());
-      TypeConverter::SignatureConversion result(newRegion->getNumArguments());
-      (void)getTypeConverter()->convertSignatureArgs(
-          newRegion->getArgumentTypes(), result);
-      rewriter.applySignatureConversion(&newRegion->front(), result);
+    Operation *newOp = op->clone(
+        Operation::CloneOptions().withResultTypes(llvm::to_vector(newResults)));
+    newOp->setOperands(operands);
+    rewriter.insert(newOp);
+    if (op->hasTrait<OpTrait::ConstantLike>() ||
+        isa<IREE::Util::GlobalOpInterface>(op)) {
+      convertAttributes(newOp, *getTypeConverter());
     }
 
-    Operation *newOp = rewriter.create(state);
+    for (auto [r, newRegion] :
+         llvm::zip_equal(op->getRegions(), newOp->getRegions())) {
+      rewriter.inlineRegionBefore(r, newRegion, newRegion.begin());
+      TypeConverter::SignatureConversion result(newRegion.getNumArguments());
+      (void)getTypeConverter()->convertSignatureArgs(
+          newRegion.getArgumentTypes(), result);
+      rewriter.applySignatureConversion(&newRegion.front(), result);
+    }
+
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }
@@ -189,7 +183,9 @@ struct ConvertTypeSensitiveArithCastOp : OpConversionPattern<OpTy> {
                                                 resultEType.getWidth())) {
       return rewriter.notifyMatchFailure(op, "invalid width combination");
     }
-    rewriter.replaceOpWithNewOp<OpTy>(op, resultType, op.getOperand());
+    rewriter.replaceOpWithNewOp<OpTy>(
+        op, TypeRange{resultType}, ValueRange{op.getOperand()},
+        op.getProperties(), op->getDiscardableAttrDictionary().getValue());
     return success();
   }
 };

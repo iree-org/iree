@@ -11,8 +11,8 @@ Bazel's module system (introduced in Bazel 6.0, default in Bazel 7.0+). It repla
 the legacy WORKSPACE file with `MODULE.bazel` for managing external dependencies.
 
 ### Root Module
-The top-level project being built. In bzlmod, only the root module's `MODULE.bazel`
-is fully evaluated - dependency modules have limited control over the build graph.
+The top-level project being built. Its `MODULE.bazel` controls dependency overrides
+and can inject repositories into extensions used by dependency modules.
 
 ### Module Extension
 A mechanism for creating repositories dynamically in bzlmod. Extensions are defined
@@ -62,20 +62,21 @@ repositories **only when IREE is the root module**:
 ```python
 # In build_tools/bazel/extensions.bzl
 def _iree_extension_impl(module_ctx):
+    iree_root = str(module_ctx.path(Label("//:MODULE.bazel")).dirname)
     if any([m.is_root and m.name == "iree_core" for m in module_ctx.modules]):
         new_local_repository(
             name = "llvm-raw",
             build_file_content = "# empty",
-            path = "third_party/llvm-project",
+            path = iree_root + "/third_party/llvm-project",
         )
         local_repository(
             name = "stablehlo",
-            path = "third_party/stablehlo",
+            path = iree_root + "/third_party/stablehlo",
         )
         new_local_repository(
             name = "torch-mlir-raw",
             build_file_content = "# empty - BUILD files overlaid by torch_mlir_configure",
-            path = "third_party/torch-mlir",
+            path = iree_root + "/third_party/torch-mlir",
         )
     # ... other repos
 ```
@@ -83,6 +84,38 @@ def _iree_extension_impl(module_ctx):
 When your project depends on IREE, IREE is **not** the root module - your project is.
 Therefore, IREE's extension will not create these MLIR-adjacent repositories,
 and you must provide the ones needed by the compiler plugins you enable.
+
+Creating a repository in your root module does not automatically make it visible
+to IREE. Use `inject_repo()` to supply the raw source repositories to IREE's
+extension and `llvm-raw` to LLVM's extension, as shown below.
+
+## Label Resolution in Macros
+
+In legacy macros, target references resolve according to how they are written:
+
+- `Label("...")` resolves using the package and repository mapping of the `.bzl`
+  file containing the `Label()` call. The reference retains that meaning when
+  the macro is called from another repository.
+- A raw label string passed to a rule's label attribute resolves using the
+  package and repository mapping of the `BUILD` file calling the macro.
+
+For raw strings, declare or import the repository under the expected name in
+the caller's `MODULE.bazel`. This does not require `override_repo()`.
+
+To replace a repository provided by a module extension, use `override_repo()`
+in the root module. Given an extension proxy `ext` from `use_extension()` and
+an existing root-visible repository `my_dependency`:
+
+```python
+override_repo(ext, dependency = "my_dependency")
+```
+
+This replaces the extension's `dependency` repository, including references
+resolved to it through definition-site `Label()` calls.
+
+See Bazel's [label resolution in macros](https://bazel.build/extending/legacy-macros#label-resolution-in-macros)
+and [repository overrides](https://bazel.build/external/extension#overriding-and-injecting-module-extension-repos)
+for details.
 
 ## MODULE.bazel Ordering
 
@@ -109,6 +142,8 @@ module(
 bazel_dep(name = "bazel_skylib", version = "1.8.2")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.11")
+bazel_dep(name = "rules_python", version = "1.9.0")
+bazel_dep(name = "rules_shell", version = "0.6.1")
 # ... other deps as needed
 
 # Depend on IREE
@@ -151,37 +186,35 @@ local_repository(
     path = "my/custom/stablehlo",
 )
 
-# Use LLVM's extension for third-party deps (gmp, mpfr, etc.)
+# Use LLVM's extension for its generated repositories. Other dependencies,
+# such as gmp and mpfr, are declared by the LLVM overlay's MODULE.bazel.
 llvm_repos_ext = use_extension(
     "@llvm-project-overlay//:extensions.bzl",
     "llvm_repos_extension",
 )
 use_repo(
     llvm_repos_ext,
-    "gmp",
-    "mpc",
-    "mpfr",
-    "nanobind",
-    "pfm",
-    "pybind11",
+    "pyyaml",
     "vulkan_sdk",
 )
+inject_repo(llvm_repos_ext, "llvm-raw")
 
 # Use IREE's extension (won't create llvm-raw since you're the root module)
 iree_ext = use_extension(
     "@iree_core//build_tools/bazel:extensions.bzl",
     "iree_extension",
 )
+inject_repo(iree_ext, "llvm-raw", "stablehlo", "torch-mlir-raw")
 use_repo(
     iree_ext,
     "com_github_dvidelabs_flatcc",
     "com_google_benchmark",
     "com_google_googletest",
-    "stablehlo",
     # ... other IREE repos you need
 )
 
-# Configure LLVM (creates llvm-project from your llvm-raw)
+# Configure LLVM for calls from your project's BUILD files. IREE configures
+# its own llvm-project repository from the same injected llvm-raw sources.
 llvm_configure = use_repo_rule(
     "@llvm-raw//utils/bazel:configure.bzl",
     "llvm_configure",
@@ -271,5 +304,7 @@ Your LLVM version may be incompatible with IREE. Check that your LLVM commit
 is close to IREE's expected version.
 
 ### Duplicate repository errors
-Multiple modules may be trying to create the same repository. Ensure only
-one source defines each repository name.
+Check for duplicate names within your module's repository mapping. For example,
+after defining `stablehlo` locally and injecting it into IREE's extension, do not
+also import it with `use_repo(iree_ext, "stablehlo")`. Different modules may each
+use the same apparent repository name.

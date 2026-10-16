@@ -45,7 +45,7 @@ module {
 // CHECK-LABEL: @t004_module_version
 module @t004_module_version {
 
-// CHECK: vm.module public @my_module attributes {version = 4 : i32}
+// CHECK: vm.module public @my_module <version = 4>
 module @my_module attributes {vm.version = 4 : i32} {}
 
 }

@@ -15,7 +15,7 @@ util.func @splatConstant() {
 
 // Tests that constant parameters are outlined.
 
-// CHECK: util.global private @__parameter_scope_key_tensor_4x2xi32 {inlining_policy = #util.inline.never} = #flow.parameter.named<"scope"::"key"> : tensor<4x2xi32>
+// CHECK: util.global private @__parameter_scope_key_tensor_4x2xi32 <inlining_policy = #util.inline.never> = #flow.parameter.named<"scope"::"key"> : tensor<4x2xi32>
 // CHECK-LABEL: @parameterConstant
 util.func @parameterConstant() {
   // CHECK: = util.global.load immutable @__parameter_scope_key_tensor_4x2xi32 : tensor<4x2xi32>
@@ -27,8 +27,8 @@ util.func @parameterConstant() {
 
 // Tests that multiple constants will be hoisted and named uniquely.
 
-//      CHECK: util.global private @__constant_tensor_2xf32 {inlining_policy = #util.inline.never} = dense<[0.0287729427, 0.0297581609]> : tensor<2xf32>
-// CHECK-NEXT: util.global private @__constant_tensor_2xf32_0 {inlining_policy = #util.inline.never} = dense<[0.000000e+00, 1.000000e+00]> : tensor<2xf32>
+//      CHECK: util.global private @__constant_tensor_2xf32 <inlining_policy = #util.inline.never> = dense<[0.0287729427, 0.0297581609]> : tensor<2xf32>
+// CHECK-NEXT: util.global private @__constant_tensor_2xf32_0 <inlining_policy = #util.inline.never> = dense<[0.000000e+00, 1.000000e+00]> : tensor<2xf32>
 // CHECK-NEXT: util.func private @denseConstants
 util.func private @denseConstants() {
   // CHECK-NEXT: = util.global.load immutable @__constant_tensor_2xf32 : tensor<2xf32>

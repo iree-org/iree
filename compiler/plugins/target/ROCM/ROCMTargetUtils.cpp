@@ -22,7 +22,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/WithColor.h"
 #include "llvm/Transforms/IPO/Internalize.h"
-#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
+#include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -131,21 +131,25 @@ static void overridePlatformGlobal(llvm::Module *module, StringRef globalName,
 }
 
 LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
-                            const amdgpu::Chipset &chipset, bool isWave64,
+                            const ROCDL::TargetInfo &target, bool isWave64,
                             uint32_t abiVersion) {
+  llvm::AMDGPU::IsaVersion isaVersion = target.getIsaVersion();
+  unsigned majorVersion = isaVersion.Major;
+  unsigned minorVersion = isaVersion.Minor;
+  unsigned steppingVersion = isaVersion.Stepping;
   // Oldest GFX arch supported is gfx60x.
-  if (chipset.majorVersion < 6) {
+  if (majorVersion < 6) {
     return emitError(loc, "pre-gfx6 chipsets are not supported");
   }
   // Latest GFX arch supported is gfx1250.
-  if (chipset > amdgpu::Chipset(12, 5, 0)) {
+  if (std::make_tuple(majorVersion, minorVersion, steppingVersion) >
+      std::make_tuple(12u, 5u, 0u)) {
     return emitError(loc)
-           << "a chipset with major version = " << chipset.majorVersion
-           << " and minor version = " << chipset.minorVersion
+           << "a chipset with major version = " << majorVersion
+           << " and minor version = " << minorVersion
            << " was not known to exist at the time this IREE was built";
   }
-  int chipCode = chipset.majorVersion * 1000 + chipset.minorVersion * 16 +
-                 chipset.steppingVersion;
+  int chipCode = majorVersion * 1000 + minorVersion * 16 + steppingVersion;
   auto *int32Type = llvm::Type::getInt32Ty(module->getContext());
   overridePlatformGlobal(module, "__oclc_ISA_version", chipCode, int32Type);
 

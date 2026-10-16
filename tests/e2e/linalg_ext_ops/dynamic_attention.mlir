@@ -23,7 +23,7 @@ func.func @dynamic_attention_3x4() {
   %init = tensor.empty(%batch, %seq_len, %head_dim) : tensor<?x?x?xf32>
   %scale = arith.constant 0.5 : f32
 
-  %result = iree_linalg_ext.attention {
+  %result = iree_linalg_ext.attention <
     indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
@@ -31,7 +31,7 @@ func.func @dynamic_attention_3x4() {
       affine_map<(d0, d1, d2, d3, d4) -> ()>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
     ]
-  } ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32)
+  > ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32)
     outs(%init : tensor<?x?x?xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
@@ -94,7 +94,7 @@ func.func @dynamic_attention_3x3x4() {
   %init = tensor.empty(%batch, %seq_len, %head_dim) : tensor<?x?x?xf32>
   %scale = arith.constant 0.5 : f32
 
-  %result = iree_linalg_ext.attention {
+  %result = iree_linalg_ext.attention <
     indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
@@ -102,7 +102,7 @@ func.func @dynamic_attention_3x3x4() {
       affine_map<(d0, d1, d2, d3, d4) -> ()>,
       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
     ]
-  } ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32)
+  > ins(%query, %key, %value, %scale : tensor<?x?x?xf32>, tensor<?x?x?xf32>, tensor<?x?x?xf32>, f32)
     outs(%init : tensor<?x?x?xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32

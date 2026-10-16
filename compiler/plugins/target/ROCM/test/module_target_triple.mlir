@@ -12,14 +12,14 @@
 // Therefore, the ROCMTargetBackend validation checks for the target triple to
 // be set and emits an explicit error if that is not the case.
 
-// CHECK: target triple = "amdgcn-amd-amdhsa"
+// CHECK: target triple = "amdgpu9.42-amd-amdhsa"
 
 #pipeline_layout = #hal.pipeline.layout<bindings = []>
 hal.executable.source public @exe {
   hal.executable.export public @empty ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
-  } attributes {subgroup_size = 64 : index, workgroup_size = [1 : index, 1 : index, 1 : index]}
+  } <subgroup_size = 64, workgroup_size = [1 : index, 1 : index, 1 : index]>
   builtin.module {
     llvm.func @empty() attributes {rocdl.kernel} {
       llvm.return

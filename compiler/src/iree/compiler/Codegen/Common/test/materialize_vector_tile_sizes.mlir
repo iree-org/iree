@@ -643,7 +643,7 @@ func.func @inner_tiled_attention_pv(
     into %empty_acc : tensor<1x16x64xf32> -> tensor<1x1x4x16x16xf32>
   // CHECK: iree_codegen.inner_tiled
   // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4, 4>
-  %result_packed = iree_codegen.inner_tiled ins(%pack_lhs, %pack_rhs) outs(%pack_acc) {
+  %result_packed = iree_codegen.inner_tiled ins(%pack_lhs, %pack_rhs) outs(%pack_acc) <
     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
                      affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>],
@@ -653,7 +653,7 @@ func.func @inner_tiled_attention_pv(
                       #linalg.iterator_type<parallel>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
-  } : tensor<1x1x4x16x16xf16>, tensor<1x4x4x16x16xf16> into tensor<1x1x4x16x16xf32>
+  > : tensor<1x1x4x16x16xf16>, tensor<1x4x4x16x16xf16> into tensor<1x1x4x16x16xf32>
   %empty_result = tensor.empty() : tensor<1x16x64xf32>
   // CHECK: linalg.unpack
   // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4, 16, 16>
@@ -709,7 +709,7 @@ func.func @inner_tiled_dynamic(
     into %empty_acc : tensor<1x?x?xf32> -> tensor<1x?x?x16x16xf32>
   // CHECK: iree_codegen.inner_tiled
   // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4, 4>
-  %result_packed = iree_codegen.inner_tiled ins(%pack_lhs, %pack_rhs) outs(%pack_acc) {
+  %result_packed = iree_codegen.inner_tiled ins(%pack_lhs, %pack_rhs) outs(%pack_acc) <
     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
                      affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>],
@@ -719,7 +719,7 @@ func.func @inner_tiled_dynamic(
                       #linalg.iterator_type<parallel>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
-  } : tensor<1x?x?x16x16xf16>, tensor<1x?x?x16x16xf16> into tensor<1x?x?x16x16xf32>
+  > : tensor<1x?x?x16x16xf16>, tensor<1x?x?x16x16xf16> into tensor<1x?x?x16x16xf32>
   %empty_result = tensor.empty(%m, %n) : tensor<1x?x?xf32>
   // CHECK: linalg.unpack
   // CHECK-SAME: iree_codegen.vector_tile_sizes = array<i64: 1, 1, 4, 16, 16>

@@ -24,7 +24,9 @@ class IREEEncoding_I32EnumAttr<string name, string summary, list<I32EnumAttrCase
 }
 
 class IREEEncoding_EnumAttr<EnumAttrInfo enumInfo, string name = "">
-  : EnumAttr<IREEEncoding_Dialect, enumInfo, name>;
+  : EnumAttr<IREEEncoding_Dialect, enumInfo, name> {
+  let assemblyFormat = "$value";
+}
 
 // Enums for tagging operand operation in an EncodingAttr
 def MATMUL : I32EnumAttrCase<"matmul", 0>;

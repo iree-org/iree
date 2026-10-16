@@ -32,11 +32,6 @@ jobs:
             pjrt_platform: cpu
           - runner: ubuntu-24.04
             pjrt_platform: cuda
-          # TODO: enable these AMD runners
-          # - runner: iree-w7900x2
-          #   pjrt_platform: rocm
-          # - runner: iree-w7900x2
-          #   pjrt_platform: vulkan
     name: Build and test
     runs-on: ${{ matrix.runner }}
     env:
@@ -52,7 +47,7 @@ jobs:
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: ${{ inputs.artifact_run_id == '' }}
         with:
           name: linux_x86_64_release_packages
@@ -65,7 +60,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: ccache
-        uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
         with:
           key: ${{ github.job }}-${{ matrix.pjrt_platform }}
           save: ${{ inputs.write-caches == 1 }}

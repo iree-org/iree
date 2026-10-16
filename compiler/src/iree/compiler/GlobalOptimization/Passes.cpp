@@ -24,6 +24,13 @@ static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     llvm::cl::desc(
         "Enables reassociation of quantized matmul ops (experimental)."),
     llvm::cl::init(false));
+static llvm::cl::opt<bool> clConvertQDQToIntegerMath(
+    "iree-global-opt-enable-qdq-to-integer-math",
+    llvm::cl::desc("Rewrites contractions over dequantized operands into "
+                   "integer contractions with zero point corrections ("
+                   "changes floating-point rounding and exceptional-value "
+                   "behavior)."),
+    llvm::cl::init(true));
 static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",
     llvm::cl::desc(
@@ -123,6 +130,13 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
       .addPass(createLinalgQuantizedConvToConvPass)
       .addPass(createLinalgQuantizedMatmulToMatmulPass)
+      // Run propagation immediately before the QDQ rewrite so contractions
+      // consume dequantize results directly. This must happen before im2col
+      // inserts a packing operation between dequantize and its matmul.
+      .addPredicatedPass(clConvertQDQToIntegerMath,
+                         createPropagateAffineQuantizationPass)
+      .addPredicatedPass(clConvertQDQToIntegerMath,
+                         createConvertQDQToIntegerMathPass)
       .addPredicatedPass(transformOptions.useIm2colForConvs,
                          createConvertConv2DToImg2ColPass)
       .addPass(IREE::Flow::createCanonicalizePass)
@@ -200,6 +214,12 @@ void buildGlobalOptimizationPassPipeline(
                                clEnableEdgeReshapePropagation;
                            return createPropagateLinalgTransposePass(options);
                          })
+      // Run propagation immediately before the QDQ rewrite again: earlier
+      // reshape/transpose passes can separate dequantize from its consumers.
+      .addPredicatedPass(clConvertQDQToIntegerMath,
+                         createPropagateAffineQuantizationPass)
+      .addPredicatedPass(clConvertQDQToIntegerMath,
+                         createConvertQDQToIntegerMathPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
   mainPassManager.addPass(

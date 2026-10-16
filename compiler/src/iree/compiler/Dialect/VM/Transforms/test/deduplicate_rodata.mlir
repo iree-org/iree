@@ -27,10 +27,10 @@ vm.module @basic {
 
 // CHECK-LABEL: vm.module public @unique_mime_types
 vm.module @unique_mime_types {
-  // CHECK: vm.rodata private @const1a {mime_type = "aaa"} dense<1>
-  vm.rodata private @const1a {mime_type = "aaa"} dense<1> : vector<1xi8>
-  // CHECK: vm.rodata private @const1b {mime_type = "bbb"} dense<1>
-  vm.rodata private @const1b {mime_type = "bbb"} dense<1> : vector<1xi8>
+  // CHECK: vm.rodata private @const1a <mime_type = "aaa"> dense<1>
+  vm.rodata private @const1a <mime_type = "aaa"> dense<1> : vector<1xi8>
+  // CHECK: vm.rodata private @const1b <mime_type = "bbb"> dense<1>
+  vm.rodata private @const1b <mime_type = "bbb"> dense<1> : vector<1xi8>
   // CHECK-NEXT: vm.func @fn
   vm.func @fn() {
     // CHECK-NEXT: = vm.const.ref.rodata @const1a : !vm.buffer
@@ -45,9 +45,9 @@ vm.module @unique_mime_types {
 
 // CHECK-LABEL: vm.module public @widen_alignment
 vm.module @widen_alignment {
-  // CHECK: vm.rodata private @const1a {alignment = 16 : i64} dense<1>
-  vm.rodata private @const1a {alignment = 1 : i64} dense<1> : vector<1xi8>
-  vm.rodata private @const1b {alignment = 16 : i64} dense<1> : vector<1xi8>
+  // CHECK: vm.rodata private @const1a <alignment = 16> dense<1>
+  vm.rodata private @const1a <alignment = 1> dense<1> : vector<1xi8>
+  vm.rodata private @const1b <alignment = 16> dense<1> : vector<1xi8>
   // CHECK-NEXT: vm.func @fn
   vm.func @fn() {
     // CHECK-NEXT: = vm.const.ref.rodata @const1a : !vm.buffer

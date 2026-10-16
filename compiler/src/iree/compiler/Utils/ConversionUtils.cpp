@@ -126,4 +126,17 @@ Attribute convertAttribute(Location loc, Attribute oldAttr,
   return oldAttr;
 }
 
+void convertAttributes(Operation *op, const TypeConverter &typeConverter) {
+  op->getName().walkInherentAttrs(op, [&](StringRef, Attribute &attr) {
+    attr = convertAttribute(op->getLoc(), attr, typeConverter);
+  });
+  SmallVector<NamedAttribute> attrs;
+  for (NamedAttribute attr : op->getDiscardableAttrs()) {
+    attrs.emplace_back(
+        attr.getName(),
+        convertAttribute(op->getLoc(), attr.getValue(), typeConverter));
+  }
+  op->setDiscardableAttrs(attrs);
+}
+
 } // namespace mlir::iree_compiler

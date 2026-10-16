@@ -13,11 +13,11 @@ hal.executable.source public @pm4_command_buffer_benchmark {
   hal.executable.export public @model_a ordinal(0) layout(#layout_2) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
-  } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
+  } <workgroup_size = [1 : index, 1 : index, 1 : index]>
   hal.executable.export public @model_b ordinal(1) layout(#layout_2) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
-  } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
+  } <workgroup_size = [1 : index, 1 : index, 1 : index]>
   builtin.module {
     func.func @model_a() {
       %in = hal.interface.binding.subspan layout(#layout_2) binding(0) : memref<4xi32>

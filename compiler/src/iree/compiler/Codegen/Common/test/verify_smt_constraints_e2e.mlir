@@ -461,10 +461,7 @@ func.func @attention_e2e_constraints_passing(
     -> (tensor<4x1024x64xf16>, tensor<4x1024xf16>, tensor<4x1024xf16>)
     attributes {hal.executable.target = #exec_target_attn,
                 translation_info = #translation_attn} {
-  %res:3 = iree_linalg_ext.online_attention {
-      root_op = #iree_codegen.root_op<set = 0>,
-      indexing_maps = [#qmap, #kmap, #vmap, #smap, #omap, #stmap, #stmap],
-      lowering_config = #iree_gpu.lowering_config<{
+  %res:3 = iree_linalg_ext.online_attention <indexing_maps = [#qmap, #kmap, #vmap, #smap, #omap, #stmap, #stmap]> {root_op = #iree_codegen.root_op<set = 0>, lowering_config = #iree_gpu.lowering_config<{
           workgroup = [1, 128, 0, 0, 64],
           reduction = [0, 0, 0, 64, 0],
           promote_operands = [0, 1, 2],
@@ -543,10 +540,7 @@ func.func @attention_e2e_generated_violation(
   // expected-error @below {{pipeline constraints violated}}
   // expected-note @below {{dim_1 must be divisible by m_tile (1024 % 96 == 0)}}
   // expected-note @below {{m_tile must be divisible by sg_m_cnt * pv_mma_m}}
-  %res:3 = iree_linalg_ext.online_attention {
-      root_op = #iree_codegen.root_op<set = 0>,
-      indexing_maps = [#qmap_v, #kmap_v, #vmap_v, #smap_v, #omap_v, #stmap_v, #stmap_v],
-      lowering_config = #iree_gpu.lowering_config<{
+  %res:3 = iree_linalg_ext.online_attention <indexing_maps = [#qmap_v, #kmap_v, #vmap_v, #smap_v, #omap_v, #stmap_v, #stmap_v]> {root_op = #iree_codegen.root_op<set = 0>, lowering_config = #iree_gpu.lowering_config<{
           workgroup = [1, 96, 0, 0, 64],
           reduction = [0, 0, 0, 64, 0],
           promote_operands = [0, 1, 2],

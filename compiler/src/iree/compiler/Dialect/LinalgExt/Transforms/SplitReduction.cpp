@@ -683,7 +683,8 @@ splitArgmaxReduction(RewriterBase &rewriter, linalg::GenericOp genericOp,
         unsigned outBitWidth = outType.getIntOrFloatBitWidth();
 
         if (outBitWidth > inBitWidth) {
-          inCast = arith::ExtFOp::create(b, loc, outVal.getType(), in);
+          inCast = arith::ExtFOp::create(b, loc, outVal.getType(), in,
+                                         arith::FastMathFlagsAttr{});
         } else if (outBitWidth < inBitWidth) {
           inCast = arith::TruncFOp::create(b, loc, outVal.getType(), in);
         }

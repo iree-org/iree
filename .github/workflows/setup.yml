@@ -13,6 +13,9 @@ name: Setup
 on:
   workflow_call:
     outputs:
+      ci-deferred:
+        description: Whether CI is deferred for an upper stack PR.
+        value: ${{ jobs.setup.outputs.ci-deferred }}
       enabled-jobs:
         description: |
           Which jobs should run.
@@ -37,6 +40,7 @@ jobs:
       # parent will be the tip of main.
       BASE_REF: HEAD^
     outputs:
+      ci-deferred: ${{ steps.configure.outputs.ci-deferred }}
       enabled-jobs: ${{ steps.configure.outputs.enabled-jobs }}
       is-pr: ${{ steps.configure.outputs.is-pr }}
       write-caches: ${{ steps.configure.outputs.write-caches }}

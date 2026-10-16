@@ -49,12 +49,12 @@
 func.func @cpu_inner_tiled_requires_cpu_semantics(
     %lhs: tensor<1x1x16x1xf32>, %rhs: tensor<1x1x16x1xf32>, %acc: tensor<1x1x16x16xf32>) -> tensor<1x1x16x16xf32> {
   // expected-error @+1 {{'iree_codegen.inner_tiled' op kind attribute (dialect 'iree_cpu') and semantics attribute (dialect 'iree_gpu') must use the same dialect namespace}}
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 16>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
-  } : tensor<1x1x16x1xf32>, tensor<1x1x16x1xf32> into tensor<1x1x16x16xf32>
+  > : tensor<1x1x16x1xf32>, tensor<1x1x16x1xf32> into tensor<1x1x16x16xf32>
   return %0 : tensor<1x1x16x16xf32>
 }
 
@@ -71,12 +71,12 @@ func.func @cpu_inner_tiled_requires_cpu_semantics(
 func.func @cpu_inner_tiled_f32_avx512_missing_intrinsics_m(
     %lhs: tensor<1x1x16x1xf32>, %rhs: tensor<1x1x16x1xf32>, %acc: tensor<1x1x16x16xf32>) -> tensor<1x1x16x16xf32> {
   // expected-error @+1 {{'iree_codegen.inner_tiled' op operand #0 inner tile 'tensor<16x1xf32>' is incompatible with expected MMA tile type 'vector<1x1xf32>'}}
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32>,
     semantics = #iree_cpu.mma_semantics<>
-  } : tensor<1x1x16x1xf32>, tensor<1x1x16x1xf32> into tensor<1x1x16x16xf32>
+  > : tensor<1x1x16x1xf32>, tensor<1x1x16x1xf32> into tensor<1x1x16x16xf32>
   return %0 : tensor<1x1x16x16xf32>
 }
 
@@ -92,12 +92,12 @@ func.func @cpu_inner_tiled_f32_avx512_missing_intrinsics_m(
 func.func @cpu_inner_tiled_element_type_mismatch(
     %lhs: tensor<1x1x16x1xf16>, %rhs: tensor<1x1x16x1xf16>, %acc: tensor<1x1x16x16xf32>) -> tensor<1x1x16x16xf32> {
   // expected-error @+1 {{'iree_codegen.inner_tiled' op operand #0 inner tile 'tensor<16x1xf16>' is incompatible with expected MMA tile type 'vector<16x1x1xf32>'}}
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 16>,
     semantics = #iree_cpu.mma_semantics<>
-  } : tensor<1x1x16x1xf16>, tensor<1x1x16x1xf16> into tensor<1x1x16x16xf32>
+  > : tensor<1x1x16x1xf16>, tensor<1x1x16x1xf16> into tensor<1x1x16x16xf32>
   return %0 : tensor<1x1x16x16xf32>
 }
 
@@ -114,12 +114,12 @@ func.func @cpu_inner_tiled_element_type_mismatch(
 func.func @cpu_inner_tiled_sve_rhs_n_must_be_dynamic(
     %lhs: tensor<1x1x1x1xf32>, %rhs: tensor<1x1x4x1xf32>, %acc: tensor<1x1x1x?xf32>) -> tensor<1x1x1x?xf32> {
   // expected-error @+1 {{'iree_codegen.inner_tiled' op operand #1 inner tile 'tensor<4x1xf32>' is incompatible with expected MMA tile type 'vector<[4]x1xf32>'}}
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32>,
     semantics = #iree_cpu.mma_semantics<>
-  } : tensor<1x1x1x1xf32>, tensor<1x1x4x1xf32> into tensor<1x1x1x?xf32>
+  > : tensor<1x1x1x1xf32>, tensor<1x1x4x1xf32> into tensor<1x1x1x?xf32>
   return %0 : tensor<1x1x1x?xf32>
 }
 
@@ -142,3 +142,24 @@ func.func @cpu_inner_tiled_sve_rhs_n_must_be_dynamic(
 // An empty hint (no tiling levels) is meaningless and is rejected.
 // expected-error@+1 {{expected at least one tiling level}}
 #invalid_inner_tile_alignment_empty = #iree_cpu.inner_tile_alignments<>
+
+// -----
+
+// `vlen` is only accepted on VLEN-parameterized intrinsics (RISC-V V).
+// expected-error@+1 {{`vlen` is only meaningful for VLEN-parameterized intrinsics}}
+#invalid_vlen_on_non_parameterized_intrinsic = #iree_cpu.data_tiled_mma_layout<
+    intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, vlen = 512>
+
+// -----
+
+// A VLEN-parameterized intrinsic requires a `vlen`.
+// expected-error@+1 {{is VLEN-parameterized and requires a power of two 128 <= vlen <= 65536}}
+#invalid_vlen_missing = #iree_cpu.data_tiled_mma_layout<
+    intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16>
+
+// -----
+
+// RVV VLEN is a power of two, at least the V extension's 128-bit minimum.
+// expected-error@+1 {{is VLEN-parameterized and requires a power of two 128 <= vlen <= 65536}}
+#invalid_vlen_not_pow2 = #iree_cpu.data_tiled_mma_layout<
+    intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16, vlen = 384>

@@ -24,3 +24,13 @@ iree_check_single_backend_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if(IREE_HAL_DRIVER_HIP AND IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx1250")
+  foreach(_TEST IN ITEMS
+    "iree/tests/e2e/encoding/check_rocm_hip_encoding.mlir"
+  )
+    if(TEST "${_TEST}")
+      set_property(TEST "${_TEST}" APPEND PROPERTY LABELS "very-expensive")
+    endif()
+  endforeach()
+endif()

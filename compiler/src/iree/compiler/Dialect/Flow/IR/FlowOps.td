@@ -426,6 +426,8 @@ let opDocGroup = OpGroupExecutableOps in {
 def FLOW_ExecutableOp : FLOW_Op<"executable", [
   IsolatedFromAbove,
   SingleBlockImplicitTerminator<"IREE::Flow::ExecutableEndOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   SymbolTable,
   Util_ObjectLike,
@@ -479,6 +481,8 @@ def FLOW_ExecutableEndOp : FLOW_Op<"executable_end", [
 
 def FLOW_ExecutableExportOp : FLOW_Op<"executable.export", [
   HasParent<"IREE::Flow::ExecutableOp">,
+  SymbolName,
+  SymbolVisibility,
   Symbol,
   IsolatedFromAbove,
 ]> {
@@ -648,6 +652,8 @@ let opDocGroup = OpGroupStreamableCallOps in {
 
 def FLOW_FuncOp : FLOW_Op<"func", [
   CallableOpInterface,
+  SymbolName,
+  SymbolVisibility,
   FunctionOpInterface,
   IsolatedFromAbove,
 ]> {
@@ -749,7 +755,7 @@ def FLOW_CallOp : FLOW_Op<"call", [
 
   let assemblyFormat = [{
     $callee
-    `(` $arguments `)` attr-dict `:`
+    `(` $arguments `)` prop-dict attr-dict `:`
     custom<ShapedFunctionType>(ref($arguments),
                                type($arguments), $argument_dims,
                                type($results), $result_dims,
@@ -785,12 +791,13 @@ def FLOW_CallOp : FLOW_Op<"call", [
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     ValueRange getOperandDynamicDims(unsigned idx) {
@@ -1213,7 +1220,6 @@ def FLOW_TensorEmptyOp : FLOW_PureOp<"tensor.empty", [
   }];
 
   let hasVerifier = 1;
-  let hasCanonicalizer = 1;
 }
 
 def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
@@ -1329,6 +1335,7 @@ def FLOW_TensorEncodeOp : FLOW_PureOp<"tensor.encode", [
     ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
   }];
 
+  let hasFolder = 1;
   let hasVerifier = 1;
 }
 

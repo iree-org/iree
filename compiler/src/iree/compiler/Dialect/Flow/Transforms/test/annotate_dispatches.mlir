@@ -1034,7 +1034,7 @@ flow.executable private @ex {
       %3 = tensor.empty() : tensor<1024x64xf32>
       %scale = arith.constant 1.0 : f32
 
-      %4 = iree_linalg_ext.attention {
+      %4 = iree_linalg_ext.attention <
         indexing_maps = [
           affine_map<(m, n, k2, k1) -> (m, k1)>,
           affine_map<(m, n, k2, k1) -> (k2, k1)>,
@@ -1042,7 +1042,7 @@ flow.executable private @ex {
           affine_map<(m, n, k2, k1) -> ()>,
           affine_map<(m, n, k2, k1) -> (m, n)>
         ]
-      }
+      >
       ins(%0, %1, %2, %scale : tensor<1024x64xf32>, tensor<1024x64xf32>, tensor<1024x64xf32>, f32)
       outs(%3 : tensor<1024x64xf32>) {
       ^bb0(%score : f32):

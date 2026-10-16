@@ -140,7 +140,7 @@ func.func @fuse_multi_operand_consumer_into_generic(%arg0: tensor<?x?xi32>, %d0:
     pcf.write_slice %cst_7 into %ref1[%id0, %id1] [4, 5] [1, 1] : tensor<4x5xi32> into !pcf.sref<?x?xi32, sync(#pcf.test_scope)>
     pcf.return
   }
-  %1 = linalg.add ins(%0#0, %0#1 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%dest: tensor<?x?xi32>) -> tensor<?x?xi32>
+  %1 = linalg.elementwise <add> ins(%0#0, %0#1 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%dest: tensor<?x?xi32>) -> tensor<?x?xi32>
   return %1 : tensor<?x?xi32>
 }
 
@@ -159,7 +159,7 @@ func.func @fuse_multi_operand_consumer_into_generic(%arg0: tensor<?x?xi32>, %d0:
 //       CHECK:    cf.assert
 
 //       CHECK:    %[[SLICE:.+]] = tensor.extract_slice %[[DEST]][%[[ID0]], %[[ID1]]] [4, 5]
-//       CHECK:    %[[COPY:.+]] = linalg.add ins(%[[CST5]], %[[CST7]]{{.*}} outs(%[[SLICE]]
+//       CHECK:    %[[COPY:.+]] = linalg.elementwise <add> ins(%[[CST5]], %[[CST7]]{{.*}} outs(%[[SLICE]]
 //       CHECK:    pcf.write_slice %[[COPY]] into %[[REF]][%[[ID0]], %[[ID1]]]
 //       CHECK:    pcf.return
 //       CHECK:  return %[[GENERIC]]
@@ -267,7 +267,7 @@ func.func @fuse_into_generic_multiple_fusion_sites_with_repeated_result_use(
     pcf.write_slice %cst_7 into %ref[%id] [3] [1] : tensor<3xi32> into !pcf.sref<?xi32, sync(#pcf.test_scope)>
     pcf.return
   }
-  %1 = linalg.add ins(%0, %0 : tensor<?xi32>, tensor<?xi32>) outs(%dest: tensor<?xi32>) -> tensor<?xi32>
+  %1 = linalg.elementwise <add> ins(%0, %0 : tensor<?xi32>, tensor<?xi32>) outs(%dest: tensor<?xi32>) -> tensor<?xi32>
   return %1 : tensor<?xi32>
 }
 
@@ -282,13 +282,13 @@ func.func @fuse_into_generic_multiple_fusion_sites_with_repeated_result_use(
 
 //       CHECK:   ^bb1
 //       CHECK:    %[[SLICE5:.+]] = tensor.extract_slice %[[DEST]][%[[ID]]] [3]
-//       CHECK:    %[[ADD5:.+]] = linalg.add ins(%[[CST5]], %[[CST5]]{{.*}} outs(%[[SLICE5]]
+//       CHECK:    %[[ADD5:.+]] = linalg.elementwise <add> ins(%[[CST5]], %[[CST5]]{{.*}} outs(%[[SLICE5]]
 //       CHECK:    pcf.write_slice %[[ADD5]] into %[[REF]][%[[ID]]]
 //       CHECK:    pcf.return
 
 //       CHECK:   ^bb2
 //       CHECK:    %[[SLICE7:.+]] = tensor.extract_slice %[[DEST]][%[[ID]]] [3]
-//       CHECK:    %[[ADD7:.+]] = linalg.add ins(%[[CST7]], %[[CST7]]{{.*}} outs(%[[SLICE7]]
+//       CHECK:    %[[ADD7:.+]] = linalg.elementwise <add> ins(%[[CST7]], %[[CST7]]{{.*}} outs(%[[SLICE7]]
 //       CHECK:    pcf.write_slice %[[ADD7]] into %[[REF]][%[[ID]]]
 //       CHECK:    pcf.return
 //       CHECK:  return %[[GENERIC]]
@@ -304,9 +304,9 @@ func.func @fuse_into_generic_diamond(%arg0: tensor<?x?xf32>, %dest: tensor<?x?xf
     pcf.write_slice %cst into %ref[%id0, %id1] [4, 5] [1, 1] : tensor<4x5xf32> into !pcf.sref<?x?xf32, sync(#pcf.test_scope)>
     pcf.return
   }
-  %1 = linalg.exp ins(%0: tensor<?x?xf32>) outs(%dest: tensor<?x?xf32>) -> tensor<?x?xf32>
-  %2 = linalg.sqrt ins(%0: tensor<?x?xf32>) outs(%dest: tensor<?x?xf32>) -> tensor<?x?xf32>
-  %3 = linalg.add ins(%1, %2 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%dest: tensor<?x?xf32>) -> tensor<?x?xf32>
+  %1 = linalg.elementwise <exp> ins(%0: tensor<?x?xf32>) outs(%dest: tensor<?x?xf32>) -> tensor<?x?xf32>
+  %2 = linalg.elementwise <sqrt> ins(%0: tensor<?x?xf32>) outs(%dest: tensor<?x?xf32>) -> tensor<?x?xf32>
+  %3 = linalg.elementwise <add> ins(%1, %2 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%dest: tensor<?x?xf32>) -> tensor<?x?xf32>
   return %3 : tensor<?x?xf32>
 }
 
@@ -319,11 +319,11 @@ func.func @fuse_into_generic_diamond(%arg0: tensor<?x?xf32>, %dest: tensor<?x?xf
 //  CHECK-NEXT:    execute(%[[REF:.+]] = %[[DEST]])[%[[ID0:[A-Za-z0-9_]+]]: index, %[[ID1:[A-Za-z0-9_]+]]: index
 
 //       CHECK:    %[[SLICE1:.+]] = tensor.extract_slice %[[DEST]][%[[ID0]], %[[ID1]]] [4, 5]
-//       CHECK:    %[[SQRT:.+]] = linalg.sqrt ins(%[[CST]]{{.*}} outs(%[[SLICE1]]
+//       CHECK:    %[[SQRT:.+]] = linalg.elementwise <sqrt> ins(%[[CST]]{{.*}} outs(%[[SLICE1]]
 //       CHECK:    %[[SLICE0:.+]] = tensor.extract_slice %[[DEST]][%[[ID0]], %[[ID1]]] [4, 5]
-//       CHECK:    %[[EXP:.+]] = linalg.exp ins(%[[CST]]{{.*}} outs(%[[SLICE0]]
+//       CHECK:    %[[EXP:.+]] = linalg.elementwise <exp> ins(%[[CST]]{{.*}} outs(%[[SLICE0]]
 //       CHECK:    %[[SLICE2:.+]] = tensor.extract_slice %[[DEST]][%[[ID0]], %[[ID1]]] [4, 5]
-//       CHECK:    %[[ADD:.+]] = linalg.add ins(%[[EXP]], %[[SQRT]]{{.*}} outs(%[[SLICE2]]
+//       CHECK:    %[[ADD:.+]] = linalg.elementwise <add> ins(%[[EXP]], %[[SQRT]]{{.*}} outs(%[[SLICE2]]
 //       CHECK:    pcf.write_slice %[[ADD]] into %[[REF]][%[[ID0]], %[[ID1]]]
 //       CHECK:    pcf.return
 //       CHECK:  return %[[GENERIC]]
@@ -455,14 +455,14 @@ func.func @no_fuse_iteration_space_mismatch(%arg0: tensor<?x?xi32>, %d0: index, 
     pcf.write_slice %cst_7 into %ref1[%id1, %id0] [5, 4] [1, 1] : tensor<5x4xi32> into !pcf.sref<?x?xi32, sync(#pcf.test_scope)>
     pcf.return
   }
-  %1 = linalg.add ins(%0#0, %0#1 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%dest: tensor<?x?xi32>) -> tensor<?x?xi32>
+  %1 = linalg.elementwise <add> ins(%0#0, %0#1 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%dest: tensor<?x?xi32>) -> tensor<?x?xi32>
   return %1 : tensor<?x?xi32>
 }
 
 // CHECK-LABEL: @no_fuse_iteration_space_mismatch
 
 //       CHECK:  %[[GENERIC:.+]]:2 = pcf.generic scope(#pcf.test_scope)
-//       CHECK:  %[[ADD:.+]] = linalg.add ins(%[[GENERIC]]#0, %[[GENERIC]]#1
+//       CHECK:  %[[ADD:.+]] = linalg.elementwise <add> ins(%[[GENERIC]]#0, %[[GENERIC]]#1
 //       CHECK:  return %[[ADD]]
 
 // -----
@@ -481,14 +481,14 @@ func.func @no_fuse_no_insertion_point(%arg0: tensor<?x?xi32>, %d0: index, %d1: i
     }
     pcf.return
   }
-  %1 = linalg.add ins(%0#0, %0#1 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%dest: tensor<?x?xi32>) -> tensor<?x?xi32>
+  %1 = linalg.elementwise <add> ins(%0#0, %0#1 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%dest: tensor<?x?xi32>) -> tensor<?x?xi32>
   return %1 : tensor<?x?xi32>
 }
 
 // CHECK-LABEL: @no_fuse_no_insertion_point
 
 //       CHECK:  %[[GENERIC:.+]]:2 = pcf.generic scope(#pcf.test_scope)
-//       CHECK:  %[[ADD:.+]] = linalg.add ins(%[[GENERIC]]#0, %[[GENERIC]]#1
+//       CHECK:  %[[ADD:.+]] = linalg.elementwise <add> ins(%[[GENERIC]]#0, %[[GENERIC]]#1
 //       CHECK:  return %[[ADD]]
 
 // -----

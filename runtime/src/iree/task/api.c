@@ -9,7 +9,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "iree/base/internal/math.h"
 #include "iree/base/tooling/flags.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/topology.h"
@@ -94,16 +93,33 @@ IREE_FLAG_LIST(
 
 IREE_FLAG(
     string, task_topology_nodes, "current",
-    "Comma-separated list of NUMA nodes that topologies will be defined for.\n"
-    "Each node specified will be configured based on the other topology\n"
-    "flags. 'all' can be used to indicate all available NUMA nodes and\n"
-    "'current' will inherit the node of the calling thread.");
+    "Specifies which cores become task executors, and how they are grouped. "
+    "One\n"
+    "executor is created per NUMA node named below, each with its own workers\n"
+    "and queue:\n"
+    "  'current'  - the calling thread's NUMA node only (default).\n"
+    "  'numa'     - one executor per NUMA node.\n"
+    "  'all'      - every core in a single executor, not split per node.\n"
+    "  '0,2,...'  - explicit NUMA node ids; one executor per listed id.\n"
+    "Node ids come from /sys/devices/system/node on Linux and may be sparse.\n"
+    "Each worker takes the affinity of its own core; an executor whose cores\n"
+    "span several nodes has no single node to allocate from.");
 
 IREE_FLAG(
     int32_t, task_topology_max_group_count, 64,
     "Sets a maximum value on the worker count that can be automatically\n"
     "detected and used when --task_topology_group_count=0 and is ignored\n"
     "otherwise.");
+
+IREE_FLAG(string, task_topology_snapshot, "",
+          "Reads CPU topology from a captured snapshot instead of the host.\n"
+          "For testing only.");
+
+static iree_status_t iree_task_topology_apply_snapshot_flag(void) {
+  const char* path = FLAG_task_topology_snapshot;
+  if (!path || !*path) return iree_ok_status();
+  return iree_task_topology_set_snapshot_path(path);
+}
 
 IREE_FLAG(string, task_topology_performance_level, "any",
           "Selects only cores that match the specified performance level from\n"
@@ -125,57 +141,95 @@ IREE_FLAG(
     "  `throughput` - Maximize batch throughput (scatter + any-perf).\n"
     "  `efficiency` - Minimize power consumption (compact + low-perf).");
 
-// Builds a bitmask of NUMA nodes that topologies should be created for.
-//
-// NOTE: because of the mask being 64-bits we have a 64-node limit.
-// We could change this mask to be variable-sized (ala cpu_set) if we wanted to
-// go higher than that. Since this entire set of functionality is part of the
-// private implementation and not something core to the task system it's easy to
-// change in the future if we get >4096-core machines.
-static iree_status_t iree_task_topologies_select_nodes_from_flags(
-    uint64_t* out_node_mask) {
-  IREE_ASSERT_ARGUMENT(out_node_mask);
-  *out_node_mask = 0ull;
+iree_status_t iree_task_topology_select_nodes(
+    iree_string_view_t spec, iree_task_node_selection_t* out_selection) {
+  IREE_ASSERT_ARGUMENT(out_selection);
+  memset(out_selection, 0, sizeof(*out_selection));
 
-  // Query the total number of NUMA nodes in the system. On implementations
-  // where this information isn't available this will return 1.
-  const iree_host_size_t available_node_count =
-      iree_max(1u, iree_min(64u, iree_task_topology_query_node_count()));
-
-  // Build a bitmask based on the flags.
-  iree_string_view_t nodes_flag =
-      iree_make_cstring_view(FLAG_task_topology_nodes);
-  uint64_t node_mask = 0ull;
-  if (iree_string_view_is_empty(nodes_flag) ||
-      iree_string_view_equal(nodes_flag, IREE_SV("current"))) {
-    // Use a single default node.
-    node_mask = 1ull << iree_task_topology_query_current_node();
-  } else if (iree_string_view_equal(nodes_flag, IREE_SV("all"))) {
-    // Use all nodes in the system (set bits starting at 0 for each node).
-    node_mask = UINT64_MAX >> (64 - available_node_count);
-  } else {
-    // Use some subset of nodes.
-    iree_string_view_t remaining = nodes_flag;
-    while (!iree_string_view_is_empty(remaining)) {
-      iree_string_view_t node_value;
-      iree_string_view_split(remaining, ',', &node_value, &remaining);
-      uint32_t node_id = 0;
-      if (!iree_string_view_atoi_uint32(node_value, &node_id)) {
-        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "invalid NUMA node ID specified: '%.*s'",
-                                (int)node_value.size, node_value.data);
-      } else if (node_id >= available_node_count) {
-        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "NUMA node ID out of valid range [0,%" PRIhsz
-                                "): %u",
-                                available_node_count, node_id);
-      }
-      node_mask |= 1ull << node_id;
-    }
+  iree_string_view_t nodes_flag = spec;
+  if (iree_string_view_is_empty(nodes_flag)) {
+    nodes_flag = IREE_SV("current");
   }
 
-  *out_node_mask = node_mask;
+  // 'current' (default): a single executor scoped to the calling thread's NUMA
+  // node; does not spread across NUMA nodes.
+  if (iree_string_view_equal(nodes_flag, IREE_SV("current"))) {
+    out_selection->count = 1;
+    out_selection->ids[0] = iree_task_topology_query_current_node();
+    return iree_ok_status();
+  }
+
+  // 'all': a SINGLE executor spanning every core (node id ANY, no per-node
+  // partitioning) so all workers get work regardless of node layout.
+  if (iree_string_view_equal(nodes_flag, IREE_SV("all"))) {
+    out_selection->count = 1;
+    out_selection->ids[0] = IREE_TASK_TOPOLOGY_NODE_ID_ANY;
+    return iree_ok_status();
+  }
+
+  // Explicit ids are validated against the enumerated node ids rather than the
+  // node count, which would reject valid sparse ids.
+  iree_task_topology_node_id_t available_ids[IREE_TASK_TOPOLOGY_MAX_NODES];
+  const iree_host_size_t available_count = iree_task_topology_query_node_ids(
+      IREE_TASK_TOPOLOGY_MAX_NODES, available_ids);
+  if (available_count > IREE_TASK_TOPOLOGY_MAX_NODES) {
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "machine has %" PRIhsz
+        " NUMA nodes but a selection can name at most %d; use explicit node "
+        "ids to choose a subset",
+        available_count, IREE_TASK_TOPOLOGY_MAX_NODES);
+  }
+
+  // 'numa': one executor per NUMA node across the whole machine.
+  if (iree_string_view_equal(nodes_flag, IREE_SV("numa"))) {
+    memcpy(out_selection->ids, available_ids,
+           available_count * sizeof(available_ids[0]));
+    out_selection->count = available_count;
+    return iree_ok_status();
+  }
+
+  // Explicit list of node ids -> one executor per id.
+  iree_string_view_t remaining = nodes_flag;
+  while (!iree_string_view_is_empty(remaining)) {
+    iree_string_view_t node_value;
+    iree_string_view_split(remaining, ',', &node_value, &remaining);
+    uint32_t node_id = 0;
+    if (!iree_string_view_atoi_uint32(node_value, &node_id)) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "invalid --task_topology_nodes value: '%.*s'",
+                              (int)node_value.size, node_value.data);
+    }
+    bool node_available = false;
+    for (iree_host_size_t i = 0; i < available_count; ++i) {
+      if (available_ids[i] == node_id) {
+        node_available = true;
+        break;
+      }
+    }
+    if (!node_available) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "NUMA node id %u is not present on this machine; "
+                              "%" PRIhsz " node(s) available",
+                              node_id, available_count);
+    }
+    if (out_selection->count >= IREE_TASK_TOPOLOGY_MAX_NODES) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "too many nodes specified (max %d)",
+                              IREE_TASK_TOPOLOGY_MAX_NODES);
+    }
+    out_selection->ids[out_selection->count++] = node_id;
+  }
   return iree_ok_status();
+}
+
+// Resolves --task_topology_nodes into a node selection. See the flag help for
+// the grammar.
+static iree_status_t iree_task_topologies_select_nodes_from_flags(
+    iree_task_node_selection_t* out_selection) {
+  IREE_RETURN_IF_ERROR(iree_task_topology_apply_snapshot_flag());
+  return iree_task_topology_select_nodes(
+      iree_make_cstring_view(FLAG_task_topology_nodes), out_selection);
 }
 
 static iree_status_t iree_task_topology_parse_performance_level(
@@ -247,6 +301,7 @@ iree_status_t iree_task_topology_initialize_from_flags(
     iree_task_topology_node_id_t node_id, iree_task_topology_t* out_topology) {
   IREE_ASSERT_ARGUMENT(out_topology);
   iree_task_topology_initialize(out_topology);
+  IREE_RETURN_IF_ERROR(iree_task_topology_apply_snapshot_flag());
 
   if (FLAG_task_topology_group_count != 0) {
     // Unpinned topology. Let the system try to figure it out.
@@ -293,14 +348,32 @@ static void iree_task_flags_print_action_flag(iree_string_view_t flag_name,
   fprintf(file, "# --%.*s\n", (int)flag_name.size, flag_name.data);
 }
 
+// Prints the active backend's raw hardware ids for |processor|, or nothing when
+// the backend exposes none.
+static void iree_task_flags_dump_processor_debug_ids(uint32_t processor) {
+  char ids[128];
+  if (iree_task_topology_format_processor_debug_ids(processor, sizeof(ids),
+                                                    ids) == 0) {
+    return;
+  }
+  fprintf(stdout, "#     hardware ids: %s\n", ids);
+}
+
 static void iree_task_flags_dump_task_topology(
     iree_host_size_t topology_id, const iree_task_topology_t* topology) {
   fprintf(stdout,
           "# "
           "===-------------------------------------------------------------"
           "-----------===\n");
-  fprintf(stdout, "# topology[%" PRIhsz "]: %" PRIhsz " worker groups\n",
-          topology_id, topology->group_count);
+  char numa_node[16];
+  if (topology->numa_node_id == IREE_TASK_TOPOLOGY_NODE_ID_ANY) {
+    iree_snprintf(numa_node, sizeof(numa_node), "any");
+  } else {
+    iree_snprintf(numa_node, sizeof(numa_node), "%u", topology->numa_node_id);
+  }
+  fprintf(stdout,
+          "# topology[%" PRIhsz "]: %" PRIhsz " worker groups, numa node: %s\n",
+          topology_id, topology->group_count, numa_node);
   fprintf(stdout,
           "# "
           "===-------------------------------------------------------------"
@@ -310,6 +383,7 @@ static void iree_task_flags_dump_task_topology(
     const iree_task_topology_group_t* group = &topology->groups[j];
     fprintf(stdout, "# group[%d]: '%s'\n", group->group_index, group->name);
     fprintf(stdout, "#      processor: %u\n", group->processor_index);
+    iree_task_flags_dump_processor_debug_ids(group->processor_index);
     fprintf(stdout, "#       affinity: ");
     if (group->ideal_thread_affinity.group_any) {
       fprintf(stdout, "group=%u (any)", group->ideal_thread_affinity.group);
@@ -359,24 +433,15 @@ static iree_status_t iree_task_flags_dump_task_topologies(
       FLAG_task_topology_cpu_ids_list();
   if (cpu_ids_list.count == 0) {
     // Select which nodes in the machine we will be creating topologies for.
-    uint64_t node_mask = 0ull;
+    iree_task_node_selection_t selection;
     IREE_RETURN_IF_ERROR(
-        iree_task_topologies_select_nodes_from_flags(&node_mask));
+        iree_task_topologies_select_nodes_from_flags(&selection));
 
-    // TODO(benvanik): macros to make this iteration easier (ala cpu_set
-    // iterators).
-    iree_host_size_t topology_count = iree_math_count_ones_u64(node_mask);
-    uint64_t node_mask_bits = node_mask;
-    iree_task_topology_node_id_t node_base_id = 0;
     iree_host_size_t topology_index = 0;
-    for (iree_host_size_t i = 0; i < topology_count; ++i) {
-      int node_offset = iree_math_count_trailing_zeros_u64(node_mask_bits);
-      iree_task_topology_node_id_t node_id = node_base_id + node_offset;
-      node_base_id += node_offset + 1;
-      node_mask_bits = iree_shr(node_mask_bits, node_offset + 1);
+    for (iree_host_size_t i = 0; i < selection.count; ++i) {
       iree_task_topology_t topology;
-      IREE_RETURN_IF_ERROR(
-          iree_task_topology_initialize_from_flags(node_id, &topology));
+      IREE_RETURN_IF_ERROR(iree_task_topology_initialize_from_flags(
+          selection.ids[i], &topology));
       // Skip topologies with no worker groups.
       if (topology.group_count > 0) {
         iree_task_flags_dump_task_topology(topology_index++, &topology);
@@ -402,10 +467,9 @@ static iree_status_t iree_task_flags_dump_task_topologies(
   return iree_ok_status();
 }
 
-IREE_FLAG_CALLBACK(
-    iree_task_flags_dump_task_topologies, iree_task_flags_print_action_flag,
-    NULL, dump_task_topologies,
-    "Dumps the flag-specified topology used for creating task executors.");
+IREE_FLAG_CALLBACK(iree_task_flags_dump_task_topologies,
+                   iree_task_flags_print_action_flag, NULL,
+                   dump_task_topologies, "Prints the task executor topology.");
 
 //===----------------------------------------------------------------------===//
 // Task system factory functions
@@ -429,13 +493,14 @@ iree_status_t iree_task_executors_create_from_flags(
   // Select which nodes in the machine we will be creating topologies for based
   // on the topology mode.
   iree_host_size_t topology_count = 0;
-  uint64_t node_mask = 0ull;
+  iree_task_node_selection_t selection;
+  memset(&selection, 0, sizeof(selection));
   const iree_flag_string_list_t cpu_ids_list =
       FLAG_task_topology_cpu_ids_list();
   if (cpu_ids_list.count == 0) {
     IREE_RETURN_IF_ERROR(
-        iree_task_topologies_select_nodes_from_flags(&node_mask));
-    topology_count = iree_math_count_ones_u64(node_mask);
+        iree_task_topologies_select_nodes_from_flags(&selection));
+    topology_count = selection.count;
   } else {
     topology_count = cpu_ids_list.count;
   }
@@ -471,19 +536,11 @@ iree_status_t iree_task_executors_create_from_flags(
   iree_status_t status = iree_ok_status();
   iree_host_size_t executor_index = 0;
   if (cpu_ids_list.count == 0) {
-    // TODO(benvanik): macros to make this iteration easier (ala cpu_set
-    // iterators).
-    uint64_t node_mask_bits = node_mask;
-    iree_task_topology_node_id_t node_base_id = 0;
     for (iree_host_size_t i = 0; i < topology_count; ++i) {
-      int node_offset = iree_math_count_trailing_zeros_u64(node_mask_bits);
-      iree_task_topology_node_id_t node_id = node_base_id + node_offset;
-      node_base_id += node_offset + 1;
-      node_mask_bits = iree_shr(node_mask_bits, node_offset + 1);
-
       // Query topology for the node this executor is pinned to.
       iree_task_topology_t topology;
-      status = iree_task_topology_initialize_from_flags(node_id, &topology);
+      status =
+          iree_task_topology_initialize_from_flags(selection.ids[i], &topology);
       if (!iree_status_is_ok(status)) break;
 
       // Skip topologies with no worker groups.
@@ -516,6 +573,16 @@ iree_status_t iree_task_executors_create_from_flags(
       iree_task_topology_deinitialize(&topology);
       if (!iree_status_is_ok(status)) break;
     }
+  }
+
+  // A selection that resolves to no usable cores would otherwise hand callers
+  // an executor-less driver (queue_count=0) and fail far from the cause.
+  if (iree_status_is_ok(status) && executor_index == 0) {
+    status = iree_make_status(
+        IREE_STATUS_NOT_FOUND,
+        "--task_topology_nodes=%s selected %" PRIhsz
+        " node(s) but none contain any usable cores; no executors created",
+        FLAG_task_topology_nodes, topology_count);
   }
 
   if (iree_status_is_ok(status)) {

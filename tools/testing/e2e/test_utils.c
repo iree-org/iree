@@ -585,7 +585,7 @@ iree_status_t iree_test_utils_load_and_run_e2e_tests(
   iree_tooling_module_list_reset(&module_list);
 
   // Begin profiling (if enabled).
-  iree_hal_profiling_from_flags_t* profiling = NULL;
+  iree_hal_profiling_session_t* profiling = NULL;
   if (iree_status_is_ok(status)) {
     status =
         iree_hal_begin_profiling_from_flags(device, host_allocator, &profiling);
@@ -600,7 +600,7 @@ iree_status_t iree_test_utils_load_and_run_e2e_tests(
   // End profiling (if enabled).
   if (profiling) {
     status =
-        iree_status_join(status, iree_hal_end_profiling_from_flags(profiling));
+        iree_status_join(status, iree_hal_profiling_session_end(profiling));
   }
 
   iree_vm_context_release(context);

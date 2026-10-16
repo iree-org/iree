@@ -321,7 +321,8 @@ static PCF::GenericOp foldForallIntoPCFLoopImpl(RewriterBase &rewriter,
       /*inits=*/forallOp.getOutputs(),
       /*dynamic_sizes=*/ValueRange{},
       /*is_tied=*/SmallVector<bool>(forallOp.getNumResults(), true),
-      /*num_iterators=*/1);
+      /*num_iterators=*/1,
+      /*sync_on_return=*/loopOp.getSyncOnReturn());
 
   // Set sync scope to SyncOnReturn for the pcf.generic sref arguments.
   Attribute syncScope = PCF::SyncOnReturnAttr::get(rewriter.getContext());

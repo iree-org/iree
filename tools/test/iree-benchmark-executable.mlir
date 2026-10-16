@@ -47,9 +47,9 @@ hal.executable.source public @executable {
     // Unused - the workgroup count is provided to the tool.
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
-  } attributes {
+  } <
     workgroup_size = [1 : index, 1 : index, 1 : index]
-  }
+  >
   builtin.module {
     func.func @elementwise_mul() {
       %lhs = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(32) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf32>>

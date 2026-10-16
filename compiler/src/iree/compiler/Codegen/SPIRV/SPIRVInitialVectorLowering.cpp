@@ -108,7 +108,8 @@ Operation *stripElementBitPatternPreservingParents(Value op) {
                        .Case([](vector::BroadcastOp broadcast) {
                          return broadcast.getVector();
                        })
-                       .Case<vector::ExtractOp, vector::ExtractStridedSliceOp>(
+                       .Case<vector::ExtractOp, vector::ExtractStridedSliceOp,
+                             vector::ShapeCastOp>(
                            [](auto extract) { return extract.getSource(); })
                        .Case<vector::InsertOp, vector::InsertStridedSliceOp>(
                            [](auto insert) { return insert.getValueToStore(); })

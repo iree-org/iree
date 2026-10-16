@@ -198,7 +198,7 @@ func.func @reduction() attributes {hal.executable.target = #executable_target_cu
 }
 
 // CHECK-LABEL: llvm.func @reduction
-//       CHECK:     "llvm.intr.vector.reduce.fadd"({{.*}}) {{.*}} : (f32, vector<4xf32>) -> f32
+//       CHECK:     llvm.intr.vector.reduce.fadd({{.*}}){{.*}} : (f32, vector<4xf32>) -> f32
 
 // -----
 
@@ -264,7 +264,7 @@ func.func @vector_reduction_dispatch() attributes {hal.executable.target = #exec
 }
 
 //   CHECK-LABEL: llvm.func @vector_reduction_dispatch
-// CHECK-COUNT-4:     "llvm.intr.vector.reduce.fadd"({{.*}}) {{.*}} : (f32, vector<4xf32>) -> f32
+// CHECK-COUNT-4:     llvm.intr.vector.reduce.fadd({{.*}}){{.*}} : (f32, vector<4xf32>) -> f32
 //         CHECK:     llvm.store %{{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
@@ -376,7 +376,7 @@ func.func @vector_distribution_broadcast_dispatch() attributes {hal.executable.t
 //         CHECK:     llvm.load {{.*}} : !llvm.ptr<3> -> vector<1xf32>
 // CHECK-COUNT-2:     nvvm.shfl.sync bfly
 //         CHECK:     llvm.fdiv %{{.*}}, %{{.*}}
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<1>
+//         CHECK:     llvm.store %{{.*}}, %{{.*}} <alignment = 4> : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 
@@ -434,8 +434,8 @@ func.func @shared_mem_transpose() attributes {hal.executable.target = #executabl
 // Check that bufferization is emitting correct code for the temp shared
 // memory alloc.
 //   SM80-LABEL: llvm.func @shared_mem_transpose
-//         SM80:     llvm.load %{{.*}} {alignment = 4 : i64} : !llvm.ptr<1> -> vector<4xf32>
-//         SM80:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<3>
+//         SM80:     llvm.load %{{.*}} <alignment = 4> : !llvm.ptr<1> -> vector<4xf32>
+//         SM80:     llvm.store %{{.*}}, %{{.*}} <alignment = 4> : vector<4xf32>, !llvm.ptr<3>
 
 // -----
 

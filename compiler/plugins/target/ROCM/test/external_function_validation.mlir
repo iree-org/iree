@@ -26,7 +26,7 @@ builtin.module {
         %c2 = arith.constant 2 : index
         %c1 = arith.constant 1 : index
         hal.return %c128, %c2, %c1 : index, index, index
-      } attributes {subgroup_size = 64 : index, workgroup_size = [128 : index, 2 : index, 1 : index]}
+      } <subgroup_size = 64, workgroup_size = [128 : index, 2 : index, 1 : index]>
       builtin.module {
         llvm.func @external_func() attributes {sym_visibility = "private"}
         llvm.func @test() attributes { rocdl.kernel } {

@@ -14,10 +14,10 @@
 #include "llvm/Support/DebugLog.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
-#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -35,8 +35,6 @@ namespace mlir::iree_compiler {
 namespace {
 
 constexpr int64_t kTransposeLoadLaneGroupSize = 16;
-constexpr amdgpu::Chipset kGfx950 = amdgpu::Chipset(9, 5, 0);
-constexpr amdgpu::Chipset kGfx1200 = amdgpu::Chipset(12, 0, 0);
 constexpr llvm::StringLiteral kPassLocalHintAttr = "__pass_local_hint";
 
 //===----------------------------------------------------------------------===//
@@ -965,14 +963,17 @@ struct ROCDLLoadToTransposeLoadPass final
     if (!target) {
       return;
     }
-    FailureOr<amdgpu::Chipset> chipset =
-        amdgpu::Chipset::parse(target.getArch());
-    if (failed(chipset)) {
+    FailureOr<ROCDL::TargetInfo> targetInfo =
+        ROCDL::TargetInfo::get(target.getArch());
+    if (failed(targetInfo)) {
       return;
     }
 
-    bool isGfx950 = (*chipset == kGfx950);
-    bool isRDNA4 = chipset->majorVersion == 12 && chipset->minorVersion <= 1;
+    bool isGfx950 = targetInfo->has(llvm::AMDGPU::FEAT_GFX950_INSTS);
+    // RDNA4 is gfx1200/gfx1201; gfx1250 is also a gfx12 generation target but
+    // is excluded here.
+    bool isRDNA4 = targetInfo->isGeneration(12) &&
+                   !targetInfo->has(llvm::AMDGPU::FEAT_GFX1250_INSTS);
 
     if (!isGfx950 && !isRDNA4) {
       return;

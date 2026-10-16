@@ -556,13 +556,13 @@ func.func @propagate_collapse_through_inner_tiled(
   // Collapse the first two outer dims of LHS: [2,3] -> [6]
   %collapsed = tensor.collapse_shape %src [[0, 1], [2], [3], [4]]
       : tensor<2x3x4x16x16xf16> into tensor<6x4x16x16xf16>
-  %result = iree_codegen.inner_tiled ins(%collapsed, %rhs) outs(%out) {
+  %result = iree_codegen.inner_tiled ins(%collapsed, %rhs) outs(%out) <
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
     permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>],
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
-  } : tensor<6x4x16x16xf16>, tensor<4x2x16x16xf16> into tensor<6x2x16x16xf32>
+  > : tensor<6x4x16x16xf16>, tensor<4x2x16x16xf16> into tensor<6x2x16x16xf32>
   return %result : tensor<6x2x16x16xf32>
 }
 
@@ -595,13 +595,13 @@ func.func @propagate_collapse_through_inner_tiled(
 func.func @propagate_expand_through_inner_tiled(
     %lhs: tensor<6x4x16x16xf16>, %rhs: tensor<4x2x16x16xf16>, %out: tensor<6x2x16x16xf32>)
     -> tensor<2x3x2x16x16xf32> {
-  %result = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%out) {
+  %result = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%out) <
     indexing_maps = #contraction_accesses2,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
     permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>],
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
-  } : tensor<6x4x16x16xf16>, tensor<4x2x16x16xf16> into tensor<6x2x16x16xf32>
+  > : tensor<6x4x16x16xf16>, tensor<4x2x16x16xf16> into tensor<6x2x16x16xf32>
   %expanded = tensor.expand_shape %result [[0, 1], [2], [3], [4]]
       output_shape [2, 3, 2, 16, 16] : tensor<6x2x16x16xf32> into tensor<2x3x2x16x16xf32>
   return %expanded : tensor<2x3x2x16x16xf32>
@@ -639,13 +639,13 @@ func.func @no_propagate_inner_dim_reshape(
   // Collapsing inner dims [3,4] which are part of inner tile - should NOT propagate.
   %collapsed = tensor.collapse_shape %src [[0], [1], [2], [3, 4]]
       : tensor<6x4x16x2x8xf16> into tensor<6x4x16x16xf16>
-  %result = iree_codegen.inner_tiled ins(%collapsed, %rhs) outs(%out) {
+  %result = iree_codegen.inner_tiled ins(%collapsed, %rhs) outs(%out) <
     indexing_maps = #contraction_accesses3,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
     permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>],
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
-  } : tensor<6x4x16x16xf16>, tensor<4x2x16x16xf16> into tensor<6x2x16x16xf32>
+  > : tensor<6x4x16x16xf16>, tensor<4x2x16x16xf16> into tensor<6x2x16x16xf32>
   return %result : tensor<6x2x16x16xf32>
 }
 
@@ -667,13 +667,13 @@ func.func @propagate_collapse_through_inner_tiled_dynamic(
   // Collapse the first two outer dims of LHS: [?, 3] -> [?*3]
   %collapsed = tensor.collapse_shape %src [[0, 1], [2], [3], [4]]
       : tensor<?x3x4x16x16xf16> into tensor<?x4x16x16xf16>
-  %result = iree_codegen.inner_tiled ins(%collapsed, %rhs) outs(%out) {
+  %result = iree_codegen.inner_tiled ins(%collapsed, %rhs) outs(%out) <
     indexing_maps = #contraction_accesses_dyn1,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
     permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>],
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
-  } : tensor<?x4x16x16xf16>, tensor<4x2x16x16xf16> into tensor<?x2x16x16xf32>
+  > : tensor<?x4x16x16xf16>, tensor<4x2x16x16xf16> into tensor<?x2x16x16xf32>
   return %result : tensor<?x2x16x16xf32>
 }
 
@@ -709,13 +709,13 @@ func.func @propagate_expand_through_inner_tiled_dynamic(
     %lhs: tensor<?x4x16x16xf16>, %rhs: tensor<4x2x16x16xf16>, %out: tensor<?x2x16x16xf32>,
     %dyn_dim: index)
     -> tensor<?x3x2x16x16xf32> {
-  %result = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%out) {
+  %result = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%out) <
     indexing_maps = #contraction_accesses_dyn2,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
     permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>],
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
-  } : tensor<?x4x16x16xf16>, tensor<4x2x16x16xf16> into tensor<?x2x16x16xf32>
+  > : tensor<?x4x16x16xf16>, tensor<4x2x16x16xf16> into tensor<?x2x16x16xf32>
   %expanded = tensor.expand_shape %result [[0, 1], [2], [3], [4]]
       output_shape [%dyn_dim, 3, 2, 16, 16] : tensor<?x2x16x16xf32> into tensor<?x3x2x16x16xf32>
   return %expanded : tensor<?x3x2x16x16xf32>

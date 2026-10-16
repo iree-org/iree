@@ -12,6 +12,9 @@
 # included:
 #   compiler_plugins
 
+# Not in the default build: needs a riscv-none-elf GCC toolchain with
+# semihosting support and an explicit --target samples/baremetal_riscv64/all.
+add_subdirectory(baremetal_riscv64 EXCLUDE_FROM_ALL)
 add_subdirectory(custom_dispatch)
 add_subdirectory(custom_module)
 add_subdirectory(dynamic_shapes)

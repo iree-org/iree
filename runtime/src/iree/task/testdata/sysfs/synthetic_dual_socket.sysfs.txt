@@ -1,6 +1,5 @@
 # SYNTHETIC machine (not a hardware capture): two sockets, 4 single-threaded
-# cores each (package 0 = cpu 0-3, package 1 = cpu 4-7), per-socket 8M L3, no
-# /sys/devices/system/node hierarchy (node identity = package fallback).
+# cores each (package 0 = cpu 0-3, package 1 = cpu 4-7), per-socket 8M L3.
 # core_id restarts at 0 on each socket, exactly as x86 kernels report it:
 # topology/core_id is only unique WITHIN a package, so deduplicating physical
 # cores on it collapses socket 1 onto socket 0. core_cpus_list is present
@@ -126,3 +125,6 @@ cpu/cpu7/topology/core_cpus_list=7
 cpu/cpu7/topology/core_id=3
 cpu/cpu7/topology/physical_package_id=1
 cpu/present=0-7
+node/node0/cpulist=0-3
+node/node1/cpulist=4-7
+node/online=0,1

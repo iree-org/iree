@@ -34,6 +34,12 @@ enum iree_vm_buffer_access_bits_t {
   IREE_VM_BUFFER_ACCESS_ORIGIN_GUEST = 1u << 2,
   // Buffer references external host memory with an unknown lifetime.
   IREE_VM_BUFFER_ACCESS_ORIGIN_HOST = 1u << 3,
+
+  // Buffer handle and data are co-allocated in a single aligned allocation
+  // and the handle pointer must be freed with iree_allocator_free_aligned.
+  // Set internally by iree_vm_buffer_create/iree_vm_buffer_clone; buffers
+  // initialized in-place over existing storage must not set this.
+  IREE_VM_BUFFER_ACCESS_COALLOCATED = 1u << 4,
 };
 typedef uint32_t iree_vm_buffer_access_t;
 

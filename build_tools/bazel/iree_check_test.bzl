@@ -74,9 +74,10 @@ def iree_check_test(
     test_data = list(data)
     test_env = dict(env)
     if driver == "vulkan":
-        test_data.append("//build_tools/sanitizer:lsan_suppressions_vulkan.txt")
+        lsan_suppressions = Label("//build_tools/sanitizer:lsan_suppressions_vulkan.txt")
+        test_data.append(lsan_suppressions)
         if "LSAN_OPTIONS" not in test_env:
-            test_env["LSAN_OPTIONS"] = "suppressions=$(location //build_tools/sanitizer:lsan_suppressions_vulkan.txt)"
+            test_env["LSAN_OPTIONS"] = "suppressions=$(location %s)" % lsan_suppressions
 
     native_test(
         name = name,
@@ -86,7 +87,7 @@ def iree_check_test(
         ] + runner_args,
         data = [":%s" % bytecode_module_name] + test_data,
         env = test_env,
-        src = "//tools:iree-check-module",
+        src = Label("//tools:iree-check-module"),
         tags = tags + ["driver=%s" % driver, "target=%s" % target_backend],
         timeout = timeout,
         **kwargs

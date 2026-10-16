@@ -104,7 +104,7 @@ void ModuleOp::build(OpBuilder &builder, OperationState &result,
                      StringRef name) {
   ensureTerminator(*result.addRegion(), builder, result.location);
   result.attributes.push_back(builder.getNamedAttr(
-      mlir::SymbolTable::getSymbolAttrName(), builder.getStringAttr(name)));
+      getSymNameAttrName(result.name), builder.getStringAttr(name)));
 }
 
 LogicalResult ModuleOp::verify() {
@@ -149,7 +149,7 @@ void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                    FunctionType type, ArrayRef<NamedAttribute> attrs,
                    ArrayRef<DictionaryAttr> argAttrs) {
   result.addRegion();
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
+  result.addAttribute(getSymNameAttrName(result.name),
                       builder.getStringAttr(name));
   result.addAttribute("function_type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
@@ -284,8 +284,7 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
     result.addAttribute("is_optional", builder.getUnitAttr());
   }
   StringAttr nameAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
+  if (failed(parser.parseSymbolName(nameAttr, getSymNameAttrName(result.name),
                                     result.attributes)) ||
       failed(parser.parseLParen())) {
     return parser.emitError(parser.getNameLoc()) << "invalid import name";
@@ -391,7 +390,7 @@ void ImportOp::print(OpAsmPrinter &p) {
 void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      FunctionType type, ArrayRef<NamedAttribute> attrs,
                      ArrayRef<DictionaryAttr> argAttrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
+  result.addAttribute(getSymNameAttrName(result.name),
                       builder.getStringAttr(name));
   result.addAttribute("function_type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());

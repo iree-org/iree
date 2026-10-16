@@ -90,7 +90,7 @@ def iree_runtime_cc_fuzz(deps = None, **kwargs):
     if deps == None:
         deps = []
     iree_cc_fuzz(
-        deps = deps + ["//runtime/src:runtime_defines"],
+        deps = deps + [Label("//runtime/src:runtime_defines")],
         **kwargs
     )
 
@@ -106,6 +106,6 @@ def iree_compiler_cc_fuzz(deps = None, **kwargs):
     if deps == None:
         deps = []
     iree_cc_fuzz(
-        deps = deps + ["//compiler/src:defs"],
+        deps = deps + [Label("//compiler/src:defs")],
         **kwargs
     )

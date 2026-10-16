@@ -67,10 +67,10 @@ util.func @interleaved_import(%arg0 : !hal.buffer_view, %arg1 : !hal.fence,
   %0 = hal.tensor.import wait(%arg1) => %arg0 : !hal.buffer_view -> tensor<10xf32>
   %1 = hal.tensor.import wait(%arg3) => %arg2 : !hal.buffer_view -> tensor<10xf32>
   %2 = tensor.empty() : tensor<10xf32>
-  %3 = linalg.add ins(%0, %1 : tensor<10xf32>, tensor<10xf32>)
+  %3 = linalg.elementwise <add> ins(%0, %1 : tensor<10xf32>, tensor<10xf32>)
       outs(%2 : tensor<10xf32>) -> tensor<10xf32>
   %4 = hal.tensor.import wait(%arg5) => %arg4 : !hal.buffer_view -> tensor<10xf32>
-  %5 = linalg.add ins(%3, %4 : tensor<10xf32>, tensor<10xf32>)
+  %5 = linalg.elementwise <add> ins(%3, %4 : tensor<10xf32>, tensor<10xf32>)
       outs(%2 : tensor<10xf32>) -> tensor<10xf32>
   util.return %3, %5 : tensor<10xf32>, tensor<10xf32>
 }
@@ -86,8 +86,8 @@ util.func @interleaved_import(%arg0 : !hal.buffer_view, %arg1 : !hal.fence,
 //   CHECK-DAG:   %[[IMPORT2:.+]] = hal.tensor.import wait(%[[ARG5]]) => %[[ARG4]]
 //       CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.region
 //       CHECK:     %[[EMPTY:.+]] = tensor.empty()
-//       CHECK:     %[[ADD1:.+]] = linalg.add ins(%[[IMPORT0]], %[[IMPORT1]] :
-//       CHECK:     %[[ADD2:.+]] = linalg.add ins(%[[ADD1]], %[[IMPORT2]] :
+//       CHECK:     %[[ADD1:.+]] = linalg.elementwise <add> ins(%[[IMPORT0]], %[[IMPORT1]] :
+//       CHECK:     %[[ADD2:.+]] = linalg.elementwise <add> ins(%[[ADD1]], %[[IMPORT2]] :
 //       CHECK:     flow.return %[[ADD1]], %[[ADD2]]
 //       CHECK:   return %[[DISPATCH]]#0, %[[DISPATCH]]#1
 
@@ -98,11 +98,11 @@ util.func @interleaved_export(%arg0 : tensor<10xf32>, %arg1 : tensor<10xf32>,
     %arg2 : tensor<10xf32>, %arg3 : !hal.fence)
     -> (!hal.buffer_view, !hal.buffer_view) {
   %0 = tensor.empty() : tensor<10xf32>
-  %1 = linalg.add ins(%arg0, %arg1 : tensor<10xf32>, tensor<10xf32>)
+  %1 = linalg.elementwise <add> ins(%arg0, %arg1 : tensor<10xf32>, tensor<10xf32>)
       outs(%0 : tensor<10xf32>) -> tensor<10xf32>
   %2 = hal.tensor.barrier join(%1 : tensor<10xf32>) => %arg3 : !hal.fence
   %3 = hal.tensor.export %2 : tensor<10xf32> -> !hal.buffer_view
-  %4 = linalg.add ins(%arg2, %1 : tensor<10xf32>, tensor<10xf32>)
+  %4 = linalg.elementwise <add> ins(%arg2, %1 : tensor<10xf32>, tensor<10xf32>)
       outs(%0 : tensor<10xf32>) -> tensor<10xf32>
   %5 = hal.tensor.barrier join(%4 : tensor<10xf32>) => %arg3 : !hal.fence
   %6 = hal.tensor.export %5 : tensor<10xf32> -> !hal.buffer_view
@@ -115,8 +115,8 @@ util.func @interleaved_export(%arg0 : tensor<10xf32>, %arg1 : tensor<10xf32>,
 //  CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: !hal.fence
 //       CHECK:   %[[DISPATCH:.+]]:2 = flow.dispatch.region
 //       CHECK:     %[[EMPTY:.+]] = tensor.empty()
-//       CHECK:     %[[ADD1:.+]] = linalg.add ins(%[[ARG0]], %[[ARG1]] :
-//       CHECK:     %[[ADD2:.+]] = linalg.add ins(%[[ARG2]], %[[ADD1]] :
+//       CHECK:     %[[ADD1:.+]] = linalg.elementwise <add> ins(%[[ARG0]], %[[ARG1]] :
+//       CHECK:     %[[ADD2:.+]] = linalg.elementwise <add> ins(%[[ARG2]], %[[ADD1]] :
 //       CHECK:     flow.return %[[ADD1]], %[[ADD2]]
 //   CHECK-DAG:   %[[BARRIER0:.+]] = hal.tensor.barrier join(%[[DISPATCH]]#0 :
 //   CHECK-DAG:   %[[EXPORT0:.+]] = hal.tensor.export %[[BARRIER0]]
@@ -132,7 +132,7 @@ util.func @multi_use_return(%arg0 : tensor<10xf32>, %arg1 : tensor<10xf32>,
     %arg2 : tensor<10xf32>, %arg3 : !hal.fence)
     -> (!hal.buffer_view, !hal.buffer_view) {
   %0 = tensor.empty() : tensor<10xf32>
-  %1 = linalg.add ins(%arg0, %arg1 : tensor<10xf32>, tensor<10xf32>)
+  %1 = linalg.elementwise <add> ins(%arg0, %arg1 : tensor<10xf32>, tensor<10xf32>)
       outs(%0 : tensor<10xf32>) -> tensor<10xf32>
   %2 = hal.tensor.barrier join(%1 : tensor<10xf32>) => %arg3 : !hal.fence
   %3 = hal.tensor.export %2 : tensor<10xf32> -> !hal.buffer_view

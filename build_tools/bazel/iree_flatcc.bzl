@@ -15,7 +15,7 @@ def iree_flatbuffer_c_library(
         includes = [],
         testonly = False,
         **kwargs):
-    flatcc = "@com_github_dvidelabs_flatcc//:flatcc"
+    flatcc = Label("@com_github_dvidelabs_flatcc//:flatcc")
 
     flags = [
         "-o$(RULEDIR)",

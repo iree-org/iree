@@ -946,7 +946,7 @@ func.func @attention_ops(
 
   // CHECK: iree_linalg_ext.attention
   // CHECK-SAME:   match_status = "matched"
-  %res1 = iree_linalg_ext.attention {indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output], match_status = "unmatched"}
+  %res1 = iree_linalg_ext.attention <indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output]> {match_status = "unmatched"}
       ins(%query, %key, %value, %scale : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16)
       outs(%output : tensor<2x10x6x4xf16>) {
     ^bb0(%arg: f32):
@@ -1010,10 +1010,7 @@ func.func @attention_constraints(
   // CHECK: iree_linalg_ext.attention
   // CHECK-SAME:   lowering_config = #iree_gpu.lowering_config<{promote_operands = [0, 1]}>
   // CHECK-SAME:   match_status = "matched"
-  %res = iree_linalg_ext.attention {
-      indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output],
-      lowering_config = #lowering_config,
-      match_status = "unmatched"}
+  %res = iree_linalg_ext.attention <indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output]> {lowering_config = #lowering_config, match_status = "unmatched"}
       ins(%query, %key, %value, %scale : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16)
       outs(%output : tensor<2x10x6x4xf16>) {
     ^bb0(%arg: f32):
@@ -1076,9 +1073,7 @@ func.func @online_attention_exact(
 
   // CHECK: iree_linalg_ext.online_attention
   // CHECK-SAME: match_status = "matched"
-  %res:3 = iree_linalg_ext.online_attention {
-      indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output, #map_max, #map_max],
-      match_status = "unmatched"}
+  %res:3 = iree_linalg_ext.online_attention <indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output, #map_max, #map_max]> {match_status = "unmatched"}
       ins(%query, %key, %value, %scale : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16)
       outs(%output, %max, %sum : tensor<2x10x6x4xf32>, tensor<2x10x6xf32>, tensor<2x10x6xf32>) {
     ^bb0(%arg: f32):
@@ -1141,7 +1136,7 @@ func.func @indexing_maps_test(
 
   // CHECK: iree_linalg_ext.attention
   // CHECK-SAME:   maps_match = "unmatched"
-  %res = iree_linalg_ext.attention {indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output], maps_match = "unmatched"}
+  %res = iree_linalg_ext.attention <indexing_maps = [#map_query, #map_key, #map_value, #map_scale, #map_output]> {maps_match = "unmatched"}
       ins(%query, %key, %value, %scale : tensor<2x10x6x4xf16>, tensor<2x10x4x4xf16>, tensor<2x10x4x4xf16>, f16)
       outs(%output : tensor<2x10x6x4xf16>) {
     ^bb0(%arg: f32):
@@ -1170,6 +1165,51 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%module: !transform.any_op) {
     transform.foreach_match in %module
         @match_with_wrong_maps -> @annotate
+      : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+module attributes {transform.with_named_sequence} {
+  // CHECK-LABEL: func.func @native_properties_match
+  func.func @native_properties_match() {
+    // CHECK: pcf.generic sync true
+    // CHECK: match_status = "matched"
+    pcf.generic sync true scope(#pcf.test_scope) execute[%id: index, %count: index] {
+      pcf.return
+    } {match_status = "unmatched"}
+    return
+  }
+
+  // CHECK-LABEL: func.func @native_properties_mismatch
+  func.func @native_properties_mismatch() {
+    // CHECK: pcf.generic scope
+    // CHECK: match_status = "unmatched"
+    pcf.generic scope(#pcf.test_scope) execute[%id: index, %count: index] {
+      pcf.return
+    } {match_status = "unmatched"}
+    return
+  }
+
+  transform.named_sequence @match_sync(%root: !transform.any_op {transform.readonly}) -> !transform.any_op {
+    %inputs, %outputs = transform.iree.match.cast_compatible_dag_from_root %root {
+      pcf.generic sync true scope(#pcf.test_scope) execute[%id: index, %count: index] {
+        pcf.return
+      } {match_status = "unmatched"}
+    } : (!transform.any_op) -> (!transform.any_value, !transform.any_value)
+    transform.yield %root : !transform.any_op
+  }
+
+  transform.named_sequence @annotate_sync(%root: !transform.any_op {transform.readonly}) {
+    %value = transform.param.constant "matched" -> !transform.any_param
+    transform.annotate %root "match_status" = %value : !transform.any_op, !transform.any_param
+    transform.yield
+  }
+
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
+    transform.foreach_match in %module @match_sync -> @annotate_sync
       : (!transform.any_op) -> (!transform.any_op)
     transform.yield
   }

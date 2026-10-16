@@ -8,87 +8,78 @@
 # @ghost is used to make a pattern have no owners. It is a sentinel GitHub user
 # that takes the place of deleted users.
 
-# No global owners because we don't really want e.g. changing the root
-# CMakeLists.txt file to always ping a bunch of people.
+# Default to members of the IREE TSC
+* @AGindinson @devtbi @jschuhmacher @schuermans-roofline
 
 # Third-Party Code
-/.gitmodules @ScottTodd @stellaraccident
-/third_party/ @ScottTodd @stellaraccident
+/.gitmodules @AGindinson @jschuhmacher @schuermans-roofline
+/third_party/ @AGindinson @jschuhmacher @schuermans-roofline
 # Except for routinely-updated submodules
-/third_party/llvm-project @ghost
-/third_party/llvm-project.branch-pin @ghost
-/third_party/stablehlo @ghost
-/third_party/torch-mlir @ghost
+/third_party/llvm-project @AGindinson @schuermans-roofline
+/third_party/stablehlo @jschuhmacher @maxbartel
+/third_party/torch-mlir @AGindinson @maxbartel @ziereis
 
 # Bindings
-/runtime/bindings/python/ @stellaraccident
-/runtime/bindings/tflite/ @benvanik
-
-# Integrations
-/integrations/ @benvanik @stellaraccident
-/integrations/tensorflow/ @stellaraccident
-/integrations/tensorflow/test/**/iree_tfl_tests/ @rsuderman
+/runtime/bindings/python/ @devtbi @Manewing @schuermans-roofline @stellaraccident
+/runtime/bindings/tflite/ @AGindinson @benvanik @maxbartel
 
 # Experimental
 # It's experimental, but we still don't want any old directory added here.
-/experimental/ @benvanik @stellaraccident
+/experimental/ @benvanik @jschuhmacher @maxbartel @stellaraccident
 
 # Infra Top-Level Directories
-/build_tools/ @Groverkss @kuhar
-/build_tools/python_deploy/ @stellaraccident
-/build_tools/scripts/ @Groverkss @kuhar
-/build_tools/third_party/ @ScottTodd @stellaraccident
-/.github/ @amd-eochoalo @kuhar @Groverkss
-
-# llvm-external-projects
-/llvm-external-projects/ @stellaraccident
+/.github/ @AGindinson @kuhar @schuermans-roofline
+/build_tools/ @AGindinson @jschuhmacher @schuermans-roofline
+/build_tools/python_deploy/ @chrsmcgrr @maxbartel @stellaraccident
+/build_tools/scripts/ @AGindinson @Manewing @schuermans-roofline
+/build_tools/third_party/ @AGindinson @devtbi @stellaraccident
 
 # Other Top-Level Directories
-/docs/ @ScottTodd
-/tools/ @benvanik
+/docs/ @AGindinson @devtbi @jschuhmacher @schuermans-roofline
+/tools/ @benvanik @devtbi @schuermans-roofline
 
 # Tests
-/tests/external/iree-test-suites @Groverkss @MaheshRavishankar @kuhar
+/tests/external/iree-test-suites @AGindinson @jschuhmacher @roberto-laudani @ziereis
 
 # Compiler
-/compiler/src/iree/compiler/ @benvanik
-/compiler/src/iree/compiler/API/ @benvanik @IanWood1
-/compiler/src/iree/compiler/Codegen/ @MaheshRavishankar
-/compiler/src/iree/compiler/Codegen/Common @hanhanW @Max191 @MaheshRavishankar @qedawkins
-/compiler/src/iree/compiler/Codegen/**/*Vector* @amd-eochoalo @Groverkss @hanhanW @sommerlukas
-/compiler/src/iree/compiler/Codegen/Common/GPU @qedawkins @Groverkss @kuhar
-/compiler/src/iree/compiler/Codegen/Dialect/Codegen @Max191 @MaheshRavishankar @qedawkins
-/compiler/src/iree/compiler/Codegen/Dialect/CPU @hanhanW
-/compiler/src/iree/compiler/Codegen/Dialect/GPU @qedawkins @Max191 @Groverkss @nirvedhmeshram @krzysz00
-/compiler/src/iree/compiler/Codegen/Dialect/PCF @qedawkins
-/compiler/src/iree/compiler/Codegen/Dialect/VectorExt @Groverkss
-/compiler/src/iree/compiler/Codegen/ExternalInterfaces @hanhanW @Max191 @jtuyls
-/compiler/src/iree/compiler/Codegen/LLVMCPU/ @hanhanW
-/compiler/src/iree/compiler/Codegen/LLVMGPU/ @qedawkins @kuhar @Groverkss @nirvedhmeshram @krzysz00 @Max191
-/compiler/src/iree/compiler/Codegen/SPIRV/ @kuhar
-/compiler/src/iree/compiler/ConstEval/ @hanhanW @MaheshRavishankar
-/compiler/src/iree/compiler/Dialect/Encoding/ @hanhanW @Max191 @jtuyls
-/compiler/src/iree/compiler/Dialect/Flow/ @hanhanW @MaheshRavishankar @IanWood1
-/compiler/src/iree/compiler/Dialect/LinalgExt/ @hanhanW @MaheshRavishankar @Groverkss @Max191 @IanWood1 @bangtianliu
-/compiler/src/iree/compiler/Dialect/Stream/ @benvanik @hanhanW @MaheshRavishankar
-/compiler/src/iree/compiler/Dialect/TensorExt/ @hanhanW @MaheshRavishankar @IanWood1
-/compiler/src/iree/compiler/Dialect/Vulkan/ @kuhar
-/compiler/src/iree/compiler/DispatchCreation/ @MaheshRavishankar @IanWood1
-/compiler/src/iree/compiler/GlobalOptimization/ @MaheshRavishankar @IanWood1
-/compiler/src/iree/compiler/InputConversion/ @MaheshRavishankar
-/compiler/src/iree/compiler/Pipelines/ @benvanik @IanWood1
-/compiler/src/iree/compiler/Preprocessing/ @qedawkins @MaheshRavishankar
+/compiler/plugins/ @jschuhmacher @Manewing @schuermans-roofline
+/compiler/plugins/input @AGindinson @jschuhmacher @maxbartel
+/compiler/plugins/target @devtbi @egebeysel @jschuhmacher @Manewing
+/compiler/src/ @AGindinson @benvanik @jschuhmacher
+/compiler/src/iree/compiler/API/ @benvanik @jschuhmacher @maxbartel @schuermans-roofline
+/compiler/src/iree/compiler/Codegen/ @AGindinson @egebeysel @phemashekar
+/compiler/src/iree/compiler/Codegen/Common @AGindinson @egebeysel @phemashekar
+/compiler/src/iree/compiler/Codegen/**/*Vector* @Groverkss @hanhanW @sommerlukas
+/compiler/src/iree/compiler/Codegen/Common/GPU @AGindinson @egebeysel @ziereis
+/compiler/src/iree/compiler/Codegen/Dialect/CPU @AGindinson @egebeysel @Manewing @hanhanW
+/compiler/src/iree/compiler/Codegen/Dialect/GPU @AGindinson @egebeysel @Groverkss @krzysz00
+/compiler/src/iree/compiler/Codegen/LLVMCPU/ @AGindinson @egebeysel @Manewing @phemashekar @ziereis
+/compiler/src/iree/compiler/Codegen/LLVMGPU/ @AGindinson @egebeysel @Groverkss @krzysz00 @ziereis
+/compiler/src/iree/compiler/Codegen/SPIRV/ @AGindinson @devtbi @egebeysel
+/compiler/src/iree/compiler/ConstEval/ @AGindinson @jschuhmacher @MaheshRavishankar
+/compiler/src/iree/compiler/Dialect/Encoding/ @egebeysel @hanhanW @jschuhmacher @phemashekar
+/compiler/src/iree/compiler/Dialect/Flow/ @devtbi @jschuhmacher @Manewing @mbknust @ziereis
+/compiler/src/iree/compiler/Dialect/LinalgExt/ @AGindinson @egebeysel @jschuhmacher @ziereis
+/compiler/src/iree/compiler/Dialect/Stream/ @benvanik @devtbi @Manewing @ziereis
+/compiler/src/iree/compiler/Dialect/TensorExt/ @devtbi @egebeysel @ziereis
+/compiler/src/iree/compiler/Dialect/Vulkan/ @AGindinson @devtbi
+/compiler/src/iree/compiler/DispatchCreation/ @AGindinson @egebeysel @phemashekar @ziereis
+/compiler/src/iree/compiler/GlobalOptimization/ @AGindinson @egebeysel @Manewing @phemashekar @ziereis
+/compiler/src/iree/compiler/InputConversion/ @AGindinson @jschuhmacher @Manewing
+/compiler/src/iree/compiler/Pipelines/ @benvanik @jschuhmacher @Manewing
+/compiler/src/iree/compiler/Preprocessing/ @AGindinson @egebeysel @Manewing @phemashekar @ziereis
 
 # Compiler Plugins
-/compiler/plugins/input/StableHLO/ @MaheshRavishankar @rsuderman
-/compiler/plugins/input/Torch/ @keshavvinayak01 @rsuderman @zjgarvey
-/compiler/plugins/input/TOSA/ @MaheshRavishankar @rsuderman
-/compiler/plugins/target/ROCM/ @kuhar @krzysz00 @jtuyls @Yu-Zhewen
+/compiler/plugins/input/StableHLO/ @jschuhmacher @maxbartel
+/compiler/plugins/input/Torch/ @AGindinson @rsuderman @ziereis @zjgarvey
+/compiler/plugins/input/TOSA/ @AGindinson @chrsmcgrr @jschuhmacher @Manewing
+/compiler/plugins/target/ROCM/ @jtuyls @krzysz00 @kuhar @Yu-Zhewen
 
 # Runtime
-/runtime/src/iree/ @benvanik
-/runtime/src/iree/hal/drivers/amdgpu/ @benvanik @AWoloszyn
-/runtime/src/iree/hal/drivers/cuda/ @antiagainst
-/runtime/src/iree/hal/drivers/hip/ @AWoloszyn
-/runtime/src/iree/hal/drivers/metal/ @antiagainst
-/runtime/src/iree/hal/drivers/vulkan/ @antiagainst
+/runtime/src/ @benvanik @devtbi @Manewing @schuermans-roofline
+/runtime/src/iree/builtins/ukernel @egebeysel @jschuhmacher @phemashekar
+/runtime/src/iree/hal/drivers/amdgpu/ @benvanik @krzysz00 @kuhar
+/runtime/src/iree/hal/drivers/cuda/ @antiagainst @devtbi
+/runtime/src/iree/hal/drivers/hip/ @AWoloszyn @krzysz00
+/runtime/src/iree/hal/drivers/metal/ @antiagainst @devtbi
+/runtime/src/iree/hal/drivers/vulkan/ @AGindinson @benvanik @devtbi

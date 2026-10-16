@@ -7,6 +7,7 @@
 import array
 import gc
 import logging
+import os
 import numpy as np
 from pathlib import Path
 import tempfile
@@ -156,6 +157,76 @@ class ParameterApiTest(unittest.TestCase):
             # down the temp dir.
             verify_archive_from_fd(file_path)
             gc.collect()
+
+    def testArchiveFileAsync(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "archive.irpa"
+            expected = np.arange(24, dtype=np.int64)
+            rt.save_archive_file({"array": expected}, path)
+            index = rt.ParameterIndex()
+            index.load(str(path), mode="file_async")
+            entry = dict(index.items())["array"]
+            handle, offset = entry.file_storage
+            self.assertTrue(handle.is_fd)
+            self.assertTrue(handle.is_async)
+            self.assertFalse(handle.is_host_allocation)
+            self.assertEqual(entry.length, expected.nbytes)
+            self.assertGreaterEqual(offset, 0)
+            fd = handle.fd
+            del entry, index
+            gc.collect()
+            # The Python handle keeps the descriptor alive after the index dies.
+            self.assertEqual(os.fstat(fd).st_size, path.stat().st_size)
+            del handle
+            gc.collect()
+            with self.assertRaises(OSError):
+                os.fstat(fd)
+
+    def testArchiveLegacyMmapModes(self):
+        def verify(path, expected, *args, **kwargs):
+            index = rt.ParameterIndex()
+            index.load(str(path), *args, **kwargs)
+            entry = dict(index.items())["array"]
+            handle, _ = entry.file_storage
+            self.assertTrue(handle.is_host_allocation)
+            self.assertFalse(handle.is_async)
+            np.testing.assert_array_equal(
+                index_entry_as_array(entry, expected), expected
+            )
+
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "archive.irpa"
+            expected = np.arange(24, dtype=np.int64)
+            rt.save_archive_file({"array": expected}, path)
+            verify(path, expected)
+            for mmap in (True, False):
+                with self.subTest(mmap=mmap):
+                    verify(path, expected, mmap=mmap)
+                    verify(path, expected, "irpa", True, False, mmap)
+            gc.collect()
+
+    def testArchiveInvalidMode(self):
+        index = rt.ParameterIndex()
+        with self.assertRaisesRegex(ValueError, "unsupported parameter file mode"):
+            index.load("missing.irpa", mode="invalid")
+        for mmap in (True, False):
+            with self.subTest(mmap=mmap):
+                with self.assertRaisesRegex(ValueError, "mode and mmap"):
+                    index.load("missing.irpa", mode="file_async", mmap=mmap)
+        self.assertEqual(len(index), 0)
+
+    def testArchiveAsyncInvalidAccess(self):
+        index = rt.ParameterIndex()
+        for readable, writable in ((False, False), (False, True), (True, True)):
+            with self.subTest(readable=readable, writable=writable):
+                with self.assertRaisesRegex(ValueError, "requires read-only access"):
+                    index.load(
+                        "missing.irpa",
+                        mode="file_async",
+                        readable=readable,
+                        writable=writable,
+                    )
+        self.assertEqual(len(index), 0)
 
     def testParameterIndexEntryFromToNumpy(self):
         array = np.array([[1, 2], [3, 4]], dtype=np.int32)

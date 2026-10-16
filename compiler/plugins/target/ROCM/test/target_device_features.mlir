@@ -64,7 +64,25 @@
 //
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
 // RUN:   --iree-rocm-target=gfx1250 %s | FileCheck %s --check-prefixes=GFX1250
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-rocm-target=cdna5 %s | FileCheck %s --check-prefixes=GFX1250
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-rocm-target=mi455x %s | FileCheck %s --check-prefixes=GFX1250,MI455X
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=hip},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-rocm-target=MI455X %s | FileCheck %s --check-prefixes=GFX1250,MI455X
+//
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=amdgpu},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-rocm-target=gfx1250 %s | FileCheck %s --check-prefixes=GFX1250,AMDGPU
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=amdgpu},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-rocm-target=cdna5 %s | FileCheck %s --check-prefixes=GFX1250,AMDGPU
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=amdgpu},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-rocm-target=mi455x %s | FileCheck %s --check-prefixes=GFX1250,AMDGPU
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=amdgpu},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-rocm-target=MI455X %s | FileCheck %s --check-prefixes=GFX1250,AMDGPU
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetDevices=amdgpu},iree-hal-transformation-pipeline{serialize-executables=false})' \
+// RUN:   --iree-rocm-target=mi300x --iree-rocm-target-features=+sramecc,-xnack %s | FileCheck %s --check-prefixes=GFX942,AMDGPU-FEATURES
 
+// AMDGPU-FEATURES: #hal.executable.target<"rocm", "gfx942:sramecc+:xnack-",
 // GFX942: target_info = #iree_gpu.target<arch = "gfx942",
 // GFX942-SAME: wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8,
 // GFX942-SAME:         subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32,
@@ -128,8 +146,11 @@
 // RX9070:   chip = <wgp_count = 28, sku = "rx9070", memory_bandwidth_tbps = 6.400000e-01 : f32, perf_tflops = {fp16 = 1.450000e+02 : f32, fp32 = 3.610000e+01 : f32, fp8 = 2.890000e+02 : f32, int8 = 2.890000e+02 : f32}>>
 // R9700:    chip = <wgp_count = 32, sku = "r9700", memory_bandwidth_tbps = 6.400000e-01 : f32, perf_tflops = {fp16 = 1.910000e+02 : f32, fp32 = 4.780000e+01 : f32, fp8 = 3.830000e+02 : f32, int8 = 3.830000e+02 : f32}>>
 
-// Note: The gfx1250 target is experimental and contains placeholder values.
+// CDNA5 architecture limits and MI455X product specifications.
+// AMDGPU: #hal.executable.target<"rocm", "gfx1250",
 // GFX1250: target_info = #iree_gpu.target<arch = "gfx1250",
+// GFX1250-SAME:        wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8,
+// GFX1250-SAME:        subgroup =  shuffle|arithmetic,
 // GFX1250-SAME:        mma = [<WMMA_F32_16x16x4_F32>,
 // GFX1250-SAME:               <WMMA_F32_16x16x32_F16>, <WMMA_F32_16x16x32_BF16>, <WMMA_F16_16x16x32_F16>, <WMMA_BF16_16x16x32_BF16>,
 // GFX1250-SAME:               <WMMA_F32_16x16x64_F8E4M3FN>, <WMMA_F32_16x16x64_F8E4M3FN_F8E5M2>, <WMMA_F32_16x16x64_F8E5M2>, <WMMA_F32_16x16x64_F8E5M2_F8E4M3FN>,
@@ -137,8 +158,11 @@
 // GFX1250-SAME:               <WMMA_I32_16x16x64_I8>,
 // GFX1250-SAME:               <WMMA_F32_16x16x128_F8E5M2>, <WMMA_F32_16x16x128_F8E5M2_F8E4M3FN>, <WMMA_F32_16x16x128_F8E4M3FN>, <WMMA_F32_16x16x128_F8E4M3FN_F8E5M2>,
 // GFX1250-SAME:               <WMMA_F16_16x16x128_F8E5M2>, <WMMA_F16_16x16x128_F8E5M2_F8E4M3FN>, <WMMA_F16_16x16x128_F8E4M3FN>, <WMMA_F16_16x16x128_F8E4M3FN_F8E5M2>]
-// GFX1250-SAME:        subgroup_size_choices = [32]
+// GFX1250-SAME:        subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+// GFX1250-SAME:        max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 327680,
+// GFX1250-SAME:        max_workgroup_counts = [2147483647, 2147483647, 2147483647],
 // GFX1250-SAME:        max_load_instruction_bits = 128, simds_per_wgp = 4, vgpr_space_bits = 32768, workgroup_memory_bank_count = 64
+// MI455X: chip = <wgp_count = 256, sku = "mi455x", memory_bandwidth_tbps = 2.330000e+01 : f32, perf_tflops = {fp16 = 5.030000e+03 : f32, fp32 = 3.150000e+02 : f32, fp4 = 4.026000e+04 : f32, fp6 = 2.013000e+04 : f32, fp8 = 2.013000e+04 : f32}>>
 
 stream.executable public @reduce_dispatch {
   stream.executable.export @reduce_dispatch workgroups() -> (index, index, index) {

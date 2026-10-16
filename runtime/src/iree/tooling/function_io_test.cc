@@ -6,12 +6,15 @@
 
 #include "iree/tooling/function_io.h"
 
+#include <fstream>
+
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/io/vec_stream.h"
 #include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
+#include "iree/testing/temp_file.h"
 #include "iree/vm/api.h"
 
 namespace iree {
@@ -128,6 +131,129 @@ TEST_F(FunctionIOTest, ParsePrintMultipleBufferViews) {
   IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &result));
   EXPECT_EQ(result, std::string("result[0]: hal.buffer_view\n") + buf_string1 +
                         "\nresult[1]: hal.buffer_view\n" + buf_string2 + "\n");
+}
+
+TEST_F(FunctionIOTest, WriteOpaqueBufferViewUsesBackingBufferLength) {
+  iree_hal_buffer_params_t buffer_params = {
+      /*.usage=*/IREE_HAL_BUFFER_USAGE_DEFAULT,
+      /*.access=*/IREE_HAL_MEMORY_ACCESS_ALL,
+      /*.type=*/IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      /*.queue_affinity=*/0,
+  };
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
+      device_allocator, buffer_params, /*allocation_size=*/1, &buffer));
+  const uint8_t contents = 0x5A;
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(buffer, 0, &contents, 1));
+
+  const iree_hal_dim_t shape[] = {2};
+  iree_hal_buffer_view_t* buffer_view = NULL;
+  IREE_ASSERT_OK(iree_hal_buffer_view_create(
+      buffer, IREE_ARRAYSIZE(shape), shape, IREE_HAL_ELEMENT_TYPE_INT_8,
+      IREE_HAL_ENCODING_TYPE_OPAQUE, host_allocator, &buffer_view));
+  iree_hal_buffer_release(buffer);
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     host_allocator, &outputs));
+  iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(outputs.get(), &buffer_view_ref));
+
+  testing::TempFilePath path("function_io_short_opaque_buffer", ".bin");
+  ASSERT_TRUE(path);
+  std::string output_spec = "@" + path.path();
+  iree_string_view_t spec =
+      iree_make_string_view(output_spec.data(), output_spec.size());
+  iree_string_view_list_t specs = {1, &spec};
+  IREE_ASSERT_OK(iree_tooling_write_variants(
+      outputs.get(), specs, /*max_element_count=*/1024,
+      /*default_stream=*/NULL, host_allocator));
+  std::ifstream output(path.path(), std::ios::binary);
+  ASSERT_TRUE(output);
+  EXPECT_EQ(contents, output.get());
+  EXPECT_EQ(std::char_traits<char>::eof(), output.get());
+}
+
+TEST_F(FunctionIOTest, WriteDenseBufferViewUsesLogicalByteLength) {
+  iree_hal_buffer_params_t buffer_params = {
+      /*.usage=*/IREE_HAL_BUFFER_USAGE_DEFAULT,
+      /*.access=*/IREE_HAL_MEMORY_ACCESS_ALL,
+      /*.type=*/IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      /*.queue_affinity=*/0,
+  };
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
+      device_allocator, buffer_params, /*allocation_size=*/8, &buffer));
+  const uint8_t contents[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  IREE_ASSERT_OK(
+      iree_hal_buffer_map_write(buffer, 0, contents, IREE_ARRAYSIZE(contents)));
+
+  const iree_hal_dim_t shape[] = {3};
+  iree_hal_buffer_view_t* buffer_view = NULL;
+  IREE_ASSERT_OK(iree_hal_buffer_view_create(
+      buffer, IREE_ARRAYSIZE(shape), shape, IREE_HAL_ELEMENT_TYPE_INT_8,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, host_allocator, &buffer_view));
+  iree_hal_buffer_release(buffer);
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     host_allocator, &outputs));
+  iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(outputs.get(), &buffer_view_ref));
+
+  testing::TempFilePath path("function_io_padded_dense_buffer", ".bin");
+  ASSERT_TRUE(path);
+  std::string output_spec = "@" + path.path();
+  iree_string_view_t spec =
+      iree_make_string_view(output_spec.data(), output_spec.size());
+  iree_string_view_list_t specs = {1, &spec};
+  IREE_ASSERT_OK(iree_tooling_write_variants(
+      outputs.get(), specs, /*max_element_count=*/1024,
+      /*default_stream=*/NULL, host_allocator));
+  std::ifstream output(path.path(), std::ios::binary);
+  ASSERT_TRUE(output);
+  for (iree_host_size_t i = 0; i < shape[0]; ++i) {
+    EXPECT_EQ(contents[i], output.get());
+  }
+  EXPECT_EQ(std::char_traits<char>::eof(), output.get());
+}
+
+TEST_F(FunctionIOTest, WriteEmptyDenseBufferView) {
+  iree_hal_buffer_params_t buffer_params = {
+      /*.usage=*/IREE_HAL_BUFFER_USAGE_DEFAULT,
+      /*.access=*/IREE_HAL_MEMORY_ACCESS_ALL,
+      /*.type=*/IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      /*.queue_affinity=*/0,
+  };
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
+      device_allocator, buffer_params, /*allocation_size=*/1, &buffer));
+
+  const iree_hal_dim_t shape[] = {0};
+  iree_hal_buffer_view_t* buffer_view = NULL;
+  IREE_ASSERT_OK(iree_hal_buffer_view_create(
+      buffer, IREE_ARRAYSIZE(shape), shape, IREE_HAL_ELEMENT_TYPE_INT_8,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, host_allocator, &buffer_view));
+  iree_hal_buffer_release(buffer);
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(), 1,
+                                     host_allocator, &outputs));
+  iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
+  IREE_ASSERT_OK(iree_vm_list_push_ref_move(outputs.get(), &buffer_view_ref));
+
+  testing::TempFilePath path("function_io_empty_dense_buffer", ".bin");
+  ASSERT_TRUE(path);
+  std::string output_spec = "@" + path.path();
+  iree_string_view_t spec =
+      iree_make_string_view(output_spec.data(), output_spec.size());
+  iree_string_view_list_t specs = {1, &spec};
+  IREE_ASSERT_OK(iree_tooling_write_variants(
+      outputs.get(), specs, /*max_element_count=*/1024,
+      /*default_stream=*/NULL, host_allocator));
+  std::ifstream output(path.path(), std::ios::binary);
+  ASSERT_TRUE(output);
+  EXPECT_EQ(std::char_traits<char>::eof(), output.get());
 }
 
 }  // namespace

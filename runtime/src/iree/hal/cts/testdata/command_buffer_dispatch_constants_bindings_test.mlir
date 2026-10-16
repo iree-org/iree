@@ -10,7 +10,7 @@ hal.executable.source public @executable {
   hal.executable.export public @scale_and_offset ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index
-  } attributes {workgroup_size = [1 : index, 1 : index, 1 : index]}
+  } <workgroup_size = [1 : index, 1 : index, 1 : index]>
   builtin.module {
     func.func @scale_and_offset() {
       %scale = hal.interface.constant.load layout(#pipeline_layout) ordinal(0) : i32

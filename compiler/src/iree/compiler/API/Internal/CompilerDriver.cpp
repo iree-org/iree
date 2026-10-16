@@ -59,6 +59,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Endian.h"
@@ -419,7 +420,7 @@ GlobalInit::GlobalInit() : threadPool(getGlobalThreadPoolStrategy()) {
   mlir::iree_compiler::registerAllDialects(registry);
   mlir::iree_compiler::registerLLVMIRTranslations(registry);
 
-  if (!pluginManager.loadAvailablePlugins()) {
+  if (!pluginManager.loadAvailablePlugins(/*tolerateDynamicFailures=*/true)) {
     fprintf(stderr, "Failed to initialize IREE compiler plugins.\n");
     abort();
   }
@@ -1148,6 +1149,12 @@ void Invocation::dumpCompilationPhase(IREEVMPipelinePhase phase,
           std::string(path.begin(), path.end())}));
 }
 
+// Returns true if LLVM's -print-pipeline-passes flag was given.
+static bool shouldPrintPipelinePasses() {
+  llvm::PassBuilder passBuilder;
+  return passBuilder.getPrintPipelinePasses().has_value();
+}
+
 bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   auto passManager = createPassManager();
 
@@ -1235,6 +1242,9 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     return false;
   }
 
+  if (shouldPrintPipelinePasses()) {
+    passManager->dump();
+  }
   if (failed(passManager->run(parsedModule))) {
     return false;
   }
@@ -1248,6 +1258,10 @@ bool Invocation::runTextualPassPipeline(const char *textPassPipeline) {
   if (failed(mlir::parsePassPipeline(textPassPipeline, *passManager,
                                      llvm::errs()))) {
     return false;
+  }
+
+  if (shouldPrintPipelinePasses()) {
+    passManager->dump();
   }
   if (failed(passManager->run(parsedModule))) {
     return false;
@@ -1523,9 +1537,18 @@ void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
   }
 
   llvm::cl::ParseCommandLineOptions(argc, argv, banner);
+  // Reject load flags that were not handled before global initialization.
+  if (!mlir::iree_compiler::verifyDynamicPluginFlags(llvm::errs())) {
+    exit(EXIT_FAILURE);
+  }
 }
 
 void ireeCompilerGlobalInitialize() {
+  // No argv here, so only IREE_LOAD_PLUGINS names plugins. Failures are
+  // logged: a library must not kill its host.
+  (void)mlir::iree_compiler::initializeDynamicPlugins(/*args=*/{},
+                                                      llvm::errs());
+
   if (globalInit) {
     globalInit->refCount.fetch_add(1);
     return;

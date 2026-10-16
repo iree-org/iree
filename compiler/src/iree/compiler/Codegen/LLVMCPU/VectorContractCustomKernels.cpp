@@ -873,7 +873,7 @@ private:
     LLVM::InlineAsmOp asmOp = LLVM::InlineAsmOp::create(
         rewriter, loc, returnType, inputs, code, constraints,
         /*has_side_effects=*/false, /*is_align_stack=*/false,
-        LLVM::TailCallKind::None, dialectAttr,
+        LLVM::TailCallKind::None, /*convergent=*/false, dialectAttr,
         /*operand_attrs=*/ArrayAttr());
     // Extract result vectors from the asm op.
     SmallVector<Value> resVec;

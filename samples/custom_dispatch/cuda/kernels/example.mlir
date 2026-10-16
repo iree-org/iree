@@ -37,7 +37,7 @@ module @example attributes {hal.device.targets = [#cuda_target]} {
   // authored functions with code generated ones even for the same functions
   // such that code generation is used as a fallback when the hand-authored
   // kernels aren't supported at runtime.
-  hal.executable.source private @executable attributes {
+  hal.executable.source private @executable <
     // Object files linked into the executable per-target.
     // Certain backends (today) support either wholesale definition or linking
     // of partial objects for imports used by generated code. Each compilation
@@ -64,7 +64,7 @@ module @example attributes {hal.device.targets = [#cuda_target]} {
         }>
       ]
     }>
-  } {
+  > {
 
     // TODO(benvanik): demonstrate hal.executable.constant.block for
     // specialization via host logic. Maps to a read-only buffer passed into
@@ -88,11 +88,11 @@ module @example attributes {hal.device.targets = [#cuda_target]} {
       %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
       %c1 = arith.constant 1 : index
       hal.return %x, %c1, %c1 : index, index, index
-    } attributes {
+    } <
       // Certain backends (like CUDA) require a workgroup size (aka block
       // size) to be defined ahead of time.
       workgroup_size = [64 : index, 1 : index, 1 : index]
-    }
+    >
 
     // Similar to the above but in-place by using a read/write binding.
     hal.executable.export public @simple_mul_inplace ordinal(1)
@@ -103,9 +103,9 @@ module @example attributes {hal.device.targets = [#cuda_target]} {
       %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
       %c1 = arith.constant 1 : index
       hal.return %x, %c1, %c1 : index, index, index
-    } attributes {
+    } <
       workgroup_size = [64 : index, 1 : index, 1 : index]
-    }
+    >
 
   }  // hal.executable.source
 

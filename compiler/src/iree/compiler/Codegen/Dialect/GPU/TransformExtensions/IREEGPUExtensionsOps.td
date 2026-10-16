@@ -209,7 +209,7 @@ def FuseForallOp : Op<Transform_Dialect, "iree.fuse_forall",
   let results = (outs TransformHandleTypeInterface:$result);
 
   let assemblyFormat = [{
-    $producer `into` $consumer attr-dict
+    $producer `into` $consumer prop-dict attr-dict
     `:` functional-type(operands, results)
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";

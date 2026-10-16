@@ -24,6 +24,6 @@ func.func @shifted_mul(%arg0: tensor<4xi32>, %arg1: tensor<4xi32>) -> tensor<4xi
 func.func @quantized_avg_pool(%arg0: tensor<1x2x4x1xi8>) -> tensor<1x1x3x1xi8> {
   %input_zp = "tosa.const"() {values = dense<0> : tensor<1xi8>} : () -> tensor<1xi8>
   %output_zp = "tosa.const"() {values = dense<0> : tensor<1xi8>} : () -> tensor<1xi8>
-  %0 = tosa.avg_pool2d %arg0, %input_zp, %output_zp {acc_type = i32, kernel = array<i64: 2, 2>, stride = array<i64: 1, 1>, pad = array<i64: 0, 0, 0, 0>} : (tensor<1x2x4x1xi8>, tensor<1xi8>, tensor<1xi8>) -> tensor<1x1x3x1xi8>
+  %0 = tosa.avg_pool2d %arg0, %input_zp, %output_zp kernel([2, 2]) stride([1, 1]) pad([0, 0, 0, 0]) acc_type(i32) : (tensor<1x2x4x1xi8>, tensor<1xi8>, tensor<1xi8>) -> tensor<1x1x3x1xi8>
   return %0 : tensor<1x1x3x1xi8>
 }

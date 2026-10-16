@@ -1,3 +1,4 @@
+// RUN: iree-opt --split-input-file --mlir-print-op-generic %s | iree-opt --split-input-file | FileCheck %s
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @resourceAlloc
@@ -60,8 +61,8 @@ util.func private @resourceIsTerminal(%arg0: !stream.resource<*>, %arg1: index) 
 
 // CHECK-LABEL: @resourceSize
 util.func private @resourceSize(%arg0: !stream.resource<*>) -> index {
-  // CHECK: = stream.resource.size %arg0 : !stream.resource<*>
-  %0 = stream.resource.size %arg0 : !stream.resource<*>
+  // CHECK: = stream.resource.size %arg0 <affinity = #hal.device.affinity<@device>> {test.discardable} : !stream.resource<*>
+  %0 = stream.resource.size %arg0 <affinity = #hal.device.affinity<@device>> {test.discardable} : !stream.resource<*>
   util.return %0 : index
 }
 

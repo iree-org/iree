@@ -1,0 +1,6 @@
+// One library named twice loads once. Two libraries with one id is an error.
+
+// RUN: iree-opt --iree-load-plugin=%iree_test_valid_plugin --iree-load-plugin=%iree_test_valid_plugin --help
+// RUN: not iree-opt --iree-load-plugin=%iree_test_valid_plugin --iree-load-plugin=%iree_test_duplicate_id_plugin 2>&1 | FileCheck %s
+
+// CHECK: [IREE Dynamic Plugin ERROR]: plugin{{.*}}reports id 'sample_plugin', already taken by

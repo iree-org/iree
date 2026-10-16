@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
@@ -83,7 +84,8 @@ struct PromoteContractOperands final
     }
 
     if (isa<FloatType>(dstElementType)) {
-      return arith::ExtFOp::create(rewriter, loc, promotedType, v);
+      return arith::ExtFOp::create(rewriter, loc, promotedType, v,
+                                   arith::FastMathFlagsAttr{});
     }
     // For integer types, vector.contract only supports signless integer types
     // and promotion happens via sign extension.
@@ -214,13 +216,15 @@ struct ContractToChainFMA final : OpRewritePattern<vector::ContractionOp> {
 
     if (lhsVecType.getElementType() != elemType) {
       Type promotedType = lhsVecType.clone(elemType);
-      lhs = arith::ExtFOp::create(rewriter, loc, promotedType, lhs);
+      lhs = arith::ExtFOp::create(rewriter, loc, promotedType, lhs,
+                                  arith::FastMathFlagsAttr{});
       lhsVecType = cast<VectorType>(lhs.getType());
     }
 
     if (rhsVecType.getElementType() != elemType) {
       Type promotedType = rhsVecType.clone(elemType);
-      rhs = arith::ExtFOp::create(rewriter, loc, promotedType, rhs);
+      rhs = arith::ExtFOp::create(rewriter, loc, promotedType, rhs,
+                                  arith::FastMathFlagsAttr{});
       rhsVecType = cast<VectorType>(rhs.getType());
     }
 
@@ -425,11 +429,6 @@ private:
       p *= vt.getDimSize(i);
     }
     return p;
-  }
-
-  static bool isIdentityPermutation(ArrayRef<int64_t> perm) {
-    return llvm::all_of(llvm::enumerate(perm),
-                        [](auto p) { return p.value() == p.index(); });
   }
 
   static Value buildFMAChain(PatternRewriter &rewriter, Location loc,

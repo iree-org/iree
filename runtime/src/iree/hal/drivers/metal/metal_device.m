@@ -98,7 +98,10 @@ static const iree_hal_metal_device_t* iree_hal_metal_device_const_cast(
 // Advances the frontier tracker epoch for the device.
 // Called at submit time ([commandBuffer commit]) because the Metal command
 // queue is FIFO-ordered: submission order = causal ordering.
+// No-op for standalone devices not assigned to a topology group
+// (frontier_tracker is NULL until iree_hal_device_assign_topology_info).
 static void iree_hal_metal_device_advance_frontier(iree_hal_metal_device_t* device) {
+  if (!device->frontier_tracker) return;
   uint64_t epoch =
       (uint64_t)iree_atomic_fetch_add(&device->epoch, 1, iree_memory_order_acq_rel) + 1;
   iree_async_frontier_tracker_advance(device->frontier_tracker, device->axis, epoch);

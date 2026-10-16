@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
@@ -109,7 +110,8 @@ struct ReorderConvOpInputDimensions final
 
     SmallVector<Value, 2> operands = {transposed, op.getRhs()};
     auto newConv = mlir::stablehlo::ConvolutionOp::create(
-        rewriter, op.getLoc(), op.getType(), operands, op->getAttrs());
+        rewriter, op.getLoc(), TypeRange{op.getType()}, operands,
+        op.getProperties(), op->getDiscardableAttrDictionary().getValue());
     newConv.setDimensionNumbersAttr(newDimensionNumbers);
     rewriter.replaceOp(op, newConv.getResult());
 
@@ -177,7 +179,8 @@ struct ReorderConvOpKernelDimensions final
     SmallVector<Value, 2> operands = {op.getLhs(), transposeKernel};
     mlir::stablehlo::ConvolutionOp newConv =
         mlir::stablehlo::ConvolutionOp::create(
-            rewriter, op.getLoc(), op.getType(), operands, op->getAttrs());
+            rewriter, op.getLoc(), TypeRange{op.getType()}, operands,
+            op.getProperties(), op->getDiscardableAttrDictionary().getValue());
     newConv.setDimensionNumbersAttr(newDimensionNumbers);
 
     rewriter.replaceOp(op, {newConv.getResult()});
@@ -242,8 +245,10 @@ struct ReorderConvOpOutputDimensions final
     SmallVector<Value, 2> operands = {op.getLhs(), op.getRhs()};
     auto newConv = mlir::stablehlo::ConvolutionOp::create(
         rewriter, op.getLoc(),
-        RankedTensorType::get(convShape, resultType.getElementType()), operands,
-        op->getAttrs());
+        TypeRange{
+            RankedTensorType::get(convShape, resultType.getElementType())},
+        operands, op.getProperties(),
+        op->getDiscardableAttrDictionary().getValue());
     newConv.setDimensionNumbersAttr(newDimensionNumbers);
 
     auto transposed = mlir::stablehlo::TransposeOp::create(
@@ -1163,12 +1168,6 @@ struct ScatterIndexedDimsFirst final
       return rewriter.notifyMatchFailure(op, "batching dims are not handled");
     }
 
-    auto isIdentityPermutation = [](ArrayRef<int64_t> perm) {
-      return llvm::all_of(llvm::enumerate(perm), [](auto it) {
-        return static_cast<int64_t>(it.index()) == it.value();
-      });
-    };
-
     if (isIdentityPermutation(scatterDimsToOperandDims)) {
       return rewriter.notifyMatchFailure(
           op, "indexed operand dims are already leading");
@@ -1717,8 +1716,9 @@ struct ReorderBroadcastInDimOpAndElementwiseOp final
     auto resultShape = bcastOperandType.getShape();
     auto resultType = RankedTensorType::get(resultShape, elementType);
 
-    Value result = ElementwiseOpT::create(rewriter, op.getLoc(), resultType,
-                                          bcastOperands);
+    Value result = ElementwiseOpT::create(
+        rewriter, op.getLoc(), TypeRange{resultType}, bcastOperands,
+        op.getProperties(), op->getDiscardableAttrDictionary().getValue());
     rewriter.replaceOpWithNewOp<mlir::stablehlo::BroadcastInDimOp>(
         op, op.getType(), result, bcastOps[0].getBroadcastDimensionsAttr());
 
@@ -1803,8 +1803,9 @@ struct FuseWidenOperands final : OpRewritePattern<Op> {
           op, "fused operands do not satisfy op type constraints");
     }
 
-    rewriter.replaceOpWithNewOp<Op>(op, op->getResultTypes(), operands,
-                                    op->getAttrs());
+    rewriter.replaceOpWithNewOp<Op>(
+        op, op->getResultTypes(), operands, op.getProperties(),
+        op->getDiscardableAttrDictionary().getValue());
     return success();
   }
 };

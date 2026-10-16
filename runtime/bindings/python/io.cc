@@ -120,7 +120,19 @@ void ParameterIndexParseFileHandle(ParameterIndex& self,
 
 void ParameterIndexLoadFile(ParameterIndex& self, std::string& file_path,
                             std::optional<std::string> format, bool readable,
-                            bool writable, bool mmap) {
+                            bool writable, std::optional<bool> mmap,
+                            std::optional<std::string> mode) {
+  if (mode) {
+    if (*mode != "file_async") {
+      throw std::invalid_argument("unsupported parameter file mode: " + *mode);
+    }
+    if (mmap) {
+      throw std::invalid_argument("mode and mmap are mutually exclusive");
+    }
+    if (!readable || writable) {
+      throw std::invalid_argument("file_async requires read-only access");
+    }
+  }
   // Default format from extension.
   if (!format) {
     iree_string_view_t path_ext = iree_file_path_extension(
@@ -128,20 +140,17 @@ void ParameterIndexLoadFile(ParameterIndex& self, std::string& file_path,
     format.emplace(path_ext.data, path_ext.size);
   }
 
-  // TODO: this behavior is wrong; the python code assumes that the file handle
-  // always ends up as a host allocation, but this is the
-  // slowest/least-efficient path in most cases. The fast-path is to use
-  // iree_io_file_handle_open and get a file descriptor-backed handle as the HAL
-  // is then able to perform optimized reads/writes sometimes zero-copy. By
-  // mapping the file explicitly all accesses go down the pathologically slow
-  // path where zero-copy is not supported and we rely on the OS to fault pages
-  // and bring them in on demand instead of being able to read/write them more
-  // efficiently. The tests (and likely user code) rely on the mapping, though,
-  // so for now this remains slow.
-
-  // Open file.
+  // Preserve host allocation handles for existing mmap callers. Async file
+  // mode lets the HAL stream data without retaining a mapping of the archive.
   iree_io_file_handle_t* raw_file_handle = nullptr;
-  if (mmap) {
+  if (mode) {
+    CheckApiStatus(
+        iree_io_file_handle_open(
+            IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_ASYNC,
+            iree_make_string_view(file_path.data(), file_path.size()),
+            iree_allocator_system(), &raw_file_handle),
+        "Error opening parameter file (file_async)");
+  } else if (mmap.value_or(true)) {
     iree_io_file_contents_t* contents = NULL;
     CheckApiStatus(
         iree_io_file_contents_map(
@@ -247,6 +256,10 @@ void SetupIoBindings(py::module_& m) {
                      auto primitive =
                          iree_io_file_handle_primitive(self.raw_ptr());
                      return primitive.type == IREE_IO_FILE_HANDLE_TYPE_FD;
+                   })
+      .def_prop_ro("is_async",
+                   [](FileHandle& self) {
+                     return iree_io_file_handle_uses_async_io(self.raw_ptr());
                    })
       .def_prop_ro("fd",
                    [](FileHandle& self) {
@@ -444,7 +457,12 @@ void SetupIoBindings(py::module_& m) {
            py::arg("file_handle"), py::arg("format"))
       .def("load", ParameterIndexLoadFile, py::arg("file_path"),
            py::arg("format") = py::none(), py::arg("readable") = true,
-           py::arg("writable") = false, py::arg("mmap") = true)
+           py::arg("writable") = false, py::arg("mmap") = py::none(),
+           py::kw_only(), py::arg("mode") = py::none(),
+           "Load an archive. By default, or with mmap=True, map its contents. "
+           "mmap=False preloads the contents. mode='file_async' opens a "
+           "read-only async file handle for HAL streaming. The index retains "
+           "the handle. Explicit mode and mmap arguments cannot be combined.")
       .def(
           "create_provider",
           [](ParameterIndex& self, std::string scope,

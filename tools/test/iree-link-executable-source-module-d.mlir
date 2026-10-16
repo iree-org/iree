@@ -3,9 +3,9 @@
 
 module @module_d {
   // Extern kernel executable (e.g., a pre-compiled GPU kernel object).
-  hal.executable.source private @extern_kernel attributes {
+  hal.executable.source private @extern_kernel <
     objects = #hal.executable.objects<{}>
-  } {
+  > {
     hal.executable.export public @entry ordinal(0)
         layout(#hal.pipeline.layout<constants = 2, bindings = [
           #hal.pipeline.binding<storage_buffer, ReadOnly>,
@@ -13,7 +13,7 @@ module @module_d {
         ]>) count(%device: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
-    } attributes {workgroup_size = [64 : index, 1 : index, 1 : index]}
+    } <workgroup_size = [64 : index, 1 : index, 1 : index]>
   }
 
   // Function that dispatches to the extern kernel.

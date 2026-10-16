@@ -70,8 +70,8 @@ jobs:
           - name: windows-2022
             runs-on: windows-2022
             driver-options: -DIREE_HAL_DRIVER_CUDA=ON -DIREE_HAL_DRIVER_HIP=ON -DIREE_HAL_DRIVER_VULKAN=ON
-          - name: macos-14
-            runs-on: macos-14
+          - name: macos-15
+            runs-on: macos-15
             driver-options: -DIREE_HAL_DRIVER_METAL=ON -DIREE_HAL_DRIVER_VULKAN=OFF
     env:
       BUILD_DIR: build-runtime
@@ -100,7 +100,7 @@ jobs:
       - name: Install Python requirements
         run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: ccache
-        uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
         with:
           key: ${{ github.job }}-${{ matrix.name }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -138,7 +138,7 @@ jobs:
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
         with:
           key: ${{ github.job }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -175,7 +175,7 @@ jobs:
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
         with:
           key: ${{ github.job }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -211,7 +211,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: [ubuntu-24.04, ubuntu-24.04-arm, windows-2022, macos-14]
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm, windows-2022, macos-15]
         provider: [tracy, console]
     env:
       BUILD_DIR: build-tracing
@@ -242,7 +242,7 @@ jobs:
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@d62db5f07c26379fc4b4e0916f098a92573c3b03 # v1.2.23
+        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
         with:
           key: ${{ github.job }}-${{ matrix.runs-on}}-${{ matrix.provider }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -293,6 +293,12 @@ jobs:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_debug')
     uses: ./.github/workflows/ci_linux_x64_clang_debug.yml
+    secrets: inherit
+
+  linux_x64_clang_dynamic_plugins:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_dynamic_plugins')
+    uses: ./.github/workflows/ci_linux_x64_clang_dynamic_plugins.yml
     secrets: inherit
 
   linux_x64_clang_asan:
@@ -351,6 +357,7 @@ jobs:
       - linux_x64_gcc
       - linux_arm64_clang
       - linux_x64_clang_debug
+      - linux_x64_clang_dynamic_plugins
       - linux_x64_clang_asan
       - linux_x64_clang_ubsan
       - linux_x64_clang_tsan
@@ -361,3 +368,4 @@ jobs:
     secrets: inherit
     with:
       jobs-json: ${{ toJson(needs) }}
+      ci-deferred: ${{ needs.setup.outputs.ci-deferred == 'true' }}

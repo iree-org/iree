@@ -38,24 +38,19 @@ func.func @data_tiled_scaled_mma_inner_tiled()
   %7 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0, 0, 0, 0], sizes = [9, 9, 8, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x8x4x16x4xf8E8M0FNU>> -> tensor<9x9x8x4x16x4xf8E8M0FNU>
   %8 = iree_tensor_ext.dispatch.tensor.load %3, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [9, 9, 4, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<9x9x4x2x4x16x4xf8E8M0FNU>> -> tensor<9x9x4x2x4x16x4xf8E8M0FNU>
   %9 = iree_tensor_ext.dispatch.tensor.load %4, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [9, 9, 4, 8, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<9x9x4x8x2x4x16x4xf32>> -> tensor<9x9x4x8x2x4x16x4xf32>
-  %10 = iree_codegen.inner_tiled ins(%5, %6, %7, %8) outs(%9) {
-    lowering_config = #config,
-    indexing_maps = [
+  %10 = iree_codegen.inner_tiled ins(%5, %6, %7, %8) outs(%9) <indexing_maps = [
       affine_map<(m, n, k, kb) -> (m, k, kb)>,
       affine_map<(m, n, k, kb) -> (n, k, kb)>,
       affine_map<(m, n, k, kb) -> (m, k)>,
       affine_map<(m, n, k, kb) -> (n, k)>,
-      affine_map<(m, n, k, kb) -> (m, n)>],
-    iterator_types = [
+      affine_map<(m, n, k, kb) -> (m, n)>], iterator_types = [
       #linalg.iterator_type<parallel>,
       #linalg.iterator_type<parallel>,
       #linalg.iterator_type<reduction>,
-      #linalg.iterator_type<reduction>],
-    kind = #iree_gpu.data_tiled_scaled_mma_layout<
+      #linalg.iterator_type<reduction>], kind = #iree_gpu.data_tiled_scaled_mma_layout<
       intrinsic = MFMA_SCALE_F32_16x16x128_B32,
       lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32,
-      intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>,
-    semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>}
+      intrinsics_m = 8, intrinsics_n = 2, subgroups_n = 4, intrinsics_k = 4, operands_interleaving_intrinsics_k = [2, 3]>, semantics = #iree_gpu.mma_semantics<distributed = false, opaque = false>> {lowering_config = #config}
     : tensor<9x9x1x8x4x4x16x32xf4E2M1FN>, tensor<9x9x1x4x2x4x4x16x32xf4E2M1FN>, tensor<9x9x8x4x16x4xf8E8M0FNU>, tensor<9x9x4x2x4x16x4xf8E8M0FNU> into tensor<9x9x4x8x2x4x16x4xf32>
   iree_tensor_ext.dispatch.tensor.store %10, %4, offsets = [0, 0, 0, 0, 0, 0, 0, 0], sizes = [9, 9, 4, 8, 2, 4, 16, 4], strides = [1, 1, 1, 1, 1, 1, 1, 1] : tensor<9x9x4x8x2x4x16x4xf32> -> !iree_tensor_ext.dispatch.tensor<readwrite:tensor<9x9x4x8x2x4x16x4xf32>>
   return

@@ -693,15 +693,23 @@ function(iree_compile_flags_for_platform OUT_FLAGS IN_FLAGS)
      NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     # RV64 Linux crosscompile toolchain can support iree-compile with
     # specific CPU flags. Add the llvm flags to support RV64 RVV codegen if
-    # llvm-target-triple is not specified.
-    list(APPEND _FLAGS ${RISCV64_TEST_DEFAULT_LLVM_FLAGS})
+    # llvm-target-triple is not specified. Skip the default cpu-features flag
+    # when the test already set one, so it cannot replace the test's VLEN.
+    list(APPEND _FLAGS ${RISCV64_TEST_DEFAULT_ABI_FLAGS})
+    if(NOT IN_FLAGS MATCHES "--iree-llvmcpu-target-cpu-features=")
+      list(APPEND _FLAGS ${RISCV64_TEST_DEFAULT_FEAT_FLAGS})
+    endif()
   elseif(IREE_ARCH STREQUAL "riscv_32" AND
          CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
          NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")
     # RV32 Linux crosscompile toolchain can support iree-compile with
     # specific CPU flags. Add the llvm flags to support RV32 RVV codegen if
-    # llvm-target-triple is not specified.
-    list(APPEND _FLAGS ${RISCV32_TEST_DEFAULT_LLVM_FLAGS})
+    # llvm-target-triple is not specified. Skip the default cpu-features flag
+    # when the test already set one, so it cannot replace the test's VLEN.
+    list(APPEND _FLAGS ${RISCV32_TEST_DEFAULT_ABI_FLAGS})
+    if(NOT IN_FLAGS MATCHES "--iree-llvmcpu-target-cpu-features=")
+      list(APPEND _FLAGS ${RISCV32_TEST_DEFAULT_FEAT_FLAGS})
+    endif()
   endif()
 
   if(EMSCRIPTEN AND NOT IN_FLAGS MATCHES "iree-llvmcpu-target-triple")

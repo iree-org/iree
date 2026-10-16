@@ -3252,18 +3252,20 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
 }
 
 /// Returns the `InnerTileAlignment` implied by a loop tile size relative to a
-/// scalable pack/unpack inner tile whose vscale multiplier is `innerBase`.
-static mlir::InnerTileAlignment
-getScalableInnerTileAlignment(int64_t loopTile, bool loopScalable,
-                              int64_t innerBase) {
-  if (innerBase <= 0 || loopTile <= 0 || !loopScalable) {
+/// pack/unpack inner tile size.
+static mlir::InnerTileAlignment getInnerTileAlignment(int64_t loopTile,
+                                                      bool loopScalable,
+                                                      int64_t innerTile,
+                                                      bool innerScalable) {
+  if (innerTile <= 0 || loopTile <= 0) {
     return mlir::InnerTileAlignment::Unknown;
   }
-  if (loopTile == innerBase) {
-    return mlir::InnerTileAlignment::Equal;
-  }
-  if (loopTile % innerBase == 0) {
-    return mlir::InnerTileAlignment::Multiple;
+  if (loopScalable) {
+    if (innerScalable && loopTile == innerTile) {
+      return mlir::InnerTileAlignment::Equal;
+    }
+    return loopTile % innerTile == 0 ? mlir::InnerTileAlignment::Multiple
+                                     : mlir::InnerTileAlignment::Unknown;
   }
   return mlir::InnerTileAlignment::Unknown;
 }
@@ -3830,13 +3832,19 @@ static void captureInnerTileAlignment(
       rank, llvm::to_underlying(mlir::InnerTileAlignment::Unknown));
   bool any = false;
   for (auto [i, pos] : llvm::enumerate(op.getInnerDimsPos())) {
-    // Only scalable inner tiles need a hint; static ones are resolved by static
-    // shape inference downstream.
-    if (!scalableTilesFlags.second[i] || pos >= tileSizes.size()) {
+    if (pos >= tileSizes.size() || pos >= scalableFlags.size()) {
       continue;
     }
-    mlir::InnerTileAlignment kind = getScalableInnerTileAlignment(
-        tileSizes[pos], scalableFlags[pos], scalableTilesFlags.first[i]);
+    bool innerScalable = scalableTilesFlags.second[i];
+    bool loopScalable = scalableFlags[pos];
+    // Two static sizes are related by static shape inference downstream, which
+    // needs no hint.
+    if (!innerScalable && !loopScalable) {
+      continue;
+    }
+    mlir::InnerTileAlignment kind =
+        getInnerTileAlignment(tileSizes[pos], loopScalable,
+                              scalableTilesFlags.first[i], innerScalable);
     alignments[pos] = llvm::to_underlying(kind);
     if (kind != mlir::InnerTileAlignment::Unknown) {
       any = true;

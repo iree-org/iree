@@ -24,11 +24,26 @@ extern "C" {
 // Configuration
 //===----------------------------------------------------------------------===//
 
+// Size for buffers holding a composed sysfs path
+#define IREE_SYSFS_MAX_PATH 512
+
 // Returns the root path for sysfs system files.
-// Defaults to "/sys/devices/system" but can be overridden at compile time
-// by defining IREE_SYSFS_ROOT="/path/to/sysfs" for testing with mock
-// filesystem snapshots.
+// Defaults to "/sys/devices/system"; see iree_sysfs_set_root_path.
 const char* iree_sysfs_get_root_path(void);
+
+// Sets/overwrites the sysfs root path pointer for testing.
+//
+// Not thread-safe, set during startup.
+void iree_sysfs_set_root_path(const char* root_path);
+
+// Returns true if the sysfs tree being read describes the machine this process
+// is running on. Returns false when the root has been redirected to a captured
+// or synthetic tree via iree_sysfs_set_root_path().
+//
+// Callers must consult this before combining sysfs-derived topology with
+// host-derived queries (sched_getaffinity, getcpu, /proc): against a redirected
+// root those describe a *different* machine, so intersecting them is incorrect.
+bool iree_sysfs_host_matches_root(void);
 
 //===----------------------------------------------------------------------===//
 // File I/O
@@ -49,7 +64,7 @@ iree_status_t iree_sysfs_read_small_file(const char* path, char* buffer,
                                          size_t buffer_size,
                                          iree_host_size_t* out_length);
 
-// Tries to read a small sysfs file into the provided buffer.
+// Tries to read a sysfs file into the caller-provided buffer.
 // Returns false when the file cannot be read or does not fit in |buffer|. This
 // is for optional sysfs data where missing files are expected and should not
 // allocate an iree_status_t.

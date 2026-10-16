@@ -20,8 +20,6 @@
 #include "mlir/Bindings/Python/NanobindAdaptors.h"
 #include "mlir/CAPI/Support.h"
 
-static const char *kCodegenModuleImportPath =
-    MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_codegen");
 static const char *kGpuModuleImportPath =
     MAKE_MLIR_PYTHON_QUALNAME("dialects.iree_gpu");
 

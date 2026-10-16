@@ -104,7 +104,6 @@ iree_cc_library(
     ::PassesIncGen
     LLVMSupport
     MLIRAMDGPUDialect
-    MLIRAMDGPUUtils
     MLIRAffineDialect
     MLIRAffineTransforms
     MLIRAffineUtils
@@ -133,6 +132,7 @@ iree_cc_library(
     MLIRMemRefUtils
     MLIRNVGPUDialect
     MLIRPass
+    MLIRROCDLDialect
     MLIRRewrite
     MLIRSCFDialect
     MLIRSCFTransforms

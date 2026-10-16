@@ -37,8 +37,8 @@ cpu.
 
 **Expected Behavior:**
 - Should detect a single NUMA node: node identity comes from
-  `/sys/devices/system/node/` (a single node here), falling back to
-  `physical_package_id`, and is NOT taken from the `cluster_id` L2 domains.
+  `/sys/devices/system/node/`, and is NOT taken from the `cluster_id` L2
+  domains. A machine with no node hierarchy is simply one node.
   Big/LITTLE selection is expressed through the performance level, not by
   splitting the machine into per-cluster nodes.
 - With 75% capacity threshold (768):
@@ -66,7 +66,8 @@ systems:
 The script captures the sysfs topology:
 - CPU enumeration (`cpu/present`, `cpu/kernel_max` fallback)
 - NUMA node hierarchy (`node/online`, `node/node<N>/cpulist`) — the primary
-  source of node identity; captures sub-NUMA clustering on SNC/NPS machines
+  source of node identity; on SNC/NPS machines this is what shows one socket as
+  several nodes
 - Per-CPU topology (`core_id`, `physical_package_id`, `cluster_id`,
   `core_cpus_list`, `thread_siblings_list`)
 - Per-CPU cache hierarchy (`type`, `level`, `size`, `shared_cpu_list`)
@@ -78,54 +79,53 @@ lines are redundant (the backend prefers `core_cpus_list`).
 
 ## Testing with Snapshots
 
-To test with sysfs snapshots, compile IREE with the `IREE_SYSFS_ROOT` define
-pointing to your snapshot directory:
+See `iree_sysfs_set_root_path`, `--task_topology_snapshot`, `iree_sysfs_host_matches_root`.
 
 ```bash
-# Configure with sysfs snapshot path
-cmake -B build/ -S . \
-  -DCMAKE_C_FLAGS="-DIREE_SYSFS_ROOT=\\\"/path/to/arm64_pixel6_tensor\\\"" \
-  -DCMAKE_CXX_FLAGS="-DIREE_SYSFS_ROOT=\\\"/path/to/arm64_pixel6_tensor\\\""
-
-# Build and test
-cmake --build build/ --target iree-run-module
+cd runtime/src/iree/task/testdata/sysfs
+./capture_sysfs.sh --expand arm64_pixel6_tensor.sysfs.txt /tmp/pixel6
+cd -
+SNAP=/tmp/pixel6
 
 # Test ARM64 big.LITTLE with default settings (all cores, scatter distribution)
-./build/tools/iree-run-module --dump_task_topologies
+./build/tools/iree-run-module \
+  --task_topology_snapshot=$SNAP --dump_task_topologies
 
 # Test ARM64 big.LITTLE with HIGH performance cores only
-./build/tools/iree-run-module \
+./build/tools/iree-run-module --task_topology_snapshot=$SNAP \
   --task_topology_performance_level=high \
   --dump_task_topologies
 
 # Test ARM64 with compact distribution (fill cache domains sequentially)
-./build/tools/iree-run-module \
+./build/tools/iree-run-module --task_topology_snapshot=$SNAP \
   --task_topology_distribution=compact \
   --dump_task_topologies
 
 # Test ARM64 with latency preset (compact + high performance)
-./build/tools/iree-run-module \
+./build/tools/iree-run-module --task_topology_snapshot=$SNAP \
   --task_topology_favor=latency \
   --dump_task_topologies
 
 # Test ARM64 with only LITTLE cores (low power)
-./build/tools/iree-run-module \
+./build/tools/iree-run-module --task_topology_snapshot=$SNAP \
   --task_topology_performance_level=low \
   --dump_task_topologies
 ```
 
 Available flags for topology configuration:
+- `--task_topology_snapshot`: path to a snapshot directory
 - `--task_topology_performance_level`: `any`, `low` (or `efficiency`), `high` (or `performance`)
 - `--task_topology_distribution`: `compact`, `scatter`
 - `--task_topology_favor`: `latency`, `throughput`, `efficiency` (overrides above flags)
-- `--task_topology_nodes`: `current`, `all`, or comma-separated node IDs (e.g., `0,2`)
+- `--task_topology_nodes`: `current`, `all`, `numa`, or comma-separated NUMA node IDs (e.g., `0,2`)
 
 ## Validation
 
 When testing, verify:
 
 1. **CPU detection:** Correct number of logical processors detected
-2. **Cluster/node mapping:** CPUs grouped correctly by cluster_id
+2. **Node mapping:** CPUs grouped by NUMA node, never by `cluster_id` (see the
+   node identity note above)
 3. **Cache hierarchy:** L1/L2/L3 sizes and sharing masks accurate
 4. **ARM big.LITTLE filtering:**
    - ANY mode includes all cores
@@ -144,4 +144,6 @@ Good candidates for test data to capture locally (but only check in small/unusua
 When adding new test data:
 1. Run `capture_sysfs.sh <name>.sysfs.txt` on the target hardware
 2. Test the manifest to ensure it exercises the intended code paths
-5. Update this README with hardware details and expected behavior if checking in
+3. Register it in the `manifests` of
+   `//runtime/src/iree/task/testdata/sysfs:expanded_sysfs_snapshots` in `BUILD.bazel` and mirror it in cmake.
+4. Extend the tests to check that the topology is correctly generated

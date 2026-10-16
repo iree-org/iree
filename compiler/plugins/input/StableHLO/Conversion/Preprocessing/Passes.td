@@ -48,6 +48,17 @@ def GatherToTorchIndexSelect :
   let summary = "Legalizes gathers to a torch index select";
 }
 
+def LowerBounds :
+    Pass<"iree-stablehlo-preprocessing-lower-bounds", "func::FuncOp"> {
+  let summary = "Lowers the bounds encoding to util.assume.int and tie_shape";
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::tensor::TensorDialect",
+    "mlir::iree_compiler::IREE::Flow::FlowDialect",
+    "mlir::iree_compiler::IREE::Util::UtilDialect",
+  ];
+}
+
 def LowerComplex :
     InterfacePass<"iree-stablehlo-preprocessing-lower-complex", "mlir::FunctionOpInterface"> {
   let summary = "Lowers complex operations into non-complex operations";

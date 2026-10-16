@@ -451,6 +451,20 @@ helpers for local development.
 
 All three files are loaded automatically by Bazel in this order.
 
+### Dynamic compiler plugins
+
+Dynamic compiler plugins are experimental. Build them with
+`iree_compiler_register_experimental_dynamic_plugin` from
+`//build_tools/bazel:renamed_link.bzl`. The compiler tools link the shared
+compiler library by default (`--//compiler/src/iree/compiler/API:link_shared=true`)
+to provide the symbols these plugins require. Setting this flag to `false`
+does not provide the exported compiler ABI required by these plugins.
+
+Build plugins with the host compiler's IREE and LLVM/MLIR revisions and matching
+ABI-affecting build settings. See the
+[compiler plugin documentation](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/PluginAPI/README.md)
+for loading, activation, and compatibility requirements.
+
 ### GPU test targets
 
 GPU tests and samples need a target chip architecture (e.g., `gfx1100` for AMD

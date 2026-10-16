@@ -1,6 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}))" --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true fuse-multi-use-producers=false}))" --split-input-file %s | FileCheck %s --check-prefix=NO-MULTI-USE
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions))" --split-input-file %s | FileCheck %s --check-prefix=DEFAULT
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{fuse-mmt4d=true}))" --split-input-file %s | FileCheck %s --check-prefix=FUSE-MMT4D
 
 util.func public @pack_elementwise_fusion(%arg0 : tensor<?xf32>,
     %arg1 : tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
@@ -771,6 +772,79 @@ util.func public @no_batch_mmt4d_fusion(%arg0: tensor<1x1x64x1x1xf32>,
 //       CHECK:   flow.return %[[GEN]] : tensor<1x1x32x1x4xf32>
 //       CHECK:   util.return %[[DISP1]] : tensor<1x1x32x1x4xf32>
 
+// With fuse-mmt4d, the elementwise consumer joins the batch_mmt4d dispatch.
+// FUSE-MMT4D-LABEL: util.func public @no_batch_mmt4d_fusion
+//  FUSE-MMT4D-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x1x64x1x1xf32>
+//  FUSE-MMT4D-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<1x32x64x4x1xf32>
+//  FUSE-MMT4D-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<1x1x32x1x4xf32>
+//       FUSE-MMT4D:   %[[DISP:.+]] = flow.dispatch.region -> (tensor<1x1x32x1x4xf32>)
+//       FUSE-MMT4D:     %[[MMT4D:.+]] = linalg.batch_mmt4d
+//  FUSE-MMT4D-SAME:         ins(%[[ARG0]], %[[ARG1]] : tensor<1x1x64x1x1xf32>, tensor<1x32x64x4x1xf32>)
+//       FUSE-MMT4D:     %[[GEN:.+]] = linalg.generic
+//  FUSE-MMT4D-SAME:         ins(%[[ARG2]], %[[MMT4D]] : tensor<1x1x32x1x4xf32>, tensor<1x1x32x1x4xf32>)
+//       FUSE-MMT4D:     flow.return %[[GEN]] : tensor<1x1x32x1x4xf32>
+//   FUSE-MMT4D-NOT:   flow.dispatch.region
+//       FUSE-MMT4D:   util.return %[[DISP]] : tensor<1x1x32x1x4xf32>
+
+
+// -----
+
+// The mmt4d result has a second use, so its dispatch does not claim the unpack.
+// The unclaimed unpack then fuses with its consumer before the later matmul
+// can, as it does without fuse-mmt4d.
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+util.func public @unclaimed_unpack_program_order(%lhs: tensor<8x128x8x1xf32>, %rhs: tensor<8x128x8x1xf32>,
+    %a: tensor<64x32xf32>, %b: tensor<32x64xf32>) -> (tensor<64x64xf32>, tensor<8x8x8x8xf32>) {
+  %zero = arith.constant 0.000000e+00 : f32
+  %empty = tensor.empty() : tensor<8x8x8x8xf32>
+  %fill = linalg.fill ins(%zero : f32) outs(%empty : tensor<8x8x8x8xf32>) -> tensor<8x8x8x8xf32>
+  %mmt4d = linalg.mmt4d ins(%lhs, %rhs : tensor<8x128x8x1xf32>, tensor<8x128x8x1xf32>) outs(%fill : tensor<8x8x8x8xf32>) -> tensor<8x8x8x8xf32>
+  %relu = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%mmt4d : tensor<8x8x8x8xf32>) outs(%empty : tensor<8x8x8x8xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %max = arith.maximumf %in, %zero : f32
+    linalg.yield %max : f32
+  } -> tensor<8x8x8x8xf32>
+  %dest = tensor.empty() : tensor<64x64xf32>
+  %unpack = linalg.unpack %relu outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %dest : tensor<8x8x8x8xf32> -> tensor<64x64xf32>
+  %matmul_fill = linalg.fill ins(%zero : f32) outs(%dest : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %matmul = linalg.matmul ins(%a, %b : tensor<64x32xf32>, tensor<32x64xf32>) outs(%matmul_fill : tensor<64x64xf32>) -> tensor<64x64xf32>
+  %add = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%unpack, %matmul : tensor<64x64xf32>, tensor<64x64xf32>) outs(%dest : tensor<64x64xf32>) {
+  ^bb0(%x: f32, %y: f32, %out: f32):
+    %sum = arith.addf %x, %y : f32
+    linalg.yield %sum : f32
+  } -> tensor<64x64xf32>
+  util.return %add, %mmt4d : tensor<64x64xf32>, tensor<8x8x8x8xf32>
+}
+//    DEFAULT-LABEL: util.func public @unclaimed_unpack_program_order
+//          DEFAULT:   %[[MMT4D_DISPATCH:.+]] = flow.dispatch.region
+//          DEFAULT:     linalg.mmt4d
+//          DEFAULT:   %[[RELU_DISPATCH:.+]] = flow.dispatch.region
+//          DEFAULT:     linalg.generic
+//          DEFAULT:   %[[MATMUL_DISPATCH:.+]] = flow.dispatch.region
+//          DEFAULT:     %[[MATMUL:.+]] = linalg.matmul
+//          DEFAULT:     flow.return %[[MATMUL]]
+//          DEFAULT:   %[[ADD_DISPATCH:.+]] = flow.dispatch.region
+//          DEFAULT:     %[[UNPACK:.+]] = linalg.unpack %[[RELU_DISPATCH]]
+//          DEFAULT:     %[[ADD:.+]] = linalg.generic
+//     DEFAULT-SAME:       ins(%[[UNPACK]], %[[MATMUL_DISPATCH]] :
+//          DEFAULT:     flow.return %[[ADD]]
+//          DEFAULT:   util.return %[[ADD_DISPATCH]], %[[MMT4D_DISPATCH]]
+// FUSE-MMT4D-LABEL: util.func public @unclaimed_unpack_program_order
+//       FUSE-MMT4D:   %[[MMT4D_DISPATCH:.+]] = flow.dispatch.region
+//       FUSE-MMT4D:     linalg.mmt4d
+//       FUSE-MMT4D:   %[[RELU_DISPATCH:.+]] = flow.dispatch.region
+//       FUSE-MMT4D:     linalg.generic
+//       FUSE-MMT4D:   %[[MATMUL_DISPATCH:.+]] = flow.dispatch.region
+//       FUSE-MMT4D:     %[[MATMUL:.+]] = linalg.matmul
+//       FUSE-MMT4D:     flow.return %[[MATMUL]]
+//       FUSE-MMT4D:   %[[ADD_DISPATCH:.+]] = flow.dispatch.region
+//       FUSE-MMT4D:     %[[UNPACK:.+]] = linalg.unpack %[[RELU_DISPATCH]]
+//       FUSE-MMT4D:     %[[ADD:.+]] = linalg.generic
+//  FUSE-MMT4D-SAME:       ins(%[[UNPACK]], %[[MATMUL_DISPATCH]] :
+//       FUSE-MMT4D:     flow.return %[[ADD]]
+//       FUSE-MMT4D:   util.return %[[ADD_DISPATCH]], %[[MMT4D_DISPATCH]]
+
 // -----
 
 util.func @custom_op_consumer_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
@@ -1054,7 +1128,7 @@ util.func @attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: 
     linalg.yield %mask : i1
   } -> tensor<?x?xi1>
 
-  %out = iree_linalg_ext.attention {
+  %out = iree_linalg_ext.attention <
     indexing_maps = [
       affine_map<(M, N, K2, K1) -> (M, K1)>,
       affine_map<(M, N, K2, K1) -> (K2, K1)>,
@@ -1063,7 +1137,7 @@ util.func @attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16>, %V: 
       affine_map<(M, N, K2, K1) -> (K2, K1)>,
       affine_map<(M, N, K2, K1) -> (M, N)>
     ]
-  } ins(%Q, %K, %V, %scale, %causalmask : tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>, f16, tensor<?x?xi1>)
+  > ins(%Q, %K, %V, %scale, %causalmask : tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>, f16, tensor<?x?xi1>)
   outs(%out_e : tensor<?x?xf16>) {
   ^bb0(%score : f32):
       iree_linalg_ext.yield %score : f32
@@ -1112,7 +1186,7 @@ util.func @online_attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16
     linalg.yield %mask : i1
   } -> tensor<?x?xi1>
 
-  %out:3 = iree_linalg_ext.online_attention {
+  %out:3 = iree_linalg_ext.online_attention <
     indexing_maps = [
       affine_map<(M, N, K2, K1) -> (M, K1)>,
       affine_map<(M, N, K2, K1) -> (K2, K1)>,
@@ -1123,7 +1197,7 @@ util.func @online_attention_clone_mask(%Q : tensor<?x?xf16>, %K : tensor<?x?xf16
       affine_map<(M, N, K2, K1) -> (M)>,
       affine_map<(M, N, K2, K1) -> (M)>
     ]
-  } ins(%Q, %K, %V, %scale, %causalmask :
+  > ins(%Q, %K, %V, %scale, %causalmask :
         tensor<?x?xf16>, tensor<?x?xf16>, tensor<?x?xf16>, f16, tensor<?x?xi1>)
     outs(%acc, %max, %sum : tensor<?x?xf32>, tensor<?xf32>, tensor<?xf32>) {
   ^bb0(%score : f32):
@@ -1508,12 +1582,12 @@ util.func @attention_rope_fusion(%arg0: tensor<10x20x30x50xbf16>,
       linalg.yield %val : bf16
   } -> tensor<10x20x40x50xbf16>
   %empty = tensor.empty() : tensor<10x20x30x40xbf16>
-  %attention = iree_linalg_ext.attention {
+  %attention = iree_linalg_ext.attention <
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d3, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5, d6) -> ()>,
-                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]}
+                       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>]>
       ins(%query, %key, %value, %cst
           : tensor<10x20x30x50xbf16>, tensor<10x20x40x50xbf16>, tensor<10x20x40x50xbf16>, bf16)
       outs(%empty : tensor<10x20x30x40xbf16>) {
@@ -3062,7 +3136,7 @@ util.func public @online_attention_normalize_fusion(
   %acc = linalg.fill ins(%cst : f32) outs(%acc_e : tensor<20x4096x64xf32>) -> tensor<20x4096x64xf32>
   %max = linalg.fill ins(%cst_neg : f32) outs(%ms_e : tensor<20x4096xf32>) -> tensor<20x4096xf32>
   %sum = linalg.fill ins(%cst : f32) outs(%ms_e : tensor<20x4096xf32>) -> tensor<20x4096xf32>
-  %r:3 = iree_linalg_ext.online_attention {
+  %r:3 = iree_linalg_ext.online_attention <
     indexing_maps = [
       affine_map<(b, m, n, k1, k2) -> (b, m, k1)>,
       affine_map<(b, m, n, k1, k2) -> (b, k2, k1)>,
@@ -3072,7 +3146,7 @@ util.func public @online_attention_normalize_fusion(
       affine_map<(b, m, n, k1, k2) -> (b, m)>,
       affine_map<(b, m, n, k1, k2) -> (b, m)>
     ]
-  } ins(%Q, %K, %V, %scale : tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16)
+  > ins(%Q, %K, %V, %scale : tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16)
     outs(%acc, %max, %sum : tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>) {
   ^bb0(%score: f32):
     iree_linalg_ext.yield %score : f32

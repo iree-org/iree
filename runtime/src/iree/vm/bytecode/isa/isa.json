@@ -3305,6 +3305,13 @@
       "encoding": "i64_to_f32_conversion"
     },
     {
+      "opcode_set": "ext_f32",
+      "opcode": 62,
+      "symbol": "FPowI32",
+      "mnemonic": "fpowi.f32",
+      "encoding": "f32_binary"
+    },
+    {
       "opcode_set": "ext_f64",
       "opcode": 0,
       "symbol": "GlobalLoadF64",
@@ -3751,6 +3758,13 @@
       "symbol": "RoundF64Even",
       "mnemonic": "round.f64.even",
       "encoding": "f64_unary"
+    },
+    {
+      "opcode_set": "ext_f64",
+      "opcode": 64,
+      "symbol": "FPowI64",
+      "mnemonic": "fpowi.f64",
+      "encoding": "f64_binary"
     }
   ]
 }

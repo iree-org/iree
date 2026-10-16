@@ -662,6 +662,15 @@ static inline int iree_uk_ceil_log2_u32(const iree_uk_uint32_t n) {
   const int prefix##exp_mask IREE_UK_ATTRIBUTE_UNUSED =             \
       (1u << prefix##sign_shift) - (1u << prefix##exp_shift);
 
+// Rounds to nearest even by adding a bias. Does not shift; the result is ready
+// to be right-shifted by shift_amount.
+static inline iree_uk_uint32_t iree_uk_bias_to_nearest_even(
+    iree_uk_uint32_t input, int shift_amount) {
+  iree_uk_uint32_t even_bit = 1u << shift_amount;
+  iree_uk_uint32_t odd_bit = even_bit >> 1;
+  return input + ((input & even_bit) ? odd_bit : (odd_bit - 1));
+}
+
 static inline float iree_uk_generic_fp16_to_f32(iree_uk_uint16_t f16_value,
                                                 int exp_bits) {
   IREE_UK_FP_FORMAT_CONSTANTS(f16_, 16, exp_bits)
@@ -683,7 +692,12 @@ static inline float iree_uk_generic_fp16_to_f32(iree_uk_uint16_t f16_value,
       // Inf. Leave zero mantissa.
     }
   } else if (f16_exp == 0) {
-    // Zero or subnormal. Generate zero. Leave zero mantissa.
+    // Zero or subnormal. bf16 shares f32's exponent field, so its subnormals
+    // are f32 subnormals with the mantissa shifted into place. Narrower
+    // exponents would need renormalizing; leave those zero.
+    if (f16_exp_bits == f32_exp_bits) {
+      f32_mantissa = f16_mantissa << (f32_mantissa_bits - f16_mantissa_bits);
+    }
   } else {
     // Normal finite value.
     int arithmetic_f16_exp = f16_exp >> f16_exp_shift;
@@ -721,7 +735,14 @@ static inline iree_uk_uint16_t iree_uk_f32_to_generic_fp16(float value,
       // Inf. Leave zero mantissa.
     }
   } else if (f32_exp == 0) {
-    // Zero or subnormal. Generate zero. Leave zero mantissa.
+    // Zero or subnormal. bf16 shares f32's exponent field, so f32 subnormals
+    // stay representable: round the mantissa and let a carry out of the field
+    // land in the exponent. Narrower exponents cannot represent them.
+    if (f16_exp_bits == f32_exp_bits) {
+      int shift_amount = f32_mantissa_bits - f16_mantissa_bits;
+      f16_mantissa = iree_uk_bias_to_nearest_even(f32_mantissa, shift_amount) >>
+                     shift_amount;
+    }
   } else {
     // Normal finite value.
     int arithmetic_exp = (f32_exp >> f32_exp_shift) - (1 << (f32_exp_bits - 1));
@@ -733,13 +754,8 @@ static inline iree_uk_uint16_t iree_uk_f32_to_generic_fp16(float value,
       f16_exp = 0;
     } else {
       // Normal case.
-      // Implement round-to-nearest-even, by adding a bias before truncating.
-      // truncating.
-      int even_bit = 1u << (f32_mantissa_bits - f16_mantissa_bits);
-      int odd_bit = even_bit >> 1;
-      iree_uk_uint32_t biased_f32_mantissa =
-          f32_mantissa +
-          ((f32_mantissa & even_bit) ? (odd_bit) : (odd_bit - 1));
+      iree_uk_uint32_t biased_f32_mantissa = iree_uk_bias_to_nearest_even(
+          f32_mantissa, f32_mantissa_bits - f16_mantissa_bits);
       // Adding the bias may cause an exponent increment.
       if (biased_f32_mantissa > f32_mantissa_mask) {
         // Note: software implementations that try to be fast tend to get this

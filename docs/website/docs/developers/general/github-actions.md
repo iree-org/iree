@@ -242,6 +242,28 @@ Any workflow that runs on the `pull_request` event can be either optional
     Required checks must use only either standard GitHub-hosted runners or
     runners from the CPU builder pool.
 
+#### Stacked pull requests
+
+For native GitHub stacks, CI and PkgCI run their selected build and test jobs
+only for the lowest unmerged pull request. This is the PR whose base branch
+matches the stack's base branch. It uses the normal presubmit job selection,
+including file filters and PR description trailers. Non-stacked PRs are
+unaffected.
+
+Upper stack PRs still run setup, which reports that CI is deferred and selects
+no build or test jobs. Clang-tidy is also skipped. DCO and pre-commit retain
+their existing behavior on every layer. Both summary jobs still run, but
+`ci_summary` explicitly fails (with an explanation) to prevent the untested PR
+to merge together with the bottom PR.
+
+After the bottom PR merges, the remaining PRs rebase. CI relies on the rebase
+of the remaining stack to reevaluate and trigger test jobs. The next PR then
+becomes eligible for normal presubmit CI.
+
+PR description trailers such as `ci-extra` and `ci-exactly` cannot override
+stack deferral. Scheduled and postsubmit workflows are unaffected. One can
+still manually dispatch a workflow on a PR that is higher in the stack.
+
 #### :octicons-skip-16: Opt-in for presubmit jobs
 
 GitHub supports

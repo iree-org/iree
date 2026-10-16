@@ -15,6 +15,8 @@ load("//build_tools/wasm:wasi_sdk_repo.bzl", "wasi_sdk_repo")
 def _iree_extension_impl(module_ctx):
     """Implementation of the IREE module extension."""
 
+    # Local dependencies belong to IREE even when a consumer relocates it.
+    iree_root = str(module_ctx.path(Label("//:MODULE.bazel")).dirname)
     iree_is_root = any([m.is_root and m.name == "iree_core" for m in module_ctx.modules])
 
     # Create MLIR-adjacent source repositories only when IREE is the root
@@ -24,98 +26,98 @@ def _iree_extension_impl(module_ctx):
         new_local_repository(
             name = "llvm-raw",
             build_file_content = "# empty",
-            path = "third_party/llvm-project",
+            path = iree_root + "/third_party/llvm-project",
         )
         local_repository(
             name = "stablehlo",
-            path = "third_party/stablehlo",
+            path = iree_root + "/third_party/stablehlo",
         )
         new_local_repository(
             name = "torch-mlir-raw",
             build_file_content = "# empty - BUILD files overlaid by torch_mlir_configure",
-            path = "third_party/torch-mlir",
+            path = iree_root + "/third_party/torch-mlir",
         )
 
     # Googletest
     local_repository(
         name = "com_google_googletest",
-        path = "third_party/googletest",
+        path = iree_root + "/third_party/googletest",
     )
 
     # Flatcc
     new_local_repository(
         name = "com_github_dvidelabs_flatcc",
-        build_file = "@iree_core//:build_tools/third_party/flatcc/BUILD.overlay",
-        path = "third_party/flatcc",
+        build_file = Label("//:build_tools/third_party/flatcc/BUILD.overlay"),
+        path = iree_root + "/third_party/flatcc",
     )
 
     # Vulkan headers
     new_local_repository(
         name = "vulkan_headers",
-        build_file = "@iree_core//:build_tools/third_party/vulkan_headers/BUILD.overlay",
-        path = "third_party/vulkan_headers",
+        build_file = Label("//:build_tools/third_party/vulkan_headers/BUILD.overlay"),
+        path = iree_root + "/third_party/vulkan_headers",
     )
 
     # Benchmark
     local_repository(
         name = "com_google_benchmark",
-        path = "third_party/benchmark",
+        path = iree_root + "/third_party/benchmark",
     )
 
     # SPIRV-Cross
     new_local_repository(
         name = "spirv_cross",
-        build_file = "@iree_core//:build_tools/third_party/spirv_cross/BUILD.overlay",
-        path = "third_party/spirv_cross",
+        build_file = Label("//:build_tools/third_party/spirv_cross/BUILD.overlay"),
+        path = iree_root + "/third_party/spirv_cross",
     )
 
     # Tracy
     new_local_repository(
         name = "tracy_client",
-        build_file = "@iree_core//:build_tools/third_party/tracy_client/BUILD.overlay",
-        path = "third_party/tracy",
+        build_file = Label("//:build_tools/third_party/tracy_client/BUILD.overlay"),
+        path = iree_root + "/third_party/tracy",
     )
 
     # NCCL
     new_local_repository(
         name = "nccl",
-        build_file = "@iree_core//:build_tools/third_party/nccl/BUILD.overlay",
-        path = "third_party/nccl",
+        build_file = Label("//:build_tools/third_party/nccl/BUILD.overlay"),
+        path = iree_root + "/third_party/nccl",
     )
 
     # HIP API headers
     new_local_repository(
         name = "hip_api_headers",
-        build_file = "@iree_core//:build_tools/third_party/hip-api-headers/BUILD.overlay",
-        path = "third_party/hip-build-deps",
+        build_file = Label("//:build_tools/third_party/hip-api-headers/BUILD.overlay"),
+        path = iree_root + "/third_party/hip-build-deps",
     )
 
     # HSA runtime headers
     new_local_repository(
         name = "hsa_runtime_headers",
-        build_file = "@iree_core//:build_tools/third_party/hsa-runtime-headers/BUILD.overlay",
-        path = "third_party/hsa-runtime-headers",
+        build_file = Label("//:build_tools/third_party/hsa-runtime-headers/BUILD.overlay"),
+        path = iree_root + "/third_party/hsa-runtime-headers",
     )
 
     # RCCL
     new_local_repository(
         name = "rccl",
-        build_file = "@iree_core//:build_tools/third_party/rccl/BUILD.overlay",
-        path = "third_party/rccl",
+        build_file = Label("//:build_tools/third_party/rccl/BUILD.overlay"),
+        path = iree_root + "/third_party/rccl",
     )
 
     # Doug Lea's malloc (dlmalloc v2.8.6, MIT-0 license)
     new_local_repository(
         name = "dlmalloc",
-        build_file = "@iree_core//:build_tools/third_party/dlmalloc/BUILD.overlay",
-        path = "third_party/dlmalloc",
+        build_file = Label("//:build_tools/third_party/dlmalloc/BUILD.overlay"),
+        path = iree_root + "/third_party/dlmalloc",
     )
 
     # WebGPU headers
     new_local_repository(
         name = "webgpu_headers",
-        build_file = "@iree_core//:build_tools/third_party/webgpu-headers/BUILD.overlay",
-        path = "third_party/webgpu-headers",
+        build_file = Label("//:build_tools/third_party/webgpu-headers/BUILD.overlay"),
+        path = iree_root + "/third_party/webgpu-headers",
     )
 
     # Dawn (Tint SPIR-V → WGSL translation for the WebGPU compiler target).
@@ -153,7 +155,7 @@ def _iree_extension_impl(module_ctx):
         name = "amdgpu_device_libs",
         urls = ["https://github.com/shark-infra/amdgpu-device-libs/releases/download/v20231101/amdgpu-device-libs-llvm-6086c272a3a59eb0b6b79dcbe00486bf4461856a.tgz"],
         sha256 = "336362416c68fdd8bb80328f65ca7ebaa0c119ea19c95df6df30c832a4df39b9",
-        build_file = "@iree_core//:build_tools/third_party/amdgpu_device_libs/BUILD.overlay",
+        build_file = Label("//:build_tools/third_party/amdgpu_device_libs/BUILD.overlay"),
     )
 
     # CUDA auto-configuration

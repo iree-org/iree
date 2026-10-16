@@ -6,12 +6,12 @@
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @distribute_inner_tiled_F16_16x16x16_F32(%lhs: tensor<2x2x16x16xf16>, %rhs: tensor<2x2x16x16xf16>, %acc: tensor<2x2x16x16xf32>) -> tensor<2x2x16x16xf32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>
-  } : tensor<2x2x16x16xf16>, tensor<2x2x16x16xf16> into tensor<2x2x16x16xf32>
+  > : tensor<2x2x16x16xf16>, tensor<2x2x16x16xf16> into tensor<2x2x16x16xf32>
   return %0 : tensor<2x2x16x16xf32>
 }
 
@@ -59,13 +59,13 @@ module attributes { transform.with_named_sequence } {
  affine_map<(i, j, k) -> (i, j)>
 ]
 func.func @distribute_inner_tiled_I8_16x16x32_I32(%lhs: tensor<2x2x16x32xi8>, %rhs: tensor<2x2x16x32xi8>, %acc: tensor<2x2x16x16xi32>) -> tensor<2x2x16x16xi32> {
-  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
     indexing_maps = #contraction_accesses,
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_I32_16x16x32_I8>,
     semantics = #iree_gpu.mma_semantics<distributed = false, opaque = true>,
     permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
-  } : tensor<2x2x16x32xi8>, tensor<2x2x16x32xi8> into tensor<2x2x16x16xi32>
+  > : tensor<2x2x16x32xi8>, tensor<2x2x16x32xi8> into tensor<2x2x16x16xi32>
   return %0 : tensor<2x2x16x16xi32>
 }
 

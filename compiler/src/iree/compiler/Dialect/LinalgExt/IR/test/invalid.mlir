@@ -1427,6 +1427,21 @@ func.func @exp_reduction_index(%S: tensor<2x3xf32>, %M : tensor<2xf32>) -> tenso
 
 // -----
 
+func.func @illegal_im2col_batch_pos_exceeds_output_rank(%arg0: tensor<2x3x4x5xf32>) -> tensor<2xf32> {
+  %0 = tensor.empty() : tensor<2xf32>
+  // expected-error @+1 {{expected batch_pos size (4) to not exceed output rank (1)}}
+  %1 = iree_linalg_ext.im2col strides = [] dilations = [] kernel_size = []
+           offsets = [0] output_sizes = [[2]]
+           batch_pos = [0, 1, 2, 3] m_pos = [] k_pos = []
+           input_k_perm = []
+           output_perm = [0]
+           ins(%arg0 : tensor<2x3x4x5xf32>)
+           outs(%0 : tensor<2xf32>) -> tensor<2xf32>
+  return %1 : tensor<2xf32>
+}
+
+// -----
+
 func.func @illegal_im2col_strides(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
   %0 = tensor.empty() : tensor<2x1024x5760xf32>
   // expected-error @+1 {{expected strides rank to be equal to the kernel rank}}
@@ -1789,11 +1804,11 @@ func.func @illegal_attention_inputs(%query: tensor<6x12x20x8xf32>, %key: tensor<
   %0 = tensor.empty() : tensor<6x12x20x8xf32>
   %scale = arith.constant 1.0 : f32
   // expected-error @+1 {{Rank Mismatch for Query. Expected: 3 Got: 4}}
-  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
                     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
                     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
                     affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
-                    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
+                    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]>
                     ins(%query, %key, %value, %scale : tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, f32) outs(%0 : tensor<6x12x20x8xf32>) {
                      ^bb0(%score: f32):
                        iree_linalg_ext.yield %score : f32
@@ -1807,11 +1822,11 @@ func.func @illegal_flash_attention_inputs(%query: tensor<20xf32>, %key: tensor<2
   %result = tensor.empty() : tensor<20x8xf32>
   %scale = arith.constant 1.0 : f32
   // expected-error @+1 {{Rank Mismatch for Query. Expected: 2 Got: 1}}
-  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
+  %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
                        affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
                        affine_map<(d0, d1, d2, d3) -> (d0, d3)>,
                        affine_map<(d0, d1, d2, d3) -> ()>,
-                       affine_map<(d0, d1, d2, d3) -> (d0)>]}
+                       affine_map<(d0, d1, d2, d3) -> (d0)>]>
                        ins(%query, %key, %value, %scale : tensor<20xf32>, tensor<20x8xf32>, tensor<20x8xf32>, f32) outs(%result : tensor<20x8xf32>) {
                         ^bb0(%score: f32):
                           iree_linalg_ext.yield %score : f32
@@ -1825,11 +1840,11 @@ func.func @illegal_attention_inputs(%query: tensor<192x1024x64xf32>, %key: tenso
   %0 = tensor.empty() : tensor<192x1024x64xf32>
   %scale = arith.constant 1.0 : f32
   // expected-error @+6 {{custom op 'iree_linalg_ext.attention' invalid kind of type specified}}
-  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
                     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
                     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
                     affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
-                    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]}
+                    affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]>
                     ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32, f32) outs(%0 : tensor<192x1024x64xf32>) {
                      ^bb0(%score: f32):
                        iree_linalg_ext.yield %score : f32
@@ -1843,10 +1858,10 @@ func.func @attention_missing_affine_map(%query: tensor<192x1024x64xf32>, %key: t
   %0 = tensor.empty() : tensor<192x1024x64xf32>
   %scale = arith.constant 1.0 : f32
   // expected-error @below {{'iree_linalg_ext.attention' op expected an indexing map for each operand}}
-  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3, d4) -> ()>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
                      ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32) outs(%0 : tensor<192x1024x64xf32>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
@@ -1860,11 +1875,11 @@ func.func @attention_affine_map_domain_mismatch(%query: tensor<192x1024x64xf32>,
   %0 = tensor.empty() : tensor<192x1024x64xf32>
   %scale = arith.constant 1.0 : f32
   // expected-error @below {{Mismatched map domain for Scale. Expected: 5 Got: 4}}
-  %1 = iree_linalg_ext.attention {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                      affine_map<(d0, d1, d2, d3) -> ()>,
-                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]}
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
                      ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32) outs(%0 : tensor<192x1024x64xf32>) {
                       ^bb0(%score: f32):
                         iree_linalg_ext.yield %score : f32
@@ -2184,4 +2199,449 @@ func.func @map_load_wrong_num_yielded_values(
     iree_linalg_ext.yield %idx0 : index
   } : memref<4xf32> into memref<4xf32>
   return
+}
+
+// -----
+
+func.func @quantize_affine_unranked_input(%input: tensor<*xf32>,
+    %scale: f32, %init: tensor<4xi8>) -> tensor<4xi8> {
+  // expected-error @+1 {{operand #0 must be ranked tensor or memref}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0) -> (d0)>,
+                        affine_map<(d0) -> ()>,
+                        affine_map<(d0) -> (d0)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : tensor<*xf32>, f32)
+      outs(%init : tensor<4xi8>) -> tensor<4xi8>
+  return %0 : tensor<4xi8>
+}
+
+// -----
+
+func.func @quantize_affine_vector_input(%input: vector<4xf32>,
+    %scale: f32, %init: tensor<4xi8>) -> tensor<4xi8> {
+  // expected-error @+1 {{operand #0 must be ranked tensor or memref}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0) -> (d0)>,
+                        affine_map<(d0) -> ()>,
+                        affine_map<(d0) -> (d0)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : vector<4xf32>, f32)
+      outs(%init : tensor<4xi8>) -> tensor<4xi8>
+  return %0 : tensor<4xi8>
+}
+
+// -----
+
+func.func @dequantize_affine_unranked_scale(%input: tensor<4xi8>,
+    %scale: tensor<*xf32>, %init: tensor<4xf32>) -> tensor<4xf32> {
+  // expected-error @+1 {{operand #1 must be ranked tensor or memref, or scalar}}
+  %0 = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0) -> (d0)>,
+                        affine_map<(d0) -> ()>,
+                        affine_map<(d0) -> (d0)>]>
+      ins(%input, %scale : tensor<4xi8>, tensor<*xf32>)
+      outs(%init : tensor<4xf32>) -> tensor<4xf32>
+  return %0 : tensor<4xf32>
+}
+
+// -----
+
+func.func @quantize_affine_mixed_float_formats(%input: tensor<4xf16>,
+    %scale: bf16, %init: tensor<4xi8>) -> tensor<4xi8> {
+  // expected-error @+1 {{cannot mix equal-width floating point types 'f16' and 'bf16'}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0) -> (d0)>,
+                        affine_map<(d0) -> ()>,
+                        affine_map<(d0) -> (d0)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : tensor<4xf16>, bf16)
+      outs(%init : tensor<4xi8>) -> tensor<4xi8>
+  return %0 : tensor<4xi8>
+}
+
+// -----
+
+func.func @dequantize_affine_mixed_float_formats(%input: tensor<4xi8>,
+    %scale: f16, %init: tensor<4xbf16>) -> tensor<4xbf16> {
+  // expected-error @+1 {{cannot mix equal-width floating point types 'bf16' and 'f16'}}
+  %0 = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0) -> (d0)>,
+                        affine_map<(d0) -> ()>,
+                        affine_map<(d0) -> (d0)>]>
+      ins(%input, %scale : tensor<4xi8>, f16)
+      outs(%init : tensor<4xbf16>) -> tensor<4xbf16>
+  return %0 : tensor<4xbf16>
+}
+
+// -----
+
+func.func @quantize_affine_scalar_scale_nonempty_map(%input: tensor<4xf32>,
+    %scale: f32, %init: tensor<4xi8>) -> tensor<4xi8> {
+  // expected-error @+1 {{expected scalar scale to have an indexing map with no results}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0) -> (d0)>,
+                        affine_map<(d0) -> (d0)>,
+                        affine_map<(d0) -> (d0)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : tensor<4xf32>, f32)
+      outs(%init : tensor<4xi8>) -> tensor<4xi8>
+  return %0 : tensor<4xi8>
+}
+
+// -----
+
+func.func @quantize_affine_shape_mismatch(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %init: tensor<128x32xi8>) -> tensor<128x32xi8> {
+  // expected-error @+1 {{expected input and output to have the same shape}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128xf32>)
+      outs(%init : tensor<128x32xi8>) -> tensor<128x32xi8>
+  return %0 : tensor<128x32xi8>
+}
+
+// -----
+
+func.func @quantize_affine_bad_map_rank(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{expected indexing map 0 to have 2 dimensions to match the rank of the quantized value, got 3}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> (d0)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128xf32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_not_projected_permutation(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{expected indexing map 1 to be a projected permutation}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d1 floordiv 32)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128xf32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_scale_rank_mismatch(%input: tensor<128x64xf32>,
+    %scale: tensor<128x64xf32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{expected scale to have rank 1 to match the number of results of its indexing map, got 2}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128x64xf32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_wrong_number_of_maps(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %zp: tensor<128xi8>,
+    %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{expected 4 indexing maps, one per operand, got 3}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale, %zp : tensor<128x64xf32>, tensor<128xf32>, tensor<128xi8>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+// A value map that drops a dimension would leave part of the value unread.
+func.func @quantize_affine_input_map_not_a_permutation(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{expected the input indexing map to be a permutation with 2 results}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128xf32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_zp_size_mismatch(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %zp: tensor<32xi8>,
+    %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{expected zero_point dimension 0 to have size 64 to match dimension 1 of the quantized value, got 32}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale, %zp : tensor<128x64xf32>, tensor<128xf32>, tensor<32xi8>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_scale_size_mismatch(%input: tensor<128x64xf32>,
+    %scale: tensor<64xf32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{expected scale dimension 0 to have size 128 to match dimension 0 of the quantized value, got 64}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<64xf32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_zp_rank_mismatch(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %zp: tensor<64xi8>,
+    %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{expected zero_point to have rank 0 to match the number of results of its indexing map, got 1}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale, %zp : tensor<128x64xf32>, tensor<128xf32>, tensor<64xi8>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_float_zp(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %zp: tensor<128xf32>,
+    %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{expected zero_point to have a signless integer element type}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale, %zp : tensor<128x64xf32>, tensor<128xf32>, tensor<128xf32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_zp_unsigned_without_zp(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{zp_unsigned is only allowed when a zero_point operand is present}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127, zp_unsigned>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128xf32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_integer_input(%input: tensor<128x64xi32>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{expected input to have a floating point element type}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : tensor<128x64xi32>, tensor<128xf32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_integer_scale(%input: tensor<128x64xf32>,
+    %scale: tensor<128xi32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{expected scale to have a floating point element type, got 'i32'}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128xi32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_inverted_range(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{expected quant_min to not exceed quant_max}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = 127, quant_max = -128>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128xf32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_range_too_wide(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{quantization range [0, 255] is not representable in signed 'i8'}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = 0, quant_max = 255>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128xf32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_negative_unsigned_range(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xi8>) -> tensor<128x64xi8> {
+  // expected-error @+1 {{quantization range [-128, 127] is not representable in unsigned 'i8'}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127, storage_unsigned>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128xf32>)
+      outs(%init : tensor<128x64xi8>) -> tensor<128x64xi8>
+  return %0 : tensor<128x64xi8>
+}
+
+// -----
+
+func.func @quantize_affine_signed_storage(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xsi8>) -> tensor<128x64xsi8> {
+  // expected-error @+1 {{expected output to have a signless integer element type, got 'si8'}}
+  %0 = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       quant_min = -128, quant_max = 127>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128xf32>)
+      outs(%init : tensor<128x64xsi8>) -> tensor<128x64xsi8>
+  return %0 : tensor<128x64xsi8>
+}
+
+// -----
+
+func.func @dequantize_affine_unsigned_zp(%input: tensor<128x64xi8>,
+    %scale: tensor<128xf32>, %zp: tensor<128xui8>,
+    %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
+  // expected-error @+1 {{expected zero_point to have a signless integer element type, got 'ui8'}}
+  %0 = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]>
+      ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<128xui8>)
+      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
+  return %0 : tensor<128x64xf32>
+}
+
+// -----
+
+func.func @dequantize_affine_float_input(%input: tensor<128x64xf32>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
+  // expected-error @+1 {{expected input to have a signless integer element type}}
+  %0 = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]>
+      ins(%input, %scale : tensor<128x64xf32>, tensor<128xf32>)
+      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
+  return %0 : tensor<128x64xf32>
+}
+
+// -----
+
+func.func @dequantize_affine_integer_scale(%input: tensor<128x64xi8>,
+    %scale: tensor<128xi32>, %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
+  // expected-error @+1 {{expected scale to have a floating point element type, got 'i32'}}
+  %0 = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]>
+      ins(%input, %scale : tensor<128x64xi8>, tensor<128xi32>)
+      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
+  return %0 : tensor<128x64xf32>
+}
+
+// -----
+
+func.func @dequantize_affine_half_specified_range(%input: tensor<128x64xi8>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
+  // expected-error @+1 {{expected quant_min and quant_max to be specified together}}
+  %0 = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>], quant_min = -127>
+      ins(%input, %scale : tensor<128x64xi8>, tensor<128xf32>)
+      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
+  return %0 : tensor<128x64xf32>
+}
+
+// -----
+
+// Subtracting a zero point from an i64 value needs 65 bits, so there is no
+// integer type the subtraction can be carried out in.
+func.func @dequantize_affine_zp_difference_too_wide(%input: tensor<128x64xi64>,
+    %scale: tensor<128xf32>, %zp: tensor<128xi64>,
+    %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
+  // expected-error @+1 {{cannot subtract a zero point from a 'i64' value without exceeding 64 bits}}
+  %0 = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]>
+      ins(%input, %scale, %zp : tensor<128x64xi64>, tensor<128xf32>, tensor<128xi64>)
+      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
+  return %0 : tensor<128x64xf32>
+}
+
+// -----
+
+// A constant zero point that is off the quantized grid would be silently
+// truncated by the lowering, so it is rejected here.
+func.func @dequantize_affine_zp_off_grid(%input: tensor<128x64xi8>,
+    %scale: tensor<128xf32>, %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
+  %zp = arith.constant dense<300> : tensor<128xi32>
+  // expected-error @+1 {{zero point 300 is not representable in the storage type 'i8', whose range is [-128, 127]}}
+  %0 = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]>
+      ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<128xi32>)
+      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
+  return %0 : tensor<128x64xf32>
 }

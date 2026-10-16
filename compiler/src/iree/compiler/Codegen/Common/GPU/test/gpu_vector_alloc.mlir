@@ -18,7 +18,7 @@ func.func @promote_global_transfer_read(%src: memref<16x16xf16>) -> vector<16x16
   %cst = arith.constant 0.0 : f16
   %read = vector.transfer_read %src[%c0, %c0], %cst : memref<16x16xf16>, vector<16x16xf16>
   %out = iree_vector_ext.to_layout %read to layout(#consumer_layout)
-      {shared_memory_conversion = #iree_gpu.derived_thread_config} : vector<16x16xf16>
+      <shared_memory_conversion = #iree_gpu.derived_thread_config> : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }
 
@@ -28,7 +28,7 @@ func.func @promote_global_transfer_read(%src: memref<16x16xf16>) -> vector<16x16
 // CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
 // CHECK: %[[GLOBAL:.+]] = vector.transfer_read %{{.*}} : memref<16x16xf16>, vector<16x16xf16>
 // CHECK: %[[READ_LAYOUT_VALUE:.+]] = iree_vector_ext.to_layout %[[GLOBAL]] to layout(#[[$READ_LAYOUT]]) : vector<16x16xf16>
-// CHECK: %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<16x16xf16, #gpu.address_space<workgroup>>
+// CHECK: %[[ALLOC:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}> : tensor<16x16xf16, #gpu.address_space<workgroup>>
 // CHECK: %[[WRITE:.+]] = vector.transfer_write %[[READ_LAYOUT_VALUE]], %[[ALLOC]]
 // CHECK: %[[BARRIER:.+]] = iree_gpu.value_barrier %[[WRITE]]
 // CHECK: %[[LDS_READ:.+]] = vector.transfer_read %[[BARRIER]]
@@ -56,7 +56,7 @@ func.func @promote_global_transfer_read_dma(%src: memref<16x16xf16>) -> vector<1
   %cst = arith.constant 0.0 : f16
   %read = vector.transfer_read %src[%c0, %c0], %cst : memref<16x16xf16>, vector<16x16xf16>
   %out = iree_vector_ext.to_layout %read to layout(#consumer_layout)
-      {shared_memory_conversion = #iree_gpu.use_global_load_dma} : vector<16x16xf16>
+      <shared_memory_conversion = #iree_gpu.use_global_load_dma> : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }
 
@@ -90,7 +90,7 @@ func.func @promote_global_gather(%src: memref<16x16xf16>,
   %gather = vector.gather %src[%c0, %c0] [%indices], %mask, %passthru
       : memref<16x16xf16>, vector<16x16xindex>, vector<16x16xi1>, vector<16x16xf16> into vector<16x16xf16>
   %out = iree_vector_ext.to_layout %gather to layout(#consumer_layout)
-      {shared_memory_conversion = #iree_gpu.derived_thread_config} : vector<16x16xf16>
+      <shared_memory_conversion = #iree_gpu.derived_thread_config> : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }
 
@@ -100,7 +100,7 @@ func.func @promote_global_gather(%src: memref<16x16xf16>,
 // CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
 // CHECK: %[[GLOBAL:.+]] = vector.gather %{{.*}} : memref<16x16xf16>, vector<16x16xindex>, vector<16x16xi1>, vector<16x16xf16> into vector<16x16xf16>
 // CHECK: %[[READ_LAYOUT_VALUE:.+]] = iree_vector_ext.to_layout %[[GLOBAL]] to layout(#[[$GATHER_READ_LAYOUT]]) : vector<16x16xf16>
-// CHECK: %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<16x16xf16, #gpu.address_space<workgroup>>
+// CHECK: %[[ALLOC:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}> : tensor<16x16xf16, #gpu.address_space<workgroup>>
 // CHECK: %[[WRITE:.+]] = vector.transfer_write %[[READ_LAYOUT_VALUE]], %[[ALLOC]]
 // CHECK: %[[BARRIER:.+]] = iree_gpu.value_barrier %[[WRITE]]
 // CHECK: %[[LDS_READ:.+]] = vector.transfer_read %[[BARRIER]]
@@ -132,7 +132,7 @@ func.func @promote_global_transfer_read_in_loop(%src: memref<16x16xf16>,
   %result = scf.for %i = %c0 to %c4 step %c1 iter_args(%acc = %init) -> (vector<16x16xf16>) {
     %read = vector.transfer_read %src[%c0, %c0], %cst : memref<16x16xf16>, vector<16x16xf16>
     %out = iree_vector_ext.to_layout %read to layout(#consumer_layout)
-        {shared_memory_conversion = #iree_gpu.derived_thread_config} : vector<16x16xf16>
+        <shared_memory_conversion = #iree_gpu.derived_thread_config> : vector<16x16xf16>
     scf.yield %out : vector<16x16xf16>
   }
   return %result : vector<16x16xf16>
@@ -179,7 +179,7 @@ func.func @materialize_layout_conflict(%vector: vector<16x16xf16>) -> vector<16x
 // CHECK-LABEL: func.func @materialize_layout_conflict
 // CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
 // CHECK: %[[A:.+]] = iree_vector_ext.to_layout %{{.*}} to layout(#[[$CONFLICT_LAYOUT_A]]) : vector<16x16xf16>
-// CHECK: %[[ALLOC:.+]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<16x16xf16, #gpu.address_space<workgroup>>
+// CHECK: %[[ALLOC:.+]] = bufferization.alloc_tensor() <{memory_space = #gpu.address_space<workgroup>}> : tensor<16x16xf16, #gpu.address_space<workgroup>>
 // CHECK: %[[WRITE:.+]] = vector.transfer_write %[[A]], %[[ALLOC]]
 // CHECK: %[[BARRIER:.+]] = iree_gpu.value_barrier %[[WRITE]]
 // CHECK: %[[LDS_READ:.+]] = vector.transfer_read %[[BARRIER]]
@@ -202,6 +202,6 @@ func.func @materialize_layout_conflict(%vector: vector<16x16xf16>) -> vector<16x
 
 func.func @invalid_shared_memory_conversion_attr(%vector: vector<16x16xf16>) -> vector<16x16xf16> {
   // expected-error @+1 {{shared_memory_conversion attribute must implement IREE::GPU::PromotionAttr}}
-  %out = iree_vector_ext.to_layout %vector to layout(#layout) {shared_memory_conversion = "invalid"} : vector<16x16xf16>
+  %out = iree_vector_ext.to_layout %vector to layout(#layout) <shared_memory_conversion = "invalid"> : vector<16x16xf16>
   return %out : vector<16x16xf16>
 }

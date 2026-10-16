@@ -784,9 +784,16 @@ public:
     Value lhs = matmulOp.getDpsInputOperand(0)->get();
     Value init = matmulOp.getDpsInitOperand(0)->get();
     rewriter.setInsertionPoint(matmulOp);
+    auto castAttr = matmulOp.getCastAttr();
     SmallVector<NamedAttribute> attrs = getPrunedAttributeList(matmulOp);
-    rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
-        matmulOp, ValueRange{lhs, *newRhs}, ValueRange{init}, attrs);
+    if (castAttr) {
+      rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
+          matmulOp, matmulOp->getResultTypes(), ValueRange{lhs, *newRhs},
+          ValueRange{init}, castAttr, attrs);
+    } else {
+      rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
+          matmulOp, ValueRange{lhs, *newRhs}, ValueRange{init}, attrs);
+    }
     return success();
   }
 };
@@ -810,9 +817,16 @@ public:
     Value lhs = bmmOp.getDpsInputOperand(0)->get();
     Value init = bmmOp.getDpsInitOperand(0)->get();
     rewriter.setInsertionPoint(bmmOp);
+    auto castAttr = bmmOp.getCastAttr();
     SmallVector<NamedAttribute> attrs = getPrunedAttributeList(bmmOp);
-    rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeBOp>(
-        bmmOp, ValueRange{lhs, *newRhs}, ValueRange{init}, attrs);
+    if (castAttr) {
+      rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeBOp>(
+          bmmOp, bmmOp->getResultTypes(), ValueRange{lhs, *newRhs},
+          ValueRange{init}, castAttr, attrs);
+    } else {
+      rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeBOp>(
+          bmmOp, ValueRange{lhs, *newRhs}, ValueRange{init}, attrs);
+    }
     return success();
   }
 };

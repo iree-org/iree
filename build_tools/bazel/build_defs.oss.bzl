@@ -99,7 +99,7 @@ def iree_compiler_cc_library(deps = [], **kwargs):
     """
     iree_cc_library(
         deps = deps + [
-            "//compiler/src:defs",
+            Label("//compiler/src:defs"),
         ],
         **kwargs
     )
@@ -119,7 +119,7 @@ def iree_compiler_cc_test(deps = [], **kwargs):
     """
     cc_test(
         deps = deps + [
-            "//compiler/src:defs",
+            Label("//compiler/src:defs"),
         ],
         **kwargs
     )
@@ -132,7 +132,7 @@ def iree_compiler_cc_binary(deps = [], **kwargs):
     """
     cc_binary(
         deps = deps + [
-            "//compiler/src:defs",
+            Label("//compiler/src:defs"),
         ],
         **kwargs
     )
@@ -146,7 +146,7 @@ def iree_runtime_cc_library(deps = [], **kwargs):
     iree_cc_library(
         deps = deps + [
             # TODO: Rename to //runtime/src:defs to match compiler.
-            "//runtime/src:runtime_defines",
+            Label("//runtime/src:runtime_defines"),
         ],
         **kwargs
     )
@@ -174,7 +174,7 @@ def iree_runtime_cc_test(deps = [], group = None, resource_group = None, **kwarg
     cc_test(
         deps = deps + [
             # TODO: Rename to //runtime/src:defs to match compiler.
-            "//runtime/src:runtime_defines",
+            Label("//runtime/src:runtime_defines"),
         ],
         tags = tags,
         **kwargs
@@ -189,7 +189,7 @@ def iree_runtime_cc_binary(deps = [], **kwargs):
     cc_binary(
         deps = deps + [
             # TODO: Rename to //runtime/src:defs to match compiler.
-            "//runtime/src:runtime_defines",
+            Label("//runtime/src:runtime_defines"),
         ],
         **kwargs
     )
@@ -221,7 +221,7 @@ def iree_assert_no_dependency(name, target, dependency, message = "", tags = [],
     )
     sh_test(
         name = name,
-        srcs = ["//build_tools/bazel:assert_empty_query.sh"],
+        srcs = [Label("//build_tools/bazel:assert_empty_query.sh")],
         args = ["$(location :%s)" % query_name],
         data = [":%s" % query_name],
         tags = tags,

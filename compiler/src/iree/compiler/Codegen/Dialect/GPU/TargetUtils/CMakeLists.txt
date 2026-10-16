@@ -53,8 +53,8 @@ iree_cc_library(
     "KnownTargets.cpp"
   DEPS
     LLVMSupport
-    MLIRAMDGPUUtils
     MLIRIR
+    MLIRROCDLDialect
     MLIRSupport
     iree::compiler::Codegen::Common::GPU::GPUHeuristics
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect

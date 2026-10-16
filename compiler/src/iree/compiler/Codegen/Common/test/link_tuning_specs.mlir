@@ -17,7 +17,7 @@ module @td_module_0 attributes { transform.with_named_sequence } {
   module @foo_module attributes { transform.with_named_sequence } {
     transform.named_sequence @foo(%arg0: !transform.any_op {transform.readonly}) -> !transform.any_op
       attributes { iree_codegen.tuning_spec_entrypoint } {
-      transform.print {name = "Foo", skip_regions}
+      transform.print name = "Foo" skip_regions
       transform.yield %arg0 : !transform.any_op
     }
   }
@@ -26,7 +26,7 @@ module @td_module_0 attributes { transform.with_named_sequence } {
     transform.named_sequence @bar(%arg0: !transform.any_op {transform.readonly}) -> !transform.any_op
       attributes { iree_codegen.tuning_spec_entrypoint } {
       transform.match.operation_name %arg0 ["func.func"] : !transform.any_op
-      transform.print {name = "Bar", skip_regions}
+      transform.print name = "Bar" skip_regions
       transform.yield %arg0 : !transform.any_op
     }
   }
@@ -34,7 +34,7 @@ module @td_module_0 attributes { transform.with_named_sequence } {
   module @baz_module attributes { transform.with_named_sequence } {
     transform.named_sequence @baz(%arg0: !transform.any_op {transform.readonly}) -> !transform.any_op
       attributes { iree_codegen.tuning_spec_entrypoint } {
-      transform.print {name = "Baz", skip_regions}
+      transform.print name = "Baz" skip_regions
       transform.yield %arg0 : !transform.any_op
     }
   }

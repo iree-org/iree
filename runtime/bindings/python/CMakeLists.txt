@@ -374,6 +374,15 @@ if(IREE_BUILD_COMPILER AND IREE_BUILD_BUNDLED_LLVM)
 
   iree_py_test(
     NAME
+      benchmark_lifecycle_test
+    SRCS
+      "tests/benchmark_lifecycle_test.py"
+    TIMEOUT
+      300
+  )
+
+  iree_py_test(
+    NAME
       hal_test
     SRCS
       "tests/hal_test.py"

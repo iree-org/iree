@@ -45,6 +45,36 @@ public:
   }
 };
 
+static Attribute
+convertIntegerAttributeIfNeeded(Attribute attr,
+                                const TypeConverter &converter) {
+  auto typedAttr = dyn_cast<TypedAttr>(attr);
+  if (!typedAttr) {
+    return attr;
+  }
+  Type newType = converter.convertType(typedAttr.getType());
+  if (!newType || newType == typedAttr.getType()) {
+    return attr;
+  }
+  if (auto intAttr = dyn_cast<IntegerAttr>(attr)) {
+    if (auto intType = dyn_cast<IntegerType>(newType)) {
+      return IntegerAttr::get(intType, intAttr.getValue().getZExtValue());
+    }
+  }
+  if (auto shapedType = dyn_cast<ShapedType>(newType)) {
+    if (auto denseAttr = dyn_cast<DenseIntElementsAttr>(attr)) {
+      auto elementType = dyn_cast<IntegerType>(shapedType.getElementType());
+      if (elementType) {
+        return denseAttr.mapValues(
+            elementType, [&elementType](const APInt &value) {
+              return APInt(elementType.getWidth(), value.getZExtValue());
+            });
+      }
+    }
+  }
+  return attr;
+}
+
 // Handles the type conversion component of the TypeConversion. This updates
 // conversion patterns that used the original i48 tensor types to be
 // updated to the i64 variants.
@@ -60,65 +90,46 @@ public:
       return rewriter.notifyMatchFailure(op, "is a func op");
     }
 
-    llvm::SmallVector<Type, 4> oldAttrTypes;
-    llvm::SmallVector<unsigned, 4> typedIndices;
-
-    // Extract the typed attributes for conversion.
-    for (auto [index, attr] : llvm::enumerate(op->getAttrs())) {
-      if (auto typedAttr = dyn_cast<TypedAttr>(attr.getValue())) {
-        oldAttrTypes.push_back(typedAttr.getType());
-        typedIndices.push_back(index);
+    if (failed(getTypeConverter()->convertTypes(op->getResultTypes(),
+                                                newResults))) {
+      return rewriter.notifyMatchFailure(op, "result type conversion failed");
+    }
+    Operation *newOp = op->clone(
+        Operation::CloneOptions().withResultTypes(llvm::to_vector(newResults)));
+    bool conversionFailed = false;
+    newOp->getName().walkInherentAttrs(newOp, [&](StringRef, Attribute &attr) {
+      if (Attribute converted =
+              convertIntegerAttributeIfNeeded(attr, *getTypeConverter())) {
+        attr = converted;
+      } else {
+        conversionFailed = true;
+      }
+    });
+    SmallVector<NamedAttribute> attrs;
+    for (NamedAttribute attr : op->getDiscardableAttrs()) {
+      if (Attribute converted = convertIntegerAttributeIfNeeded(
+              attr.getValue(), *getTypeConverter())) {
+        attrs.emplace_back(attr.getName(), converted);
+      } else {
+        conversionFailed = true;
       }
     }
-
-    llvm::SmallVector<Type, 4> newAttrTypes;
-    (void)getTypeConverter()->convertTypes(oldAttrTypes, newAttrTypes);
-
-    llvm::SmallVector<NamedAttribute, 4> newAttrs(op->getAttrs());
-    for (auto [idx, typedIndex] : llvm::enumerate(typedIndices)) {
-      auto attrValue = newAttrs[typedIndex].getValue();
-      auto newAttrType = newAttrTypes[idx];
-
-      // For integer attributes, create a new integer of new width.
-      if (auto intAttr = dyn_cast<IntegerAttr>(attrValue)) {
-        if (auto intType = dyn_cast<IntegerType>(newAttrType)) {
-          auto value =
-              IntegerAttr::get(intType, intAttr.getValue().getZExtValue());
-          newAttrs[typedIndex] =
-              NamedAttribute(newAttrs[typedIndex].getName(), value);
-          continue;
-        }
-      }
-
-      // For shaped types, map the values to the new types.
-      if (auto shapedType = dyn_cast<ShapedType>(newAttrType)) {
-        if (auto denseAttr = dyn_cast<DenseIntElementsAttr>(attrValue)) {
-          auto eType = dyn_cast<IntegerType>(shapedType.getElementType());
-          auto cast = [&](APInt value) {
-            return APInt(eType.getWidth(), value.getZExtValue());
-          };
-          auto newDenseAttr = denseAttr.mapValues(eType, cast);
-          newAttrs[typedIndex] =
-              NamedAttribute(newAttrs[typedIndex].getName(), newDenseAttr);
-          continue;
-        }
-      }
-      return rewriter.notifyMatchFailure(op, "Unsupported input type");
+    if (conversionFailed) {
+      newOp->destroy();
+      return rewriter.notifyMatchFailure(op, "unsupported attribute type");
     }
-
-    (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
-
-    OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
-                         newResults, newAttrs, op->getSuccessors());
-    for (Region &r : op->getRegions()) {
-      Region *newRegion = state.addRegion();
-      rewriter.inlineRegionBefore(r, *newRegion, newRegion->begin());
-      TypeConverter::SignatureConversion result(newRegion->getNumArguments());
+    newOp->setDiscardableAttrs(attrs);
+    newOp->setOperands(operands);
+    rewriter.insert(newOp);
+    for (auto [r, newRegion] :
+         llvm::zip_equal(op->getRegions(), newOp->getRegions())) {
+      rewriter.inlineRegionBefore(r, newRegion, newRegion.begin());
+      TypeConverter::SignatureConversion result(newRegion.getNumArguments());
       (void)getTypeConverter()->convertSignatureArgs(
-          newRegion->getArgumentTypes(), result);
-      rewriter.applySignatureConversion(&newRegion->front(), result);
+          newRegion.getArgumentTypes(), result);
+      rewriter.applySignatureConversion(&newRegion.front(), result);
     }
-    Operation *newOp = rewriter.create(state);
+
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }
@@ -159,14 +170,18 @@ void Converti48Toi64Pass::runOnOperation() {
         return false;
       }
     }
-    for (auto attr : op->getAttrs()) {
-      if (auto typedAttr = dyn_cast<TypedAttr>(attr.getValue())) {
-        if (isIllegalType(typedAttr.getType())) {
-          return false;
-        }
+    bool legal = true;
+    auto check = [&](Attribute attr) {
+      if (auto typedAttr = dyn_cast<TypedAttr>(attr)) {
+        legal &= !isIllegalType(typedAttr.getType());
       }
+    };
+    op->getName().walkInherentAttrs(
+        op, [&](StringRef, Attribute &attr) { check(attr); });
+    for (NamedAttribute attr : op->getDiscardableAttrs()) {
+      check(attr.getValue());
     }
-    return true;
+    return legal;
   });
 
   auto *ctx = &getContext();

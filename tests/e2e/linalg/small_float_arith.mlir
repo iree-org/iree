@@ -1,7 +1,7 @@
 func.func @add_f8E5M2FNUZ() {
   %input = util.unfoldable_constant dense<[0.0, 1.0, 2.0, 4.0]> : tensor<4xf8E5M2FNUZ>
   %init = tensor.empty() : tensor<4xf8E5M2FNUZ>
-  %add = linalg.add
+  %add = linalg.elementwise <add>
     ins(%input, %input : tensor<4xf8E5M2FNUZ>, tensor<4xf8E5M2FNUZ>)
     outs(%init : tensor<4xf8E5M2FNUZ>) -> tensor<4xf8E5M2FNUZ>
   check.expect_almost_eq_const(%add, dense<[0.0, 2.0, 4.0, 8.0]> : tensor<4xf8E5M2FNUZ>) : tensor<4xf8E5M2FNUZ>
@@ -12,7 +12,7 @@ func.func @sub_f8E5M2FNUZ() {
   %lhs = util.unfoldable_constant dense<[4.0, 8.0, 16.0, 32.0]> : tensor<4xf8E5M2FNUZ>
   %rhs = util.unfoldable_constant dense<[1.0, 2.0, 4.0, 8.0]> : tensor<4xf8E5M2FNUZ>
   %init = tensor.empty() : tensor<4xf8E5M2FNUZ>
-  %sub = linalg.sub
+  %sub = linalg.elementwise <sub>
     ins(%lhs, %rhs : tensor<4xf8E5M2FNUZ>, tensor<4xf8E5M2FNUZ>)
     outs(%init : tensor<4xf8E5M2FNUZ>) -> tensor<4xf8E5M2FNUZ>
   check.expect_almost_eq_const(%sub, dense<[3.0, 6.0, 12.0, 24.0]> : tensor<4xf8E5M2FNUZ>) : tensor<4xf8E5M2FNUZ>
@@ -23,7 +23,7 @@ func.func @mul_f8E5M2FNUZ() {
   %lhs = util.unfoldable_constant dense<[1.0, 2.0, 4.0, 8.0]> : tensor<4xf8E5M2FNUZ>
   %rhs = util.unfoldable_constant dense<[2.0, 2.0, 2.0, 2.0]> : tensor<4xf8E5M2FNUZ>
   %init = tensor.empty() : tensor<4xf8E5M2FNUZ>
-  %mul = linalg.mul
+  %mul = linalg.elementwise <mul>
     ins(%lhs, %rhs : tensor<4xf8E5M2FNUZ>, tensor<4xf8E5M2FNUZ>)
     outs(%init : tensor<4xf8E5M2FNUZ>) -> tensor<4xf8E5M2FNUZ>
   check.expect_almost_eq_const(%mul, dense<[2.0, 4.0, 8.0, 16.0]> : tensor<4xf8E5M2FNUZ>) : tensor<4xf8E5M2FNUZ>
@@ -33,7 +33,7 @@ func.func @mul_f8E5M2FNUZ() {
 func.func @negf_f8E5M2FNUZ() {
   %input = util.unfoldable_constant dense<[1.0, -2.0, 4.0, -8.0]> : tensor<4xf8E5M2FNUZ>
   %init = tensor.empty() : tensor<4xf8E5M2FNUZ>
-  %neg = linalg.negf
+  %neg = linalg.elementwise <negf>
     ins(%input : tensor<4xf8E5M2FNUZ>)
     outs(%init : tensor<4xf8E5M2FNUZ>) -> tensor<4xf8E5M2FNUZ>
   check.expect_almost_eq_const(%neg, dense<[-1.0, 2.0, -4.0, 8.0]> : tensor<4xf8E5M2FNUZ>) : tensor<4xf8E5M2FNUZ>
@@ -43,7 +43,7 @@ func.func @negf_f8E5M2FNUZ() {
 func.func @add_f8E4M3FNUZ() {
   %input = util.unfoldable_constant dense<[0.0, 1.0, 2.0, 4.0]> : tensor<4xf8E4M3FNUZ>
   %init = tensor.empty() : tensor<4xf8E4M3FNUZ>
-  %add = linalg.add
+  %add = linalg.elementwise <add>
     ins(%input, %input : tensor<4xf8E4M3FNUZ>, tensor<4xf8E4M3FNUZ>)
     outs(%init : tensor<4xf8E4M3FNUZ>) -> tensor<4xf8E4M3FNUZ>
   check.expect_almost_eq_const(%add, dense<[0.0, 2.0, 4.0, 8.0]> : tensor<4xf8E4M3FNUZ>) : tensor<4xf8E4M3FNUZ>
@@ -54,7 +54,7 @@ func.func @mul_f8E4M3FNUZ() {
   %lhs = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0]> : tensor<4xf8E4M3FNUZ>
   %rhs = util.unfoldable_constant dense<[2.0, 2.0, 2.0, 2.0]> : tensor<4xf8E4M3FNUZ>
   %init = tensor.empty() : tensor<4xf8E4M3FNUZ>
-  %mul = linalg.mul
+  %mul = linalg.elementwise <mul>
     ins(%lhs, %rhs : tensor<4xf8E4M3FNUZ>, tensor<4xf8E4M3FNUZ>)
     outs(%init : tensor<4xf8E4M3FNUZ>) -> tensor<4xf8E4M3FNUZ>
   check.expect_almost_eq_const(%mul, dense<[2.0, 4.0, 6.0, 8.0]> : tensor<4xf8E4M3FNUZ>) : tensor<4xf8E4M3FNUZ>
@@ -64,7 +64,7 @@ func.func @mul_f8E4M3FNUZ() {
 func.func @add_f8E5M2() {
   %input = util.unfoldable_constant dense<[0.0, 1.0, 2.0, 4.0]> : tensor<4xf8E5M2>
   %init = tensor.empty() : tensor<4xf8E5M2>
-  %add = linalg.add
+  %add = linalg.elementwise <add>
     ins(%input, %input : tensor<4xf8E5M2>, tensor<4xf8E5M2>)
     outs(%init : tensor<4xf8E5M2>) -> tensor<4xf8E5M2>
   check.expect_almost_eq_const(%add, dense<[0.0, 2.0, 4.0, 8.0]> : tensor<4xf8E5M2>) : tensor<4xf8E5M2>
@@ -74,7 +74,7 @@ func.func @add_f8E5M2() {
 func.func @add_f8E4M3FN() {
   %input = util.unfoldable_constant dense<[0.0, 1.0, 2.0, 4.0]> : tensor<4xf8E4M3FN>
   %init = tensor.empty() : tensor<4xf8E4M3FN>
-  %add = linalg.add
+  %add = linalg.elementwise <add>
     ins(%input, %input : tensor<4xf8E4M3FN>, tensor<4xf8E4M3FN>)
     outs(%init : tensor<4xf8E4M3FN>) -> tensor<4xf8E4M3FN>
   check.expect_almost_eq_const(%add, dense<[0.0, 2.0, 4.0, 8.0]> : tensor<4xf8E4M3FN>) : tensor<4xf8E4M3FN>
@@ -99,7 +99,7 @@ func.func @special_f8E5M2FNUZ() {
   %lhs = util.unfoldable_constant dense<[0.0, 4.0, 32768.0, 49152.0, 0x80, -32768.0, 0.125, -4.0]> : tensor<8xf8E5M2FNUZ>
   %rhs = util.unfoldable_constant dense<[0.0, 4.0, 32768.0, 1.0, 1.0, -32768.0, 0.125, -4.0]> : tensor<8xf8E5M2FNUZ>
   %init = tensor.empty() : tensor<8xf8E5M2FNUZ>
-  %add = linalg.add
+  %add = linalg.elementwise <add>
     ins(%lhs, %rhs : tensor<8xf8E5M2FNUZ>, tensor<8xf8E5M2FNUZ>)
     outs(%init : tensor<8xf8E5M2FNUZ>) -> tensor<8xf8E5M2FNUZ>
   check.expect_almost_eq_const(%add, dense<[0.0, 8.0, 0x80, 49152.0, 0x80, 0x80, 0.25, -8.0]> : tensor<8xf8E5M2FNUZ>) : tensor<8xf8E5M2FNUZ>
@@ -120,7 +120,7 @@ func.func @special_f8E4M3FNUZ() {
   %lhs = util.unfoldable_constant dense<[0.0, 4.0, 192.0, 224.0, 0x80, -192.0, 0.125, -4.0]> : tensor<8xf8E4M3FNUZ>
   %rhs = util.unfoldable_constant dense<[0.0, 4.0, 192.0, 1.0, 1.0, -192.0, 0.125, -4.0]> : tensor<8xf8E4M3FNUZ>
   %init = tensor.empty() : tensor<8xf8E4M3FNUZ>
-  %add = linalg.add
+  %add = linalg.elementwise <add>
     ins(%lhs, %rhs : tensor<8xf8E4M3FNUZ>, tensor<8xf8E4M3FNUZ>)
     outs(%init : tensor<8xf8E4M3FNUZ>) -> tensor<8xf8E4M3FNUZ>
   check.expect_almost_eq_const(%add, dense<[0.0, 8.0, 0x80, 224.0, 0x80, 0x80, 0.25, -8.0]> : tensor<8xf8E4M3FNUZ>) : tensor<8xf8E4M3FNUZ>
@@ -141,7 +141,7 @@ func.func @special_f8E5M2() {
   %lhs = util.unfoldable_constant dense<[0.0, -0.0, 32768.0, 0x7C, 0x7F, -32768.0, 0xFC, 0x7C]> : tensor<8xf8E5M2>
   %rhs = util.unfoldable_constant dense<[0.0, 0.0, 32768.0, 1.0, 1.0, -32768.0, -1.0, 0xFC]> : tensor<8xf8E5M2>
   %init = tensor.empty() : tensor<8xf8E5M2>
-  %add = linalg.add
+  %add = linalg.elementwise <add>
     ins(%lhs, %rhs : tensor<8xf8E5M2>, tensor<8xf8E5M2>)
     outs(%init : tensor<8xf8E5M2>) -> tensor<8xf8E5M2>
   check.expect_almost_eq_const(%add, dense<[0.0, 0.0, 0x7C, 0x7C, 0x7F, 0xFC, 0xFC, 0x7F]> : tensor<8xf8E5M2>) : tensor<8xf8E5M2>
@@ -162,7 +162,7 @@ func.func @special_f8E4M3FN() {
   %lhs = util.unfoldable_constant dense<[0.0, -0.0, 384.0, 416.0, 0x7F, -384.0, 0.125, -4.0]> : tensor<8xf8E4M3FN>
   %rhs = util.unfoldable_constant dense<[0.0, 0.0, 384.0, 1.0, 1.0, -384.0, 0.125, -4.0]> : tensor<8xf8E4M3FN>
   %init = tensor.empty() : tensor<8xf8E4M3FN>
-  %add = linalg.add
+  %add = linalg.elementwise <add>
     ins(%lhs, %rhs : tensor<8xf8E4M3FN>, tensor<8xf8E4M3FN>)
     outs(%init : tensor<8xf8E4M3FN>) -> tensor<8xf8E4M3FN>
   check.expect_almost_eq_const(%add, dense<[0.0, 0.0, 0x7F, 416.0, 0x7F, 0x7F, 0.25, -8.0]> : tensor<8xf8E4M3FN>) : tensor<8xf8E4M3FN>
@@ -185,7 +185,7 @@ func.func @special_f8E4M3FN() {
 func.func @negzero_negf_f8E5M2() {
   %input = util.unfoldable_constant dense<[0.0, 0.0, 0.0, 0.0]> : tensor<4xf8E5M2>
   %init = tensor.empty() : tensor<4xf8E5M2>
-  %neg = linalg.negf ins(%input : tensor<4xf8E5M2>) outs(%init : tensor<4xf8E5M2>) -> tensor<4xf8E5M2>
+  %neg = linalg.elementwise <negf> ins(%input : tensor<4xf8E5M2>) outs(%init : tensor<4xf8E5M2>) -> tensor<4xf8E5M2>
   %result_i8 = arith.bitcast %neg : tensor<4xf8E5M2> to tensor<4xi8>
   // -128 = 0x80 = -0.0 in f8E5M2
   check.expect_eq_const(%result_i8, dense<[-128, -128, -128, -128]> : tensor<4xi8>) : tensor<4xi8>
@@ -197,7 +197,7 @@ func.func @negzero_negf_f8E5M2() {
 func.func @negzero_negf_f8E4M3FN() {
   %input = util.unfoldable_constant dense<[0.0, 0.0, 0.0, 0.0]> : tensor<4xf8E4M3FN>
   %init = tensor.empty() : tensor<4xf8E4M3FN>
-  %neg = linalg.negf ins(%input : tensor<4xf8E4M3FN>) outs(%init : tensor<4xf8E4M3FN>) -> tensor<4xf8E4M3FN>
+  %neg = linalg.elementwise <negf> ins(%input : tensor<4xf8E4M3FN>) outs(%init : tensor<4xf8E4M3FN>) -> tensor<4xf8E4M3FN>
   %result_i8 = arith.bitcast %neg : tensor<4xf8E4M3FN> to tensor<4xi8>
   // -128 = 0x80 = -0.0 in f8E4M3FN
   check.expect_eq_const(%result_i8, dense<[-128, -128, -128, -128]> : tensor<4xi8>) : tensor<4xi8>
@@ -210,7 +210,7 @@ func.func @negzero_mul_f8E5M2() {
   %input = util.unfoldable_constant dense<[-0.0, -0.0, -0.0, -0.0]> : tensor<4xf8E5M2>
   %one = util.unfoldable_constant dense<[1.0, 1.0, 1.0, 1.0]> : tensor<4xf8E5M2>
   %init = tensor.empty() : tensor<4xf8E5M2>
-  %mul = linalg.mul ins(%input, %one : tensor<4xf8E5M2>, tensor<4xf8E5M2>) outs(%init : tensor<4xf8E5M2>) -> tensor<4xf8E5M2>
+  %mul = linalg.elementwise <mul> ins(%input, %one : tensor<4xf8E5M2>, tensor<4xf8E5M2>) outs(%init : tensor<4xf8E5M2>) -> tensor<4xf8E5M2>
   %result_i8 = arith.bitcast %mul : tensor<4xf8E5M2> to tensor<4xi8>
   // -128 = 0x80 = -0.0 in f8E5M2
   check.expect_eq_const(%result_i8, dense<[-128, -128, -128, -128]> : tensor<4xi8>) : tensor<4xi8>
@@ -222,7 +222,7 @@ func.func @negzero_mul_f8E4M3FN() {
   %input = util.unfoldable_constant dense<[-0.0, -0.0, -0.0, -0.0]> : tensor<4xf8E4M3FN>
   %one = util.unfoldable_constant dense<[1.0, 1.0, 1.0, 1.0]> : tensor<4xf8E4M3FN>
   %init = tensor.empty() : tensor<4xf8E4M3FN>
-  %mul = linalg.mul ins(%input, %one : tensor<4xf8E4M3FN>, tensor<4xf8E4M3FN>) outs(%init : tensor<4xf8E4M3FN>) -> tensor<4xf8E4M3FN>
+  %mul = linalg.elementwise <mul> ins(%input, %one : tensor<4xf8E4M3FN>, tensor<4xf8E4M3FN>) outs(%init : tensor<4xf8E4M3FN>) -> tensor<4xf8E4M3FN>
   %result_i8 = arith.bitcast %mul : tensor<4xf8E4M3FN> to tensor<4xi8>
   // -128 = 0x80 = -0.0 in f8E4M3FN
   check.expect_eq_const(%result_i8, dense<[-128, -128, -128, -128]> : tensor<4xi8>) : tensor<4xi8>
@@ -369,7 +369,7 @@ func.func @add_f4E2M1FN() {
   %input_i8 = util.unfoldable_constant dense<[0x20, 0x64, 0xCA, 0x1E]> : tensor<4xi8>
   %input_f4 = flow.tensor.bitcast %input_i8 : tensor<4xi8> -> tensor<8xf4E2M1FN>
   %init = tensor.empty() : tensor<8xf4E2M1FN>
-  %add = linalg.add
+  %add = linalg.elementwise <add>
     ins(%input_f4, %input_f4 : tensor<8xf4E2M1FN>, tensor<8xf4E2M1FN>)
     outs(%init : tensor<8xf4E2M1FN>) -> tensor<8xf4E2M1FN>
   // Expected after doubling:

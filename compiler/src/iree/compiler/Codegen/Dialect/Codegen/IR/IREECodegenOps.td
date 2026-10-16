@@ -322,7 +322,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     `N x K` = `32 x 8`.
 
     ```mlir
-    %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
         indexing_maps = [
           affine_map<(m, n, k) -> (m, k)>,
           affine_map<(m, n, k) -> (n, k)>,
@@ -336,7 +336,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
         kind         = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
         semantics    = #iree_gpu.mma_semantics<distributed = false, opaque = false>,
         permutations = [array<i64: 0, 1>, array<i64: 1, 0>, array<i64: 0, 1>]
-      } : tensor<?x?x32x8xf16>, tensor<?x?x32x8xf16>
+      > : tensor<?x?x32x8xf16>, tensor<?x?x32x8xf16>
           into tensor<?x?x32x32xf32>
     ```
 
@@ -346,7 +346,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     f32 elements per lane for ACC.
 
     ```mlir
-    %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) {
+    %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
         indexing_maps = [
           affine_map<(m, n, k) -> (m, k)>,
           affine_map<(m, n, k) -> (n, k)>,
@@ -359,7 +359,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
         ],
         kind      = #iree_gpu.mma_layout<MFMA_F32_32x32x8_F16>,
         semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-      } : tensor<?x?x4xf16>, tensor<?x?x4xf16>
+      > : tensor<?x?x4xf16>, tensor<?x?x4xf16>
           into tensor<?x?x16xf32>
     ```
   }];
@@ -377,7 +377,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
   );
 
   let assemblyFormat = [{
-    `ins` `(` $inputs `)` `outs` `(` $outputs `)` attr-dict
+    `ins` `(` $inputs `)` `outs` `(` $outputs `)` prop-dict attr-dict
     `:` type($inputs) `into` type($outputs)
   }];
 

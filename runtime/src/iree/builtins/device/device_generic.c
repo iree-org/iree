@@ -173,4 +173,39 @@ IREE_DEVICE_EXPORT double fma(double x, double y, double z) {
   return x * y + z;
 }
 
+// LLVM codegen lowers oversized llvm.memset/memcpy/memmove intrinsics to
+// libcalls, and embedded executables link with -nostdlib.
+//
+// Pointer-width unsigned integer for the string routines; bitcode is only ever
+// retargeted between architectures of the same pointer width.
+typedef __SIZE_TYPE__ iree_device_size_t;
+
+IREE_DEVICE_EXPORT void* memset(void* dest, int value,
+                                iree_device_size_t count) {
+  uint8_t* d = (uint8_t*)dest;
+  for (iree_device_size_t i = 0; i < count; ++i) d[i] = (uint8_t)value;
+  return dest;
+}
+
+IREE_DEVICE_EXPORT void* memcpy(void* IREE_DEVICE_RESTRICT dest,
+                                const void* IREE_DEVICE_RESTRICT src,
+                                iree_device_size_t count) {
+  uint8_t* d = (uint8_t*)dest;
+  const uint8_t* s = (const uint8_t*)src;
+  for (iree_device_size_t i = 0; i < count; ++i) d[i] = s[i];
+  return dest;
+}
+
+IREE_DEVICE_EXPORT void* memmove(void* dest, const void* src,
+                                 iree_device_size_t count) {
+  uint8_t* d = (uint8_t*)dest;
+  const uint8_t* s = (const uint8_t*)src;
+  if (d < s) {
+    for (iree_device_size_t i = 0; i < count; ++i) d[i] = s[i];
+  } else {
+    for (iree_device_size_t i = count; i > 0; --i) d[i - 1] = s[i - 1];
+  }
+  return dest;
+}
+
 #endif  // IREE_DEVICE_STANDALONE

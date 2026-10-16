@@ -104,6 +104,7 @@ iree_cc_library(
     "FlattenMemRefs.cpp"
     "FlattenSwizzleHintAllocs.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
+    "FoldMemRefCopyIntoDPSOps.cpp"
     "FoldSplitReductionAndWorkgroupMappingLoops.cpp"
     "FoldTensorExtractOp.cpp"
     "FoldTensorSubsetIntoVectorTransferOps.cpp"
@@ -186,7 +187,6 @@ iree_cc_library(
     LLVMSupport
     MLIRAMDGPUDialect
     MLIRAMDGPUTransforms
-    MLIRAMDGPUUtils
     MLIRAffineAnalysis
     MLIRAffineDialect
     MLIRAffineToStandard
@@ -220,6 +220,7 @@ iree_cc_library(
     MLIRMemRefUtils
     MLIRParser
     MLIRPass
+    MLIRROCDLDialect
     MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms

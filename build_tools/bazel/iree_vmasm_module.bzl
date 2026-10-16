@@ -12,7 +12,7 @@ def iree_vmasm_module(
         name,
         src,
         module_name = None,
-        assemble_tool = "//tools:iree-as-module",
+        assemble_tool = Label("//tools:iree-as-module"),
         c_identifier = "",
         deps = [],
         **kwargs):

@@ -2,7 +2,7 @@
 
 util.func private @bufferize_generic(%d0: index, %d1: index, %d2: index, %d3: index) {
   %0 = bufferization.alloc_tensor(%d0) : tensor<?xi32>
-  %1 = bufferization.alloc_tensor(%d3) {memory_space = "foo"} : tensor<?xi32>
+  %1 = bufferization.alloc_tensor(%d3) <{memory_space = "foo"}> : tensor<?xi32>
   %2:4 = pcf.generic scope(#pcf.test_scope)
     execute(%ref = %0, %ref_1, %ref_2, %ref_3 = %1)[%id: index, %n: index]
          : (!pcf.sref<?xi32, #pcf.test_scope>, !pcf.sref<?xi32, #pcf.test_scope>, !pcf.sref<?xi32, #pcf.test_scope>, !pcf.sref<?xi32, #pcf.test_scope>)
@@ -93,7 +93,7 @@ util.func private @bufferize_generic_mixed(%d0: index, %d1: index, %d2: index, %
 
 util.func private @bufferize_loop(%d0: index, %d1: index, %d2: index, %d3: index, %n: index) {
   %0 = bufferization.alloc_tensor(%d0) : tensor<?xi32>
-  %1 = bufferization.alloc_tensor(%d3) {memory_space = "foo"} : tensor<?xi32>
+  %1 = bufferization.alloc_tensor(%d3) <{memory_space = "foo"}> : tensor<?xi32>
   %2:4 = pcf.loop scope(#pcf.test_scope) count(%n)
     execute(%ref = %0, %ref_1, %ref_2, %ref_3 = %1)[%id: index]
          : (!pcf.sref<?xi32, #pcf.test_scope>, !pcf.sref<?xi32, #pcf.test_scope>, !pcf.sref<?xi32, #pcf.test_scope>, !pcf.sref<?xi32, #pcf.test_scope>)

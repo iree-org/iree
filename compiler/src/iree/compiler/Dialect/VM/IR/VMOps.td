@@ -33,6 +33,8 @@ let opDocGroup = OpGroupStructuralOps in {
 def VM_ModuleOp : VM_Op<"module", [
     IsolatedFromAbove,
     SingleBlockImplicitTerminator<"IREE::VM::ModuleTerminatorOp">,
+    SymbolName,
+    SymbolVisibility,
     Symbol,
     SymbolTable,
   ]> {
@@ -53,7 +55,7 @@ def VM_ModuleOp : VM_Op<"module", [
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
-    attr-dict-with-keyword
+    prop-dict attr-dict-with-keyword
     regions
   }];
 
@@ -95,6 +97,8 @@ def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
 def VM_FuncOp : VM_Op<"func", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
+    SymbolName,
+    SymbolVisibility,
     FunctionOpInterface,
     CallableOpInterface,
     Symbol,
@@ -106,6 +110,8 @@ def VM_FuncOp : VM_Op<"func", [
   }];
 
   let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<VM_Ordinal>:$ordinal,
     OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy,
@@ -196,6 +202,8 @@ def VM_ExportOp : VM_Op<"export", [
 }
 
 def VM_ImportOp : VM_Op<"import", [
+    SymbolName,
+    SymbolVisibility,
     Symbol,
     FunctionOpInterface,
     CallableOpInterface,
@@ -286,6 +294,8 @@ def VM_ImportOp : VM_Op<"import", [
 def VM_InitializerOp : VM_Op<"initializer", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
+    SymbolName,
+    SymbolVisibility,
     FunctionOpInterface,
     CallableOpInterface,
     Util_InitializerOpInterface,
@@ -298,6 +308,8 @@ def VM_InitializerOp : VM_Op<"initializer", [
   }];
 
   let arguments = (ins
+    OptionalAttr<SymbolNameAttr>:$sym_name,
+    OptionalAttr<StrAttr>:$sym_visibility,
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
     OptionalAttr<DictArrayAttr>:$res_attrs
@@ -365,6 +377,8 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
     VM_Op<mnemonic, !listconcat(traits, [
       IsolatedFromAbove,
       HasParent<"IREE::VM::ModuleOp">,
+      SymbolName,
+      SymbolVisibility,
       Symbol,
       DeclareOpInterfaceMethods<Util_GlobalOpInterface, [
         "createLoadOp",
@@ -385,7 +399,7 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
     custom<SymbolVisibility>($sym_visibility)
     (`mutable` $is_mutable^)?
     $sym_name
-    attr-dict
+    prop-dict attr-dict
     custom<TypeOrAttr>($type, $initial_value)
   }];
 
@@ -397,7 +411,7 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     ),
     [{
-      $_state.addAttribute(SymbolTable::getSymbolAttrName(),
+      $_state.addAttribute(getSymNameAttrName($_state.name),
                            $_builder.getStringAttr(name));
       if (isMutable) {
         $_state.addAttribute("is_mutable", $_builder.getUnitAttr());
@@ -470,6 +484,8 @@ def VM_GlobalRefOp :
     VM_Op<"global.ref", [
       IsolatedFromAbove,
       HasParent<"IREE::VM::ModuleOp">,
+      SymbolName,
+      SymbolVisibility,
       Symbol,
       DeclareOpInterfaceMethods<Util_GlobalOpInterface>,
     ]> {
@@ -494,7 +510,7 @@ def VM_GlobalRefOp :
     custom<SymbolVisibility>($sym_visibility)
     (`mutable` $is_mutable^)?
     $sym_name
-    attr-dict
+    prop-dict attr-dict
     `:` $type
   }];
 
@@ -504,7 +520,7 @@ def VM_GlobalRefOp :
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     ),
     [{
-      $_state.addAttribute(SymbolTable::getSymbolAttrName(),
+      $_state.addAttribute(getSymNameAttrName($_state.name),
                            $_builder.getStringAttr(name));
       if (isMutable) {
         $_state.addAttribute("is_mutable", $_builder.getUnitAttr());
@@ -1193,6 +1209,8 @@ def VM_AssignRefOp : VM_Op<"assign.ref", [
 def VM_RodataOp : VM_Op<"rodata", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
+    SymbolName,
+    SymbolVisibility,
     Symbol,
   ]> {
   let summary = [{Read-only data definition operation.}];
@@ -1221,7 +1239,7 @@ def VM_RodataOp : VM_Op<"rodata", [
   );
 
   let assemblyFormat = [{
-    custom<SymbolVisibility>($sym_visibility) $sym_name attr-dict $value
+    custom<SymbolVisibility>($sym_visibility) $sym_name prop-dict attr-dict $value
   }];
 
   let skipDefaultBuilders = 1;
@@ -1292,7 +1310,7 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
   );
 
   let assemblyFormat = [{
-    ($name^)? attr-dict `:` type($result) `=` $value
+    ($name^)? prop-dict attr-dict `:` type($result) `=` $value
   }];
 
   let builders = [
@@ -1338,7 +1356,7 @@ def VM_RodataTableInlineOp : VM_PureOp<"rodata.table.inline", [
   );
 
   let assemblyFormat = [{
-    $table_type attr-dict `:` type($table_result) `,` type($data_result) `=` $data_array
+    $table_type prop-dict attr-dict `:` type($table_result) `,` type($data_result) `=` $data_array
   }];
 
   let builders = [
@@ -2424,6 +2442,32 @@ class VM_TernaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
   ];
 }
 
+class VM_MixedBinaryArithmeticOp<Type ltype, Type rtype, string mnemonic, VM_OPC opcode,
+                            list<Trait> traits = []> :
+    VM_TrivialOp<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      AllTypesMatch<["lhs", "result"]>,
+    ])> {
+  let arguments = (ins
+    ltype:$lhs,
+    rtype:$rhs
+  );
+  let results = (outs
+    ltype:$result
+  );
+
+  let assemblyFormat = [{
+    operands attr-dict `:` type($result)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncOperand<"lhs", 0>,
+    VM_EncOperand<"rhs", 1>,
+    VM_EncResult<"result">,
+  ];
+}
+
 // Arithmetic ops defined for all inputs which do not exhibit UB.
 class VM_TotalUnaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
                                 list<Trait> traits = []> :
@@ -2439,6 +2483,11 @@ class VM_TotalTernaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
                                   list<Trait> traits = []> :
     VM_TernaryArithmeticOp<type, mnemonic, opcode,
                            !listconcat(traits, [AlwaysSpeculatable])> {}
+
+class VM_TotalMixedBinaryArithmeticOp<Type ltype, Type rtype, string mnemonic, VM_OPC opcode,
+                                 list<Trait> traits = []> :
+    VM_MixedBinaryArithmeticOp<ltype, rtype, mnemonic, opcode,
+                          !listconcat(traits, [AlwaysSpeculatable])> {}
 
 } // OpGroupArithmeticHelperOps
 
@@ -2954,6 +3003,16 @@ def VM_PowF32Op :
 def VM_PowF64Op :
     VM_TotalBinaryArithmeticOp<F64, "pow.f64", VM_OPC_PowF64, [VM_ExtF64]> {
   let summary = [{Floating point raised to the power of operation.}];
+}
+
+def VM_FPowI32Op :
+    VM_TotalMixedBinaryArithmeticOp<F32, I64, "fpowi.f32", VM_OPC_FPowI32, [VM_ExtF32]> {
+  let summary = [{Floating point raised to the integer power of operation.}];
+}
+
+def VM_FPowI64Op :
+    VM_TotalMixedBinaryArithmeticOp<F64, I64, "fpowi.f64", VM_OPC_FPowI64, [VM_ExtF64]> {
+  let summary = [{Floating point raised to the integer power of operation.}];
 }
 
 def VM_RsqrtF32Op :
@@ -4449,12 +4508,13 @@ class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     /// Get the argument operands to the called function as a mutable range, this is
@@ -4491,7 +4551,7 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
   );
 
   let assemblyFormat = [{
-    $callee `(` operands `)` attr-dict `:` functional-type(operands, results)
+    $callee `(` operands `)` prop-dict attr-dict `:` functional-type(operands, results)
   }];
 
   let encoding = [
@@ -4626,7 +4686,7 @@ def VM_CallYieldableOp : VM_Op<"call.yieldable", [
   );
 
   let assemblyFormat = [{
-    $callee `(` $arguments `)` attr-dict `:` `(` type($arguments) `)`
+    $callee `(` $arguments `)` prop-dict attr-dict `:` `(` type($arguments) `)`
     `->` $dest custom<ResultTypeList>($result_types)
   }];
 
@@ -4664,12 +4724,13 @@ def VM_CallYieldableOp : VM_Op<"call.yieldable", [
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     /// Get the result types of the call.
@@ -4739,7 +4800,7 @@ def VM_CallVariadicYieldableOp : VM_Op<"call.variadic.yieldable", [
   );
 
   let assemblyFormat = [{
-    $callee `(` $operands `)` attr-dict `:` `(` type($operands) `)`
+    $callee `(` $operands `)` prop-dict attr-dict `:` `(` type($operands) `)`
     `->` $dest custom<ResultTypeList>($result_types)
   }];
 
@@ -4789,12 +4850,13 @@ def VM_CallVariadicYieldableOp : VM_Op<"call.variadic.yieldable", [
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return getOperation()->getAttrOfType<FlatSymbolRefAttr>("callee");
+      return getCalleeAttr();
     }
 
     /// Set the callee for this operation.
     void setCalleeFromCallable(CallInterfaceCallable callee) {
-      (*this)->setAttr("callee", cast<SymbolRefAttr>(callee));
+      auto symbol = cast<SymbolRefAttr>(callee);
+      setCalleeAttr(cast<FlatSymbolRefAttr>(symbol));
     }
 
     /// Get the result types of the call.

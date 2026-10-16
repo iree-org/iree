@@ -22,13 +22,13 @@ func.func @attention_20x1x64x4096x64() {
   %6 = iree_tensor_ext.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
   %7 = tensor.empty() : tensor<20x1x64xf16>
   %8 = tensor.empty() : tensor<20x1xf16>
-  %9:3 = iree_linalg_ext.online_attention  {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+  %9:3 = iree_linalg_ext.online_attention  <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
                affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
                affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
                affine_map<(d0, d1, d2, d3, d4) -> ()>,
                affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
                affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
-               affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]}
+               affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]>
                ins(%4, %5, %6, %cst : tensor<20x1x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16) outs(%7, %8, %8 : tensor<20x1x64xf16>, tensor<20x1xf16>, tensor<20x1xf16>) {
                 ^bb0(%score: f32):
                   iree_linalg_ext.yield %score : f32

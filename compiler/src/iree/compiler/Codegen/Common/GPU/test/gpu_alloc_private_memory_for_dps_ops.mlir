@@ -2,7 +2,7 @@
 // RUN:   --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-alloc-private-memory-for-dps-ops))" | FileCheck %s
 
 // CHECK-LABEL: func.func @unused_result_copied
-// CHECK-DAG: %[[SRC:.*]] = bufferization.alloc_tensor() copy(%{{.*}}) {memory_space = #gpu.address_space<private>} : tensor<1x10xf32>
+// CHECK-DAG: %[[SRC:.*]] = bufferization.alloc_tensor() copy(%{{.*}}) <{memory_space = #gpu.address_space<private>}> : tensor<1x10xf32>
 // CHECK-DAG: iree_linalg_ext.sort{{.*}} dimension(1) outs(%[[SRC]], %{{.*}} : tensor<1x10xf32>, tensor<1x10xi64>)
 func.func @unused_result_copied(%arg0: !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x10xf32>>, %arg1: tensor<1x10xi64>) -> tensor<1x10xi64> {
   %2 = iree_tensor_ext.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [1, 10], strides = [1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x10xf32>> -> tensor<1x10xf32>

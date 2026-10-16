@@ -49,11 +49,13 @@ endif()
 set(RISCV_COMPILER_FLAGS "\
     -march=rv64i2p1ma2p1f2p2d2p2c2p0 -mabi=lp64d")
 set(RISCV_QEMU_CPU_FLAGS "rv64,Zve64d=true,vlen=512,elen=64,vext_spec=v1.0")
-set(RISCV64_TEST_DEFAULT_LLVM_FLAGS
+set(RISCV64_TEST_DEFAULT_ABI_FLAGS
   "--iree-llvmcpu-target-triple=riscv64"
   "--iree-llvmcpu-target-abi=lp64d"
+  CACHE INTERNAL "Default llvm triple and ABI flags for testing purposes")
+set(RISCV64_TEST_DEFAULT_FEAT_FLAGS
   "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+c,+zvl512b,+v"
-  CACHE INTERNAL "Default llvm codegen flags for testing purposes")
+  CACHE INTERNAL "Default llvm CPU feature flags for testing purposes")
 
 set(CMAKE_C_FLAGS_INIT   "${RISCV_COMPILER_FLAGS}")
 set(CMAKE_CXX_FLAGS_INIT "${RISCV_COMPILER_FLAGS}")

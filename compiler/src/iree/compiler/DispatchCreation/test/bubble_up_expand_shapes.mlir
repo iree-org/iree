@@ -34,13 +34,13 @@ util.func public @attention_v_reshape_propagation(%arg0: index,
   %1 = tensor.empty(%arg0) : tensor<128x?x128xf16>
   %collapsed = tensor.collapse_shape %arg1 [[0, 1, 2], [3], [4]]
       : tensor<4x8x4x128x?xf16> into tensor<128x128x?xf16>
-  %4 = iree_linalg_ext.attention {
+  %4 = iree_linalg_ext.attention <
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>,
                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>,
                        affine_map<(d0, d1, d2, d3, d4) -> ()>,
                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
-                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]}
+                       affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>]>
       ins(%arg2, %arg3, %collapsed, %arg4, %arg5
         : tensor<128x?x128xf16>, tensor<128x?x128xf16>, tensor<128x128x?xf16>,
           f16, tensor<128x?x?xf16>)

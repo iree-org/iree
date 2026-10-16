@@ -26,7 +26,7 @@ hal.executable public @serialize_spirv_attr_test {
     hal.executable.export public @empty ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
-    } attributes {subgroup_size = 64 : index, workgroup_size = [1 : index, 1 : index, 1 : index]}
+    } <subgroup_size = 64, workgroup_size = [1 : index, 1 : index, 1 : index]>
     builtin.module attributes {
       llvm.data_layout = "e-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-n32:64-S32-G1-P4-A0",
       llvm.target_triple = "spirv64-amd-amdhsa"

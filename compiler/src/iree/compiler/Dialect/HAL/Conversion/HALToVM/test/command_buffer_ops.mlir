@@ -2,7 +2,7 @@
 
 // CHECK-DAG: vm.import private @hal.command_buffer.dispatch{{\(.+}}attributes {minimum_version = 7 : i32}
 // CHECK-DAG: vm.import private @hal.command_buffer.dispatch.indirect{{\(.+}}attributes {minimum_version = 7 : i32}
-// CHECK-DAG: vm.import private @hal.executable.lookup.function{{.*}}attributes {minimum_version = 7 : i32, nosideeffects}
+// CHECK-DAG: vm.import private @hal.executable.lookup.function{{.*}}attributes {nosideeffects, minimum_version = 7 : i32}
 
 // CHECK-LABEL: @command_buffer_create
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64)
@@ -44,6 +44,74 @@ util.func public @command_buffer_execution_barrier(
       source("CommandIssue")
       target("CommandProcess")
       flags("None")
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_flush_buffer
+// CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>, %[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
+util.func public @command_buffer_flush_buffer(
+  %cmd: !hal.command_buffer,
+  %buffer: !hal.buffer
+) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[UNUSED_SLOT:.+]] = vm.const.i32.zero
+  // CHECK: vm.call @hal.command_buffer.flush_buffer(%[[CMD]], %[[UNUSED_SLOT]], %[[BUFFER]], %c100, %c200)
+  hal.command_buffer.flush_buffer<%cmd : !hal.command_buffer>
+      target(%buffer : !hal.buffer)[%c100, %c200]
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_flush_buffer_indirect
+// CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>, %[[BUFFER_SLOT:.+]]: i32)
+util.func public @command_buffer_flush_buffer_indirect(
+  %cmd: !hal.command_buffer,
+  %buffer_slot: index
+) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
+  // CHECK: vm.call @hal.command_buffer.flush_buffer(%[[CMD]], %[[BUFFER_SLOT]], %[[NULL_BUFFER]], %c100, %c200)
+  hal.command_buffer.flush_buffer<%cmd : !hal.command_buffer>
+      target(%buffer_slot : index)[%c100, %c200]
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_invalidate_buffer
+// CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>, %[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
+util.func public @command_buffer_invalidate_buffer(
+  %cmd: !hal.command_buffer,
+  %buffer: !hal.buffer
+) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[UNUSED_SLOT:.+]] = vm.const.i32.zero
+  // CHECK: vm.call @hal.command_buffer.invalidate_buffer(%[[CMD]], %[[UNUSED_SLOT]], %[[BUFFER]], %c100, %c200)
+  hal.command_buffer.invalidate_buffer<%cmd : !hal.command_buffer>
+      target(%buffer : !hal.buffer)[%c100, %c200]
+  util.return
+}
+
+// -----
+
+// CHECK-LABEL: @command_buffer_invalidate_buffer_indirect
+// CHECK-SAME: (%[[CMD:.+]]: !vm.ref<!hal.command_buffer>, %[[BUFFER_SLOT:.+]]: i32)
+util.func public @command_buffer_invalidate_buffer_indirect(
+  %cmd: !hal.command_buffer,
+  %buffer_slot: index
+) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[NULL_BUFFER:.+]] = vm.const.ref.zero : !vm.ref<!hal.buffer>
+  // CHECK: vm.call @hal.command_buffer.invalidate_buffer(%[[CMD]], %[[BUFFER_SLOT]], %[[NULL_BUFFER]], %c100, %c200)
+  hal.command_buffer.invalidate_buffer<%cmd : !hal.command_buffer>
+      target(%buffer_slot : index)[%c100, %c200]
   util.return
 }
 

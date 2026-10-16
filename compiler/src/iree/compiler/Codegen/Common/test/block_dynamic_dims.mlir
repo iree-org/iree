@@ -44,7 +44,7 @@ func.func @block_attention_dims() {
   %4 = linalg.fill ins(%cst_0 : f32) outs(%2 : tensor<4x32x?x128xf32>) -> tensor<4x32x?x128xf32>
   %5 = linalg.fill ins(%cst_1 : f32) outs(%3 : tensor<4x32x?xf32>) -> tensor<4x32x?xf32>
   %6 = linalg.fill ins(%cst_2 : f32) outs(%3 : tensor<4x32x?xf32>) -> tensor<4x32x?xf32>
-  %attn:3 = iree_linalg_ext.online_attention {
+  %attn:3 = iree_linalg_ext.online_attention <
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d1, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d5, d1, d4)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d5, d1, d3)>,
@@ -52,7 +52,7 @@ func.func @block_attention_dims() {
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
                        affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>,
-                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>]}
+                       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>]>
       ins(%q, %key, %value, %cst, %mask : tensor<4x?x32x128xf16>, tensor<4x?x32x128xf16>, tensor<4x?x32x128xf16>, f16, tensor<4x32x?x?xf16>)
       outs(%4, %5, %6 : tensor<4x32x?x128xf32>, tensor<4x32x?xf32>, tensor<4x32x?xf32>) {
     ^bb0(%b0 : f32) :

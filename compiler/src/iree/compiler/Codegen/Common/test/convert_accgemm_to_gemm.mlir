@@ -75,14 +75,14 @@ func.func @accumulate_scaled_gemm(
 
 func.func @accumulate_inner_tiled(%1 : tensor<?x?x4xf16>, %2 : tensor<?x?x4xf16>, %3 : memref<?x?x4xf32>) -> tensor<?x?x4xf32> {
   %4 = iree_codegen.load_from_buffer %3 : memref<?x?x4xf32> -> tensor<?x?x4xf32>
-  %5 = iree_codegen.inner_tiled ins(%1, %2) outs(%4) {
+  %5 = iree_codegen.inner_tiled ins(%1, %2) outs(%4) <
     indexing_maps = [affine_map<(i, j, k) -> (i, k)>,
                      affine_map<(i, j, k) -> (k, j)>,
                      affine_map<(i, j, k) -> (i, j)>],
     iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>],
     kind = #iree_gpu.mma_layout<MFMA_F32_16x16x16_F16>,
     semantics = #iree_gpu.mma_semantics<distributed = true, opaque = false>
-  } : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
+  > : tensor<?x?x4xf16>, tensor<?x?x4xf16> into tensor<?x?x4xf32>
   return %5 : tensor<?x?x4xf32>
 }
 

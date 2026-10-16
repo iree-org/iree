@@ -18,9 +18,9 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/DebugLog.h"
-#include "mlir/Dialect/AMDGPU/Utils/Chipset.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -779,20 +779,18 @@ getTypesNeedingConversionEmulationForGPU(MLIRContext *context,
       >(context, types);
 
   // Remove types that have hardware conversion support on this chip.
-  StringRef chipset = gpuAttr.getArch();
-  FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
-  if (failed(maybeChipset)) {
+  FailureOr<ROCDL::TargetInfo> maybeTargetInfo =
+      ROCDL::TargetInfo::get(gpuAttr.getArch());
+  if (failed(maybeTargetInfo)) {
     LDBG() << "Invalid chip name";
     return types;
   }
-  constexpr amdgpu::Chipset kGfx942{9, 4, 2};
-  constexpr amdgpu::Chipset kGfx950{9, 5, 0};
-  if (*maybeChipset >= kGfx942 && *maybeChipset < kGfx950) {
+  if (maybeTargetInfo->hasFnuzFp8()) {
     // gfx942 has hardware conversion for FNUZ types.
     llvm::erase(types, Float8E4M3FNUZType::get(context));
     llvm::erase(types, Float8E5M2FNUZType::get(context));
   }
-  if (amdgpu::hasOcpFp8(*maybeChipset)) {
+  if (maybeTargetInfo->hasOcpFp8()) {
     // gfx950+ and gfx12+ have hardware conversion for OCP types.
     llvm::erase(types, Float8E4M3FNType::get(context));
     llvm::erase(types, Float8E5M2Type::get(context));

@@ -24,7 +24,7 @@ transform.named_sequence @match_mmt(%matmul: !transform.any_op {transform.readon
 
 transform.named_sequence @main(%variant_op: !transform.any_op {transform.consumed}) -> (!transform.any_op)
   attributes { iree_codegen.tuning_spec_entrypoint } {
-  transform.print %variant_op {name="Custom spec"} : !transform.any_op
+  transform.print %variant_op name="Custom spec" : !transform.any_op
   %res = transform.foreach_match in %variant_op
     @match_mmt -> @apply_op_config
     : (!transform.any_op) -> !transform.any_op

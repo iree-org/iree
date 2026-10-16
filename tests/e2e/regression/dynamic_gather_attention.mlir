@@ -25,7 +25,7 @@ func.func @gather_attention() {
   %10 = linalg.fill ins(%cst_0 : f32) outs(%8 : tensor<32x4x2x32xf32>) -> tensor<32x4x2x32xf32>
   %11 = linalg.fill ins(%cst_1 : f32) outs(%9 : tensor<32x4x2xf32>) -> tensor<32x4x2xf32>
   %12 = linalg.fill ins(%cst_2 : f32) outs(%9 : tensor<32x4x2xf32>) -> tensor<32x4x2xf32>
-  %13:3 = iree_linalg_ext.online_attention {indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map6, #map6]} ins(%0, %6, %7, %cst, %4 : tensor<32x4x2x32xf16>, tensor<32x?x4x16x32xf16>, tensor<32x?x4x16x32xf16>, f16, tensor<32x4x2x?x16xf16>) outs(%10, %11, %12 : tensor<32x4x2x32xf32>, tensor<32x4x2xf32>, tensor<32x4x2xf32>) {
+  %13:3 = iree_linalg_ext.online_attention <indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5, #map6, #map6]> ins(%0, %6, %7, %cst, %4 : tensor<32x4x2x32xf16>, tensor<32x?x4x16x32xf16>, tensor<32x?x4x16x32xf16>, f16, tensor<32x4x2x?x16xf16>) outs(%10, %11, %12 : tensor<32x4x2x32xf32>, tensor<32x4x2xf32>, tensor<32x4x2xf32>) {
   ^bb0(%arg0: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<32x4x2x32xf32>, tensor<32x4x2xf32>, tensor<32x4x2xf32>

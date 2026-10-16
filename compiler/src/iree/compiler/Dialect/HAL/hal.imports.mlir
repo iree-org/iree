@@ -269,6 +269,24 @@ vm.import private @command_buffer.advise_buffer(
   %buffer_slot : i32
 )
 
+// Makes prior writes available to external consumers.
+vm.import private @command_buffer.flush_buffer(
+  %command_buffer : !vm.ref<!hal.command_buffer>,
+  %target_buffer_slot : i32,
+  %target_buffer : !vm.ref<!hal.buffer>,
+  %target_offset : i64,
+  %length : i64
+)
+
+// Makes external writes visible to subsequent consumers.
+vm.import private @command_buffer.invalidate_buffer(
+  %command_buffer : !vm.ref<!hal.command_buffer>,
+  %target_buffer_slot : i32,
+  %target_buffer : !vm.ref<!hal.buffer>,
+  %target_offset : i64,
+  %length : i64
+)
+
 // Fills the target buffer with the given repeating value.
 // NOTE: order slightly differs from op in order to get better arg alignment.
 vm.import private @command_buffer.fill_buffer(

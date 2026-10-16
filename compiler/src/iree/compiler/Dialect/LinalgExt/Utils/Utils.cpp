@@ -23,11 +23,41 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-linalgExt-utils"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+
+linalg::LinalgOp cloneNamedLinalgOpWithNewTypes(RewriterBase &rewriter,
+                                                linalg::LinalgOp op,
+                                                TypeRange resultTypes,
+                                                ValueRange operands) {
+  assert(op.getRegionBuilder() && "expected a named Linalg op");
+  assert(operands.size() == op->getNumOperands() &&
+         resultTypes.size() == op->getNumResults());
+  Operation *newOp = op->clone(
+      Operation::CloneOptions().withResultTypes(llvm::to_vector(resultTypes)));
+  newOp->setOperands(operands);
+  rewriter.insert(newOp);
+
+  OpBuilder::InsertionGuard guard(rewriter);
+  SmallVector<Type> argTypes = llvm::map_to_vector(operands, [](Value value) {
+    return getElementTypeOrSelf(value.getType());
+  });
+  SmallVector<Location> argLocs(argTypes.size(), op.getLoc());
+  Block *body =
+      rewriter.createBlock(&newOp->getRegion(0), {}, argTypes, argLocs);
+  // The upstream region-builder interface consumes named inherent attributes.
+  NamedAttrList attrs;
+  newOp->getName().populateInherentAttrs(newOp, attrs);
+  ImplicitLocOpBuilder bodyBuilder(op.getLoc(), rewriter);
+  op.getRegionBuilder()(bodyBuilder, *body, attrs.getAttrs(),
+                        [&] { return newOp->emitOpError(); });
+  return cast<linalg::LinalgOp>(newOp);
+}
 
 static bool hasAllOneValues(ArrayRef<int64_t> attr) {
   return llvm::all_of(attr, [](int64_t element) { return element == 1; });

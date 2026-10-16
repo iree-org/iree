@@ -29,6 +29,9 @@ struct VerifyInputLegalityPass
     // Avoid StableHLO dependency
     target.addIllegalDialect("chlo");
     target.addIllegalDialect("stablehlo");
+    // `quant` dialect ops/types (e.g., `!quant.uniform<...>`) must be lowered
+    // to plain arith before reaching this point.
+    target.addIllegalDialect("quant");
     target.addIllegalOp<UnrealizedConversionCastOp>();
 
     if (failed(iree_compiler::verifyAllOperationsAreLegal(getOperation(),
