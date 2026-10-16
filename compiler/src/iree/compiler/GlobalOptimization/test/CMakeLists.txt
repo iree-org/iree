@@ -15,7 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "cleanup_numeric_narrowing.mlir"
-    "conv2d_to_img2col.mlir"
+    "conv_to_im2col.mlir"
     "convert_batch_matmul_to_matmul.mlir"
     "convert_qdq_to_integer_math_algebra.mlir"
     "convert_qdq_to_integer_math_maps.mlir"
