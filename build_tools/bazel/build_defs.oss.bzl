@@ -23,6 +23,17 @@ iree_cc_fuzz = _iree_cc_fuzz
 iree_compiler_cc_fuzz = _iree_compiler_cc_fuzz
 iree_runtime_cc_fuzz = _iree_runtime_cc_fuzz
 
+# Link options for executables that run the compiler pipelines in-process.
+# Windows reserves only 1 MB of stack by default, which is not enough for some
+# compiler paths (e.g. the TOSA profile compliance table initialization in
+# TosaValidation). Reserve 10 MB like LLVM does for its own tools.
+# Keep in sync with IREE_COMPILER_TOOL_LINKOPTS in
+# build_tools/cmake/iree_copts.cmake.
+IREE_COMPILER_TOOL_LINKOPTS = select({
+    Label("//build_tools/bazel:iree_is_windows"): ["/STACK:10000000"],
+    "//conditions:default": [],
+})
+
 def defaulting_select(selector):
     """Pass through to select() with special semantics when converting to CMake.
 
