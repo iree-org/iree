@@ -296,6 +296,58 @@ getAllowedAttentionUnitDims(AttentionOpTy attentionOp) {
   return allowedUnitDims.takeVector();
 }
 
+/// Dropping unit loops substitutes 0 into compound accesses, so the strided
+/// `2 * ow + kw` of a convolution with one output column becomes `kw`. When the
+/// operand is longer than the window reaches, which strides with a remainder
+/// allow, that pure access would set the loop extent to the operand's. Keeps
+/// the unit loops of such accesses.
+static SmallVector<unsigned>
+keepUnitDimsOfOverlongAccesses(linalg::LinalgOp linalgOp,
+                               SmallVector<unsigned> unitDims) {
+  SmallVector<int64_t> loopRanges = linalgOp.getStaticLoopRanges();
+  if (llvm::any_of(loopRanges, ShapedType::isDynamic)) {
+    return unitDims;
+  }
+  MLIRContext *context = linalgOp.getContext();
+  llvm::SmallDenseSet<unsigned> dropped;
+  SmallVector<AffineExpr> zeroed, lastIndex;
+  for (auto [dim, range] : llvm::enumerate(loopRanges)) {
+    if (range == 1 && llvm::is_contained(unitDims, dim)) {
+      dropped.insert(dim);
+    }
+    zeroed.push_back(dropped.contains(dim) ? getAffineConstantExpr(0, context)
+                                           : getAffineDimExpr(dim, context));
+    lastIndex.push_back(getAffineConstantExpr(range - 1, context));
+  }
+  llvm::SmallDenseSet<unsigned> keep;
+  for (OpOperand &operand : linalgOp->getOpOperands()) {
+    auto operandType = dyn_cast<ShapedType>(operand.get().getType());
+    if (!operandType) {
+      continue;
+    }
+    AffineMap map = linalgOp.getMatchingIndexingMap(&operand);
+    for (auto [position, expr] : llvm::enumerate(map.getResults())) {
+      if (isa<AffineDimExpr, AffineConstantExpr>(expr)) {
+        continue;
+      }
+      AffineExpr reduced = expr.replaceDims(zeroed);
+      auto last = dyn_cast<AffineConstantExpr>(expr.replaceDims(lastIndex));
+      int64_t size = operandType.getDimSize(position);
+      if (!isa<AffineDimExpr>(reduced) || !last ||
+          ShapedType::isDynamic(size) || size == last.getValue() + 1) {
+        continue;
+      }
+      for (unsigned dim : dropped) {
+        if (expr.isFunctionOfDim(dim)) {
+          keep.insert(dim);
+        }
+      }
+    }
+  }
+  llvm::erase_if(unitDims, [&](unsigned dim) { return keep.contains(dim); });
+  return unitDims;
+}
+
 static linalg::ControlDropUnitDims getControlDropUnitDimsOptions() {
   linalg::ControlDropUnitDims options;
   auto defaultFn = options.controlFn;
@@ -313,6 +365,9 @@ static linalg::ControlDropUnitDims getControlDropUnitDimsOptions() {
     }
     if (isa<IREE::LinalgExt::LinalgExtOp>(op)) {
       return IREE::LinalgExt::defaultControlDropUnitDims(op);
+    }
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+      return keepUnitDimsOfOverlongAccesses(linalgOp, defaultFn(op));
     }
     return defaultFn(op);
   };
