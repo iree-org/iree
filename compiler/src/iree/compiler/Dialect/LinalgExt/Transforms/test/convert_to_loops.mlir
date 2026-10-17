@@ -1489,3 +1489,51 @@ func.func @map_load_memref(
 //      CHECK:       scf.yield %[[PAD]] : f32
 //      CHECK:     }
 //      CHECK:     memref.store %[[IF_RESULT]], %[[OUTPUT]][%[[IV]]]
+
+// -----
+
+// NaN pairs return false with olt. Ordinary SortOp keeps using
+// only the forward comparator result, including for equal finite keys.
+memref.global "private" @nan_keys : memref<5xf32> = dense<[2.0, 0x7FC00000, 1.0, 1.0, 0.0]>
+
+func.func @sort_nan_olt(%values: memref<5xi32>) {
+  %keys = memref.get_global @nan_keys : memref<5xf32>
+  iree_linalg_ext.sort dimension(0)
+      outs(%keys, %values : memref<5xf32>, memref<5xi32>) {
+  ^bb0(%lhs: f32, %rhs: f32, %lhs_value: i32, %rhs_value: i32):
+    %cmp = arith.cmpf olt, %lhs, %rhs : f32
+    iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+// CHECK-LABEL: func.func @sort_nan_olt
+// CHECK: %[[KEYS:.+]] = memref.get_global @nan_keys
+// CHECK: %[[LHS:.+]] = memref.load %[[KEYS]]
+// CHECK: %[[RHS:.+]] = memref.load %[[KEYS]]
+// CHECK: %[[CMP:.+]] = arith.cmpf olt, %[[LHS]], %[[RHS]] : f32
+// CHECK-NEXT: %{{.+}} = arith.select %[[CMP]], %[[LHS]], %[[RHS]] : f32
+// CHECK-NEXT: %{{.+}} = arith.select %[[CMP]], %[[RHS]], %[[LHS]] : f32
+
+// -----
+
+// NaN pairs return true with ult. Ordinary SortOp keeps using
+// only the forward comparator result, including for equal finite keys.
+memref.global "private" @nan_keys : memref<5xf32> = dense<[2.0, 0x7FC00000, 1.0, 1.0, 0.0]>
+
+func.func @sort_nan_ult(%values: memref<5xi32>) {
+  %keys = memref.get_global @nan_keys : memref<5xf32>
+  iree_linalg_ext.sort dimension(0)
+      outs(%keys, %values : memref<5xf32>, memref<5xi32>) {
+  ^bb0(%lhs: f32, %rhs: f32, %lhs_value: i32, %rhs_value: i32):
+    %cmp = arith.cmpf ult, %lhs, %rhs : f32
+    iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+// CHECK-LABEL: func.func @sort_nan_ult
+// CHECK: %[[KEYS:.+]] = memref.get_global @nan_keys
+// CHECK: %[[LHS:.+]] = memref.load %[[KEYS]]
+// CHECK: %[[RHS:.+]] = memref.load %[[KEYS]]
+// CHECK: %[[CMP:.+]] = arith.cmpf ult, %[[LHS]], %[[RHS]] : f32
+// CHECK-NEXT: %{{.+}} = arith.select %[[CMP]], %[[LHS]], %[[RHS]] : f32
+// CHECK-NEXT: %{{.+}} = arith.select %[[CMP]], %[[RHS]], %[[LHS]] : f32
