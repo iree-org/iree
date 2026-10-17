@@ -41,12 +41,15 @@ iree_cc_library(
     "CheckVHLOStableHloMixUsage.cpp"
     "ConvertCollectives.cpp"
     "DynamicShapeOps.cpp"
+    "InlineShapeAssertionHelpers.cpp"
     "LegalizeControlFlow.cpp"
     "LegalizeShapeComputations.cpp"
     "LegalizeToLinalgUtils.cpp"
     "LegalizeToLinalgUtils.h"
     "MapStableHLOToScalarOp.h"
     "StableHLOCustomCalls.cpp"
+    "StableHLOStatusCheck.cpp"
+    "StableHLOStatusCheck.h"
     "StableHLOToIREEInputDialects.cpp"
     "StableHLOToLinalgExt.cpp"
     "VerifyCompilerInputLegality.cpp"
@@ -56,6 +59,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
+    MLIRAnalysis
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRComplexDialect

@@ -67,3 +67,10 @@ def CheckVHLOStableHloMixUsage :
 
 
 #endif // IREE_COMPILER_PLUGINS_INPUT_STABLEHLO_CONVERSION_PASSES
+
+def InlineShapeAssertionHelpers :
+    Pass<"iree-stablehlo-inline-shape-assertion-helpers", "ModuleOp"> {
+  let summary =
+      "Inlines the private scalar helpers computing shape_assertion operands";
+  let dependentDialects = ["mlir::func::FuncDialect"];
+}
