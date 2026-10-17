@@ -20,6 +20,7 @@ iree_lit_test_suite(
             "auto_input_conversion.mlir",
             "canonicalize_dynamism.mlir",
             "convert_collectives.mlir",
+            "dynamic_broadcast_identity.mlir",
             "dynamic_convolution.mlir",
             "dynamic_reshape.mlir",
             "dynamic_shape_ops.mlir",

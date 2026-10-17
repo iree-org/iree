@@ -219,16 +219,18 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
                            "or batch rank + 1");
   }
 
-  {
-    // Validate the shape of indices and update value match for the first
-    // `batchRank` dims.
-    auto [indicesIt, updateIt] =
-        llvm::mismatch(indicesType.getShape().take_front(batchRank),
-                       updateType.getShape().take_front(batchRank));
-    if (indicesIt != indicesType.getShape().take_front(batchRank).end()) {
+  // Validate the shape of indices and update value match for the first
+  // `batchRank` dims.
+  // Dynamic dimensions are compatible with static dimensions; the runtime
+  // shapes are required to agree. Reject only known, unequal extents.
+  for (auto dim : llvm::seq<int64_t>(0, batchRank)) {
+    if (indicesType.isDynamicDim(dim) || updateType.isDynamicDim(dim)) {
+      continue;
+    }
+    if (indicesType.getDimSize(dim) != updateType.getDimSize(dim)) {
       return op->emitOpError("mismatch in shape of indices and " + updateName +
                              " value at dim#")
-             << (indicesIt - indicesType.getShape().begin());
+             << dim;
     }
   }
   if (batchRank + 1 < indicesType.getShape().size() &&
