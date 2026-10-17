@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/VM/Analysis/LinearScan/LiveIntervals.h"
 #include "iree/compiler/Dialect/VM/Analysis/LinearScan/RegisterBank.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/IR/Attributes.h"
@@ -58,6 +59,7 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
         llvm::DenseMap<unsigned, Register> branchOperandRegs;
         if (auto branchOp = dyn_cast<BranchOpInterface>(&op)) {
           for (unsigned i = 0; i < op.getNumSuccessors(); ++i) {
+            Block *targetBlock = op.getSuccessor(i);
             auto srcDstRegs =
                 registerAllocation.remapSuccessorRegisters(&op, i);
             auto succOperands =
@@ -75,9 +77,18 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
             // in this successor's operand list can get MOVE (matches
             // remapSuccessorRegisters logic).
             llvm::DenseMap<Value, unsigned> lastOccurrence;
+            llvm::DenseMap<Value, unsigned> refOccurrenceCounts;
+            llvm::DenseSet<Value> coalescedRefValues;
             for (auto [idx, operand] : llvm::enumerate(succOperands)) {
               if (isa<IREE::VM::RefType>(operand.getType())) {
                 lastOccurrence[operand] = idx;
+                ++refOccurrenceCounts[operand];
+                auto srcReg = registerAllocation.mapToRegister(operand);
+                auto dstReg = registerAllocation.mapToRegister(
+                    targetBlock->getArgument(idx));
+                if (srcReg == dstReg) {
+                  coalescedRefValues.insert(operand);
+                }
               }
             }
 
@@ -91,7 +102,24 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
                 bool isLastUse =
                     registerAllocation.liveness_.isLastRealValueUse(
                         operand, &op, globalIdx);
-                if (isLastOccurrence && isLastUse) {
+                auto dstReg = registerAllocation.mapToRegister(
+                    targetBlock->getArgument(localIdx));
+                bool transfersOnTargetEdge =
+                    srcReg != dstReg &&
+                    !llvm::is_contained(
+                        registerAllocation.liveness_.getBlockLiveIns(
+                            targetBlock),
+                        operand);
+                isLastUse |= transfersOnTargetEdge;
+                bool isMovable = false;
+                if (auto moveOp = dyn_cast<IREE::VM::RefMoveInterface>(&op)) {
+                  isMovable = moveOp.isRefOperandMovable(globalIdx);
+                }
+                bool hasCoalescedDuplicate =
+                    refOccurrenceCounts.lookup(operand) > 1 &&
+                    coalescedRefValues.contains(operand);
+                if (isLastOccurrence && isLastUse && isMovable &&
+                    !hasCoalescedDuplicate) {
                   srcReg.setMove(true);
                 }
               }
@@ -791,11 +819,13 @@ RegisterAllocation::remapSuccessorRegisters(Location loc, Block *targetBlock,
 // - MOVE transfers ownership (runtime nulls source after copy)
 // - No MOVE retains (runtime increments refcount of destination)
 //
-// MOVE is set when all three conditions are true:
+// MOVE is set when all four conditions are true:
 // 1. This is the last occurrence of the ref value in this successor's list
 //    (handles same ref appearing multiple times like `^bb(%ref, %ref)`)
-// 2. The ref is not live after this branch (checked via isLastRealValueUse)
+// 2. The ref is not live after this branch globally or on the selected edge
 // 3. The branch op supports MOVE on this operand (RefMoveInterface)
+// 4. The value is not duplicated with one occurrence coalesced with its
+//    destination block argument
 //
 // MOVE on back-edges (loops) is CORRECT:
 // - Ownership transfers to the next iteration's block argument
@@ -818,9 +848,17 @@ RegisterAllocation::remapSuccessorRegisters(Operation *branchOp,
   // Only the last occurrence of a value can get MOVE (for multi-use cases like
   // passing same ref to both branches of cond_br).
   llvm::DenseMap<Value, unsigned> lastOccurrence;
+  llvm::DenseMap<Value, unsigned> refOccurrenceCounts;
+  llvm::DenseSet<Value> coalescedRefValues;
   for (auto [idx, operand] : llvm::enumerate(targetOperands)) {
     if (isa<IREE::VM::RefType>(operand.getType())) {
       lastOccurrence[operand] = idx;
+      ++refOccurrenceCounts[operand];
+      auto srcReg = mapToRegister(operand);
+      auto dstReg = mapToRegister(targetBlock->getArgument(idx));
+      if (srcReg == dstReg) {
+        coalescedRefValues.insert(operand);
+      }
     }
   }
 
@@ -842,6 +880,14 @@ RegisterAllocation::remapSuccessorRegisters(Operation *branchOp,
       bool isLastUse =
           liveness_.isLastRealValueUse(operand, branchOp, globalOperandIndex);
 
+      // A branch may keep a value live on one successor while transferring it
+      // on another. For a non-coalesced remap, MOVE is safe when the original
+      // value is not live-in to this specific target block.
+      bool transfersOnTargetEdge =
+          srcReg != dstReg &&
+          !llvm::is_contained(liveness_.getBlockLiveIns(targetBlock), operand);
+      isLastUse |= transfersOnTargetEdge;
+
       // Check if the branch op supports MOVE on this operand.
       bool isMovable = false;
       if (auto moveOp = dyn_cast<IREE::VM::RefMoveInterface>(branchOp)) {
@@ -852,9 +898,15 @@ RegisterAllocation::remapSuccessorRegisters(Operation *branchOp,
       // 1. This is the last occurrence in this successor's operand list
       // 2. This is the last real use of the value (not live after branch)
       // 3. The branch op supports MOVE on this operand
+      // 4. The value is not duplicated with one occurrence coalesced with its
+      //    destination. A MOVE on another occurrence would clear the
+      //    coalesced register.
       // Note: MOVE is correct even on back-edges. The ref ownership transfers
       // to the destination block arg, which is correct for loop-carried values.
-      if (isLastOccurrence && isLastUse && isMovable) {
+      bool hasCoalescedDuplicate = refOccurrenceCounts.lookup(operand) > 1 &&
+                                   coalescedRefValues.contains(operand);
+      if (isLastOccurrence && isLastUse && isMovable &&
+          !hasCoalescedDuplicate) {
         srcReg.setMove(true);
       }
     }
