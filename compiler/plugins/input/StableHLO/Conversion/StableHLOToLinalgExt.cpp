@@ -26,15 +26,18 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/Repeated.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
@@ -42,6 +45,7 @@
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DEF_CONVERTSTABLEHLOTOLINALGEXT
+#define GEN_PASS_DEF_LEGALIZEDYNAMICREDUCEWINDOW
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h.inc"
 
 namespace {
@@ -75,7 +79,12 @@ Value materializeCast(OpBuilder &builder, Type toType, ValueRange inputs,
   Value fromValue = inputs[0];
   auto fromType = dyn_cast<RankedTensorType>(fromValue.getType());
   if (!fromType) {
-    return Value();
+    auto toTensorType = dyn_cast<RankedTensorType>(toType);
+    if (!toTensorType || toTensorType.getRank() != 0) {
+      return Value();
+    }
+    fromType = toTensorType.clone(fromValue.getType());
+    fromValue = tensor::FromElementsOp::create(builder, loc, fromType, inputs);
   }
 
   if (auto intFromType = dyn_cast<IntegerType>(fromType.getElementType())) {
@@ -91,7 +100,7 @@ Value materializeCast(OpBuilder &builder, Type toType, ValueRange inputs,
     }
   }
 
-  if (fromType.getRank() != 0) {
+  if (fromType.getRank() != 0 || isa<ShapedType>(toType)) {
     return fromValue;
   }
 
@@ -443,6 +452,146 @@ static bool checkUnary(const ArrayRef<int64_t> &values) {
   return true;
 }
 
+// Returns true when `init` is the identity of the reducer `body`, one
+// elementwise operation on its two arguments; an inclusive scan never combines
+// the init.
+static bool isReducerIdentity(Block &body, Value init) {
+  Operation *reduceOp = body.getTerminator()->getOperand(0).getDefiningOp();
+  if (!reduceOp || reduceOp->getBlock() != &body || &body.front() != reduceOp ||
+      reduceOp->getNumOperands() != 2 ||
+      !llvm::is_contained(body.getArguments(), reduceOp->getOperand(0)) ||
+      !llvm::is_contained(body.getArguments(), reduceOp->getOperand(1)) ||
+      reduceOp->getOperand(0) == reduceOp->getOperand(1)) {
+    return false;
+  }
+  DenseElementsAttr value;
+  if (!matchPattern(init, m_Constant(&value)) || !value.isSplat()) {
+    return false;
+  }
+  if (isa<FloatType>(value.getElementType())) {
+    APFloat x = value.getSplatValue<APFloat>();
+    return TypeSwitch<Operation *, bool>(reduceOp)
+        .Case([&](mlir::stablehlo::AddOp) { return x.isZero(); })
+        .Case([&](mlir::stablehlo::MulOp) { return x.isExactlyValue(1.0); })
+        .Case([&](mlir::stablehlo::MaxOp) {
+          return x.isInfinity() && x.isNegative();
+        })
+        .Case([&](mlir::stablehlo::MinOp) {
+          return x.isInfinity() && !x.isNegative();
+        })
+        .Default(false);
+  }
+  if (!value.getElementType().isIntOrIndex()) {
+    return false;
+  }
+  APInt x = value.getSplatValue<APInt>();
+  bool isUnsigned = value.getElementType().isUnsignedInteger();
+  return TypeSwitch<Operation *, bool>(reduceOp)
+      .Case<mlir::stablehlo::AddOp, mlir::stablehlo::OrOp,
+            mlir::stablehlo::XorOp>([&](auto) { return x.isZero(); })
+      .Case([&](mlir::stablehlo::MulOp) { return x.isOne(); })
+      .Case([&](mlir::stablehlo::AndOp) { return x.isAllOnes(); })
+      .Case([&](mlir::stablehlo::MaxOp) {
+        return isUnsigned ? x.isZero() : x.isMinSignedValue();
+      })
+      .Case([&](mlir::stablehlo::MinOp) {
+        return isUnsigned ? x.isAllOnes() : x.isMaxSignedValue();
+      })
+      .Default(false);
+}
+
+// Builds an inclusive scan of `input` along `reduceAxis` seeded with `init`;
+// a suffix scan reverses around it. `fillReducer` moves or clones the reducer
+// into the scan region: a block of two 0-d tensors ending in stablehlo.return.
+static Value
+createReduceWindowScan(ConversionPatternRewriter &rewriter, Location loc,
+                       Value input, Value init, int64_t reduceAxis,
+                       bool isPostfix,
+                       llvm::function_ref<void(Region &)> fillReducer) {
+  auto inputTy = cast<ShapedType>(input.getType());
+  auto initTy = cast<ShapedType>(init.getType());
+  llvm::SmallVector<Value> outputs;
+  llvm::SmallVector<Value> outputDynDims;
+  for (int i = 0; i < inputTy.getRank(); ++i) {
+    if (inputTy.isDynamicDim(i)) {
+      outputDynDims.push_back(
+          rewriter.createOrFold<tensor::DimOp>(loc, input, i));
+    }
+  }
+
+  llvm::SmallVector<int64_t> initDims;
+  llvm::SmallVector<Value> initDynDims;
+  for (int i = 0; i < inputTy.getRank(); ++i) {
+    if (i == reduceAxis) {
+      continue;
+    }
+    initDims.push_back(inputTy.getDimSize(i));
+    if (ShapedType::isDynamic(initDims.back())) {
+      initDynDims.push_back(
+          rewriter.createOrFold<tensor::DimOp>(loc, input, i));
+    }
+  }
+
+  outputs.push_back(tensor::EmptyOp::create(rewriter, loc, inputTy.getShape(),
+                                            inputTy.getElementType(),
+                                            outputDynDims));
+
+  Value newInit = tensor::EmptyOp::create(rewriter, loc, initDims,
+                                          initTy.getElementType(), initDynDims);
+
+  SmallVector<AffineMap> indexingMaps{
+      AffineMap::get(initDims.size(), /*symbolCount=*/0, {},
+                     rewriter.getContext()),
+      rewriter.getMultiDimIdentityMap(initDims.size())};
+  SmallVector<utils::IteratorType> iterators(initDims.size(),
+                                             utils::IteratorType::parallel);
+
+  newInit = linalg::GenericOp::create(
+                rewriter, loc, initTy.clone(initDims), ValueRange{init},
+                ValueRange{newInit}, indexingMaps, iterators,
+                [&](OpBuilder &b, Location loc, ValueRange args) {
+                  linalg::YieldOp::create(b, loc, args[0]);
+                })
+                .getResult(0);
+  outputs.push_back(newInit);
+
+  llvm::SmallVector<Type> outputTys;
+  for (auto output : outputs) {
+    outputTys.push_back(output.getType());
+  }
+
+  // IREE::LinalgExt::ScanOp only supports purely inclusive (prefix) scans.
+  // To support suffix (postfix) scans, we can reverse the input, perform a
+  // prefix scan, and then reverse the output.
+  auto createReverse = [&](Value val, int64_t axis) -> Value {
+    auto valTy = llvm::cast<mlir::RankedTensorType>(val.getType());
+    SmallVector<int64_t> dimensions;
+    dimensions.push_back(axis);
+    return mlir::stablehlo::ReverseOp::create(
+        rewriter, loc, valTy, val, rewriter.getDenseI64ArrayAttr(dimensions));
+  };
+  Value scanInput = isPostfix ? createReverse(input, reduceAxis) : input;
+
+  auto scanOp = IREE::LinalgExt::ScanOp::create(
+      rewriter, loc, outputTys, scanInput, outputs[0], outputs[1],
+      rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(true));
+
+  fillReducer(scanOp.getRegion());
+
+  // Handle the tensor<*> to * conversion:
+  TypeConverter::SignatureConversion signatureConverter(2);
+  signatureConverter.addInputs(0, inputTy.getElementType());
+  signatureConverter.addInputs(1, initTy.getElementType());
+  rewriter.applySignatureConversion(&scanOp.getRegion().front(),
+                                    signatureConverter);
+
+  Value result = scanOp.getResult(0);
+  if (isPostfix) {
+    result = createReverse(result, reduceAxis);
+  }
+  return result;
+}
+
 struct ScanOpConversion final
     : OpConversionPattern<mlir::stablehlo::ReduceWindowOp> {
   using Base::Base;
@@ -469,7 +618,9 @@ struct ScanOpConversion final
     auto input0 = inputs.front();
     auto input0Ty = cast<ShapedType>(input0.getType());
     auto init0 = op.getInitValues().front();
-    auto init0Ty = cast<ShapedType>(init0.getType());
+    if (!isReducerIdentity(op.getBody().front(), init0)) {
+      return rewriter.notifyMatchFailure(op, "init is not the identity");
+    }
 
     auto window = llvm::to_vector(op.getWindowDimensions());
     llvm::SmallVector<int64_t, 4> reduceAxes;
@@ -521,97 +672,256 @@ struct ScanOpConversion final
       return rewriter.notifyMatchFailure(op, "is not purely prefix or postfix");
     }
 
-    llvm::SmallVector<Value> outputs;
-    llvm::SmallVector<Value> outputDynDims;
-    for (int i = 0; i < input0Ty.getRank(); ++i) {
-      if (input0Ty.isDynamic(i)) {
-        outputDynDims.push_back(
-            rewriter.createOrFold<tensor::DimOp>(op.getLoc(), input0, i));
-      }
+    Value result = createReduceWindowScan(
+        rewriter, op.getLoc(), input0, init0, reduceAxis, isPostfix,
+        [&](Region &region) {
+          rewriter.inlineRegionBefore(op.getRegion(), region, region.begin());
+        });
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// stablehlo.dynamic_reduce_window
+//===----------------------------------------------------------------------===//
+
+// An element of a shape operand: a constant, or the scalar holding it.
+struct ShapeElement {
+  std::optional<int64_t> constant;
+  Value value;
+};
+
+// Returns element `index` of the integer tensor `tensor` when only constants
+// and data movement build it.
+static std::optional<ShapeElement> getShapeElement(Value tensor,
+                                                   SmallVector<int64_t> index) {
+  auto type = dyn_cast<RankedTensorType>(tensor.getType());
+  if (!type || !type.hasStaticShape()) {
+    return std::nullopt;
+  }
+  int64_t linear = linearize(index, computeStrides(type.getShape()));
+  DenseIntElementsAttr constant;
+  if (matchPattern(tensor, m_Constant(&constant))) {
+    return ShapeElement{constant.getValues<APInt>()[linear].getSExtValue(), {}};
+  }
+  if (auto fromElements = tensor.getDefiningOp<tensor::FromElementsOp>()) {
+    Value scalar = fromElements.getElements()[linear];
+    APInt value;
+    if (matchPattern(scalar, m_ConstantInt(&value))) {
+      return ShapeElement{value.getSExtValue(), {}};
     }
-
-    llvm::SmallVector<Value> init;
-    llvm::SmallVector<int64_t> initDims;
-    llvm::SmallVector<Value> initDynDims;
-    for (int i = 0; i < input0Ty.getRank(); ++i) {
-      if (i == reduceAxis) {
-        continue;
+    return ShapeElement{std::nullopt, scalar};
+  }
+  if (auto concat = tensor.getDefiningOp<mlir::stablehlo::ConcatenateOp>()) {
+    int64_t dim = concat.getDimension();
+    for (Value input : concat.getInputs()) {
+      int64_t size = cast<ShapedType>(input.getType()).getDimSize(dim);
+      if (ShapedType::isDynamic(size)) {
+        return std::nullopt;
       }
-      initDims.push_back(input0Ty.getDimSize(i));
-      if (ShapedType::isDynamic(initDims.back())) {
-        initDynDims.push_back(
-            rewriter.createOrFold<tensor::DimOp>(op.getLoc(), input0, i));
+      if (index[dim] < size) {
+        return getShapeElement(input, index);
       }
+      index[dim] -= size;
     }
-
-    outputs.push_back(
-        tensor::EmptyOp::create(rewriter, op.getLoc(), input0Ty.getShape(),
-                                input0Ty.getElementType(), outputDynDims));
-
-    Value newInit = tensor::EmptyOp::create(
-        rewriter, op.getLoc(), initDims, init0Ty.getElementType(), initDynDims);
-
-    SmallVector<AffineMap> indexingMaps{
-        AffineMap::get(initDims.size(), /*symbolCount=*/0, {},
-                       rewriter.getContext()),
-        rewriter.getMultiDimIdentityMap(initDims.size())};
-    SmallVector<utils::IteratorType> iterators(initDims.size(),
-                                               utils::IteratorType::parallel);
-
-    newInit =
-        linalg::GenericOp::create(
-            rewriter, op.getLoc(), init0Ty.clone(initDims), ValueRange{init0},
-            ValueRange{newInit}, indexingMaps, iterators,
-            [&](OpBuilder &b, Location loc, ValueRange args) {
-              linalg::YieldOp::create(b, loc, args[0]);
-            })
-            .getResult(0);
-    outputs.push_back(newInit);
-
-    llvm::SmallVector<Type> outputTys;
-    for (auto output : outputs) {
-      outputTys.push_back(output.getType());
+    return std::nullopt;
+  }
+  if (auto reshape = tensor.getDefiningOp<mlir::stablehlo::ReshapeOp>()) {
+    auto operandType = cast<RankedTensorType>(reshape.getOperand().getType());
+    if (!operandType.hasStaticShape()) {
+      return std::nullopt;
     }
+    return getShapeElement(
+        reshape.getOperand(),
+        delinearize(linear, computeStrides(operandType.getShape())));
+  }
+  return std::nullopt;
+}
 
-    // IREE::LinalgExt::ScanOp only supports purely inclusive (prefix) scans.
-    // To support suffix (postfix) scans, we can reverse the input, perform a
-    // prefix scan, and then reverse the output.
-    auto createReverse = [&](Value val, int64_t axis) -> Value {
-      auto valTy = llvm::cast<mlir::RankedTensorType>(val.getType());
-      SmallVector<int64_t> dimensions;
-      dimensions.push_back(axis);
-      return mlir::stablehlo::ReverseOp::create(
-          rewriter, op.getLoc(), valTy, val,
-          rewriter.getDenseI64ArrayAttr(dimensions));
-    };
-    llvm::SmallVector<Value> scanInputs;
-    if (isPostfix) {
-      for (auto input : inputs) {
-        scanInputs.push_back(createReverse(input, reduceAxis));
-      }
+// Strips casts and assumptions under which an i32 dimension size is exact.
+static Value stripExactSizeCasts(Value value) {
+  auto isWide = [](Type type) {
+    return type.isIndex() || type.getIntOrFloatBitWidth() >= 32;
+  };
+  while (Operation *op = value.getDefiningOp()) {
+    if (isa<arith::ExtSIOp, arith::ExtUIOp>(op) ||
+        (isa<arith::IndexCastOp, arith::IndexCastUIOp, arith::TruncIOp>(op) &&
+         isWide(op->getResult(0).getType()))) {
+      value = op->getOperand(0);
+    } else if (auto assume = dyn_cast<IREE::Util::AssumeIntOp>(op)) {
+      value = assume.getOperand(cast<OpResult>(value).getResultNumber());
     } else {
-      scanInputs = inputs;
+      break;
     }
+  }
+  return value;
+}
 
-    auto scanOp = IREE::LinalgExt::ScanOp::create(
-        rewriter, op.getLoc(), outputTys, scanInputs[0], outputs[0], outputs[1],
-        rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(true));
-
-    rewriter.inlineRegionBefore(op.getRegion(), scanOp.getRegion(),
-                                scanOp.getRegion().begin());
-
-    // Handle the tensor<*> to * conversion:
-    TypeConverter::SignatureConversion signatureConverter(2);
-    signatureConverter.addInputs(0, input0Ty.getElementType());
-    signatureConverter.addInputs(1, init0Ty.getElementType());
-    rewriter.applySignatureConversion(&scanOp.getRegion().front(),
-                                      signatureConverter);
-
-    Value result = scanOp.getResult(0);
-    if (isPostfix) {
-      result = createReverse(result, reduceAxis);
+// Returns true when `element` is the extent of dimension `dim` of `tensor`.
+static bool isDimSize(const ShapeElement &element, Value tensor, int64_t dim) {
+  auto type = cast<RankedTensorType>(tensor.getType());
+  if (element.constant) {
+    return type.getDimSize(dim) == *element.constant;
+  }
+  auto stripTieShape = [](Value value) {
+    while (auto tie = value.getDefiningOp<IREE::Flow::TensorTieShapeOp>()) {
+      value = tie.getOperand();
     }
+    return value;
+  };
+  Value size = stripExactSizeCasts(element.value);
+  if (auto dimOp = size.getDefiningOp<tensor::DimOp>()) {
+    return dimOp.getConstantIndex() == dim &&
+           stripTieShape(dimOp.getSource()) == stripTieShape(tensor);
+  }
+  auto tie = tensor.getDefiningOp<IREE::Flow::TensorTieShapeOp>();
+  return tie && type.isDynamicDim(dim) &&
+         stripExactSizeCasts(
+             tie.getDynamicDims()[type.getDynamicDimIndex(dim)]) == size;
+}
 
+// Returns true when `element` is one less than the extent of dimension `dim`.
+static bool isDimSizeMinusOne(const ShapeElement &element, Value tensor,
+                              int64_t dim) {
+  if (element.constant) {
+    int64_t size = cast<RankedTensorType>(tensor.getType()).getDimSize(dim);
+    return ShapedType::isStatic(size) && size - 1 == *element.constant;
+  }
+  auto isConstant = [](Value value, int64_t expected) {
+    APInt constant;
+    return matchPattern(value, m_ConstantInt(&constant)) &&
+           constant.getSExtValue() == expected;
+  };
+  Value value = stripExactSizeCasts(element.value);
+  if (auto add = value.getDefiningOp<arith::AddIOp>()) {
+    for (auto [size, offset] : {std::pair(add.getLhs(), add.getRhs()),
+                                std::pair(add.getRhs(), add.getLhs())}) {
+      if (isConstant(offset, -1) &&
+          isDimSize({std::nullopt, size}, tensor, dim)) {
+        return true;
+      }
+    }
+  }
+  auto sub = value.getDefiningOp<arith::SubIOp>();
+  return sub && isConstant(sub.getRhs(), 1) &&
+         isDimSize({std::nullopt, sub.getLhs()}, tensor, dim);
+}
+
+// The scan JAX emits as stablehlo.dynamic_reduce_window for a cumulative
+// reduction over a symbolic axis.
+struct DynamicReduceWindowScan {
+  int64_t axis;
+  bool isPostfix;
+  func::FuncOp reducer;
+};
+
+// Matches one input with unit strides and dilations, a window spanning one
+// axis and of size one elsewhere, and `size - 1` padding on one side of that
+// axis only.
+static std::optional<DynamicReduceWindowScan>
+matchDynamicReduceWindowScan(mlir::stablehlo::CustomCallOp op) {
+  if (op.getCallTargetName() != "stablehlo.dynamic_reduce_window" ||
+      op.getNumOperands() != 7 || op.getNumResults() != 1 ||
+      op.getCalledComputations().size() != 1) {
+    return std::nullopt;
+  }
+  Value input = op.getOperand(0);
+  auto inputType = dyn_cast<RankedTensorType>(input.getType());
+  auto initType = dyn_cast<RankedTensorType>(op.getOperand(1).getType());
+  if (!inputType || !initType || initType.getRank() != 0 ||
+      initType.getElementType() != inputType.getElementType() ||
+      op.getResult(0).getType() != inputType) {
+    return std::nullopt;
+  }
+  auto reducer = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+      op, cast<FlatSymbolRefAttr>(op.getCalledComputations()[0]));
+  if (!reducer || reducer.isExternal() || !reducer.getBody().hasOneBlock() ||
+      reducer.getFunctionType() != FunctionType::get(op.getContext(),
+                                                     {initType, initType},
+                                                     {initType})) {
+    return std::nullopt;
+  }
+
+  int64_t rank = inputType.getRank();
+  auto hasShape = [](Value value, ArrayRef<int64_t> shape) {
+    auto type = dyn_cast<RankedTensorType>(value.getType());
+    return type && type.getShape() == shape &&
+           type.getElementType().isSignlessInteger();
+  };
+  if (!llvm::all_of(op->getOperands().slice(2, 4),
+                    [&](Value value) { return hasShape(value, {rank}); }) ||
+      !hasShape(op.getOperand(6), {rank, 2}) ||
+      !isReducerIdentity(reducer.getBody().front(), op.getOperand(1))) {
+    return std::nullopt;
+  }
+  auto isConstant = [](std::optional<ShapeElement> element, int64_t value) {
+    return element && element->constant == value;
+  };
+  for (unsigned operand : {3, 4, 5}) {
+    for (int64_t i = 0; i < rank; ++i) {
+      if (!isConstant(getShapeElement(op.getOperand(operand), {i}), 1)) {
+        return std::nullopt;
+      }
+    }
+  }
+  std::optional<int64_t> axis;
+  for (int64_t i = 0; i < rank; ++i) {
+    std::optional<ShapeElement> window = getShapeElement(op.getOperand(2), {i});
+    if (isConstant(window, 1)) {
+      continue;
+    }
+    if (axis || !window || !isDimSize(*window, input, i)) {
+      return std::nullopt;
+    }
+    axis = i;
+  }
+  if (!axis) {
+    return std::nullopt;
+  }
+  Value padding = op.getOperand(6);
+  for (int64_t i = 0; i < rank; ++i) {
+    if (i != *axis && !(isConstant(getShapeElement(padding, {i, 0}), 0) &&
+                        isConstant(getShapeElement(padding, {i, 1}), 0))) {
+      return std::nullopt;
+    }
+  }
+  std::optional<ShapeElement> low = getShapeElement(padding, {*axis, 0});
+  std::optional<ShapeElement> high = getShapeElement(padding, {*axis, 1});
+  if (!low || !high) {
+    return std::nullopt;
+  }
+  if (isDimSizeMinusOne(*low, input, *axis) && isConstant(high, 0)) {
+    return DynamicReduceWindowScan{*axis, /*isPostfix=*/false, reducer};
+  }
+  if (isConstant(low, 0) && isDimSizeMinusOne(*high, input, *axis)) {
+    return DynamicReduceWindowScan{*axis, /*isPostfix=*/true, reducer};
+  }
+  return std::nullopt;
+}
+
+struct DynamicReduceWindowScanConversion final
+    : OpConversionPattern<mlir::stablehlo::CustomCallOp> {
+  using Base::Base;
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::CustomCallOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    std::optional<DynamicReduceWindowScan> scan =
+        matchDynamicReduceWindowScan(op);
+    if (!scan) {
+      return rewriter.notifyMatchFailure(op, "not a scan window");
+    }
+    Value result = createReduceWindowScan(
+        rewriter, op.getLoc(), op.getOperand(0), op.getOperand(1), scan->axis,
+        scan->isPostfix, [&](Region &region) {
+          OpBuilder::InsertionGuard guard(rewriter);
+          rewriter.cloneRegionBefore(scan->reducer.getBody(), region,
+                                     region.end());
+          Operation *terminator = region.front().getTerminator();
+          rewriter.setInsertionPoint(terminator);
+          rewriter.replaceOpWithNewOp<mlir::stablehlo::ReturnOp>(
+              terminator, terminator->getOperands());
+        });
     rewriter.replaceOp(op, result);
     return success();
   }
@@ -713,6 +1023,59 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
   }
 };
 
+// Converts StableHLO ops on 0-d tensors inside LinalgExt op regions.
+static void populateLinalgExtRegionPatterns(MLIRContext *context,
+                                            TypeConverter &typeConverter,
+                                            RewritePatternSet *patterns) {
+  // FIXME: It shouldn't be necessary to list every matching StableHlo op
+  // here, especially since they're already listed in
+  // populateStableHloToLinalgConversionPattern and in
+  // StableHloOpToStdScalarOp. These lists are all the same. Can we leverage
+  // SFINAE here?
+  patterns->add<
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::AbsOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::AddOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::AndOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::Atan2Op>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::BitcastConvertOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::CeilOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ClampOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::CompareOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ComplexOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ConvertOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::CosineOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::DivOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ExpOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::Expm1Op>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::FloorOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ImagOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::IsFiniteOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::LogOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::LogisticOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::Log1pOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::MaxOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::MinOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::MulOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::NegOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::NotOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::OrOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::PowOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::RealOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::RemOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::RsqrtOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::SelectOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ShiftLeftOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ShiftRightArithmeticOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ShiftRightLogicalOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::SignOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::SineOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::SqrtOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::SubtractOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::TanhOp>,
+      LinalgExtRegionHLOOpConversion<mlir::stablehlo::XorOp>,
+      LinalgExtRegionReturnOpConversion>(typeConverter, context);
+}
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -765,6 +1128,63 @@ struct ConvertStableHloToLinalgExt final
     }
   }
 };
+// A module pass: the custom call names its reducer by symbol, so lowering it
+// reads a sibling function.
+struct LegalizeDynamicReduceWindow final
+    : impl::LegalizeDynamicReduceWindowBase<LegalizeDynamicReduceWindow> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry
+        .insert<IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
+                mlir::math::MathDialect, mlir::arith::ArithDialect,
+                complex::ComplexDialect, tensor::TensorDialect>();
+  }
+
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    StableHloToStdTypeConverter typeConverter;
+    RewritePatternSet patterns(context);
+    patterns.add<DynamicReduceWindowScanConversion>(typeConverter, context);
+    populateLinalgExtRegionPatterns(context, typeConverter, &patterns);
+
+    // Bodies of LinalgExt ops created earlier are left to the general
+    // lowering, which handles ops the scan's body patterns do not.
+    llvm::DenseSet<Operation *> earlierOps;
+    getOperation().walk([&](Operation *op) {
+      if (isa<IREE::LinalgExt::IREELinalgExtDialect>(op->getDialect())) {
+        earlierOps.insert(op);
+      }
+    });
+    ConversionTarget target(*context);
+    target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+    target.addDynamicallyLegalDialect<mlir::stablehlo::StablehloDialect>(
+        [&](Operation *op) {
+          return !isInBodyOfLinalgExtOps(op) ||
+                 earlierOps.contains(op->getParentRegion()->getParentOp());
+        });
+    target.addDynamicallyLegalOp<mlir::stablehlo::CustomCallOp>(
+        [](mlir::stablehlo::CustomCallOp op) {
+          return !matchDynamicReduceWindowScan(op);
+        });
+    target.addLegalOp<UnrealizedConversionCastOp>();
+    // JAX emits the reducers public, so symbol DCE would keep them.
+    llvm::SetVector<func::FuncOp> reducers;
+    getOperation().walk([&](mlir::stablehlo::CustomCallOp op) {
+      if (std::optional<DynamicReduceWindowScan> scan =
+              matchDynamicReduceWindowScan(op)) {
+        reducers.insert(scan->reducer);
+      }
+    });
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
+      return signalPassFailure();
+    }
+    for (func::FuncOp reducer : reducers) {
+      if (SymbolTable::symbolKnownUseEmpty(reducer, getOperation())) {
+        reducer.erase();
+      }
+    }
+  }
+};
 } // namespace
 
 void populateStableHloToLinalgExtConversionPatterns(
@@ -774,53 +1194,7 @@ void populateStableHloToLinalgExtConversionPatterns(
                 FftOpConversion, ReverseOpConversion, TopkOpConversion>(
       typeConverter, context);
 
-  // FIXME: It shouldn't be necessary to list every matching StableHlo op
-  // here, especially since they're already listed in
-  // populateStableHloToLinalgConversionPattern and in
-  // StableHloOpToStdScalarOp. These lists are all the same. Can we leverage
-  // SFINAE here?
-  patterns->add<
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::AbsOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::AddOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::AndOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::Atan2Op>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::BitcastConvertOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::CeilOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ClampOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::CompareOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ComplexOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ConvertOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::CosineOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::DivOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ExpOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::Expm1Op>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::FloorOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ImagOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::IsFiniteOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::LogOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::LogisticOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::Log1pOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::MaxOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::MinOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::MulOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::NegOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::NotOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::OrOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::PowOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::RealOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::RemOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::RsqrtOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::SelectOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ShiftLeftOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ShiftRightArithmeticOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::ShiftRightLogicalOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::SignOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::SineOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::SqrtOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::SubtractOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::TanhOp>,
-      LinalgExtRegionHLOOpConversion<mlir::stablehlo::XorOp>,
-      LinalgExtRegionReturnOpConversion>(typeConverter, context);
+  populateLinalgExtRegionPatterns(context, typeConverter, patterns);
 }
 
 } // namespace mlir::iree_compiler::stablehlo

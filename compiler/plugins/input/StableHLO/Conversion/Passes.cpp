@@ -108,6 +108,7 @@ void buildStableHLOInputConversionPassPipelineImpl(
   // Convert to Linalg. After this point, StableHLO will be eliminated.
   passManager.addNestedPass<func::FuncOp>(
       stablehlo::createLegalizeShapeComputations());
+  passManager.addPass(stablehlo::createLegalizeDynamicReduceWindow());
   passManager.addNestedPass<func::FuncOp>(
       stablehlo::createConvertStableHloToLinalgExt());
   passManager.addNestedPass<func::FuncOp>(

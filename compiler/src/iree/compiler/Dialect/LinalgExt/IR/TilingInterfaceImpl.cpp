@@ -288,23 +288,51 @@ FailureOr<TilingResult> ScatterOp::getTiledImplementationFromOperandTiles(
   return getTiledImplementation(b, mappedOffsets, mappedSizes);
 }
 
+// Widens an index or integer to |wideTy|, extending by the source signedness.
+static Value widenIndex(OpBuilder &b, Location loc, Value value,
+                        IntegerType wideTy) {
+  if (isa<IndexType>(value.getType())) {
+    return arith::IndexCastOp::create(b, loc, wideTy, value);
+  }
+  auto integerTy = cast<IntegerType>(value.getType());
+  if (integerTy.getWidth() == wideTy.getWidth()) {
+    return value;
+  }
+  if (integerTy.isUnsigned()) {
+    return arith::ExtUIOp::create(b, loc, wideTy, value);
+  }
+  return arith::ExtSIOp::create(b, loc, wideTy, value);
+}
+
 LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
                                                       Location loc,
                                                       ValueRange ivs) {
   auto indexDepth = getIndexDepth();
   Value update = memref::LoadOp::create(b, loc, getUpdates(), ivs);
-  SmallVector<Value> starts;
   SmallVector<Value> loadIndices;
   append_range(loadIndices, ivs.take_front(getBatchRank()));
 
   // Populate with empty values.
   auto originalTy = getOriginalType();
-  starts.resize(originalTy.getRank(), Value());
   auto updateIvs = ivs.drop_front(getBatchRank());
 
-  int64_t offset = starts.size() - updateIvs.size();
+  // Check bounds before converting indices to the target index width. In
+  // particular, narrowing an i64 index on a 32-bit target can wrap an
+  // out-of-bounds value into a valid coordinate.
+  auto indicesElementType =
+      dyn_cast<IntegerType>(getIndicesType().getElementType());
+  unsigned wideWidth = indicesElementType ? indicesElementType.getWidth() : 64;
+  if (wideWidth < 64) {
+    wideWidth = 64;
+  }
+  auto wideTy = b.getIntegerType(wideWidth);
+  auto toWide = [&](Value value) { return widenIndex(b, loc, value, wideTy); };
+  SmallVector<Value> wideOffsets(originalTy.getRank());
+  SmallVector<Value> wideIndices(originalTy.getRank());
+
+  int64_t offset = originalTy.getRank() - updateIvs.size();
   for (auto [idx, iv] : llvm::enumerate(updateIvs)) {
-    starts[idx + offset] = iv;
+    wideOffsets[idx + offset] = toWide(iv);
   }
 
   ArrayRef<int64_t> dimMap = getDimensionMap();
@@ -317,19 +345,14 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
       loadIndices.back() = arith::ConstantIndexOp::create(b, loc, i);
     }
     Value idx = memref::LoadOp::create(b, loc, getIndices(), loadIndices);
-    Value ret = arith::IndexCastOp::create(b, loc, b.getIndexType(), idx);
-
     auto dim = dimMap[i];
-
-    if (starts[dim]) {
-      ret = arith::AddIOp::create(b, loc, ret, starts[dim]);
-    }
-    starts[dim] = ret;
+    wideIndices[dim] = toWide(idx);
   }
 
-  auto emitScatterUpdate = [&](OpBuilder &builder, Location nestedLoc) {
-    Value init =
-        memref::LoadOp::create(builder, nestedLoc, getOriginal(), starts);
+  auto emitScatterUpdate = [&](OpBuilder &builder, Location nestedLoc,
+                               ArrayRef<Value> boundedStarts) {
+    Value init = memref::LoadOp::create(builder, nestedLoc, getOriginal(),
+                                        boundedStarts);
 
     IRMapping bvm;
     Block &block = getRegion().front();
@@ -342,22 +365,62 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
     memref::StoreOp::create(
         builder, nestedLoc,
         bvm.lookupOrDefault(block.getTerminator()->getOperand(0)),
-        getOriginal(), starts);
+        getOriginal(), boundedStarts);
   };
+
+  Value isInBounds = arith::ConstantIntOp::create(b, loc, 1, 1);
+  for (auto [dim, index] : llvm::enumerate(wideIndices)) {
+    Value dimSize = memref::DimOp::create(b, loc, getOriginal(), dim);
+    Value wideDimSize = toWide(dimSize);
+    Value offsetValue = wideOffsets[dim];
+    if (!offsetValue) {
+      offsetValue = arith::ConstantIntOp::create(b, loc, wideTy, 0);
+    }
+    Value wideZero = arith::ConstantIntOp::create(b, loc, wideTy, 0);
+    Value lowerBound = wideZero;
+    Value upperBound = wideDimSize;
+    if (index) {
+      // Compare before adding the window offset: a large signed index plus
+      // that offset could overflow even a 64-bit intermediate.
+      lowerBound = arith::SubIOp::create(b, loc, wideZero, offsetValue);
+      upperBound = arith::SubIOp::create(b, loc, wideDimSize, offsetValue);
+    }
+    Value startIsAboveLowerBound =
+        arith::CmpIOp::create(b, loc, arith::CmpIPredicate::sge,
+                              index ? index : offsetValue, lowerBound);
+    Value startIsBelowUpperBound =
+        arith::CmpIOp::create(b, loc, arith::CmpIPredicate::slt,
+                              index ? index : offsetValue, upperBound);
+    Value isDimensionInBounds = arith::AndIOp::create(
+        b, loc, startIsAboveLowerBound, startIsBelowUpperBound);
+    isInBounds = arith::AndIOp::create(b, loc, isInBounds, isDimensionInBounds);
+  }
 
   if (Value mask = getMask()) {
     SmallVector<Value> maskIndices(ivs.take_front(getBatchRank()));
     Value maskValue = memref::LoadOp::create(b, loc, mask, maskIndices);
     maskValue = normalizeMaskValue(b, loc, maskValue);
-    scf::IfOp::create(b, loc, maskValue,
-                      [&](OpBuilder &thenBuilder, Location thenLoc) {
-                        emitScatterUpdate(thenBuilder, thenLoc);
-                        scf::YieldOp::create(thenBuilder, thenLoc);
-                      });
-    return success();
+    isInBounds = arith::AndIOp::create(b, loc, isInBounds, maskValue);
   }
 
-  emitScatterUpdate(b, loc);
+  scf::IfOp::create(
+      b, loc, isInBounds, [&](OpBuilder &thenBuilder, Location thenLoc) {
+        SmallVector<Value> boundedStarts;
+        for (auto [dim, index] : llvm::enumerate(wideIndices)) {
+          Value start = wideOffsets[dim];
+          if (!start) {
+            start =
+                arith::ConstantIntOp::create(thenBuilder, thenLoc, wideTy, 0);
+          }
+          if (index) {
+            start = arith::AddIOp::create(thenBuilder, thenLoc, index, start);
+          }
+          boundedStarts.push_back(arith::IndexCastOp::create(
+              thenBuilder, thenLoc, thenBuilder.getIndexType(), start));
+        }
+        emitScatterUpdate(thenBuilder, thenLoc, boundedStarts);
+        scf::YieldOp::create(thenBuilder, thenLoc);
+      });
   return success();
 }
 

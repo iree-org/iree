@@ -14,9 +14,12 @@
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
@@ -649,17 +652,189 @@ bool getUpdatedIndicesAreSorted(bool indicesAreSorted,
          llvm::is_sorted(updatedIndexMap);
 }
 
-// Returns an updated indices tensor such that an `IotaOp` is prepended for each
-// dim in `indicesBatchingDims` with a `ConcatenateOp`.
+// Returns `indices` with one iota column per batching dimension concatenated
+// along `indexVectorDim`.
 //
 // If `indexVectorDim` is equal to the rank of `indices`, it is reshaped to have
-// a trailing dimension of size 1 so it can be concatenated with the `IotaOp`s.
+// a trailing dimension of size 1 so it can be concatenated with the iotas.
 Value createConcatIndices(Value indices, int64_t indexVectorDim,
                           ArrayRef<int64_t> indicesBatchingDims,
                           PatternRewriter &rewriter) {
   Location loc = indices.getLoc();
   auto indicesType = cast<RankedTensorType>(indices.getType());
   Type elementType = indicesType.getElementType();
+
+  // Generate dynamic batched indices directly to avoid an intermediate tensor.
+  if (!indicesType.hasStaticShape()) {
+    auto integerType = cast<IntegerType>(elementType);
+    Type publicResultElementType = elementType;
+    for (int64_t batchingDim : indicesBatchingDims) {
+      if (indicesType.isDynamicDim(batchingDim)) {
+        publicResultElementType = IntegerType::get(rewriter.getContext(), 64,
+                                                   integerType.getSignedness());
+      } else {
+        Type promotedType =
+            promoteTypeForSize(publicResultElementType,
+                               indicesType.getDimSize(batchingDim), rewriter);
+        if (auto promotedIntegerType = dyn_cast<IntegerType>(promotedType)) {
+          promotedType = IntegerType::get(rewriter.getContext(),
+                                          promotedIntegerType.getWidth(),
+                                          integerType.getSignedness());
+        }
+        publicResultElementType = promotedType;
+      }
+    }
+    auto publicIntegerType = cast<IntegerType>(publicResultElementType);
+    Type resultElementType =
+        IntegerType::get(rewriter.getContext(), publicIntegerType.getWidth(),
+                         IntegerType::SignednessSemantics::Signless);
+
+    // Widen converted narrow indices inside the generated region instead, so
+    // the widened tensor is never materialized.
+    if (auto convert = indices.getDefiningOp<mlir::stablehlo::ConvertOp>()) {
+      auto sourceType = dyn_cast<IntegerType>(
+          getElementTypeOrSelf(convert.getOperand().getType()));
+      if (sourceType && !integerType.isUnsigned() &&
+          sourceType.getWidth() < integerType.getWidth()) {
+        indices = convert.getOperand();
+        indicesType = cast<RankedTensorType>(indices.getType());
+        integerType = sourceType;
+      }
+    }
+
+    // Arith integer operations require signless types. Materialize unsigned
+    // input bits as signless values before entering the generated region.
+    Value generatorIndices = indices;
+    if (integerType.getSignedness() !=
+        IntegerType::SignednessSemantics::Signless) {
+      auto signlessInputType =
+          IntegerType::get(rewriter.getContext(), integerType.getWidth(),
+                           IntegerType::SignednessSemantics::Signless);
+      auto generatorIndicesType = RankedTensorType::get(
+          indicesType.getShape(), signlessInputType, indicesType.getEncoding());
+      generatorIndices = mlir::stablehlo::ConvertOp::create(
+          rewriter, loc, generatorIndicesType, indices);
+    }
+
+    bool implicitVectorDim = indexVectorDim == indicesType.getRank();
+    SmallVector<int64_t> resultShape(indicesType.getShape());
+    if (implicitVectorDim) {
+      resultShape.push_back(1 + indicesBatchingDims.size());
+    } else if (!ShapedType::isDynamic(resultShape[indexVectorDim])) {
+      resultShape[indexVectorDim] += indicesBatchingDims.size();
+    }
+
+    Attribute resultEncoding = indicesType.getEncoding();
+    ArrayRef<int64_t> bounds =
+        mlir::hlo::encodingToBounds(indicesType.getEncoding());
+    if (!bounds.empty()) {
+      SmallVector<int64_t> resultBounds(bounds);
+      if (implicitVectorDim) {
+        resultBounds.push_back(ShapedType::kDynamic);
+      } else {
+        resultBounds[indexVectorDim] = ShapedType::kDynamic;
+      }
+      resultEncoding =
+          mlir::hlo::boundsToEncoding(indicesType.getEncoding(), resultBounds);
+    }
+    auto resultType =
+        RankedTensorType::get(resultShape, resultElementType, resultEncoding);
+    auto publicResultType = RankedTensorType::get(
+        resultShape, publicResultElementType, resultEncoding);
+
+    SmallVector<Value> dynamicExtents;
+    for (auto [dim, size] : llvm::enumerate(resultShape)) {
+      if (!ShapedType::isDynamic(size)) {
+        continue;
+      }
+      Value extent =
+          tensor::DimOp::create(rewriter, loc, generatorIndices, dim);
+      if (!implicitVectorDim && dim == indexVectorDim) {
+        Value batchCount = arith::ConstantIndexOp::create(
+            rewriter, loc, indicesBatchingDims.size());
+        extent = arith::AddIOp::create(rewriter, loc, extent, batchCount);
+      }
+      dynamicExtents.push_back(extent);
+    }
+
+    Value empty =
+        tensor::EmptyOp::create(rewriter, loc, resultType, dynamicExtents);
+    SmallVector<utils::IteratorType> iterators(resultType.getRank(),
+                                               utils::IteratorType::parallel);
+    auto generic = linalg::GenericOp::create(
+        rewriter, loc, TypeRange{resultType}, ValueRange{}, ValueRange{empty},
+        SmallVector<AffineMap>{
+            rewriter.getMultiDimIdentityMap(resultType.getRank())},
+        iterators,
+        [&](OpBuilder &builder, Location bodyLoc, ValueRange) {
+          SmallVector<Value> outputIndices;
+          outputIndices.reserve(resultType.getRank());
+          for (int64_t dim = 0; dim < resultType.getRank(); ++dim) {
+            outputIndices.push_back(
+                linalg::IndexOp::create(builder, bodyLoc, dim));
+          }
+          Value vectorIndex = outputIndices[indexVectorDim];
+          Value batchCount = arith::ConstantIndexOp::create(
+              builder, bodyLoc, indicesBatchingDims.size());
+          Value inSourceVector =
+              arith::CmpIOp::create(builder, bodyLoc, arith::CmpIPredicate::sge,
+                                    vectorIndex, batchCount);
+
+          auto ifOp = scf::IfOp::create(
+              builder, bodyLoc, TypeRange{resultElementType}, inSourceVector,
+              /*withElseRegion=*/true);
+          {
+            OpBuilder::InsertionGuard guard(builder);
+            builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+            SmallVector<Value> sourceIndices;
+            sourceIndices.reserve(indicesType.getRank());
+            for (int64_t dim = 0; dim < indicesType.getRank(); ++dim) {
+              if (!implicitVectorDim && dim == indexVectorDim) {
+                sourceIndices.push_back(arith::SubIOp::create(
+                    builder, bodyLoc, vectorIndex, batchCount));
+              } else {
+                sourceIndices.push_back(outputIndices[dim]);
+              }
+            }
+            Value sourceValue = tensor::ExtractOp::create(
+                builder, bodyLoc, generatorIndices, sourceIndices);
+            if (integerType.getWidth() <
+                cast<IntegerType>(resultElementType).getWidth()) {
+              if (integerType.isUnsigned()) {
+                sourceValue = arith::ExtUIOp::create(
+                    builder, bodyLoc, resultElementType, sourceValue);
+              } else {
+                sourceValue = arith::ExtSIOp::create(
+                    builder, bodyLoc, resultElementType, sourceValue);
+              }
+            }
+            scf::YieldOp::create(builder, bodyLoc, sourceValue);
+
+            builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+            Value batchCoordinate = arith::ConstantIntOp::create(
+                builder, bodyLoc, resultElementType, 0);
+            for (auto [ordinal, dim] : llvm::enumerate(indicesBatchingDims)) {
+              Value ordinalValue =
+                  arith::ConstantIndexOp::create(builder, bodyLoc, ordinal);
+              Value matches = arith::CmpIOp::create(builder, bodyLoc,
+                                                    arith::CmpIPredicate::eq,
+                                                    vectorIndex, ordinalValue);
+              Value coordinate = arith::IndexCastOp::create(
+                  builder, bodyLoc, resultElementType, outputIndices[dim]);
+              batchCoordinate = arith::SelectOp::create(
+                  builder, bodyLoc, matches, coordinate, batchCoordinate);
+            }
+            scf::YieldOp::create(builder, bodyLoc, batchCoordinate);
+          }
+          linalg::YieldOp::create(builder, bodyLoc, ifOp.getResult(0));
+        },
+        ArrayRef<NamedAttribute>{});
+    if (publicResultElementType == resultElementType) {
+      return generic.getResult(0);
+    }
+    return mlir::stablehlo::ConvertOp::create(rewriter, loc, publicResultType,
+                                              generic.getResult(0));
+  }
 
   // The batching dim sizes might not fit in the existing element type, in which
   // case we need to promote it.
@@ -668,7 +843,8 @@ Value createConcatIndices(Value indices, int64_t indexVectorDim,
         elementType, indicesType.getDimSize(batchingDim), rewriter);
   }
   if (elementType != indicesType.getElementType()) {
-    indicesType = RankedTensorType::get(indicesType.getShape(), elementType);
+    indicesType = RankedTensorType::get(indicesType.getShape(), elementType,
+                                        indicesType.getEncoding());
     indices =
         mlir::stablehlo::ConvertOp::create(rewriter, loc, indicesType, indices);
   }
@@ -680,7 +856,21 @@ Value createConcatIndices(Value indices, int64_t indexVectorDim,
   } else {
     iotaShape[indexVectorDim] = 1;
   }
-  auto iotaType = RankedTensorType::get(iotaShape, elementType);
+
+  Attribute iotaEncoding;
+  ArrayRef<int64_t> bounds =
+      mlir::hlo::encodingToBounds(indicesType.getEncoding());
+  if (!bounds.empty()) {
+    SmallVector<int64_t> iotaBounds(bounds);
+    if (indexVectorDimOnLastDim) {
+      iotaBounds.push_back(ShapedType::kDynamic);
+    } else {
+      iotaBounds[indexVectorDim] = ShapedType::kDynamic;
+    }
+    iotaEncoding =
+        mlir::hlo::boundsToEncoding(indicesType.getEncoding(), iotaBounds);
+  }
+  auto iotaType = RankedTensorType::get(iotaShape, elementType, iotaEncoding);
 
   if (indexVectorDimOnLastDim) {
     indices =
@@ -718,9 +908,8 @@ struct ScatterBatchingDimsExpander final
       return rewriter.notifyMatchFailure(op, "scatter op has no batching dims");
     }
 
-    if (!cast<ShapedType>(op.getScatterIndices().getType()).hasStaticShape()) {
-      return rewriter.notifyMatchFailure(
-          op, "scatter indices have dynamic shape, can't expand");
+    if (!isa<RankedTensorType>(op.getScatterIndices().getType())) {
+      return rewriter.notifyMatchFailure(op, "unranked scatter indices");
     }
 
     SmallVector<int64_t> newInsertedWindowDims =
@@ -891,17 +1080,53 @@ struct ScatterInt64Indices final
       return rewriter.notifyMatchFailure(op, "already has i32 index type");
     }
 
-    if (!indicesTy.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(op, "cannot validate legal size");
+    // Tensor shape says nothing about the values stored in its index tensor.
+    // Narrow wide indices only when their actual values are known to fit.
+    bool saturate = false;
+    if (indicesETy.getIntOrFloatBitWidth() > 32) {
+      auto integerTy = cast<IntegerType>(indicesETy);
+      DenseElementsAttr constant;
+      if (matchPattern(indices, m_Constant(&constant))) {
+        for (const APInt &value : constant.getValues<APInt>()) {
+          bool fitsI32 = integerTy.isUnsigned() ? value.getActiveBits() <= 31
+                                                : value.isSignedIntN(32);
+          if (!fitsI32) {
+            return rewriter.notifyMatchFailure(op,
+                                               "index value does not fit i32");
+          }
+        }
+      } else {
+        // Saturating keeps an out-of-bounds index out of bounds only while
+        // every indexed operand dim is at most INT32_MAX.
+        auto operandTy = cast<ShapedType>(op.getInputs().front().getType());
+        for (int64_t dim :
+             op.getScatterDimensionNumbers().getScatterDimsToOperandDims()) {
+          if (operandTy.isDynamicDim(dim) ||
+              operandTy.getDimSize(dim) > std::numeric_limits<int32_t>::max()) {
+            return rewriter.notifyMatchFailure(op,
+                                               "wide index values are unknown");
+          }
+        }
+        saturate = true;
+      }
     }
 
-    uint64_t maxSize = std::numeric_limits<int32_t>::max();
-    if (indicesETy.getIntOrFloatBitWidth() > 32) {
-      for (int i = 0, s = indicesTy.getRank(); i < s; ++i) {
-        if (indicesTy.getDimSize(i) > maxSize) {
-          return rewriter.notifyMatchFailure(op, "index may exceed i32 max");
-        }
-      }
+    // Only out-of-bounds indices collide after saturation, and scatter drops
+    // their updates, so unique_indices still holds.
+    if (saturate) {
+      auto integerTy = cast<IntegerType>(indicesETy);
+      unsigned width = integerTy.getWidth();
+      auto scalarTy = RankedTensorType::get({}, integerTy);
+      APInt low = integerTy.isUnsigned()
+                      ? APInt::getZero(width)
+                      : APInt::getSignedMinValue(32).sext(width);
+      APInt high = APInt::getSignedMaxValue(32).zext(width);
+      Value min = mlir::stablehlo::ConstantOp::create(
+          rewriter, op.getLoc(), DenseElementsAttr::get(scalarTy, low));
+      Value max = mlir::stablehlo::ConstantOp::create(
+          rewriter, op.getLoc(), DenseElementsAttr::get(scalarTy, high));
+      indices = mlir::stablehlo::ClampOp::create(rewriter, op.getLoc(), min,
+                                                 indices, max);
     }
 
     indices = mlir::stablehlo::ConvertOp::create(
@@ -2577,8 +2802,10 @@ struct StableHLOToStableHLOPreprocessing final
       StableHLOToStableHLOPreprocessingBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<shape::ShapeDialect, mlir::stablehlo::StablehloDialect,
-                    chlo::ChloDialect, tensor::TensorDialect>();
+    registry
+        .insert<shape::ShapeDialect, mlir::stablehlo::StablehloDialect,
+                chlo::ChloDialect, tensor::TensorDialect, arith::ArithDialect,
+                linalg::LinalgDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {

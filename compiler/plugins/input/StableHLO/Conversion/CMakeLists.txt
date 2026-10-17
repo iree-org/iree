@@ -73,6 +73,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRShapeDialect
     MLIRShapeOpsTransforms
+    MLIRSideEffectInterfaces
     MLIRSparseTensorDialect
     MLIRSupport
     MLIRTensorDialect

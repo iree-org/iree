@@ -782,7 +782,10 @@ func.func @scatter_update_slice_middle_dim_single_index(
 // -----
 
 // CHECK-LABEL: @scatter_i64_indices
-// CHECK: %[[INDICES:.+]] = stablehlo.convert %arg1 : (tensor<1x1xi64>) -> tensor<1x1xi32>
+// CHECK-DAG: %[[MIN:.+]] = stablehlo.constant dense<-2147483648> : tensor<i64>
+// CHECK-DAG: %[[MAX:.+]] = stablehlo.constant dense<2147483647> : tensor<i64>
+// CHECK: %[[CLAMP:.+]] = stablehlo.clamp %[[MIN]], %arg1, %[[MAX]]
+// CHECK: %[[INDICES:.+]] = stablehlo.convert %[[CLAMP]] : (tensor<1x1xi64>) -> tensor<1x1xi32>
 // CHECK: %[[SCATTER:.+]] = "stablehlo.scatter"(%arg0, %[[INDICES]], %arg2)
 // CHECK-SAME: scatter_dimension_numbers = #stablehlo.scatter<inserted_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>
 // CHECK: return %[[SCATTER]] : tensor<5xf32>
@@ -970,4 +973,204 @@ func.func @convolution_reversal(%a: tensor<1x?x1xf32>, %k: tensor<2x1x1xf32>) ->
     window_reversal = array<i1: true>
   } : (tensor<1x?x1xf32>, tensor<2x1x1xf32>) -> tensor<1x?x1xf32>
   return %r : tensor<1x?x1xf32>
+}
+
+// -----
+
+// Dynamic scatter batching fuses coordinate generation with index widening and
+// preserves the bound on the dynamic batch dimension.
+// CHECK-LABEL: @scatter_dynamic_batching_dims
+// CHECK: stablehlo.convert
+// CHECK: linalg.generic
+// CHECK: scf.if
+// CHECK: arith.index_cast
+// CHECK: linalg.yield
+// CHECK: } -> tensor<?x3x2xi64
+// CHECK: stablehlo.scatter
+// CHECK-NOT: input_batching_dims
+// CHECK-SAME: scatter_dims_to_operand_dims = [0, 1]
+func.func @scatter_dynamic_batching_dims(
+    %operand: tensor<?x5xi32>,
+    %indices: tensor<?x3xui32, #stablehlo.bounds<4, ?>>,
+    %updates: tensor<?x3xi32>) -> tensor<?x5xi32> {
+  %0 = "stablehlo.scatter"(%operand, %indices, %updates) ({
+    ^bb0(%a: tensor<i32>, %b: tensor<i32>):
+      %sum = stablehlo.add %a, %b : tensor<i32>
+      stablehlo.return %sum : tensor<i32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      inserted_window_dims = [1], input_batching_dims = [0],
+      scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1],
+      index_vector_dim = 2>
+  } : (tensor<?x5xi32>, tensor<?x3xui32, #stablehlo.bounds<4, ?>>,
+       tensor<?x3xi32>) -> tensor<?x5xi32>
+  return %0 : tensor<?x5xi32>
+}
+
+// Widen narrow unsigned indices before adding batch coordinates.
+// CHECK-LABEL: @scatter_dynamic_updates_static_batch
+// CHECK: stablehlo.convert
+// CHECK: linalg.generic
+// CHECK: arith.index_cast
+// CHECK: linalg.yield
+// CHECK: } -> tensor<256x?x2xi32>
+// CHECK: stablehlo.scatter
+func.func @scatter_dynamic_updates_static_batch(
+    %operand: tensor<256x5xi32>, %indices: tensor<256x?x1xui8>,
+    %updates: tensor<256x?xi32>) -> tensor<256x5xi32> {
+  %0 = "stablehlo.scatter"(%operand, %indices, %updates) ({
+    ^bb0(%a: tensor<i32>, %b: tensor<i32>):
+      %sum = stablehlo.add %a, %b : tensor<i32>
+      stablehlo.return %sum : tensor<i32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      inserted_window_dims = [1], input_batching_dims = [0],
+      scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1],
+      index_vector_dim = 2>
+  } : (tensor<256x5xi32>, tensor<256x?x1xui8>, tensor<256x?xi32>) -> tensor<256x5xi32>
+  return %0 : tensor<256x5xi32>
+}
+
+
+// -----
+
+// Runtime wide indices saturate to i32: an operand dim of at most INT32_MAX
+// keeps every saturated out-of-bounds index out of bounds.
+// CHECK-LABEL: @scatter_i64_indices
+// CHECK-DAG: %[[MIN:.+]] = stablehlo.constant dense<-2147483648> : tensor<i64>
+// CHECK-DAG: %[[MAX:.+]] = stablehlo.constant dense<2147483647> : tensor<i64>
+// CHECK: %[[SATURATED:.+]] = stablehlo.clamp %[[MIN]], %arg1, %[[MAX]] : (tensor<i64>, tensor<1x1xi64>, tensor<i64>) -> tensor<1x1xi64>
+// CHECK: %[[INDICES:.+]] = stablehlo.convert %[[SATURATED]] : (tensor<1x1xi64>) -> tensor<1x1xi32>
+// CHECK: %[[SCATTER:.+]] = "stablehlo.scatter"(%arg0, %[[INDICES]], %arg2)
+// CHECK-SAME: scatter_dimension_numbers = #stablehlo.scatter<inserted_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>
+// CHECK: return %[[SCATTER]] : tensor<5xf32>
+func.func @scatter_i64_indices(
+    %arg0: tensor<5xf32>, %arg1: tensor<1x1xi64>,
+    %arg2: tensor<1xf32>) -> tensor<5xf32> {
+  %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ({
+  ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+    stablehlo.return %arg4 : tensor<f32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      inserted_window_dims = [0],
+      scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 1>
+  } : (tensor<5xf32>, tensor<1x1xi64>, tensor<1xf32>) -> tensor<5xf32>
+  return %0 : tensor<5xf32>
+}
+
+
+// -----
+
+// A rank-2 window scatter with runtime indices keeps unique_indices: only
+// out-of-bounds indices can collide after saturation, and those are dropped.
+// CHECK-LABEL: @scatter_i64_runtime_indices_rank2
+// CHECK: %[[SATURATED:.+]] = stablehlo.clamp %{{.+}}, %arg1, %{{.+}} : (tensor<i64>, tensor<?x1xi64>, tensor<i64>) -> tensor<?x1xi64>
+// CHECK: %[[INDICES:.+]] = stablehlo.convert %[[SATURATED]] : (tensor<?x1xi64>) -> tensor<?x1xi32>
+// CHECK: "stablehlo.scatter"(%arg0, %[[INDICES]], %arg2)
+// CHECK-SAME: unique_indices = true
+func.func @scatter_i64_runtime_indices_rank2(
+    %arg0: tensor<6x3xf32>, %arg1: tensor<?x1xi64>,
+    %arg2: tensor<?x3xf32>) -> tensor<6x3xf32> {
+  %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ({
+  ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+    stablehlo.return %arg4 : tensor<f32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      update_window_dims = [1], inserted_window_dims = [0],
+      scatter_dims_to_operand_dims = [0], index_vector_dim = 1>,
+    indices_are_sorted = false, unique_indices = true
+  } : (tensor<6x3xf32>, tensor<?x1xi64>, tensor<?x3xf32>) -> tensor<6x3xf32>
+  return %0 : tensor<6x3xf32>
+}
+
+
+// -----
+
+// A dynamic indexed dim may exceed INT32_MAX, so runtime indices stay wide.
+// CHECK-LABEL: @scatter_i64_runtime_indices_dynamic_operand
+// CHECK-NOT: stablehlo.clamp
+// CHECK: "stablehlo.scatter"(%arg0, %arg1, %arg2)
+func.func @scatter_i64_runtime_indices_dynamic_operand(
+    %arg0: tensor<?x3xf32>, %arg1: tensor<2x1xi64>,
+    %arg2: tensor<2x3xf32>) -> tensor<?x3xf32> {
+  %0 = "stablehlo.scatter"(%arg0, %arg1, %arg2) ({
+  ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+    stablehlo.return %arg4 : tensor<f32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      update_window_dims = [1], inserted_window_dims = [0],
+      scatter_dims_to_operand_dims = [0], index_vector_dim = 1>
+  } : (tensor<?x3xf32>, tensor<2x1xi64>, tensor<2x3xf32>) -> tensor<?x3xf32>
+  return %0 : tensor<?x3xf32>
+}
+
+
+// -----
+
+// Known in-range constants may still use the i32 scatter fast path.
+// CHECK-LABEL: @scatter_i64_constant_indices
+// CHECK: %[[INDICES:.+]] = stablehlo.convert %{{.+}} : (tensor<1x1xi64>) -> tensor<1x1xi32>
+// CHECK: "stablehlo.scatter"(%arg0, %[[INDICES]], %arg1)
+func.func @scatter_i64_constant_indices(
+    %arg0: tensor<5xf32>, %arg2: tensor<1xf32>) -> tensor<5xf32> {
+  %indices = stablehlo.constant dense<1> : tensor<1x1xi64>
+  %0 = "stablehlo.scatter"(%arg0, %indices, %arg2) ({
+  ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+    stablehlo.return %arg4 : tensor<f32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      inserted_window_dims = [0], scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 1>
+  } : (tensor<5xf32>, tensor<1x1xi64>, tensor<1xf32>) -> tensor<5xf32>
+  return %0 : tensor<5xf32>
+}
+
+
+// -----
+
+// A wide constant outside i32 range must retain its width.
+// CHECK-LABEL: @scatter_i64_large_constant_indices
+// CHECK: %[[INDICES:.+]] = stablehlo.constant dense<4294967296> : tensor<1x1xi64>
+// CHECK: "stablehlo.scatter"(%arg0, %[[INDICES]], %arg1)
+func.func @scatter_i64_large_constant_indices(
+    %arg0: tensor<5xf32>, %arg2: tensor<1xf32>) -> tensor<5xf32> {
+  %indices = stablehlo.constant dense<4294967296> : tensor<1x1xi64>
+  %0 = "stablehlo.scatter"(%arg0, %indices, %arg2) ({
+  ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+    stablehlo.return %arg4 : tensor<f32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      inserted_window_dims = [0], scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 1>
+  } : (tensor<5xf32>, tensor<1x1xi64>, tensor<1xf32>) -> tensor<5xf32>
+  return %0 : tensor<5xf32>
+}
+
+
+// -----
+
+// Batch coordinates that fit the source width preserve unsigned index bits
+// without materializing a wider index tensor.
+// CHECK-LABEL: func.func @scatter_batching_unsigned_dynamic_indices
+// CHECK-SAME:    (%{{.+}}: tensor<6x4xi32>, %[[INDICES:.+]]: tensor<6x?x1xui8>
+// CHECK-NOT:     stablehlo.convert %[[INDICES]] : (tensor<6x?x1xui8>) -> tensor<6x?x1xi64>
+// CHECK:         %[[NARROW:.+]] = stablehlo.convert %[[INDICES]] : (tensor<6x?x1xui8>) -> tensor<6x?x1xi8>
+// CHECK:         linalg.generic
+// CHECK:           %[[INDEX:.+]] = tensor.extract %[[NARROW]]
+// CHECK:           scf.yield %[[INDEX]] : i8
+// CHECK:         } -> tensor<6x?x2xi8>
+// CHECK:         stablehlo.convert %{{.+}} : (tensor<6x?x2xui8>) -> tensor<6x?x2xi32>
+func.func @scatter_batching_unsigned_dynamic_indices(%operand: tensor<6x4xi32>, %indices: tensor<6x?x1xui8>, %updates: tensor<6x?xi32>) -> tensor<6x4xi32> {
+  %0 = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    %sum = stablehlo.add %current, %update : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      inserted_window_dims = [1], input_batching_dims = [0],
+      scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1],
+      index_vector_dim = 2>
+  } : (tensor<6x4xi32>, tensor<6x?x1xui8>, tensor<6x?xi32>) -> tensor<6x4xi32>
+  return %0 : tensor<6x4xi32>
 }
