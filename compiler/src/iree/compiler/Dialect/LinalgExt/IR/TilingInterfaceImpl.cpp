@@ -917,13 +917,11 @@ LogicalResult SortOp::getResultTilePosition(
 /// conditionally swap. compareOperands are fed to the comparator region (as
 /// interleaved pairs); carryOperands are swapped in lockstep but not compared.
 /// Convention: comparator returning true means keep current order (no swap).
-/// If `stable` is set, elements that the comparator treats as equivalent also
-/// keep their order, so repeated sweeps produce a stable sort.
 static void emitBubbleSortSweep(OpBuilder &b, Location loc, Value zero,
                                 Value one, Value ub, int64_t sortDim,
                                 ValueRange ivs, ValueRange compareOperands,
                                 ValueRange carryOperands,
-                                Region &comparatorRegion, bool stable) {
+                                Region &comparatorRegion) {
   Block &cmpBlock = comparatorRegion.front();
   scf::ForOp::create(
       b, loc, zero, ub, one, /*iterArgs=*/ValueRange{},
@@ -935,15 +933,13 @@ static void emitBubbleSortSweep(OpBuilder &b, Location loc, Value zero,
         SmallVector<Value> rhsIndices(ivs);
         rhsIndices[sortDim] = jPlusOne;
 
-        SmallVector<Value> cmpArgs, reverseCmpArgs;
+        SmallVector<Value> cmpArgs;
         SmallVector<Value> lhsVals, rhsVals;
         for (Value operand : compareOperands) {
           Value lhs = memref::LoadOp::create(b, loc, operand, lhsIndices);
           Value rhs = memref::LoadOp::create(b, loc, operand, rhsIndices);
           cmpArgs.push_back(lhs);
           cmpArgs.push_back(rhs);
-          reverseCmpArgs.push_back(rhs);
-          reverseCmpArgs.push_back(lhs);
           lhsVals.push_back(lhs);
           rhsVals.push_back(rhs);
         }
@@ -962,22 +958,6 @@ static void emitBubbleSortSweep(OpBuilder &b, Location loc, Value zero,
         }
         Value keepOrder =
             sortMap.lookup(cmpBlock.getTerminator()->getOperand(0));
-
-        if (stable) {
-          // Also evaluate f(rhs, lhs) and only swap when rhs is strictly
-          // ordered before lhs. If both results agree, the elements are
-          // equivalent and keep their relative order.
-          IRMapping reverseSortMap;
-          reverseSortMap.map(cmpBlock.getArguments(), reverseCmpArgs);
-          for (auto &blockOp : cmpBlock.without_terminator()) {
-            b.clone(blockOp, reverseSortMap);
-          }
-          Value reverseCmpRes =
-              reverseSortMap.lookup(cmpBlock.getTerminator()->getOperand(0));
-          Value cmpValuesEqual = arith::CmpIOp::create(
-              b, loc, arith::CmpIPredicate::eq, keepOrder, reverseCmpRes);
-          keepOrder = arith::OrIOp::create(b, loc, keepOrder, cmpValuesEqual);
-        }
 
         SmallVector<Value> allOps;
         allOps.append(compareOperands.begin(), compareOperands.end());
@@ -1009,7 +989,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
   SmallVector<Value> compareOperands(getDpsInits().begin(),
                                      getDpsInits().end());
   emitBubbleSortSweep(b, loc, zero, one, ub, sortDim, ivs, compareOperands,
-                      /*carryOperands=*/{}, getRegion(), /*stable=*/true);
+                      /*carryOperands=*/{}, getRegion());
   return success();
 }
 
@@ -1633,7 +1613,7 @@ static void emitBubbleSort(OpBuilder &b, Location loc, Value ub, Value zero,
         Value innerUb = arith::SubIOp::create(b, loc, kMinus1, i);
         emitBubbleSortSweep(b, loc, zero, one, innerUb, kDim, ivs,
                             /*compareOperands=*/{outputValues}, carryOps,
-                            comparatorRegion, /*stable=*/false);
+                            comparatorRegion);
         scf::YieldOp::create(b, loc, /*operands=*/ValueRange{});
       });
 }
