@@ -63,6 +63,20 @@ def ConvertToFlowPass :
   ];
 }
 
+def GeneralizeExecutablesPass :
+    Pass<"iree-flow-generalize-executables", "mlir::ModuleOp"> {
+  let summary = "Turns the constants in which otherwise equal executables differ into dispatch operands.";
+  let description = [{
+    Within a group of executables whose dispatch functions are structurally
+    equal up to the values of scalar integer / index constants and of the static
+    offsets of their tensor loads and stores, each such value that differs
+    across the group becomes a new operand of the dispatch, passed by every call
+    site, so that deduplication can merge the group (e.g. one executable per
+    layer reading a KV cache at the layer's constant offset).
+  }];
+  let dependentDialects = ["mlir::arith::ArithDialect"];
+}
+
 def DeduplicateExecutablesPass :
     Pass<"iree-flow-deduplicate-executables", "mlir::ModuleOp"> {
   let summary = "Deduplicates executables that are identical.";
