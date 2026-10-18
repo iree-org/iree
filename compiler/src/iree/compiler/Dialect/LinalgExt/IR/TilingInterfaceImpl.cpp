@@ -859,7 +859,12 @@ LogicalResult MapStoreOp::generateScalarImplementation(OpBuilder &b,
 static bool isFullSortTile(SortOp sortOp, ArrayRef<OpFoldResult> offsets,
                            ArrayRef<OpFoldResult> sizes) {
   int64_t dimension = sortOp.getDimension();
-  if (!isConstantIntValue(offsets[dimension], 0)) {
+  // Prove zero even when an explicit full-axis tile uses a loop IV as offset.
+  auto zero = IntegerAttr::get(IndexType::get(sortOp.getContext()), 0);
+  auto startsAtZero = ValueBoundsConstraintSet::areEqual(
+      ValueBoundsConstraintSet::Variable(offsets[dimension]),
+      ValueBoundsConstraintSet::Variable(OpFoldResult(zero)));
+  if (failed(startsAtZero) || !*startsAtZero) {
     return false;
   }
   auto coversSortDimension = ValueBoundsConstraintSet::areEqual(
