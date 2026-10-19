@@ -1032,3 +1032,41 @@ func.func @preserve_matmul_properties() {
   util.optimization_barrier %result : tensor<2x3xi32>
   return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @drop_packed_i2
+// CHECK: tensor.empty() : tensor<8xi2>
+func.func @drop_packed_i2() {
+  %0 = tensor.empty() : tensor<8xi2, #iree_encoding.packed_storage>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @drop_packed_i4
+// CHECK: tensor.empty() : tensor<8xi4>
+func.func @drop_packed_i4() {
+  %0 = tensor.empty() : tensor<8xi4, #iree_encoding.packed_storage>
+  return
+}
+
+// -----
+
+// CHECK: #[[$ENCODING:.+]] = #iree_encoding.testing<>
+// CHECK-LABEL: func.func @retain_testing_encoding
+// CHECK: tensor.empty() : tensor<8xi8, #[[$ENCODING]]>
+func.func @retain_testing_encoding() {
+  %0 = tensor.empty() : tensor<8xi8, #iree_encoding.testing<>>
+  return
+}
+
+// -----
+
+// CHECK: #[[$UNKNOWN:.+]] = #iree_encoding.unknown
+// CHECK-LABEL: func.func @retain_unknown_encoding
+// CHECK: tensor.empty() : tensor<8xi8, #[[$UNKNOWN]]>
+func.func @retain_unknown_encoding() {
+  %0 = tensor.empty() : tensor<8xi8, #iree_encoding.unknown>
+  return
+}
