@@ -9,6 +9,8 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-set-split-reduction-sizes"
@@ -52,6 +54,29 @@ static std::optional<SmallVector<int64_t>> getReductionDimSizes(Operation *Op) {
     }
   }
   return reductionDimSizes;
+}
+
+/// Returns true if the generic Linalg partial-reduction implementation can
+/// handle every output of `op`. That implementation requires each output to be
+/// combined by a single recognized operation with a known neutral element, and
+/// returns failure otherwise. Coupled reductions, such as argmax over a
+/// value/index pair, do not meet these conditions and must not be annotated
+/// for splitting.
+static bool supportsGenericPartialReduction(linalg::LinalgOp op) {
+  for (unsigned initIndex = 0, e = op->getNumResults(); initIndex < e;
+       ++initIndex) {
+    SmallVector<Operation *, 4> combinerOps;
+    if (!matchReduction(op.getRegionOutputArgs(), initIndex, combinerOps) ||
+        combinerOps.size() != 1) {
+      LDBG() << "skipping op; no single combiner for result " << initIndex;
+      return false;
+    }
+    if (!arith::getNeutralElement(combinerOps.front()).has_value()) {
+      LDBG() << "skipping op; no neutral element for result " << initIndex;
+      return false;
+    }
+  }
+  return true;
 }
 
 static std::optional<int64_t>
@@ -592,6 +617,16 @@ struct SetSplitReductionSizesPass final
           });
       if (numReduction == 0) {
         return;
+      }
+
+      // The split-reduction formation relies on the generic Linalg
+      // partial-reduction implementation. Skip Linalg ops whose reduction body
+      // it cannot handle instead of annotating them and failing later during
+      // dispatch formation. Other ops may provide their own implementation.
+      if (auto linalgOp = dyn_cast<linalg::LinalgOp>(tilingOp.getOperation())) {
+        if (!supportsGenericPartialReduction(linalgOp)) {
+          return;
+        }
       }
 
       // --- Case 1: Outer reduction ---
