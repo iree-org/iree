@@ -136,6 +136,21 @@ export function createImports(context) {
   // |builtins|: {fillPipeline, fillBGL, copyPipeline, copyBGL}.
   function processInstructions(
       device, queue, text, buffers, offsets, builtins) {
+    const temporaryBuffers = [];
+    try {
+      processInstructionsImpl(
+          device, queue, text, buffers, offsets, builtins, temporaryBuffers);
+      return STATUS_OK;
+    } catch {
+      return STATUS_INTERNAL;
+    } finally {
+      // Submission retains these buffers until GPU work completes.
+      for (const buffer of temporaryBuffers) buffer.destroy();
+    }
+  }
+
+  function processInstructionsImpl(
+      device, queue, text, buffers, offsets, builtins, temporaryBuffers) {
     let cursor = 0;
     let encoder = null;
     const pendingCommandBuffers = [];
@@ -252,6 +267,7 @@ export function createImports(context) {
               size: 16,
               mappedAtCreation: true,
             });
+            temporaryBuffers.push(params);
             new Uint32Array(params.getMappedRange()).set([
               effectiveSrc, effectiveDst, length, 0
             ]);
@@ -275,7 +291,6 @@ export function createImports(context) {
             pass.setBindGroup(0, bindGroup);
             pass.dispatchWorkgroups(workgroups);
             pass.end();
-            params.destroy();
           }
           break;
         }
@@ -295,6 +310,7 @@ export function createImports(context) {
             size: 16,
             mappedAtCreation: true,
           });
+          temporaryBuffers.push(params);
           new Uint32Array(params.getMappedRange()).set([
             effectiveOffset, length, pattern, 0
           ]);
@@ -318,7 +334,6 @@ export function createImports(context) {
           pass.setBindGroup(0, bindGroup);
           pass.dispatchWorkgroups(workgroups);
           pass.end();
-          params.destroy();
           break;
         }
 
@@ -483,7 +498,7 @@ export function createImports(context) {
       }
 
       // Execute the cached instruction stream.
-      processInstructions(
+      const status = processInstructions(
           this.device, queue, this.text, this.buffers, this.offsets,
           this.builtins);
 
@@ -492,6 +507,7 @@ export function createImports(context) {
         this.buffers[i] = null;
         this.offsets[i] = 0;
       }
+      return status;
     }
   }
 
@@ -811,8 +827,8 @@ export function createImports(context) {
       // Read builtins.
       const builtins = readBuiltins(builtinsPtr);
 
-      processInstructions(device, queue, text, buffers, offsets, builtins);
-      return 0;
+      return processInstructions(
+          device, queue, text, buffers, offsets, builtins);
     },
 
     create_recording(
@@ -845,8 +861,7 @@ export function createImports(context) {
       const recording = handles.get(recordingHandle);
       const queue = handles.get(queueHandle);
       if (!recording || !queue) return 1;
-      recording.execute(queue, dynamicBindingTablePtr);
-      return 0;
+      return recording.execute(queue, dynamicBindingTablePtr);
     },
 
     //==========================================================================
