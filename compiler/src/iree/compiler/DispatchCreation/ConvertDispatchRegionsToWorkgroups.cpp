@@ -234,6 +234,65 @@ convertDispatchRegionWithSortWorkspaces(IREE::Flow::DispatchRegionOp &regionOp,
         auto initialized =
             materializeSortInitializer(regionOp, source, rewriter);
         if (failed(initialized)) {
+          // A uniquely chained update of an earlier Sort can keep using its
+          // managed workspace when no earlier tensor version is observed.
+          Value version = source;
+          OpOperand *consumer = &init;
+          bool reusesEarlierSort = false;
+          while (auto versionResult = dyn_cast<OpResult>(version)) {
+            if (llvm::any_of(version.getUses(), [&](OpOperand &use) {
+                  return &use != consumer &&
+                         !isa<tensor::DimOp>(use.getOwner());
+                })) {
+              break;
+            }
+            if (isa<IREE::LinalgExt::SortOp>(versionResult.getOwner())) {
+              reusesEarlierSort = true;
+              break;
+            }
+            auto dps =
+                dyn_cast<DestinationStyleOpInterface>(versionResult.getOwner());
+            if (!dps || !dps.hasPureTensorSemantics() ||
+                !isPure(dps.getOperation())) {
+              break;
+            }
+            consumer = dps.getTiedOpOperand(versionResult);
+            if (!consumer) {
+              break;
+            }
+            version = consumer->get();
+          }
+          if (reusesEarlierSort) {
+            continue;
+          }
+          // Keep a local source in this dispatch when its initializer cannot
+          // move. A separate initialized workspace lets bufferization preserve
+          // the source's tensor version without an in-kernel allocation.
+          auto type = dyn_cast<RankedTensorType>(source.getType());
+          if (!type || type.hasStaticShape()) {
+            continue;
+          }
+          SmallVector<Value> dims;
+          if (failed(IREE::Flow::getOptimizedDynamicResultDims(rewriter, source,
+                                                               dims)) ||
+              llvm::any_of(dims, [&](Value dim) {
+                return regionOp.getBody().isAncestor(dim.getParentRegion());
+              })) {
+            continue;
+          }
+          rewriter.setInsertionPoint(regionOp);
+          auto allocation = IREE::Flow::TensorAllocaOp::create(
+              rewriter, sortOp.getLoc(), type, dims);
+          rewriter.setInsertionPoint(sortOp);
+          auto copy = linalg::CopyOp::create(
+              rewriter, sortOp.getLoc(), ValueRange{source},
+              ValueRange{allocation.getResult()});
+          rewriter.modifyOpInPlace(sortOp,
+                                   [&]() { init.set(copy.getResult(0)); });
+          if (!yieldedValues.contains(result)) {
+            workspaceResults.push_back(result);
+            workspaceDims.push_back(std::move(dims));
+          }
           continue;
         }
         source = *initialized;

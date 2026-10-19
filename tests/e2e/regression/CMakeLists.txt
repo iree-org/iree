@@ -25,6 +25,8 @@ iree_lit_test_suite(
     "globals.mlir"
     "libm_linking.mlir"
     "scalar.mlir"
+    "scatter_preserve_borrowed_input.mlir"
+    "sort_dynamic_observed_versions.mlir"
     "sort_preserve_intermediate_version.mlir"
     "stream_reference_counting_aliased_loop_results.mlir"
     "trace_dispatch_tensors.mlir"
