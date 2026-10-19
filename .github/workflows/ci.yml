@@ -165,6 +165,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       BUILD_DIR: build-runtime-wasm
+      IREE_WEBGPU_PACKAGE_ROOT: ${{ runner.temp }}/iree-webgpu
     defaults:
       run:
         shell: bash
@@ -199,6 +200,32 @@ jobs:
               iree_async_platform_js_proactor \
               iree_hal_drivers_local_sync_sync_driver \
             -- -k 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+      - name: Install WebGPU test requirements
+        run: |
+          sudo apt install -y libvulkan1 mesa-vulkan-drivers
+          npm install --prefix "${IREE_WEBGPU_PACKAGE_ROOT}" \
+            --no-audit --no-fund webgpu@0.6.1
+          icds=(/usr/share/vulkan/icd.d/lvp_icd*.json)
+          test "${#icds[@]}" -eq 1 && test -f "${icds[0]}"
+          echo "VK_ICD_FILENAMES=${icds[0]}" >> "${GITHUB_ENV}"
+      - name: Install Bazelisk
+        run: sudo bash ./build_tools/bazel/install_bazelisk.sh 1.21.0
+      - name: Checkout LLVM Bazel build definitions
+        run: git submodule update --init --depth 1 third_party/llvm-project
+      - name: Configure Bazel
+        run: python3 configure_bazel.py
+      - name: Bazel - run wasm32 WebGPU HAL tests
+        run: |
+          bazel test --config=wasm32_wasi \
+            --test_env=PATH \
+            --test_env=IREE_WEBGPU_PACKAGE_ROOT \
+            --test_env=VK_ICD_FILENAMES \
+            --test_output=errors \
+            --test_timeout=120 \
+            //runtime/src/iree/hal/drivers/webgpu/cts/...
 
   runtime_tracing:
     needs: setup
