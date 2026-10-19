@@ -73,9 +73,13 @@ export class ProactorRing {
   // buffer: {int32 token, int32 status_code}. Returns the number of entries
   // copied.
   drain(wasmMemory, bufferPointer, maxCount) {
+    // Wasm64 pointers are BigInts; wasm32 pointers are signed i32 Numbers.
+    const byteOffset = typeof bufferPointer === 'bigint' ?
+        Number(bufferPointer) :
+        bufferPointer >>> 0;
     // Fresh view each call — memory.grow() can detach the underlying buffer.
     const wasmView =
-        new Int32Array(wasmMemory.buffer, bufferPointer, maxCount * 2);
+        new Int32Array(wasmMemory.buffer, byteOffset, maxCount * 2);
     let count = 0;
     while (count < maxCount) {
       const head = Atomics.load(this.control, HEAD);
