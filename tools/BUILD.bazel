@@ -15,7 +15,7 @@
 # platforms (e.g. Android), so they are tagged "hostonly".
 
 load("@rules_cc//cc:defs.bzl", "cc_binary")
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_binary", "iree_runtime_cc_binary")
+load("//build_tools/bazel:build_defs.oss.bzl", "IREE_COMPILER_TOOL_LINKOPTS", "iree_compiler_cc_binary", "iree_runtime_cc_binary")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -254,6 +254,7 @@ iree_runtime_cc_binary(
 iree_compiler_cc_binary(
     name = "iree-opt",
     srcs = ["iree-opt-main.cc"],
+    linkopts = IREE_COMPILER_TOOL_LINKOPTS,
     tags = ["hostonly"],
     deps = [
         "//compiler/bindings/c:headers",
@@ -264,6 +265,7 @@ iree_compiler_cc_binary(
 iree_compiler_cc_binary(
     name = "iree-mlir-lsp-server",
     srcs = ["iree-mlir-lsp-server.cc"],
+    linkopts = IREE_COMPILER_TOOL_LINKOPTS,
     deps = [
         "//compiler/bindings/c:headers",
         "//compiler/src/iree/compiler/API:Impl",
@@ -276,6 +278,7 @@ iree_compiler_cc_binary(
 cc_binary(
     name = "iree-run-mlir",
     srcs = ["iree-run-mlir-main.cc"],
+    linkopts = IREE_COMPILER_TOOL_LINKOPTS,
     tags = ["hostonly"],
     deps = [
         "//compiler/bindings/c:headers",
@@ -357,6 +360,7 @@ iree_runtime_cc_binary(
 iree_compiler_cc_binary(
     name = "iree-compile",
     srcs = ["iree-compile-main.cc"],
+    linkopts = IREE_COMPILER_TOOL_LINKOPTS,
     tags = ["hostonly"],
     deps = [
         "//compiler/bindings/c:headers",
@@ -377,6 +381,7 @@ iree_compiler_cc_binary(
 iree_compiler_cc_binary(
     name = "iree-reduce",
     srcs = ["iree-reduce.cc"],
+    linkopts = IREE_COMPILER_TOOL_LINKOPTS,
     tags = ["hostonly"],
     deps = [
         "//compiler/bindings/c:headers",
