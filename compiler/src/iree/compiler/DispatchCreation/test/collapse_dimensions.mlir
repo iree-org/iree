@@ -1260,3 +1260,108 @@ util.func public @no_collapse_batch_matmul_compilation_info(%arg0: tensor<4x8x16
 // CHECK-SAME:        indexing_maps = [#{{.+}}, #{{.+}}, #{{.+}}] {compilation_info = #{{.+}}}
 // CHECK-SAME:        ins(%{{.+}}, %{{.+}} : tensor<4x8x16xf32>, tensor<16x12xf32>)
 // CHECK-NOT:     tensor.expand_shape
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-LABEL: @collapse_packed_static
+// CHECK: tensor.collapse_shape
+// CHECK: linalg.generic
+// CHECK-SAME: iterator_types = ["parallel"]
+// CHECK-SAME: outs({{.*}} : tensor<8xi1, #iree_encoding.packed_storage>)
+// CHECK: tensor.expand_shape
+// CHECK: util.return
+util.func public @collapse_packed_static(%arg0: tensor<2x4xi1, #iree_encoding.packed_storage>) -> tensor<2x4xi1, #iree_encoding.packed_storage> {
+  %0 = flow.dispatch.region -> (tensor<2x4xi1, #iree_encoding.packed_storage>) {
+    %empty = tensor.empty() : tensor<2x4xi1, #iree_encoding.packed_storage>
+    %elementwise = linalg.generic {
+      indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<2x4xi1, #iree_encoding.packed_storage>) outs(%empty : tensor<2x4xi1, #iree_encoding.packed_storage>) {
+    ^bb0(%in : i1, %out : i1):
+      %true = arith.constant true
+      %flipped = arith.xori %in, %true : i1
+      linalg.yield %flipped : i1
+    } -> tensor<2x4xi1, #iree_encoding.packed_storage>
+    flow.return %elementwise : tensor<2x4xi1, #iree_encoding.packed_storage>
+  }
+  util.return %0 : tensor<2x4xi1, #iree_encoding.packed_storage>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-LABEL: @collapse_packed_dynamic
+// CHECK: tensor.collapse_shape
+// CHECK: linalg.generic
+// CHECK-SAME: iterator_types = ["parallel"]
+// CHECK-SAME: outs({{.*}} : tensor<?xi1, #iree_encoding.packed_storage>)
+// CHECK: tensor.expand_shape
+// CHECK: util.return
+util.func public @collapse_packed_dynamic(%arg0: tensor<?x4xi1, #iree_encoding.packed_storage>) -> tensor<?x4xi1, #iree_encoding.packed_storage> {
+  %c0 = arith.constant 0 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?x4xi1, #iree_encoding.packed_storage>
+  %0 = flow.dispatch.region -> (tensor<?x4xi1, #iree_encoding.packed_storage>{%dim}) {
+    %empty = tensor.empty(%dim) : tensor<?x4xi1, #iree_encoding.packed_storage>
+    %elementwise = linalg.generic {
+      indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<?x4xi1, #iree_encoding.packed_storage>) outs(%empty : tensor<?x4xi1, #iree_encoding.packed_storage>) {
+    ^bb0(%in : i1, %out : i1):
+      %true = arith.constant true
+      %flipped = arith.xori %in, %true : i1
+      linalg.yield %flipped : i1
+    } -> tensor<?x4xi1, #iree_encoding.packed_storage>
+    flow.return %elementwise : tensor<?x4xi1, #iree_encoding.packed_storage>
+  }
+  util.return %0 : tensor<?x4xi1, #iree_encoding.packed_storage>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-LABEL: @collapse_packed_destination
+// CHECK: tensor.collapse_shape
+// CHECK: linalg.generic
+// CHECK-SAME: iterator_types = ["parallel"]
+// CHECK-SAME: outs({{.*}} : tensor<8xi1, #iree_encoding.packed_storage>)
+// CHECK: tensor.expand_shape
+// CHECK: util.return
+util.func public @collapse_packed_destination(%arg0: tensor<2x4xi1>) -> tensor<2x4xi1, #iree_encoding.packed_storage> {
+  %0 = flow.dispatch.region -> (tensor<2x4xi1, #iree_encoding.packed_storage>) {
+    %empty = tensor.empty() : tensor<2x4xi1, #iree_encoding.packed_storage>
+    %elementwise = linalg.generic {
+      indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<2x4xi1>) outs(%empty : tensor<2x4xi1, #iree_encoding.packed_storage>) {
+    ^bb0(%in : i1, %out : i1):
+      %true = arith.constant true
+      %flipped = arith.xori %in, %true : i1
+      linalg.yield %flipped : i1
+    } -> tensor<2x4xi1, #iree_encoding.packed_storage>
+    flow.return %elementwise : tensor<2x4xi1, #iree_encoding.packed_storage>
+  }
+  util.return %0 : tensor<2x4xi1, #iree_encoding.packed_storage>
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-LABEL: @do_not_collapse_unknown_encoding
+// CHECK-NOT: tensor.collapse_shape
+// CHECK: linalg.generic
+// CHECK-SAME: iterator_types = ["parallel", "parallel"]
+// CHECK-NOT: tensor.collapse_shape
+// CHECK: util.return
+util.func public @do_not_collapse_unknown_encoding(%arg0: tensor<2x4xi1, #iree_encoding.unknown>) -> tensor<2x4xi1, #iree_encoding.unknown> {
+  %0 = flow.dispatch.region -> (tensor<2x4xi1, #iree_encoding.unknown>) {
+    %empty = tensor.empty() : tensor<2x4xi1, #iree_encoding.unknown>
+    %elementwise = linalg.generic {
+      indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<2x4xi1, #iree_encoding.unknown>) outs(%empty : tensor<2x4xi1, #iree_encoding.unknown>) {
+    ^bb0(%in : i1, %out : i1):
+      %true = arith.constant true
+      %flipped = arith.xori %in, %true : i1
+      linalg.yield %flipped : i1
+    } -> tensor<2x4xi1, #iree_encoding.unknown>
+    flow.return %elementwise : tensor<2x4xi1, #iree_encoding.unknown>
+  }
+  util.return %0 : tensor<2x4xi1, #iree_encoding.unknown>
+}
