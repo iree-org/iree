@@ -88,7 +88,7 @@ iree_status_t iree_hal_webgpu_buffer_create(
       // this copies zeroes — but it ensures the shadow matches the GPU state.
       iree_hal_webgpu_import_buffer_get_mapped_range(
           buffer_handle, /*offset=*/0, /*size=*/(uint64_t)allocation_size,
-          (uint32_t)(uintptr_t)buffer->shadow_buffer);
+          (uintptr_t)buffer->shadow_buffer);
     }
   }
 
@@ -230,7 +230,7 @@ iree_status_t iree_hal_webgpu_buffer_bind(
         buffer->shadow_buffer_size = allocation_size;
         iree_hal_webgpu_import_buffer_get_mapped_range(
             new_handle, /*offset=*/0, /*size=*/(uint64_t)allocation_size,
-            (uint32_t)(uintptr_t)buffer->shadow_buffer);
+            (uintptr_t)buffer->shadow_buffer);
       }
     }
   }
@@ -351,8 +351,7 @@ static iree_status_t iree_hal_webgpu_buffer_map_range(
     iree_hal_webgpu_import_buffer_get_mapped_range(
         buffer->buffer_handle, (uint64_t)local_byte_offset,
         (uint64_t)local_byte_length,
-        (uint32_t)(uintptr_t)((uint8_t*)buffer->shadow_buffer +
-                              local_byte_offset));
+        (uintptr_t)((uint8_t*)buffer->shadow_buffer + local_byte_offset));
   }
 
   // Return a pointer into the shadow buffer.
@@ -379,8 +378,7 @@ static iree_status_t iree_hal_webgpu_buffer_unmap_range(
   iree_hal_webgpu_import_buffer_set_mapped_range(
       buffer->buffer_handle, (uint64_t)local_byte_offset,
       (uint64_t)local_byte_length,
-      (uint32_t)(uintptr_t)((uint8_t*)buffer->shadow_buffer +
-                            local_byte_offset));
+      (uintptr_t)((uint8_t*)buffer->shadow_buffer + local_byte_offset));
 
   // For mappedAtCreation buffers, unmap transitions the buffer to the
   // unmapped state permanently (it cannot be re-mapped for writing).

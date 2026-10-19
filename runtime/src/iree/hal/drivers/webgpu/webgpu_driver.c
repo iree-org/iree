@@ -169,7 +169,7 @@ static iree_status_t iree_hal_webgpu_driver_request_adapter(
                                                  &token));
 
   iree_hal_webgpu_import_request_adapter(
-      /*options_flags=*/0, (uint32_t)(uintptr_t)&request.result_handle, token);
+      /*options_flags=*/0, (uintptr_t)&request.result_handle, token);
 
   iree_status_t status =
       iree_hal_webgpu_poll_until_complete(proactor, &request);
@@ -207,7 +207,7 @@ static iree_status_t iree_hal_webgpu_driver_request_device(
                                                  &token));
 
   iree_hal_webgpu_import_adapter_request_device(
-      adapter_handle, (uint32_t)(uintptr_t)&request.result_handle, token);
+      adapter_handle, (uintptr_t)&request.result_handle, token);
 
   iree_status_t status =
       iree_hal_webgpu_poll_until_complete(proactor, &request);

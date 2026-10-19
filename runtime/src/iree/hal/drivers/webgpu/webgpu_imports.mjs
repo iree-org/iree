@@ -57,6 +57,19 @@ class HandleTable {
   }
 }
 
+// Wasm32 pointers arrive as signed i32 Numbers; memory64 pointers as BigInt.
+function memoryOffset(pointer) {
+  return typeof pointer === 'bigint' ? Number(pointer) : pointer >>> 0;
+}
+
+function memoryBase(pointer) {
+  const offset = memoryOffset(pointer);
+  if (offset % 4 !== 0) {
+    throw new RangeError('Wasm memory pointer must be 4-byte aligned');
+  }
+  return offset / 4;
+}
+
 // GPUMapMode constants.
 const MAP_READ = 1;
 const MAP_WRITE = 2;
@@ -118,7 +131,8 @@ export function createImports(context) {
 
   // Helper: read a UTF-8 string from wasm linear memory.
   function readString(ptr, length) {
-    return new TextDecoder().decode(u8().subarray(ptr, ptr + length));
+    const offset = memoryOffset(ptr);
+    return new TextDecoder().decode(u8().subarray(offset, offset + length));
   }
 
   //============================================================================
@@ -383,7 +397,7 @@ export function createImports(context) {
   // Reads a builtins descriptor from wasm memory (4 uint32 handles).
   function readBuiltins(builtinsPtr) {
     const view = u32();
-    const base = builtinsPtr >> 2;
+    const base = memoryBase(builtinsPtr);
     return {
       fillPipeline: handles.get(view[base]),
       fillBGL: handles.get(view[base + 1]),
@@ -392,16 +406,24 @@ export function createImports(context) {
     };
   }
 
+  // Decode a native pointer table using the width of its Wasm pointer argument.
+  function readBlockPointer(view, blockTablePtr, index) {
+    const memory64 = typeof blockTablePtr === 'bigint';
+    const base = memoryBase(blockTablePtr) + index * (memory64 ? 2 : 1);
+    return memory64 ? BigInt(view[base]) | (BigInt(view[base + 1]) << 32n) :
+                      view[base];
+  }
+
   // Reads instruction blocks zero-copy from wasm memory. The block table is an
-  // array of uint32_t* pointers (stored as uint32 wasm pointers). For a single
-  // block (the common case), returns a direct subarray view. For multiple
-  // blocks, concatenates into a temporary Uint32Array.
+  // array of uint32_t* pointers (32 or 64 bits according to the Wasm ABI). For
+  // a single block (the common case), returns a direct subarray view. For
+  // multiple blocks, concatenates into a temporary Uint32Array.
   function readBlocksZeroCopy(
       view, blockTablePtr, blockCount, blockWordCapacity, lastBlockWordCount) {
-    const tableBase = blockTablePtr >> 2;
     if (blockCount === 1) {
-      const blockPtr = view[tableBase];
-      return view.subarray(blockPtr >> 2, (blockPtr >> 2) + lastBlockWordCount);
+      const blockPtr = readBlockPointer(view, blockTablePtr, 0);
+      const blockBase = memoryBase(blockPtr);
+      return view.subarray(blockBase, blockBase + lastBlockWordCount);
     }
     // Multi-block: concatenate into a flat array.
     return readBlocksCopy(
@@ -413,14 +435,13 @@ export function createImports(context) {
   // and as the multi-block fallback for execute_instructions.
   function readBlocksCopy(
       view, blockTablePtr, blockCount, blockWordCapacity, lastBlockWordCount) {
-    const tableBase = blockTablePtr >> 2;
     const totalWords =
         (blockCount - 1) * blockWordCapacity + lastBlockWordCount;
     const result = new Uint32Array(totalWords);
     let destOffset = 0;
     for (let i = 0; i < blockCount; i++) {
-      const blockPtr = view[tableBase + i];
-      const blockBase = blockPtr >> 2;
+      const blockPtr = readBlockPointer(view, blockTablePtr, i);
+      const blockBase = memoryBase(blockPtr);
       const wordCount =
           (i < blockCount - 1) ? blockWordCapacity : lastBlockWordCount;
       result.set(view.subarray(blockBase, blockBase + wordCount), destOffset);
@@ -434,7 +455,7 @@ export function createImports(context) {
   // Uint32Array}.
   function readBindingTable(ptr, count) {
     const view = u32();
-    const base = ptr >> 2;
+    const base = memoryBase(ptr);
     const result_buffers = new Array(count);
     const result_offsets = new Uint32Array(count);
     for (let i = 0; i < count; i++) {
@@ -475,7 +496,7 @@ export function createImports(context) {
       // Resolve dynamic bindings from wasm memory.
       if (this.dynamicCount > 0) {
         const view = u32();
-        const base = dynamicBindingTablePtr >> 2;
+        const base = memoryBase(dynamicBindingTablePtr);
         for (let i = 0; i < this.dynamicCount; i++) {
           this.buffers[i] = handles.get(view[base + i * 2]);
           this.offsets[i] = view[base + i * 2 + 1];
@@ -513,7 +534,7 @@ export function createImports(context) {
               return;
             }
             const handle = handles.insert(adapter);
-            u32()[outAdapterHandlePtr >> 2] = handle;
+            u32()[memoryBase(outAdapterHandlePtr)] = handle;
             complete(token, STATUS_OK);
           },
           () => complete(token, STATUS_UNAVAILABLE),
@@ -533,7 +554,7 @@ export function createImports(context) {
               return;
             }
             const handle = handles.insert(device);
-            u32()[outDeviceHandlePtr >> 2] = handle;
+            u32()[memoryBase(outDeviceHandlePtr)] = handle;
             complete(token, STATUS_OK);
           },
           () => complete(token, STATUS_INTERNAL),
@@ -596,7 +617,7 @@ export function createImports(context) {
       const mapped = new Uint8Array(
           buffer.getMappedRange(Number(offset), Number(size)),
       );
-      u8().set(mapped, destPtr);
+      u8().set(mapped, memoryOffset(destPtr));
     },
 
     buffer_set_mapped_range(bufferHandle, offset, size, srcPtr) {
@@ -605,7 +626,9 @@ export function createImports(context) {
       const mapped = new Uint8Array(
           buffer.getMappedRange(Number(offset), Number(size)),
       );
-      mapped.set(u8().subarray(srcPtr, srcPtr + Number(size)));
+      mapped.set(
+          u8().subarray(
+              memoryOffset(srcPtr), memoryOffset(srcPtr) + Number(size)));
     },
 
     buffer_unmap(bufferHandle) {
@@ -642,7 +665,7 @@ export function createImports(context) {
       const bindGroup = handles.get(bindGroupHandle);
       if (!pass || !bindGroup) return;
       if (dynamicOffsetsCount > 0) {
-        const base = dynamicOffsetsPtr >> 2;
+        const base = memoryBase(dynamicOffsetsPtr);
         pass.setBindGroup(
             index, bindGroup, u32().subarray(base, base + dynamicOffsetsCount));
       } else {
@@ -712,7 +735,7 @@ export function createImports(context) {
       const device = handles.get(deviceHandle);
       if (!device) return 0;
       const view = u32();
-      const base = layoutsPtr >> 2;
+      const base = memoryBase(layoutsPtr);
       const layouts = [];
       for (let i = 0; i < layoutCount; i++) {
         layouts.push(handles.get(view[base + i]));
@@ -735,7 +758,7 @@ export function createImports(context) {
       //   uint64_t min_binding_size (as two uint32s: lo, hi)
       const ENTRY_UINT32S = 6;
       const view = u32();
-      const viewBase = entriesPtr >> 2;
+      const viewBase = memoryBase(entriesPtr);
 
       const bufferTypes = ['uniform', 'storage', 'read-only-storage'];
       const entries = [];
@@ -770,7 +793,7 @@ export function createImports(context) {
       //   uint64_t size (as two uint32s: lo, hi)
       const ENTRY_UINT32S = 6;
       const view = u32();
-      const viewBase = entriesPtr >> 2;
+      const viewBase = memoryBase(entriesPtr);
 
       const entries = [];
       for (let i = 0; i < entryCount; i++) {
@@ -880,7 +903,8 @@ export function createImports(context) {
       if (!queue || !buffer) return;
       const size = Number(dataSize);
       queue.writeBuffer(
-          buffer, Number(bufferOffset), u8().subarray(dataPtr, dataPtr + size));
+          buffer, Number(bufferOffset),
+          u8().subarray(memoryOffset(dataPtr), memoryOffset(dataPtr) + size));
     },
 
     //==========================================================================
@@ -949,7 +973,7 @@ export function createImports(context) {
       if (!adapter) return;
       // Write adapter info to wasm memory. Layout defined by C struct.
       const view = u32();
-      const base = destPtr >> 2;
+      const base = memoryBase(destPtr);
       const info = adapter.info || {};
       view[base] = info.vendor ? parseInt(info.vendor, 16) || 0 : 0;
       view[base + 1] = info.device ? parseInt(info.device, 16) || 0 : 0;
@@ -962,7 +986,7 @@ export function createImports(context) {
       if (!device) return;
       const limits = device.limits;
       const view = u32();
-      const base = destPtr >> 2;
+      const base = memoryBase(destPtr);
       view[base] = limits.maxBufferSize & 0xFFFFFFFF;
       view[base + 1] = Math.floor(limits.maxBufferSize / 0x100000000);
       view[base + 2] = limits.maxStorageBufferBindingSize & 0xFFFFFFFF;

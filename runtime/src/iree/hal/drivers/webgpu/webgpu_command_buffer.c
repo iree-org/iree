@@ -181,12 +181,12 @@ static iree_status_t iree_hal_webgpu_command_buffer_end(
 
     command_buffer->recording_handle = iree_hal_webgpu_import_create_recording(
         command_buffer->device_handle,
-        (uint32_t)(uintptr_t)iree_hal_webgpu_builder_block_table(builder),
+        (uintptr_t)iree_hal_webgpu_builder_block_table(builder),
         iree_hal_webgpu_builder_block_count(builder),
         iree_hal_webgpu_builder_block_word_capacity(builder),
         iree_hal_webgpu_builder_last_block_word_count(builder),
-        (uint32_t)(uintptr_t)static_entries, static_count,
-        builder->dynamic_count, (uint32_t)(uintptr_t)&builtins_descriptor);
+        (uintptr_t)static_entries, static_count, builder->dynamic_count,
+        (uintptr_t)&builtins_descriptor);
 
     iree_allocator_free(command_buffer->host_allocator, static_entries);
 
