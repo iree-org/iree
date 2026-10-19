@@ -32,6 +32,7 @@ typedef struct iree_hal_webgpu_buffer_t {
   // Whether the buffer was created with mappedAtCreation:true. These buffers
   // start in the mapped state and the shadow buffer is allocated at creation.
   bool mapped_at_creation;
+  iree_host_size_t mapping_count;
 } iree_hal_webgpu_buffer_t;
 
 static const iree_hal_buffer_vtable_t iree_hal_webgpu_buffer_vtable;
@@ -83,12 +84,6 @@ iree_status_t iree_hal_webgpu_buffer_create(
                               &buffer->shadow_buffer);
     if (iree_status_is_ok(status)) {
       buffer->shadow_buffer_size = allocation_size;
-      // Pull the initial mapped contents from the GPU buffer into the shadow.
-      // For mappedAtCreation the buffer is zero-initialized by WebGPU, so
-      // this copies zeroes — but it ensures the shadow matches the GPU state.
-      iree_hal_webgpu_import_buffer_get_mapped_range(
-          buffer_handle, /*offset=*/0, /*size=*/(uint64_t)allocation_size,
-          (uint32_t)(uintptr_t)buffer->shadow_buffer);
     }
   }
 
@@ -228,9 +223,6 @@ iree_status_t iree_hal_webgpu_buffer_bind(
                                      &buffer->shadow_buffer);
       if (iree_status_is_ok(status)) {
         buffer->shadow_buffer_size = allocation_size;
-        iree_hal_webgpu_import_buffer_get_mapped_range(
-            new_handle, /*offset=*/0, /*size=*/(uint64_t)allocation_size,
-            (uint32_t)(uintptr_t)buffer->shadow_buffer);
       }
     }
   }
@@ -346,14 +338,17 @@ static iree_status_t iree_hal_webgpu_buffer_map_range(
                             (uint64_t)buffer->shadow_buffer_size);
   }
 
-  // For read access, pull data from the GPU mapped range into the shadow.
-  if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_READ)) {
+  // The mapped-at-creation shadow contains the latest host writes.
+  if (!buffer->mapped_at_creation &&
+      iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_READ)) {
     iree_hal_webgpu_import_buffer_get_mapped_range(
         buffer->buffer_handle, (uint64_t)local_byte_offset,
         (uint64_t)local_byte_length,
         (uint32_t)(uintptr_t)((uint8_t*)buffer->shadow_buffer +
                               local_byte_offset));
   }
+
+  ++buffer->mapping_count;
 
   // Return a pointer into the shadow buffer.
   mapping->contents = iree_make_byte_span(
@@ -370,6 +365,13 @@ static iree_status_t iree_hal_webgpu_buffer_unmap_range(
   if (!buffer->is_mapped) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "buffer is not mapped");
+  }
+
+  --buffer->mapping_count;
+  if (buffer->mapped_at_creation) {
+    if (buffer->mapping_count != 0) return iree_ok_status();
+    local_byte_offset = 0;
+    local_byte_length = buffer->shadow_buffer_size;
   }
 
   // For write access, flush the shadow buffer contents to the GPU mapped range.
