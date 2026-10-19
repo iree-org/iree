@@ -3256,10 +3256,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-global-opt-convert-conv2d-to-img2col" class="md-nav__link">
+  <a href="#-iree-global-opt-convert-conv-to-im2col" class="md-nav__link">
     <span class="md-ellipsis">
       
-        -iree-global-opt-convert-conv2d-to-img2col
+        -iree-global-opt-convert-conv-to-im2col
       
     </span>
   </a>
@@ -6465,10 +6465,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-global-opt-convert-conv2d-to-img2col" class="md-nav__link">
+  <a href="#-iree-global-opt-convert-conv-to-im2col" class="md-nav__link">
     <span class="md-ellipsis">
       
-        -iree-global-opt-convert-conv2d-to-img2col
+        -iree-global-opt-convert-conv-to-im2col
       
     </span>
   </a>
@@ -6818,8 +6818,19 @@
 <p><em>Cleans up any numeric narrowing ops inserted by iree-global-opt-infer-numeric-narrowing.</em></p>
 <h3 id="-iree-global-opt-convert-batch-matmul-to-matmul"><code>-iree-global-opt-convert-batch-matmul-to-matmul</code><a class="headerlink" href="#-iree-global-opt-convert-batch-matmul-to-matmul" title="Permanent link">link</a></h3>
 <p><em>Converts batch_matmul to reshape + matmul + reshape.</em></p>
-<h3 id="-iree-global-opt-convert-conv2d-to-img2col"><code>-iree-global-opt-convert-conv2d-to-img2col</code><a class="headerlink" href="#-iree-global-opt-convert-conv2d-to-img2col" title="Permanent link">link</a></h3>
-<p><em>Convert linalg convolution ops to matmul img2col based implementation</em></p>
+<h3 id="-iree-global-opt-convert-conv-to-im2col"><code>-iree-global-opt-convert-conv-to-im2col</code><a class="headerlink" href="#-iree-global-opt-convert-conv-to-im2col" title="Permanent link">link</a></h3>
+<p><em>Rewrites convolutions as contractions over an im2col gather</em></p>
+<p>Rewrites every linalg op that implements a convolution, named or generic,
+as an all-parallel <code>linalg.generic</code> that gathers the convolved input
+windows, followed by a contraction over the gathered tensor with the
+original payload. Contraction loops are collapsed wherever the operand
+layouts allow, so standard layouts become plain or batched matmuls.
+Convolutions without an output channel dimension, i.e. depthwise
+convolutions with a unit multiplier and pooling ops, are left unchanged:
+nothing reuses the gathered input, so the rewrite never pays off.</p>
+<p>The pass expects quantization to be lowered already: quantized
+convolutions such as <code>linalg.conv_2d_nhwc_hwcf_q</code> are not matched, and
+dequantize producers are not looked through.</p>
 <h3 id="-iree-global-opt-convert-qdq-to-integer-math"><code>-iree-global-opt-convert-qdq-to-integer-math</code><a class="headerlink" href="#-iree-global-opt-convert-qdq-to-integer-math" title="Permanent link">link</a></h3>
 <p><em>Rewrites contractions over dequantized operands into integer contractions.</em></p>
 <p>Matches a contraction or convolution whose inputs are produced by
