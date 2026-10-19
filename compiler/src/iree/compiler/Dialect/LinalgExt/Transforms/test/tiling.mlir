@@ -4496,3 +4496,237 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+// Score indices of the tiled attention are offset by the query tile start; the
+// key index is not tiled here.
+func.func @attention_score_index(%query: tensor<3x12x8xf32>, %key: tensor<3x10x8xf32>, %value: tensor<3x10x5xf32>) -> tensor<3x12x5xf32> {
+  %init = tensor.empty() : tensor<3x12x5xf32>
+  %scale = arith.constant 1.0 : f32
+  %result = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
+                     ins(%query, %key, %value, %scale : tensor<3x12x8xf32>, tensor<3x10x8xf32>, tensor<3x10x5xf32>, f32) outs(%init : tensor<3x12x5xf32>) {
+                      ^bb0(%score: f32):
+                        %q = iree_linalg_ext.index 1 : index
+                        %k = iree_linalg_ext.index 2 : index
+                        %hidden = arith.cmpi ugt, %k, %q : index
+                        %ninf = arith.constant 0xFF800000 : f32
+                        %masked = arith.select %hidden, %ninf, %score : f32
+                        iree_linalg_ext.yield %masked : f32
+                     } -> tensor<3x12x5xf32>
+  return %result : tensor<3x12x5xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [2, 4] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-DAG:  #[[$ADD:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+// CHECK-LABEL: func.func @attention_score_index(
+// CHECK:        scf.for %[[B:[a-zA-Z0-9_]+]] =
+// CHECK:          scf.for %[[M:[a-zA-Z0-9_]+]] =
+// CHECK:            iree_linalg_ext.attention
+// CHECK:              %[[Q:.+]] = iree_linalg_ext.index 1 : index
+// CHECK:              %[[Q_GLOBAL:.+]] = affine.apply #[[$ADD]](%[[M]])[%[[Q]]]
+// CHECK:              %[[K:.+]] = iree_linalg_ext.index 2 : index
+// CHECK-NOT:          affine.apply
+// CHECK:              arith.cmpi ugt, %[[K]], %[[Q_GLOBAL]] : index
+
+// -----
+
+// The score map follows the operand maps, not the iteration order: the query
+// is iteration dim 2 here, so score index 1 takes the offset of loop 2.
+func.func @attention_score_index_permuted(%query: tensor<3x12x8xf32>, %key: tensor<3x10x8xf32>, %value: tensor<3x10x5xf32>) -> tensor<3x12x5xf32> {
+  %init = tensor.empty() : tensor<3x12x5xf32>
+  %scale = arith.constant 1.0 : f32
+  %result = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d3)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>]>
+                     ins(%query, %key, %value, %scale : tensor<3x12x8xf32>, tensor<3x10x8xf32>, tensor<3x10x5xf32>, f32) outs(%init : tensor<3x12x5xf32>) {
+                      ^bb0(%score: f32):
+                        %q = iree_linalg_ext.index 1 : index
+                        %k = iree_linalg_ext.index 2 : index
+                        %hidden = arith.cmpi ugt, %k, %q : index
+                        %ninf = arith.constant 0xFF800000 : f32
+                        %masked = arith.select %hidden, %ninf, %score : f32
+                        iree_linalg_ext.yield %masked : f32
+                     } -> tensor<3x12x5xf32>
+  return %result : tensor<3x12x5xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [0, 0, 4, 0, 2] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-DAG:  #[[$ADD:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
+// CHECK-LABEL: func.func @attention_score_index_permuted(
+// CHECK:        scf.for %[[M:[a-zA-Z0-9_]+]] =
+// CHECK:          scf.for %[[N:[a-zA-Z0-9_]+]] =
+// CHECK:            iree_linalg_ext.attention
+// CHECK:              %[[Q:.+]] = iree_linalg_ext.index 1 : index
+// CHECK:              %[[Q_GLOBAL:.+]] = affine.apply #[[$ADD]](%[[M]])[%[[Q]]]
+// CHECK:              %[[K:.+]] = iree_linalg_ext.index 2 : index
+// CHECK:              arith.cmpi ugt, %[[K]], %[[Q_GLOBAL]] : index
+
+// -----
+
+// Decomposing the K2 partial reduction reads the query from the score dim of
+// extent 9 and the key from the dim of extent 4, the K2 tile.
+func.func @online_attention_score_index_k2_decomposed(%query: tensor<3x9x8xf32>, %key: tensor<3x12x8xf32>, %value: tensor<3x12x5xf32>) -> tensor<3x9x5xf32> {
+  %scale = arith.constant 1.0 : f32
+  %zero = arith.constant 0.0 : f32
+  %lowest = arith.constant -3.40282347E+38 : f32
+  %acc_empty = tensor.empty() : tensor<3x9x5xf32>
+  %row_empty = tensor.empty() : tensor<3x9xf32>
+  %acc = linalg.fill ins(%zero : f32) outs(%acc_empty : tensor<3x9x5xf32>) -> tensor<3x9x5xf32>
+  %max = linalg.fill ins(%lowest : f32) outs(%row_empty : tensor<3x9xf32>) -> tensor<3x9xf32>
+  %sum = linalg.fill ins(%zero : f32) outs(%row_empty : tensor<3x9xf32>) -> tensor<3x9xf32>
+  %out:3 = iree_linalg_ext.online_attention
+        <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]>
+        ins(%query, %key, %value, %scale : tensor<3x9x8xf32>, tensor<3x12x8xf32>, tensor<3x12x5xf32>, f32)
+        outs(%acc, %max, %sum : tensor<3x9x5xf32>, tensor<3x9xf32>, tensor<3x9xf32>) {
+                      ^bb0(%score: f32):
+                        %q = iree_linalg_ext.index 1 : index
+                        %k = iree_linalg_ext.index 2 : index
+                        %hidden = arith.cmpi ugt, %k, %q : index
+                        %ninf = arith.constant 0xFF800000 : f32
+                        %masked = arith.select %hidden, %ninf, %score : f32
+                        iree_linalg_ext.yield %masked : f32
+                     }
+        -> tensor<3x9x5xf32>, tensor<3x9xf32>, tensor<3x9xf32>
+  return %out#0 : tensor<3x9x5xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.online_attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %fill_op:3, %split, %merge:3, %forop = transform.structured.tile_reduction_using_for %0 by tile_sizes = [0, 0, 0, 4, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.iree.decompose_aggregate_op %split : (!transform.any_op) -> ()
+    transform.yield
+  }
+}
+// The partial results carry K2, which makes it a batch dim of the tiled op:
+// its score map is (batch, k2, m), so the query index becomes 2 and the key 1.
+// CHECK-LABEL: func.func @online_attention_score_index_k2_decomposed(
+// CHECK:        scf.for
+// CHECK:          linalg.generic
+// CHECK:            %[[Q:.+]] = linalg.index 2 : index
+// CHECK:            %[[K:.+]] = linalg.index 1 : index
+// CHECK:            arith.cmpi ugt, %{{.+}}, %[[Q]] : index
+// CHECK:          -> tensor<3x4x9xf32>
+
+// -----
+
+// K2 partial reduction offsets the key index by the K2 tile start.
+func.func @online_attention_score_index_k2(%query: tensor<3x9x8xf32>, %key: tensor<3x12x8xf32>, %value: tensor<3x12x5xf32>) -> tensor<3x9x5xf32> {
+  %scale = arith.constant 1.0 : f32
+  %zero = arith.constant 0.0 : f32
+  %lowest = arith.constant -3.40282347E+38 : f32
+  %acc_empty = tensor.empty() : tensor<3x9x5xf32>
+  %row_empty = tensor.empty() : tensor<3x9xf32>
+  %acc = linalg.fill ins(%zero : f32) outs(%acc_empty : tensor<3x9x5xf32>) -> tensor<3x9x5xf32>
+  %max = linalg.fill ins(%lowest : f32) outs(%row_empty : tensor<3x9xf32>) -> tensor<3x9xf32>
+  %sum = linalg.fill ins(%zero : f32) outs(%row_empty : tensor<3x9xf32>) -> tensor<3x9xf32>
+  %out:3 = iree_linalg_ext.online_attention
+        <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]>
+        ins(%query, %key, %value, %scale : tensor<3x9x8xf32>, tensor<3x12x8xf32>, tensor<3x12x5xf32>, f32)
+        outs(%acc, %max, %sum : tensor<3x9x5xf32>, tensor<3x9xf32>, tensor<3x9xf32>) {
+                      ^bb0(%score: f32):
+                        %q = iree_linalg_ext.index 1 : index
+                        %k = iree_linalg_ext.index 2 : index
+                        %hidden = arith.cmpi ugt, %k, %q : index
+                        %ninf = arith.constant 0xFF800000 : f32
+                        %masked = arith.select %hidden, %ninf, %score : f32
+                        iree_linalg_ext.yield %masked : f32
+                     }
+        -> tensor<3x9x5xf32>, tensor<3x9xf32>, tensor<3x9xf32>
+  return %out#0 : tensor<3x9x5xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.online_attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %fill_op:3, %split, %merge:3, %forop = transform.structured.tile_reduction_using_for %0 by tile_sizes = [0, 0, 0, 4, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// The partial results carry K2, which makes it a batch dim of the tiled op:
+// its score map is (batch, k2, m), so the query index becomes 2 and the key 1.
+// CHECK-LABEL: func.func @online_attention_score_index_k2(
+// CHECK:        scf.for %[[K2:[a-zA-Z0-9_]+]] =
+// CHECK:          iree_linalg_ext.online_attention
+// CHECK:            %[[Q:.+]] = iree_linalg_ext.index 2 : index
+// CHECK-NOT:        affine.apply
+// CHECK:            %[[K:.+]] = iree_linalg_ext.index 1 : index
+// CHECK:            %[[K_GLOBAL:.+]] = affine.apply #{{.+}}(%[[K2]])[%[[K]]]
+// CHECK:            arith.cmpi ugt, %[[K_GLOBAL]], %[[Q]] : index
+
+// -----
+
+// Two tiling levels of the query dim add both offsets to the query index.
+func.func @online_attention_score_index_nested(%query: tensor<3x12x8xf32>, %key: tensor<3x10x8xf32>, %value: tensor<3x10x5xf32>) -> tensor<3x12x5xf32> {
+  %scale = arith.constant 1.0 : f32
+  %zero = arith.constant 0.0 : f32
+  %lowest = arith.constant -3.40282347E+38 : f32
+  %acc_empty = tensor.empty() : tensor<3x12x5xf32>
+  %row_empty = tensor.empty() : tensor<3x12xf32>
+  %acc = linalg.fill ins(%zero : f32) outs(%acc_empty : tensor<3x12x5xf32>) -> tensor<3x12x5xf32>
+  %max = linalg.fill ins(%lowest : f32) outs(%row_empty : tensor<3x12xf32>) -> tensor<3x12xf32>
+  %sum = linalg.fill ins(%zero : f32) outs(%row_empty : tensor<3x12xf32>) -> tensor<3x12xf32>
+  %out:3 = iree_linalg_ext.online_attention
+        <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>,
+                          affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>]>
+        ins(%query, %key, %value, %scale : tensor<3x12x8xf32>, tensor<3x10x8xf32>, tensor<3x10x5xf32>, f32)
+        outs(%acc, %max, %sum : tensor<3x12x5xf32>, tensor<3x12xf32>, tensor<3x12xf32>) {
+                      ^bb0(%score: f32):
+                        %q = iree_linalg_ext.index 1 : index
+                        %k = iree_linalg_ext.index 2 : index
+                        %hidden = arith.cmpi ugt, %k, %q : index
+                        %ninf = arith.constant 0xFF800000 : f32
+                        %masked = arith.select %hidden, %ninf, %score : f32
+                        iree_linalg_ext.yield %masked : f32
+                     }
+        -> tensor<3x12x5xf32>, tensor<3x12xf32>, tensor<3x12xf32>
+  return %out#0 : tensor<3x12x5xf32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.online_attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %outer = transform.structured.tile_using_for %0 tile_sizes [0, 6] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %2, %inner = transform.structured.tile_using_for %1 tile_sizes [0, 2] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @online_attention_score_index_nested(
+// CHECK:        scf.for %[[OUTER:[a-zA-Z0-9_]+]] =
+// CHECK:          scf.for %[[INNER:[a-zA-Z0-9_]+]] =
+// CHECK:            iree_linalg_ext.online_attention
+// CHECK:              %[[Q:.+]] = iree_linalg_ext.index 1 : index
+// CHECK:              %[[Q_GLOBAL:.+]] = affine.apply #{{.+}}(%[[OUTER]], %[[INNER]])[%[[Q]]]
+// CHECK:              %[[K:.+]] = iree_linalg_ext.index 2 : index
+// CHECK:              arith.cmpi ugt, %[[K]], %[[Q_GLOBAL]] : index

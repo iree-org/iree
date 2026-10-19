@@ -3776,20 +3776,54 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
         "expected parent op to be one of `iree_linalg_ext.custom_op`, "
         "`iree_linalg_ext.attention`, `iree_linalg_ext.online_attention`");
   }
-  int64_t numLoops;
   if (auto customOp = dyn_cast<CustomOp>(parentOp)) {
-    numLoops = customOp.getNumLoops();
-  } else if (auto attentionOp = dyn_cast<AttentionOp>(parentOp)) {
-    numLoops = attentionOp.getIterationDomainRank();
-  } else {
-    numLoops = cast<OnlineAttentionOp>(parentOp).getIterationDomainRank();
+    int64_t numLoops = customOp.getNumLoops();
+    if (numLoops <= getDim()) {
+      return emitOpError("expected dim (")
+             << getDim() << ") to be lower than the number of loops ("
+             << numLoops << ") of the enclosing operation";
+    }
+    return success();
   }
-  if (numLoops <= getDim()) {
+  FailureOr<AttentionOpDetail> opInfo =
+      TypeSwitch<Operation *, FailureOr<AttentionOpDetail>>(parentOp)
+          .Case<AttentionOp, OnlineAttentionOp>([](auto attentionOp) {
+            return AttentionOpDetail::get(
+                attentionOp.getQueryMap(), attentionOp.getKeyMap(),
+                attentionOp.getValueMap(), attentionOp.getOutputMap());
+          });
+  // The parent's verifier reports unusable indexing maps.
+  if (failed(opInfo)) {
+    return success();
+  }
+  int64_t scoreRank = opInfo->getSMap().getNumResults();
+  if (scoreRank <= getDim()) {
     return emitOpError("expected dim (")
-           << getDim() << ") to be lower than the number of loops (" << numLoops
-           << ") of the enclosing operation";
+           << getDim() << ") to be lower than the score rank (" << scoreRank
+           << ") of the enclosing attention";
   }
   return success();
+}
+
+void remapAttentionScoreIndices(
+    RewriterBase &rewriter, Block *body, AffineMap oldScoreMap,
+    AffineMap newScoreMap,
+    function_ref<Value(OpBuilder &, Location, unsigned,
+                       function_ref<Value(unsigned)>)>
+        getOldDim) {
+  OpBuilder::InsertionGuard guard(rewriter);
+  for (IndexOp indexOp : llvm::to_vector(body->getOps<IndexOp>())) {
+    rewriter.setInsertionPoint(indexOp);
+    Location loc = indexOp.getLoc();
+    auto newIndex = [&](unsigned newDim) -> Value {
+      std::optional<unsigned> pos =
+          newScoreMap.getResultPosition(rewriter.getAffineDimExpr(newDim));
+      assert(pos && "score dims map to score dims");
+      return IndexOp::create(rewriter, loc, *pos);
+    };
+    unsigned oldDim = oldScoreMap.getDimPosition(indexOp.getDim());
+    rewriter.replaceOp(indexOp, getOldDim(rewriter, loc, oldDim, newIndex));
+  }
 }
 
 //===---------------------------------------------------------------------===//
