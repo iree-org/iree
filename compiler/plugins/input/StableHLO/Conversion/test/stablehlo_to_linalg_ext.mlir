@@ -5,12 +5,13 @@
 // CHECK-LABEL: func.func @sort_1d(
 // CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:  )
+// An omitted is_stable defaults to false.
 func.func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
   %0 = "stablehlo.sort"(%arg0) ( {
   ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
     %1 = "stablehlo.compare"(%arg2, %arg3) {comparison_direction = #stablehlo<comparison_direction GT>} : (tensor<i32>, tensor<i32>) -> tensor<i1>
     "stablehlo.return"(%1) : (tensor<i1>) -> ()
-  }) {dimension = 0 : i64, is_stable = false} : (tensor<128xi32>) -> (tensor<128xi32>)
+  }) {dimension = 0 : i64} : (tensor<128xi32>) -> (tensor<128xi32>)
   return %0 : tensor<128xi32>
 }
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
@@ -63,7 +64,9 @@ func.func @sort_cst_capture(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
 // CHECK:         ^bb0(%[[ARG1:.+]]: i32, %{{.*}}: i32)
 // CHECK:           %[[RES:.+]] = arith.cmpi slt, %[[ARG1]], %[[SCALAR]] : i32
-// CHECK:           iree_linalg_ext.yield %[[RES]] : i1
+// CHECK:           %[[CMP_EQUAL:.+]] = arith.cmpi eq, %{{.+}}, %{{.+}} : i1
+// CHECK:           %[[KEEP:.+]] = arith.ori %[[RES]], %[[CMP_EQUAL]] : i1
+// CHECK:           iree_linalg_ext.yield %[[KEEP]]
 // CHECK:         } -> tensor<1x10xi32>
 // CHECK:         return %[[SORT]]
 
@@ -86,7 +89,9 @@ func.func @sort_argument_capture(%arg0: tensor<1x10xi32>, %arg1 : tensor<i32>) -
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort dimension(1) outs(%[[ARG0]] : tensor<1x10xi32>)  {
 // CHECK:         ^bb0(%[[ARG2:.+]]: i32, %{{.*}}: i32)
 // CHECK:           %[[RES:.+]] = arith.cmpi slt, %[[ARG2]], %[[SCALAR]] : i32
-// CHECK:           iree_linalg_ext.yield %[[RES]] : i1
+// CHECK:           %[[CMP_EQUAL:.+]] = arith.cmpi eq, %{{.+}}, %{{.+}} : i1
+// CHECK:           %[[KEEP:.+]] = arith.ori %[[RES]], %[[CMP_EQUAL]] : i1
+// CHECK:           iree_linalg_ext.yield %[[KEEP]]
 // CHECK:         } -> tensor<1x10xi32>
 // CHECK:         return %[[SORT]]
 
@@ -134,7 +139,9 @@ func.func @sort_unsigned(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
 // CHECK:             %[[CAST1:.+]] = arith.bitcast %[[ARG1]] : f32 to i32
 // CHECK:             %[[CAST2:.+]] = arith.bitcast %[[ARG2]] : f32 to i32
 // CHECK:             %[[CMP:.+]] = arith.cmpi ult, %[[CAST1]], %[[CAST2]] : i32
-// CHECK:             iree_linalg_ext.yield %[[CMP]]
+// CHECK:           %[[CMP_EQUAL:.+]] = arith.cmpi eq, %{{.+}}, %{{.+}} : i1
+// CHECK:           %[[KEEP:.+]] = arith.ori %[[CMP]], %[[CMP_EQUAL]] : i1
+// CHECK:           iree_linalg_ext.yield %[[KEEP]]
 // CHECK:         return %[[SORT]]
 
 // -----
@@ -162,7 +169,9 @@ func.func @sort_unsigned_cst_capture(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> 
 // CHECK:           ^bb0(%[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32)
 // CHECK:             %[[CAST1:.+]] = arith.bitcast %[[ARG1]] : f32 to i32
 // CHECK:             %[[CMP:.+]] = arith.cmpi ult, %[[CAST1]], %[[EXTRACT_CST]] : i32
-// CHECK:             iree_linalg_ext.yield %[[CMP]]
+// CHECK:           %[[CMP_EQUAL:.+]] = arith.cmpi eq, %{{.+}}, %{{.+}} : i1
+// CHECK:           %[[KEEP:.+]] = arith.ori %[[CMP]], %[[CMP_EQUAL]] : i1
+// CHECK:           iree_linalg_ext.yield %[[KEEP]]
 // CHECK:         return %[[SORT]]
 
 // -----
@@ -193,7 +202,9 @@ func.func @sort_complex(%arg0: tensor<1x5xf32>, %arg1 : tensor<complex<f32>>) ->
 // CHECK:         ^bb0(%[[ARG1:.+]]: f32, %[[ARG2:.+]]: f32)
 // CHECK-NOT:       stablehlo.complex
 // CHECK:           %[[CMP:.+]] = arith.cmpf olt, %{{.+}}, %{{.+}} : f32
-// CHECK:           iree_linalg_ext.yield %[[CMP]]
+// CHECK:           %[[CMP_EQUAL:.+]] = arith.cmpi eq, %{{.+}}, %{{.+}} : i1
+// CHECK:           %[[KEEP:.+]] = arith.ori %[[CMP]], %[[CMP_EQUAL]] : i1
+// CHECK:           iree_linalg_ext.yield %[[KEEP]]
 // CHECK:       return %[[SORT]]
 
 // -----
@@ -998,3 +1009,40 @@ func.func @suffix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32>
 // CHECK:         linalg.yield
 // CHECK:       } -> tensor<7x5xi32>
 // CHECK:       return %[[REV_OUT]] : tensor<7x5xi32>
+
+// -----
+
+func.func @sort_nan_stable(%values: tensor<5xi32>) -> (tensor<5xf32>, tensor<5xi32>) {
+  %keys = stablehlo.constant dense<[2.0, 0x7FC00000, 1.0, 1.0, 0.0]> : tensor<5xf32>
+  %sort:2 = "stablehlo.sort"(%keys, %values) ({
+  ^bb0(%lhs: tensor<f32>, %rhs: tensor<f32>, %lhs_value: tensor<i32>, %rhs_value: tensor<i32>):
+    %cmp = stablehlo.compare LT, %lhs, %rhs, FLOAT : (tensor<f32>, tensor<f32>) -> tensor<i1>
+    stablehlo.return %cmp : tensor<i1>
+  }) {dimension = 0 : i64, is_stable = true} : (tensor<5xf32>, tensor<5xi32>) -> (tensor<5xf32>, tensor<5xi32>)
+  return %sort#0, %sort#1 : tensor<5xf32>, tensor<5xi32>
+}
+// CHECK-LABEL: func.func @sort_nan_stable
+// CHECK: iree_linalg_ext.sort dimension(0)
+// CHECK: ^bb0(%[[LHS:.+]]: f32, %[[RHS:.+]]: f32, %{{.+}}: i32, %{{.+}}: i32):
+// CHECK: %[[CMP:.+]] = arith.cmpf olt, %[[LHS]], %[[RHS]] : f32
+// CHECK: %[[REV:.+]] = arith.cmpf olt, %[[RHS]], %[[LHS]] : f32
+// CHECK: %[[EQ:.+]] = arith.cmpi eq, %[[CMP]], %[[REV]] : i1
+// CHECK: %[[KEEP:.+]] = arith.ori %[[CMP]], %[[EQ]] : i1
+// CHECK: iree_linalg_ext.yield %[[KEEP]] : i1
+
+// -----
+
+func.func @sort_nan_unstable(%values: tensor<5xi32>) -> (tensor<5xf32>, tensor<5xi32>) {
+  %keys = stablehlo.constant dense<[2.0, 0x7FC00000, 1.0, 1.0, 0.0]> : tensor<5xf32>
+  %sort:2 = "stablehlo.sort"(%keys, %values) ({
+  ^bb0(%lhs: tensor<f32>, %rhs: tensor<f32>, %lhs_value: tensor<i32>, %rhs_value: tensor<i32>):
+    %cmp = stablehlo.compare LT, %lhs, %rhs, FLOAT : (tensor<f32>, tensor<f32>) -> tensor<i1>
+    stablehlo.return %cmp : tensor<i1>
+  }) {dimension = 0 : i64, is_stable = false} : (tensor<5xf32>, tensor<5xi32>) -> (tensor<5xf32>, tensor<5xi32>)
+  return %sort#0, %sort#1 : tensor<5xf32>, tensor<5xi32>
+}
+// CHECK-LABEL: func.func @sort_nan_unstable
+// CHECK: iree_linalg_ext.sort dimension(0)
+// CHECK: ^bb0(%[[LHS:.+]]: f32, %[[RHS:.+]]: f32, %{{.+}}: i32, %{{.+}}: i32):
+// CHECK: %[[CMP:.+]] = arith.cmpf olt, %[[LHS]], %[[RHS]] : f32
+// CHECK-NEXT: iree_linalg_ext.yield %[[CMP]] : i1
