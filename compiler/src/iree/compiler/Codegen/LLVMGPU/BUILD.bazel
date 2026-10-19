@@ -202,6 +202,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:ArithCommonConversion",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithToAMDGPU",
         "@llvm-project//mlir:ArithToLLVM",

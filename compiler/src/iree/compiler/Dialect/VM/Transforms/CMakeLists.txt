@@ -40,6 +40,7 @@ iree_cc_library(
     MLIRAffineTransforms
     MLIRAffineUtils
     MLIRAnalysis
+    MLIRArithCommonConversion
     MLIRArithTransforms
     MLIRControlFlowInterfaces
     MLIRFuncDialect
