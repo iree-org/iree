@@ -61,7 +61,7 @@ TEST_F(EncodingAttrsTest, PackedStorageCapabilities) {
   EXPECT_FALSE(encoding.isIdentityLayout());
   EXPECT_EQ(encoding.getCollapsedEncoding({2, 4}, {8}), packedStorage);
   EXPECT_EQ(encoding.getCollapsedEncoding({ShapedType::kDynamic, 4},
-                                         {ShapedType::kDynamic}),
+                                          {ShapedType::kDynamic}),
             packedStorage);
 }
 
