@@ -28,6 +28,7 @@
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -38,6 +39,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
@@ -225,7 +227,7 @@ struct ScatterOpConversion final
   /// Returns true if the `dimensionNumbers` from the stablehlo.scatter op
   /// follows a canonical form:
   ///
-  /// * The rank of indices is greater than or equal to two.
+  /// * The rank of indices is two.
   /// * The index_vector_dim is the last dim of indices.
   /// * Scatter dims to operand dims order: (0, ... , n)
   /// * Inserted window dims order: (0, ... , d)
@@ -235,10 +237,18 @@ struct ScatterOpConversion final
     auto indicesType = cast<ShapedType>(op.getScatterIndices().getType());
     auto indicesRank = indicesType.getRank();
     auto indexVectorDim = dimNumbers.getIndexVectorDim();
-    auto indexDepth = indicesType.getShape().back();
     auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
 
+    // The local type converter scalarizes rank-zero originals.
+    if (cast<ShapedType>(op.getInputs().front().getType()).getRank() == 0) {
+      return false;
+    }
     if (indicesRank != 2) {
+      return false;
+    }
+    int64_t indexDepth = indicesType.getDimSize(indicesRank - 1);
+    if (!dimNumbers.getInputBatchingDims().empty() ||
+        !dimNumbers.getScatterIndicesBatchingDims().empty()) {
       return false;
     }
     if (indexVectorDim != indicesRank - 1) {
@@ -254,15 +264,36 @@ struct ScatterOpConversion final
     }
 
     auto insertedWindowDims = dimNumbers.getInsertedWindowDims();
+    if (static_cast<int64_t>(insertedWindowDims.size()) != indexDepth) {
+      return false;
+    }
     for (auto [idx, dim] : llvm::enumerate(insertedWindowDims)) {
       if (idx != dim) {
         return false;
       }
     }
 
+    // The update is one batch axis followed by the unindexed window axes.
+    auto updateType = cast<ShapedType>(op.getUpdates().front().getType());
+    auto originalType = cast<ShapedType>(op.getInputs().front().getType());
+    int64_t windowRank = dimNumbers.getUpdateWindowDims().size();
+    if (updateType.getRank() != windowRank + 1 ||
+        originalType.getRank() != indexDepth + windowRank) {
+      return false;
+    }
     // Check that there is only one batch dimension in the updates.
     for (auto [idx, dim] : llvm::enumerate(dimNumbers.getUpdateWindowDims())) {
       if (idx + 1 != dim) {
+        return false;
+      }
+    }
+    // LinalgExt scatter writes whole windows; narrower ones take the general
+    // lowering.
+    for (int64_t dim = 0; dim < windowRank; ++dim) {
+      int64_t updateSize = updateType.getDimSize(dim + 1);
+      int64_t originalSize = originalType.getDimSize(indexDepth + dim);
+      if (ShapedType::isStatic(updateSize) &&
+          ShapedType::isStatic(originalSize) && updateSize != originalSize) {
         return false;
       }
     }
@@ -270,41 +301,49 @@ struct ScatterOpConversion final
     return true;
   }
 
-  LogicalResult
-  matchAndRewrite(mlir::stablehlo::ScatterOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    if (!hasCanonicalDimensionNumbers(op)) {
-      return failure();
+  /// Returns the window axes, as (update dim, operand dim), whose extents may
+  /// differ at runtime.
+  static SmallVector<std::pair<int64_t, int64_t>>
+  getUnprovenWindowDims(mlir::stablehlo::ScatterOp op, Value original,
+                        Value updates) {
+    auto indicesType = cast<ShapedType>(op.getScatterIndices().getType());
+    int64_t indexDepth = indicesType.getShape().back();
+    auto originalType = cast<ShapedType>(original.getType());
+    auto updateType = cast<ShapedType>(updates.getType());
+    SmallVector<std::pair<int64_t, int64_t>> dims;
+    for (int64_t updateDim = 1; updateDim < updateType.getRank(); ++updateDim) {
+      int64_t originalDim = indexDepth + updateDim - 1;
+      if (updateType.isStaticDim(updateDim) &&
+          originalType.isStaticDim(originalDim)) {
+        continue;
+      }
+      FailureOr<bool> equal = ValueBoundsConstraintSet::areEqual(
+          {updates, updateDim}, {original, originalDim});
+      if (failed(equal) || !*equal) {
+        dims.push_back({updateDim, originalDim});
+      }
     }
-    if (llvm::size(op.getInputs()) != 1) {
-      return op.emitError("NYI variadic operands scatter");
-    }
-    if (llvm::size(op.getUpdates()) != 1) {
-      return op.emitError("NYI variadic updates scatter");
-    }
+    return dims;
+  }
 
-    ImplicitLocOpBuilder b(op.getLoc(), rewriter);
-
-    Value original = adaptor.getInputs().front();
-    Value indices = adaptor.getScatterIndices();
-    Value updates = adaptor.getUpdates().front();
-
-    auto originalType = dyn_cast<ShapedType>(original.getType());
-
-    llvm::SmallVector<int64_t> scatterDimMap;
-    for (auto dim :
-         op.getScatterDimensionNumbers().getScatterDimsToOperandDims()) {
-      scatterDimMap.push_back(dim);
-    }
-
+  static Value createWindowScatter(mlir::stablehlo::ScatterOp op,
+                                   Value original, Value indices, Value updates,
+                                   bool cloneReducer,
+                                   ConversionPatternRewriter &rewriter) {
+    SmallVector<int64_t> scatterDimMap(
+        op.getScatterDimensionNumbers().getScatterDimsToOperandDims());
     auto scatterOp = IREE::LinalgExt::ScatterOp::create(
-        rewriter, op.getLoc(), originalType, updates, indices,
+        rewriter, op.getLoc(), original.getType(), updates, indices,
         /*mask=*/Value(), original, scatterDimMap, op.getUniqueIndices());
 
-    rewriter.inlineRegionBefore(op.getUpdateComputation(),
-                                scatterOp.getRegion(),
-                                scatterOp.getRegion().begin());
     Region &region = scatterOp.getRegion();
+    if (cloneReducer) {
+      rewriter.cloneRegionBefore(op.getUpdateComputation(), region,
+                                 region.begin());
+    } else {
+      rewriter.inlineRegionBefore(op.getUpdateComputation(), region,
+                                  region.begin());
+    }
     TypeConverter::SignatureConversion signatureConverter(2);
     Type argType = getElementTypeOrSelf(original.getType());
     // stablehlo.scatter op takes:
@@ -313,8 +352,139 @@ struct ScatterOpConversion final
     signatureConverter.addInputs(1, argType);
     signatureConverter.addInputs(0, argType);
     rewriter.applySignatureConversion(&region.front(), signatureConverter);
+    return scatterOp->getResult(0);
+  }
 
-    rewriter.replaceOp(op, scatterOp->getResults());
+  /// Returns true if `op` lowers to the whole-window LinalgExt scatter.
+  static bool takesWholeWindowPath(mlir::stablehlo::ScatterOp op) {
+    return isMemoryEffectFree(op) && hasCanonicalDimensionNumbers(op) &&
+           llvm::size(op.getInputs()) == 1 && llvm::size(op.getUpdates()) == 1;
+  }
+
+  /// Returns why the general lowering cannot take `op`, or nullptr.
+  static const char *getGeneralScatterBlocker(mlir::stablehlo::ScatterOp op) {
+    auto indexElementType =
+        getElementTypeOrSelf(op.getScatterIndices().getType());
+    auto integerType = dyn_cast<IntegerType>(indexElementType);
+    if (!integerType || integerType.getWidth() > 64) {
+      return "general scatter lowering supports indices up to 64 bits";
+    }
+    if (integerType.isUnsigned()) {
+      return "general scatter lowering requires unsigned index normalization";
+    }
+    for (auto [input, update, result] :
+         llvm::zip(op.getInputs(), op.getUpdates(), op.getResultTypes())) {
+      Type inputElementType = getElementTypeOrSelf(input.getType());
+      if (inputElementType != getElementTypeOrSelf(update.getType()) ||
+          inputElementType != getElementTypeOrSelf(result)) {
+        return "general scatter lowering requires element promotion "
+               "before conversion";
+      }
+    }
+    return nullptr;
+  }
+
+  SmallVector<Value>
+  createGeneralScatter(mlir::stablehlo::ScatterOp op, OpAdaptor adaptor,
+                       ConversionPatternRewriter &rewriter) const {
+    auto asRankedTensor = [&](Value value) -> Value {
+      if (isa<RankedTensorType>(value.getType())) {
+        return value;
+      }
+      auto tensorType = RankedTensorType::get({}, value.getType());
+      return tensor::FromElementsOp::create(rewriter, op.getLoc(), tensorType,
+                                            ValueRange{value});
+    };
+    Value indices = asRankedTensor(adaptor.getScatterIndices());
+    SmallVector<Value> originals =
+        llvm::map_to_vector(adaptor.getInputs(), asRankedTensor);
+    SmallVector<Value> updates =
+        llvm::map_to_vector(adaptor.getUpdates(), asRankedTensor);
+    SmallVector<Type> resultTypes(ValueRange(originals).getTypes());
+    auto generalScatter = IREE::LinalgExt::GeneralScatterOp::create(
+        rewriter, op.getLoc(), resultTypes, updates, indices, originals,
+        op.getScatterDimensionNumbers().getUpdateWindowDims(),
+        op.getScatterDimensionNumbers().getInsertedWindowDims(),
+        op.getScatterDimensionNumbers().getInputBatchingDims(),
+        op.getScatterDimensionNumbers().getScatterIndicesBatchingDims(),
+        op.getScatterDimensionNumbers().getScatterDimsToOperandDims(),
+        op.getScatterDimensionNumbers().getIndexVectorDim());
+    rewriter.inlineRegionBefore(op.getUpdateComputation(),
+                                generalScatter.getRegion(),
+                                generalScatter.getRegion().begin());
+    Region &region = generalScatter.getRegion();
+    TypeConverter::SignatureConversion signatureConverter(
+        2 * adaptor.getInputs().size());
+    for (auto [i, argument] : llvm::enumerate(region.front().getArguments())) {
+      signatureConverter.addInputs(
+          i, getTypeConverter()->convertType(argument.getType()));
+    }
+    rewriter.applySignatureConversion(&region.front(), signatureConverter);
+    SmallVector<Value> results;
+    for (auto [result, sourceType] :
+         llvm::zip(generalScatter.getResults(), op.getResultTypes())) {
+      if (cast<RankedTensorType>(sourceType).getRank() == 0) {
+        results.push_back(
+            tensor::ExtractOp::create(rewriter, op.getLoc(), result));
+      } else {
+        results.push_back(result);
+      }
+    }
+    return results;
+  }
+
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ScatterOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    const char *generalBlocker = getGeneralScatterBlocker(op);
+
+    // Keep the established lowering for its contiguous-window fast path.
+    if (takesWholeWindowPath(op)) {
+      Value original = adaptor.getInputs().front();
+      Value indices = adaptor.getScatterIndices();
+      Value updates = adaptor.getUpdates().front();
+      SmallVector<std::pair<int64_t, int64_t>> unproven =
+          getUnprovenWindowDims(op, original, updates);
+      // Without a general fallback, runtime windows stay unchecked as before.
+      if (unproven.empty() || generalBlocker) {
+        rewriter.replaceOp(
+            op, createWindowScatter(op, original, indices, updates,
+                                    /*cloneReducer=*/false, rewriter));
+        return success();
+      }
+
+      Location loc = op.getLoc();
+      Value whole;
+      for (auto [updateDim, originalDim] : unproven) {
+        Value updateSize =
+            tensor::DimOp::create(rewriter, loc, updates, updateDim);
+        Value originalSize =
+            tensor::DimOp::create(rewriter, loc, original, originalDim);
+        Value equal = arith::CmpIOp::create(
+            rewriter, loc, arith::CmpIPredicate::eq, updateSize, originalSize);
+        whole =
+            whole ? arith::AndIOp::create(rewriter, loc, whole, equal) : equal;
+      }
+      auto ifOp = scf::IfOp::create(rewriter, loc, original.getType(), whole,
+                                    /*addThenBlock=*/true,
+                                    /*addElseBlock=*/true);
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToStart(ifOp.thenBlock());
+      scf::YieldOp::create(rewriter, loc,
+                           createWindowScatter(op, original, indices, updates,
+                                               /*cloneReducer=*/true,
+                                               rewriter));
+      rewriter.setInsertionPointToStart(ifOp.elseBlock());
+      scf::YieldOp::create(rewriter, loc,
+                           createGeneralScatter(op, adaptor, rewriter));
+      rewriter.replaceOp(op, ifOp.getResults());
+      return success();
+    }
+
+    if (generalBlocker) {
+      return op.emitError(generalBlocker);
+    }
+    rewriter.replaceOp(op, createGeneralScatter(op, adaptor, rewriter));
     return success();
   }
 };
@@ -1084,15 +1254,33 @@ struct ConvertStableHloToLinalgExt final
   using ConvertStableHloToLinalgExtBase::ConvertStableHloToLinalgExtBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
-                IREE::Flow::FlowDialect, mlir::cf::ControlFlowDialect,
-                mlir::math::MathDialect, mlir::arith::ArithDialect,
-                complex::ComplexDialect, tensor::TensorDialect>();
+    registry.insert<IREE::LinalgExt::IREELinalgExtDialect,
+                    linalg::LinalgDialect, IREE::Flow::FlowDialect,
+                    mlir::cf::ControlFlowDialect, mlir::math::MathDialect,
+                    mlir::arith::ArithDialect, complex::ComplexDialect,
+                    scf::SCFDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
+    // A scatter is not illegal, so a declined general lowering must fail here
+    // rather than leave the scatter behind after its diagnostic.
+    WalkResult unsupportedScatter =
+        getOperation().walk([](mlir::stablehlo::ScatterOp op) {
+          if (ScatterOpConversion::takesWholeWindowPath(op)) {
+            return WalkResult::advance();
+          }
+          if (const char *blocker =
+                  ScatterOpConversion::getGeneralScatterBlocker(op)) {
+            op.emitError(blocker);
+            return WalkResult::interrupt();
+          }
+          return WalkResult::advance();
+        });
+    if (unsupportedScatter.wasInterrupted()) {
+      return signalPassFailure();
+    }
+
     RewritePatternSet patterns(context);
 
     StableHloToStdTypeConverter typeConverter;
@@ -1100,15 +1288,16 @@ struct ConvertStableHloToLinalgExt final
                                                    &patterns);
 
     ConversionTarget target(getContext());
-    target.addLegalDialect<IREE::LinalgExt::IREELinalgExtDialect,
-                           linalg::LinalgDialect, IREE::Flow::FlowDialect,
-                           mlir::cf::ControlFlowDialect,
-                           mlir::math::MathDialect, mlir::arith::ArithDialect,
-                           tensor::TensorDialect, complex::ComplexDialect>();
+    target.addLegalDialect<
+        IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
+        IREE::Flow::FlowDialect, mlir::cf::ControlFlowDialect,
+        mlir::math::MathDialect, mlir::arith::ArithDialect, scf::SCFDialect,
+        tensor::TensorDialect, complex::ComplexDialect>();
     // TODO: Scatter is not marked as illegal to allow falling back to the
     // generic LinAlg lowering, the generic lowering is not always performant
     // and even though only used in fallback here, may hide performance
     // issues and we'd rather know when the optimized lowering fails.
+    // Other supported operations must use their dedicated lowering.
     target.addIllegalOp<mlir::stablehlo::SortOp, mlir::stablehlo::FftOp,
                         mlir::stablehlo::ReverseOp>();
     // FFT conversion creates complex ops which will be converted by the normal

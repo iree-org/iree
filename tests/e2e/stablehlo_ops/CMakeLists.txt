@@ -252,6 +252,49 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_llvm-cpu_local-task_general_scatter
+  SRCS
+    "scatter_general.mlir"
+    "scatter_general_complex.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
+  LABELS
+    "nowasm"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_local-task_general_scatter
+  SRCS
+    "scatter_general.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-input-promote-f16-to-f32"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_local-task_index32_general_scatter
+  SRCS
+    "scatter_general.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-input-promote-f16-to-f32"
+    "--iree-vm-target-index-bits=32"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_vulkan-spirv_vulkan
   SRCS
     "abs.mlir"

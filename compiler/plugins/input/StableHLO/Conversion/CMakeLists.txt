@@ -80,6 +80,7 @@ iree_cc_library(
     MLIRTensorUtils
     MLIRTransformUtils
     MLIRTransforms
+    MLIRValueBoundsOpInterface
     MLIRVectorDialect
     StablehloBroadcastUtils
     StablehloLinalgTransforms

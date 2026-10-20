@@ -425,6 +425,241 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 }
 
 //===----------------------------------------------------------------------===//
+// GeneralScatterOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<utils::IteratorType> GeneralScatterOp::getLoopIteratorTypes() {
+  // A generic scatter cannot assume that expanded window coordinates are
+  // unique. Keep the update schedule sequential until a safe mapping exists.
+  return SmallVector<utils::IteratorType>(
+      cast<ShapedType>(getUpdates().front().getType()).getRank(),
+      utils::IteratorType::reduction);
+}
+
+SmallVector<Range> GeneralScatterOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  SmallVector<Range> ranges;
+  auto updateRank = cast<ShapedType>(getUpdates().front().getType()).getRank();
+  for (int64_t dim = 0; dim < updateRank; ++dim) {
+    ranges.push_back(
+        Range{zero, getDim(builder, loc, getUpdates().front(), dim), one});
+  }
+  return ranges;
+}
+
+FailureOr<TilingResult>
+GeneralScatterOp::getTiledImplementation(OpBuilder &builder,
+                                         ArrayRef<OpFoldResult> offsets,
+                                         ArrayRef<OpFoldResult> sizes) {
+  // The operation has data-dependent destinations. Its only supported tile is
+  // the full update domain with the full output tensors.
+  auto updateRank = cast<ShapedType>(getUpdates().front().getType()).getRank();
+  if (offsets.size() != updateRank || sizes.size() != updateRank) {
+    return failure();
+  }
+  Location loc = getLoc();
+  for (int64_t dim = 0; dim < updateRank; ++dim) {
+    auto offset = getConstantIntValue(offsets[dim]);
+    auto size = getConstantIntValue(sizes[dim]);
+    int64_t staticExtent =
+        cast<ShapedType>(getUpdates().front().getType()).getDimSize(dim);
+    OpFoldResult extent = getDim(builder, loc, getUpdates().front(), dim);
+    if (!offset || *offset != 0 ||
+        (staticExtent != ShapedType::kDynamic
+             ? (!size || *size != staticExtent)
+             : !isEqualConstantIntOrValue(sizes[dim], extent))) {
+      return failure();
+    }
+  }
+  Operation *tiledOp = builder.clone(*getOperation());
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults()), {}};
+}
+
+LogicalResult GeneralScatterOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  if (resultNumber >= getNumResults()) {
+    return failure();
+  }
+  resultOffsets.clear();
+  resultSizes.clear();
+  auto resultType = cast<ShapedType>(getResults()[resultNumber].getType());
+  for (int64_t dim = 0; dim < resultType.getRank(); ++dim) {
+    resultOffsets.push_back(builder.getIndexAttr(0));
+    resultSizes.push_back(
+        getDim(builder, getLoc(), getOriginals()[resultNumber], dim));
+  }
+  return success();
+}
+
+LogicalResult GeneralScatterOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &, ArrayRef<unsigned>, ArrayRef<SmallVector<OpFoldResult>>,
+    ArrayRef<SmallVector<OpFoldResult>>, SmallVectorImpl<OpFoldResult> &,
+    SmallVectorImpl<OpFoldResult> &) {
+  return failure();
+}
+
+FailureOr<TilingResult>
+GeneralScatterOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &, ArrayRef<unsigned>, ArrayRef<SmallVector<OpFoldResult>>,
+    ArrayRef<SmallVector<OpFoldResult>>) {
+  return failure();
+}
+
+LogicalResult GeneralScatterOp::generateScalarImplementation(OpBuilder &b,
+                                                             Location loc,
+                                                             ValueRange ivs) {
+  auto updateRank = cast<ShapedType>(getUpdates().front().getType()).getRank();
+  if (ivs.size() != updateRank) {
+    return failure();
+  }
+
+  SmallVector<int64_t> updateWindowDims(getUpdateWindowDims().begin(),
+                                        getUpdateWindowDims().end());
+  SmallVector<int64_t> inputBatchDims(getInputBatchingDims().begin(),
+                                      getInputBatchingDims().end());
+  SmallVector<int64_t> indicesBatchDims(getScatterIndicesBatchingDims().begin(),
+                                        getScatterIndicesBatchingDims().end());
+  SmallVector<int64_t> scatterDimsToInput(getScatterDimsToOperandDims().begin(),
+                                          getScatterDimsToOperandDims().end());
+  auto indicesType = cast<ShapedType>(getIndices().getType());
+  int64_t indexVectorDim = getIndexVectorDim();
+  if (indexVectorDim < 0 || indexVectorDim > indicesType.getRank()) {
+    return failure();
+  }
+
+  SmallVector<int64_t> updateScatterDims;
+  for (int64_t dim = 0; dim < updateRank; ++dim) {
+    if (!llvm::is_contained(updateWindowDims, dim)) {
+      updateScatterDims.push_back(dim);
+    }
+  }
+  SmallVector<int64_t> indicesNonVectorDims;
+  for (int64_t dim = 0; dim < indicesType.getRank(); ++dim) {
+    if (dim != indexVectorDim) {
+      indicesNonVectorDims.push_back(dim);
+    }
+  }
+  if (updateScatterDims.size() != indicesNonVectorDims.size()) {
+    return failure();
+  }
+
+  SmallVector<Value> indices(indicesType.getRank());
+  for (auto [updateDim, indicesDim] :
+       llvm::zip(updateScatterDims, indicesNonVectorDims)) {
+    indices[indicesDim] = ivs[updateDim];
+  }
+
+  auto wideTy = b.getIntegerType(64);
+  auto toWide = [&](Value value) { return widenIndex(b, loc, value, wideTy); };
+  Value zero = arith::ConstantIntOp::create(b, loc, wideTy, 0);
+  SmallVector<Value> wideStarts(
+      cast<ShapedType>(getOriginals().front().getType()).getRank(), zero);
+  SmallVector<Value> wideOffsets(wideStarts.size(), zero);
+
+  for (auto [component, inputDim] : llvm::enumerate(scatterDimsToInput)) {
+    if (indexVectorDim < indicesType.getRank()) {
+      indices[indexVectorDim] = arith::ConstantIndexOp::create(
+          b, loc, static_cast<int64_t>(component));
+    }
+    Value indexValue = memref::LoadOp::create(b, loc, getIndices(), indices);
+    wideStarts[inputDim] = toWide(indexValue);
+  }
+
+  SmallVector<int64_t> nonWindowInputDims;
+  auto firstOriginalType = cast<ShapedType>(getOriginals().front().getType());
+  for (int64_t dim = 0; dim < firstOriginalType.getRank(); ++dim) {
+    if (!llvm::is_contained(getInsertedWindowDims(), dim) &&
+        !llvm::is_contained(inputBatchDims, dim)) {
+      nonWindowInputDims.push_back(dim);
+    }
+  }
+  if (nonWindowInputDims.size() != updateWindowDims.size()) {
+    return failure();
+  }
+  for (auto [updateDim, inputDim] :
+       llvm::zip(updateWindowDims, nonWindowInputDims)) {
+    wideOffsets[inputDim] = toWide(ivs[updateDim]);
+  }
+  for (auto [inputBatchDim, indicesBatchDim] :
+       llvm::zip(inputBatchDims, indicesBatchDims)) {
+    auto it = llvm::find(indicesNonVectorDims, indicesBatchDim);
+    if (it == indicesNonVectorDims.end()) {
+      return failure();
+    }
+    auto scatterPosition = std::distance(indicesNonVectorDims.begin(), it);
+    auto updateDim = updateScatterDims[scatterPosition];
+    wideOffsets[inputBatchDim] = toWide(ivs[updateDim]);
+  }
+
+  Value inBounds = arith::ConstantIntOp::create(b, loc, 1, 1);
+  for (auto [resultIndex, start] : llvm::enumerate(wideStarts)) {
+    Value offset = wideOffsets[resultIndex];
+    Value dimensionSize =
+        memref::DimOp::create(b, loc, getOriginals().front(), resultIndex);
+    Value extent = toWide(dimensionSize);
+    Value negOffset = arith::SubIOp::create(b, loc, zero, offset);
+    Value extentMinusOffset = arith::SubIOp::create(b, loc, extent, offset);
+    Value startAtOrAfterZeroResult = arith::CmpIOp::create(
+        b, loc, arith::CmpIPredicate::sge, start, negOffset);
+    Value startBeforeExtent = arith::CmpIOp::create(
+        b, loc, arith::CmpIPredicate::slt, start, extentMinusOffset);
+    inBounds = arith::AndIOp::create(
+        b, loc, inBounds,
+        arith::AndIOp::create(b, loc, startAtOrAfterZeroResult,
+                              startBeforeExtent));
+  }
+
+  scf::IfOp::create(
+      b, loc, inBounds, [&](OpBuilder &thenBuilder, Location thenLoc) {
+        SmallVector<Value> destinations;
+        for (auto [dim, start] : llvm::enumerate(wideStarts)) {
+          Value destination = arith::AddIOp::create(thenBuilder, thenLoc, start,
+                                                    wideOffsets[dim]);
+          destinations.push_back(arith::IndexCastOp::create(
+              thenBuilder, thenLoc, thenBuilder.getIndexType(), destination));
+        }
+        SmallVector<Value> updateValues;
+        for (Value update : getUpdates()) {
+          updateValues.push_back(
+              memref::LoadOp::create(thenBuilder, thenLoc, update, ivs));
+        }
+        SmallVector<Value> currentValues;
+        for (Value original : getOriginals()) {
+          currentValues.push_back(memref::LoadOp::create(
+              thenBuilder, thenLoc, original, destinations));
+        }
+        IRMapping mapping;
+        Block &body = getRegion().front();
+        for (auto [arg, value] :
+             llvm::zip(body.getArguments().take_front(currentValues.size()),
+                       currentValues)) {
+          mapping.map(arg, value);
+        }
+        for (auto [arg, value] :
+             llvm::zip(body.getArguments().drop_front(currentValues.size()),
+                       updateValues)) {
+          mapping.map(arg, value);
+        }
+        for (Operation &bodyOp : body.without_terminator()) {
+          thenBuilder.clone(bodyOp, mapping);
+        }
+        auto yieldOp = cast<YieldOp>(body.getTerminator());
+        for (auto [original, value] :
+             llvm::zip(getOriginals(), yieldOp->getOperands())) {
+          memref::StoreOp::create(thenBuilder, thenLoc,
+                                  mapping.lookupOrDefault(value), original,
+                                  destinations);
+        }
+        scf::YieldOp::create(thenBuilder, thenLoc);
+      });
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // GatherOp
 //===----------------------------------------------------------------------===//
 
@@ -4101,6 +4336,12 @@ FailureOr<TilingResult> FftOp::getTiledImplementation(
   return getTiledImplementation(builder, offsets, sizes);
 }
 
+FailureOr<TilingResult> GeneralScatterOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
 FailureOr<TilingResult> GatherOp::getTiledImplementation(
     OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
@@ -4213,6 +4454,28 @@ FailureOr<TilingResult> Im2colOp::generateResultTileValue(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
   return generateResultTileValue(builder, resultNumber, offsets, sizes);
+}
+
+FailureOr<TilingResult>
+GeneralScatterOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
+    ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementationFromOperandTiles(b, operandNumbers, allOffsets,
+                                                allSizes);
+}
+
+LogicalResult GeneralScatterOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
+    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+    SmallVectorImpl<OpFoldResult> &iterDomainSizes,
+    ArrayRef<mlir::InnerTileAlignment>) {
+  return getIterationDomainTileFromOperandTiles(b, operandNumbers, allOffsets,
+                                                allSizes, iterDomainOffsets,
+                                                iterDomainSizes);
 }
 
 FailureOr<TilingResult> MapLoadOp::getTiledImplementationFromOperandTiles(

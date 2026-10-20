@@ -3013,3 +3013,57 @@ func.func @dequantize_affine_wider_scale(%input: tensor<128x64xi8>,
 //       CHECK:   iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%{{.+}}, %{{.+}} : tensor<128x64xi8>, tensor<128xf32>)
 //  CHECK-SAME:     outs(%{{.+}} : tensor<128x64xf16>)
+
+// -----
+
+// CHECK-LABEL: @general_scatter_tensor
+// CHECK: iree_linalg_ext.general_scatter
+// CHECK-SAME: ins({{.*}} : tensor<2x2xi32>, tensor<2x2xi32>)
+// CHECK-SAME: indices({{.*}} : tensor<2x1xi64>)
+// CHECK-SAME: outs({{.*}} : tensor<4xi32>, tensor<4xi32>)
+func.func @general_scatter_tensor(%updates0: tensor<2x2xi32>, %updates1: tensor<2x2xi32>, %indices: tensor<2x1xi64>, %original0: tensor<4xi32>, %original1: tensor<4xi32>) -> (tensor<4xi32>, tensor<4xi32>) {
+  %result:2 = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [1], inserted_window_dims = [], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates0, %updates1 : tensor<2x2xi32>, tensor<2x2xi32>)
+    indices(%indices : tensor<2x1xi64>)
+    outs(%original0, %original1 : tensor<4xi32>, tensor<4xi32>) {
+  ^bb0(%current0: i32, %current1: i32, %update0: i32, %update1: i32):
+    iree_linalg_ext.yield %update0, %update1 : i32, i32
+  } -> tensor<4xi32>, tensor<4xi32>
+  return %result#0, %result#1 : tensor<4xi32>, tensor<4xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @general_scatter_tensor_2d
+// CHECK: iree_linalg_ext.general_scatter
+// CHECK-SAME: ins({{.*}} : tensor<3x2x4xi32>, tensor<3x2x4xi32>)
+// CHECK-SAME: indices({{.*}} : tensor<3x1xi64>)
+// CHECK-SAME: outs({{.*}} : tensor<5x7xi32>, tensor<5x7xi32>)
+func.func @general_scatter_tensor_2d(%updates0: tensor<3x2x4xi32>, %updates1: tensor<3x2x4xi32>, %indices: tensor<3x1xi64>, %original0: tensor<5x7xi32>, %original1: tensor<5x7xi32>) -> (tensor<5x7xi32>, tensor<5x7xi32>) {
+  %result:2 = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [1, 2], inserted_window_dims = [], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates0, %updates1 : tensor<3x2x4xi32>, tensor<3x2x4xi32>)
+    indices(%indices : tensor<3x1xi64>)
+    outs(%original0, %original1 : tensor<5x7xi32>, tensor<5x7xi32>) {
+  ^bb0(%current0: i32, %current1: i32, %update0: i32, %update1: i32):
+    iree_linalg_ext.yield %update0, %update1 : i32, i32
+  } -> tensor<5x7xi32>, tensor<5x7xi32>
+  return %result#0, %result#1 : tensor<5x7xi32>, tensor<5x7xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @general_scatter_memref
+// CHECK: iree_linalg_ext.general_scatter
+// CHECK-SAME: ins({{.*}} : memref<2x2xi32>, memref<2x2xi32>)
+// CHECK-SAME: indices({{.*}} : memref<2x1xi64>)
+// CHECK-SAME: outs({{.*}} : memref<4xi32>, memref<4xi32>)
+func.func @general_scatter_memref(%updates0: memref<2x2xi32>, %updates1: memref<2x2xi32>, %indices: memref<2x1xi64>, %original0: memref<4xi32>, %original1: memref<4xi32>) {
+  iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [1], inserted_window_dims = [], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates0, %updates1 : memref<2x2xi32>, memref<2x2xi32>)
+    indices(%indices : memref<2x1xi64>)
+    outs(%original0, %original1 : memref<4xi32>, memref<4xi32>) {
+  ^bb0(%current0: i32, %current1: i32, %update0: i32, %update1: i32):
+    iree_linalg_ext.yield %update0, %update1 : i32, i32
+  }
+  return
+}

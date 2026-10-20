@@ -806,14 +806,33 @@ func.func @scatter_i64_indices(
 
 // -----
 
-// A single-index, full-rank, overwrite scatter (dynamic-update-slice semantics)
-// becomes a stablehlo.dynamic_update_slice.
+// Unknown starts may leave a partially out-of-bounds overwrite window. An
+// in-bounds window takes the clamping DUS; otherwise a DUS into the operand
+// padded by the window extent drops the out-of-bounds rows.
 // CHECK-LABEL: @scatter_to_dynamic_update_slice
+// CHECK-SAME:    %[[OPERAND:[a-zA-Z0-9]+]]: tensor<2x7x3x3xf32>
+// CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]: tensor<2x4x3x3xf32>
+// CHECK-NOT:     stablehlo.scatter
+// CHECK-DAG:     %[[ZERO:.+]] = stablehlo.constant dense<0> : tensor<i64>
+// CHECK-DAG:     %[[MAX_START:.+]] = stablehlo.constant dense<3> : tensor<i64>
+// CHECK-DAG:     %[[EXTENT:.+]] = stablehlo.constant dense<4> : tensor<i64>
+// CHECK:         %[[START:.+]] = stablehlo.reshape %{{.+}} : (tensor<1xi64>) -> tensor<i64>
+// CHECK:         %[[NOT_LOW:.+]] = stablehlo.compare GE, %[[START]], %[[ZERO]], SIGNED
+// CHECK:         %[[NOT_HIGH:.+]] = stablehlo.compare LE, %[[START]], %[[MAX_START]], SIGNED
+// CHECK:         %[[IN_BOUNDS:.+]] = stablehlo.and %[[NOT_LOW]], %[[NOT_HIGH]]
+// CHECK:         %[[CONDITION:.+]] = tensor.extract %[[IN_BOUNDS]][]
+// CHECK:         %[[RESULT:.+]] = scf.if %[[CONDITION]] -> (tensor<2x7x3x3xf32>) {
+// CHECK:           %[[DUS:.+]] = stablehlo.dynamic_update_slice %[[OPERAND]], %[[UPDATES]], %[[ZERO]], %[[START]], %[[ZERO]], %[[ZERO]]
+// CHECK:           scf.yield %[[DUS]]
+// CHECK:         } else {
+// CHECK:           %[[PADDED:.+]] = stablehlo.pad %[[OPERAND]], %{{.+}}, low = [0, 4, 0, 0], high = [0, 4, 0, 0], interior = [0, 0, 0, 0]
+// CHECK:           %[[SHIFTED:.+]] = stablehlo.add %[[START]], %[[EXTENT]]
+// CHECK:           %[[PADDED_DUS:.+]] = stablehlo.dynamic_update_slice %[[PADDED]], %[[UPDATES]], %[[ZERO]], %[[SHIFTED]], %[[ZERO]], %[[ZERO]]
+// CHECK:           %[[SLICE:.+]] = stablehlo.slice %[[PADDED_DUS]] [0:2, 4:11, 0:3, 0:3]
+// CHECK:           scf.yield %[[SLICE]]
+// CHECK:         }
+// CHECK:         return %[[RESULT]]
 func.func @scatter_to_dynamic_update_slice(%operand: tensor<2x7x3x3xf32>, %indices: tensor<1xi32>, %updates: tensor<2x4x3x3xf32>) -> tensor<2x7x3x3xf32> {
-  // CHECK: %[[C0:.+]] = stablehlo.constant dense<0> : tensor<i32>
-  // CHECK: %[[IDX:.+]] = stablehlo.reshape %{{.+}} : (tensor<1xi32>) -> tensor<i32>
-  // CHECK: stablehlo.dynamic_update_slice %{{.+}}, %{{.+}}, %[[C0]], %[[IDX]], %[[C0]], %[[C0]]
-  // CHECK-NOT: stablehlo.scatter
   %0 = "stablehlo.scatter"(%operand, %indices, %updates) <{indices_are_sorted = true, scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0, 1, 2, 3], scatter_dims_to_operand_dims = [1]>, unique_indices = true}> ({
   ^bb0(%a: tensor<f32>, %b: tensor<f32>):
     stablehlo.return %b : tensor<f32>
@@ -1173,4 +1192,136 @@ func.func @scatter_batching_unsigned_dynamic_indices(%operand: tensor<6x4xi32>, 
       index_vector_dim = 2>
   } : (tensor<6x4xi32>, tensor<6x?x1xui8>, tensor<6x?xi32>) -> tensor<6x4xi32>
   return %0 : tensor<6x4xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @scatter_inbounds_overwrite_window
+// CHECK: stablehlo.dynamic_update_slice
+// CHECK-NOT: stablehlo.scatter
+func.func @scatter_inbounds_overwrite_window(%operand: tensor<2x7x3x3xf32>, %updates: tensor<2x4x3x3xf32>) -> tensor<2x7x3x3xf32> {
+  %indices = stablehlo.constant dense<2> : tensor<1xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<f32>, %update: tensor<f32>):
+    stablehlo.return %update : tensor<f32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0, 1, 2, 3], scatter_dims_to_operand_dims = [1], index_vector_dim = 0>, indices_are_sorted = true, unique_indices = true} : (tensor<2x7x3x3xf32>, tensor<1xi32>, tensor<2x4x3x3xf32>) -> tensor<2x7x3x3xf32>
+  return %result : tensor<2x7x3x3xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @scatter_negative_overwrite_window
+// CHECK-NOT: stablehlo.dynamic_update_slice
+// CHECK: stablehlo.scatter
+func.func @scatter_negative_overwrite_window(%operand: tensor<2x7x3x3xf32>, %updates: tensor<2x4x3x3xf32>) -> tensor<2x7x3x3xf32> {
+  %indices = stablehlo.constant dense<-1> : tensor<1xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<f32>, %update: tensor<f32>):
+    stablehlo.return %update : tensor<f32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0, 1, 2, 3], scatter_dims_to_operand_dims = [1], index_vector_dim = 0>, indices_are_sorted = true, unique_indices = true} : (tensor<2x7x3x3xf32>, tensor<1xi32>, tensor<2x4x3x3xf32>) -> tensor<2x7x3x3xf32>
+  return %result : tensor<2x7x3x3xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @scatter_past_end_overwrite_window
+// CHECK-NOT: stablehlo.dynamic_update_slice
+// CHECK: stablehlo.scatter
+func.func @scatter_past_end_overwrite_window(%operand: tensor<2x7x3x3xf32>, %updates: tensor<2x4x3x3xf32>) -> tensor<2x7x3x3xf32> {
+  %indices = stablehlo.constant dense<4> : tensor<1xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<f32>, %update: tensor<f32>):
+    stablehlo.return %update : tensor<f32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0, 1, 2, 3], scatter_dims_to_operand_dims = [1], index_vector_dim = 0>, indices_are_sorted = true, unique_indices = true} : (tensor<2x7x3x3xf32>, tensor<1xi32>, tensor<2x4x3x3xf32>) -> tensor<2x7x3x3xf32>
+  return %result : tensor<2x7x3x3xf32>
+}
+
+// -----
+
+// Dynamic unsigned saturation gets its shape through signless storage.
+// CHECK-LABEL: @scatter_dynamic_unsigned_indices
+// CHECK: %[[CARRIER:.*]] = stablehlo.convert %arg1 : (tensor<?x1xui64>) -> tensor<?x1xi64>
+// CHECK: shape.shape_of %[[CARRIER]] : tensor<?x1xi64>
+// CHECK: stablehlo.dynamic_broadcast_in_dim
+// CHECK: stablehlo.minimum
+// CHECK: stablehlo.convert {{.*}} : (tensor<?x1xui64>) -> tensor<?x1xi64>
+// CHECK: "stablehlo.scatter"
+// CHECK-SAME: indices_are_sorted = false
+// CHECK-SAME: unique_indices = false
+func.func @scatter_dynamic_unsigned_indices(%operand: tensor<4xi32>, %indices: tensor<?x1xui64>, %updates: tensor<?x2xi32>) -> tensor<4xi32> {
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    %sum = stablehlo.add %current, %update : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [1], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>, indices_are_sorted = true, unique_indices = true} : (tensor<4xi32>, tensor<?x1xui64>, tensor<?x2xi32>) -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}
+
+// -----
+
+// Both original values and updates use the promoted reducer element type.
+// CHECK-LABEL: @scatter_promote_elements
+// CHECK: stablehlo.convert %arg0 : (tensor<3xi8>) -> tensor<3xi32>
+// CHECK: stablehlo.convert %arg2 : (tensor<2xi8>) -> tensor<2xi32>
+// CHECK: "stablehlo.scatter"
+// CHECK: (tensor<3xi32>, tensor<2x1xi32>, tensor<2xi32>) -> tensor<3xi32>
+func.func @scatter_promote_elements(%operand: tensor<3xi8>, %indices: tensor<2x1xi64>, %updates: tensor<2xi8>) -> tensor<3xi32> {
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    %sum = stablehlo.add %current, %update : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<inserted_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>, indices_are_sorted = false, unique_indices = false} : (tensor<3xi8>, tensor<2x1xi64>, tensor<2xi8>) -> tensor<3xi32>
+  return %result : tensor<3xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @scatter_effect
+// CHECK-NOT: stablehlo.dynamic_update_slice
+// CHECK: "stablehlo.scatter"
+// CHECK: stablehlo.custom_call @review_effect
+// CHECK-SAME: has_side_effect = true
+func.func @scatter_effect(%operand: tensor<4xf32>, %updates: tensor<2xf32>) -> tensor<4xf32> {
+  %indices = stablehlo.constant dense<1> : tensor<1xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<f32>, %update: tensor<f32>):
+    %effect = stablehlo.custom_call @review_effect(%current) {has_side_effect = true} : (tensor<f32>) -> tensor<f32>
+    stablehlo.return %update : tensor<f32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 0>, indices_are_sorted = false, unique_indices = false} : (tensor<4xf32>, tensor<1xi32>, tensor<2xf32>) -> tensor<4xf32>
+  return %result : tensor<4xf32>
+}
+
+// -----
+
+// Reordering destination axes can change the lexicographic start ordering.
+// CHECK-LABEL: @scatter_sorted_permutation
+// CHECK: stablehlo.transpose
+// CHECK: "stablehlo.scatter"
+// CHECK-SAME: indices_are_sorted = false
+// CHECK-SAME: scatter_dims_to_operand_dims = [0, 1]
+// CHECK-SAME: unique_indices = true
+func.func @scatter_sorted_permutation(%operand: tensor<4x4xi32>, %updates: tensor<2xi32>) -> tensor<4x4xi32> {
+  %indices = stablehlo.constant dense<[[2, 1], [1, 2]]> : tensor<2x2xi64>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    stablehlo.return %update : tensor<i32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<inserted_window_dims = [0, 1], scatter_dims_to_operand_dims = [1, 0], index_vector_dim = 1>, indices_are_sorted = true, unique_indices = true} : (tensor<4x4xi32>, tensor<2x2xi64>, tensor<2xi32>) -> tensor<4x4xi32>
+  return %result : tensor<4x4xi32>
+}
+
+// -----
+
+// Moving increasing indexed axes ahead of zero axes preserves sorted starts.
+// CHECK-LABEL: @scatter_sorted_axis_move
+// CHECK: stablehlo.transpose
+// CHECK: "stablehlo.scatter"
+// CHECK-SAME: indices_are_sorted = true
+// CHECK-SAME: scatter_dims_to_operand_dims = [0]
+// CHECK-SAME: unique_indices = true
+func.func @scatter_sorted_axis_move(%operand: tensor<4x4xi32>, %indices: tensor<2x1xi64>, %updates: tensor<2x4xi32>) -> tensor<4x4xi32> {
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    stablehlo.return %update : tensor<i32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [1], inserted_window_dims = [1], scatter_dims_to_operand_dims = [1], index_vector_dim = 1>, indices_are_sorted = true, unique_indices = true} : (tensor<4x4xi32>, tensor<2x1xi64>, tensor<2x4xi32>) -> tensor<4x4xi32>
+  return %result : tensor<4x4xi32>
 }
