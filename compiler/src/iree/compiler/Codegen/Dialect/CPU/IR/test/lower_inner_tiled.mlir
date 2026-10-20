@@ -979,3 +979,153 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   util.hoistable_conversion "data_tiled_acc_reassemble"
 //       CHECK:     vector.scalable.extract {{.*}} : vector<32xf32> from vector<[8]xf32>
 //       CHECK:     arith.truncf {{.*}} : vector<32xf32> to vector<32xf16>
+
+// -----
+
+// RISC-V VLEN=256 bf16×bf16→f32 vfwmaccbf16.vf. No extf; vl is vlen/8.
+
+#contraction_accesses_rvv_bf16 = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_riscv_v_1x8vlsx1_bf16_vlen256(
+    %lhs: vector<1x1xbf16>, %rhs: vector<32x1xbf16>, %acc: vector<1x32xf32>)
+    -> vector<1x32xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = #contraction_accesses_rvv_bf16,
+    iterator_types = [],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16, vlen = 256>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : vector<1x1xbf16>, vector<32x1xbf16> into vector<1x32xf32>
+  return %0 : vector<1x32xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root
+        : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_riscv_v_1x8vlsx1_bf16_vlen256
+//       CHECK:   %[[POL:.+]] = arith.constant 1 : i64
+//       CHECK:   %[[VL:.+]] = arith.constant 32 : i64
+//       CHECK:   %[[FRM:.+]] = arith.constant 7 : i64
+//       CHECK:   ub.poison : vector<[8]xf32>
+//       CHECK:   util.hoistable_conversion "data_tiled_acc_distribute"
+//   CHECK-NOT:   arith.extf
+//       CHECK:     vector.scalable.insert {{.*}} : vector<32xf32> into vector<[8]xf32>
+//       CHECK:   vector.extract {{.*}} : bf16 from vector<{{1x1|1}}xbf16>
+//   CHECK-NOT:   arith.extf
+//   CHECK-NOT:   vector.broadcast {{.*}} : bf16 to vector<[8]xbf16>
+//       CHECK:   vector.scalable.insert {{.*}} : vector<32xbf16> into vector<[8]xbf16>
+//   CHECK-NOT:   arith.extf
+//   CHECK-NOT:   vector.scalable.insert
+//   CHECK-NOT:   vector.scalable.extract
+//       CHECK:   llvm.call_intrinsic "llvm.riscv.vfwmaccbf16"({{.*}}, %[[FRM]], %[[VL]], %[[POL]]) : (vector<[8]xf32>, bf16, vector<[8]xbf16>, i64, i64, i64) -> vector<[8]xf32>
+//   CHECK-NOT:   vector.scalable.insert
+//   CHECK-NOT:   vector.scalable.extract
+//       CHECK:   util.hoistable_conversion "data_tiled_acc_reassemble"
+//       CHECK:     vector.scalable.extract {{.*}} : vector<32xf32> from vector<[8]xf32>
+
+// -----
+
+// RISC-V VLEN=128 bf16: lane count tracks vlen/8.
+
+#contraction_accesses_rvv_bf16_128 = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_riscv_v_1x8vlsx1_bf16_vlen128(
+    %lhs: vector<1x1xbf16>, %rhs: vector<16x1xbf16>, %acc: vector<1x16xf32>)
+    -> vector<1x16xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = #contraction_accesses_rvv_bf16_128,
+    iterator_types = [],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16, vlen = 128>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : vector<1x1xbf16>, vector<16x1xbf16> into vector<1x16xf32>
+  return %0 : vector<1x16xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root
+        : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_riscv_v_1x8vlsx1_bf16_vlen128
+//       CHECK:   %[[POL:.+]] = arith.constant 1 : i64
+//       CHECK:   %[[VL:.+]] = arith.constant 16 : i64
+//       CHECK:   %[[FRM:.+]] = arith.constant 7 : i64
+//       CHECK:   ub.poison : vector<[8]xf32>
+//       CHECK:   util.hoistable_conversion "data_tiled_acc_distribute"
+//   CHECK-NOT:   arith.extf
+//       CHECK:     vector.scalable.insert {{.*}} : vector<16xf32> into vector<[8]xf32>
+//       CHECK:   vector.extract {{.*}} : bf16 from vector<{{1x1|1}}xbf16>
+//   CHECK-NOT:   arith.extf
+//   CHECK-NOT:   vector.broadcast {{.*}} : bf16 to vector<[8]xbf16>
+//       CHECK:   vector.scalable.insert {{.*}} : vector<16xbf16> into vector<[8]xbf16>
+//   CHECK-NOT:   arith.extf
+//       CHECK:   llvm.call_intrinsic "llvm.riscv.vfwmaccbf16"({{.*}}, %[[FRM]], %[[VL]], %[[POL]]) : (vector<[8]xf32>, bf16, vector<[8]xbf16>, i64, i64, i64) -> vector<[8]xf32>
+//       CHECK:   util.hoistable_conversion "data_tiled_acc_reassemble"
+//       CHECK:     vector.scalable.extract {{.*}} : vector<16xf32> from vector<[8]xf32>
+
+// -----
+
+// RISC-V VLEN=256 swapped bf16: scalar from unit-N RHS.
+
+#contraction_accesses_rvv_bf16_t = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @lower_riscv_v_8vlsx1x1_bf16_vlen256(
+    %lhs: vector<32x1xbf16>, %rhs: vector<1x1xbf16>, %acc: vector<32x1xf32>)
+    -> vector<32x1xf32> {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = #contraction_accesses_rvv_bf16_t,
+    iterator_types = [],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16, vlen = 256>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : vector<32x1xbf16>, vector<1x1xbf16> into vector<32x1xf32>
+  return %0 : vector<32x1xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root
+        : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.lower_inner_tiled
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @lower_riscv_v_8vlsx1x1_bf16_vlen256
+//       CHECK:   %[[POL:.+]] = arith.constant 1 : i64
+//       CHECK:   %[[VL:.+]] = arith.constant 32 : i64
+//       CHECK:   %[[FRM:.+]] = arith.constant 7 : i64
+//       CHECK:   util.hoistable_conversion "data_tiled_acc_distribute"
+//   CHECK-NOT:   arith.extf
+//       CHECK:     vector.scalable.insert {{.*}} : vector<32xf32> into vector<[8]xf32>
+//       CHECK:   vector.extract {{.*}} : bf16 from vector<{{1x1|1}}xbf16>
+//   CHECK-NOT:   arith.extf
+//   CHECK-NOT:   vector.broadcast {{.*}} : bf16 to vector<[8]xbf16>
+//       CHECK:   vector.scalable.insert {{.*}} : vector<32xbf16> into vector<[8]xbf16>
+//   CHECK-NOT:   arith.extf
+//       CHECK:   llvm.call_intrinsic "llvm.riscv.vfwmaccbf16"({{.*}}, %[[FRM]], %[[VL]], %[[POL]]) : (vector<[8]xf32>, bf16, vector<[8]xbf16>, i64, i64, i64) -> vector<[8]xf32>
+//       CHECK:   util.hoistable_conversion "data_tiled_acc_reassemble"
+//       CHECK:     vector.scalable.extract {{.*}} : vector<32xf32> from vector<[8]xf32>
