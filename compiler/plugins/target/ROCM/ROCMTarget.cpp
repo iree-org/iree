@@ -38,7 +38,6 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
-#include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Frontend/Offloading/Utility.h"
 #include "llvm/IR/Constants.h"
@@ -50,7 +49,6 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Endian.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
@@ -1131,19 +1129,6 @@ public:
         targetHSACO = createHsaco(variantOp.getLoc(), targetObj, libraryName);
         if (targetHSACO.empty()) {
           return failure();
-        }
-
-        // LLVM a86b58566a25 started encoding gfx1250's hardwired XNACK as
-        // XNACK_ON in ELF e_flags. ROCm then looks for a gfx1250:xnack+
-        // target, which the runtime does not register. Keep the pre-existing
-        // encoding for this non-selectable feature until LLVM's ELF emission
-        // is corrected. This does not change the kernel's XNACK codegen.
-        if (targetArch == "gfx1250") {
-          char *flags =
-              targetHSACO.data() + offsetof(llvm::ELF::Elf64_Ehdr, e_flags);
-          llvm::support::endian::write32le(
-              flags, llvm::support::endian::read32le(flags) &
-                         ~llvm::ELF::EF_AMDGPU_FEATURE_XNACK_V4);
         }
 
         if (targetOptions.enableRegSpillWarning) {

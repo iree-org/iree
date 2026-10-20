@@ -18,13 +18,12 @@
 // export does not specify one. CDNA5 only supports wave32; asking LLVM for
 // wave64 silently produces an executable with no kernels.
 
-// The ELF target ID must not require selectable XNACK on CDNA5. Check the
-// little-endian e_flags at byte offset 48: gfx1250 (0x49), SRAMECC any
-// (0x400), and XNACK unsupported (0x0).
-// ELF: data = dense<"0x7F454C46{{([0-9A-F]{88})}}49040000
+// CDNA5 has selectable XNACK, so the ELF target ID keeps the XNACK feature
+// bits. Check the little-endian e_flags at byte offset 48: gfx1250 (0x49),
+// SRAMECC any (0x400), and XNACK any (0x100).
+// ELF: data = dense<"0x7F454C46{{([0-9A-F]{88})}}49050000
 
-// Targets with selectable XNACK must retain their feature bits: gfx942
-// (0x4c), SRAMECC any (0x400), and XNACK any (0x100).
+// Likewise for gfx942: (0x4c), SRAMECC any (0x400), and XNACK any (0x100).
 // RUN: iree-opt --iree-hal-transformation-pipeline --iree-hal-target-device=hip \
 // RUN:   --iree-rocm-target=gfx942 --iree-rocm-container-type=hsaco %s | FileCheck %s --check-prefix=ELF-CDNA3
 // ELF-CDNA3: data = dense<"0x7F454C46{{([0-9A-F]{88})}}4C050000

@@ -138,6 +138,7 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRAnalysis
+    MLIRArithCommonConversion
     MLIRArithDialect
     MLIRArithToAMDGPU
     MLIRArithToLLVM
