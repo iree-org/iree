@@ -91,8 +91,8 @@ iree_cc_test(
     LLVMSupport
     MLIRArithDialect
     MLIRControlFlowDialect
+    MLIRFuncAllExtensions
     MLIRFuncDialect
-    MLIRFuncExtensions
     MLIRIR
     MLIRParser
     MLIRPass
