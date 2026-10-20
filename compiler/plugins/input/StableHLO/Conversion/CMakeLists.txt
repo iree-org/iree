@@ -126,4 +126,51 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    CustomCallMetadata
+  HDRS
+    "StableHLOCustomCallMetadata.h"
+  SRCS
+    "StableHLOCustomCallMetadata.cpp"
+  DEPS
+    MLIRIR
+    StablehloOps
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    TargetRegistry
+  HDRS
+    "TargetRegistry.h"
+  SRCS
+    "TargetRegistry.cpp"
+  DEPS
+    LLVMSupport
+    MLIRFuncDialect
+    MLIRIR
+    MLIRPass
+    MLIRTransformUtils
+    MLIRTransforms
+    StablehloOps
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    TargetPreprocessing
+  HDRS
+    "TargetPreprocessing.h"
+  SRCS
+    "TargetPreprocessing.cpp"
+  DEPS
+    ::PassHeaders
+    ::StableHLOLegalization
+    ::TargetRegistry
+    MLIRPass
+    StablehloPasses
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

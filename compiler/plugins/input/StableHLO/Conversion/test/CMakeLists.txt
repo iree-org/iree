@@ -40,4 +40,81 @@ iree_lit_test_suite(
     iree-opt
 )
 
+iree_cc_test(
+  NAME
+    TargetRegistryTest
+  SRCS
+    "TargetRegistryTest.cpp"
+  DEPS
+    LLVMSupport
+    MLIRArithDialect
+    MLIRAsmParser
+    MLIRFuncDialect
+    MLIRIR
+    MLIRParser
+    MLIRPass
+    MLIRTransformUtils
+    MLIRTransforms
+    StablehloOps
+    StablehloPasses
+    gmock
+    gtest
+    iree::compiler::plugins::input::StableHLO::Conversion::TargetRegistry
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    TargetPreprocessingTest
+  SRCS
+    "TargetPreprocessingTest.cpp"
+  DEPS
+    MLIRArithDialect
+    MLIRFuncDialect
+    MLIRIR
+    MLIRParser
+    MLIRPass
+    StablehloOps
+    StablehloPasses
+    gmock
+    gtest
+    iree::compiler::plugins::input::StableHLO::Conversion
+    iree::compiler::plugins::input::StableHLO::Conversion::CustomCallMetadata
+    iree::compiler::plugins::input::StableHLO::Conversion::TargetPreprocessing
+    iree::compiler::plugins::input::StableHLO::Conversion::TargetRegistry
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    TargetPipelineTest
+  SRCS
+    "TargetPipelineTest.cpp"
+  DEPS
+    LLVMSupport
+    MLIRArithDialect
+    MLIRControlFlowDialect
+    MLIRFuncAllExtensions
+    MLIRFuncDialect
+    MLIRIR
+    MLIRParser
+    MLIRPass
+    MLIRSCFDialect
+    MLIRTensorDialect
+    MLIRTransforms
+    StablehloOps
+    StablehloPasses
+    gmock
+    gtest
+    iree::compiler::Dialect::HAL::Target
+    iree::compiler::Pipelines
+    iree::compiler::Pipelines::Options
+    iree::compiler::PluginAPI
+    iree::compiler::plugins::input::StableHLO::Conversion
+    iree::compiler::plugins::input::StableHLO::Conversion::CustomCallMetadata
+    iree::compiler::plugins::input::StableHLO::Conversion::TargetPreprocessing
+    iree::compiler::plugins::input::StableHLO::Conversion::TargetRegistry
+    iree::testing::gtest_main
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
