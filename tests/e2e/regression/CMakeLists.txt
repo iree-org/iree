@@ -73,6 +73,20 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_executable_generalization_llvm-cpu
+  SRCS
+    "generalize_executables.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-flow-enable-executable-generalization"
+    "--iree-llvmcpu-target-cpu=generic"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_regression_dynamic_gather_attention_llvm-cpu
   SRCS
     "dynamic_gather_attention.mlir"
@@ -147,6 +161,19 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_executable_generalization_vulkan-spirv
+  SRCS
+    "generalize_executables.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-flow-enable-executable-generalization"
 )
 
 iree_check_single_backend_test_suite(
