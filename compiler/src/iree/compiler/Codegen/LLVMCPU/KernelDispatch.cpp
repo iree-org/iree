@@ -2160,6 +2160,163 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                             pipelineConfig));
 }
 
+/// A pack after online attention is tiled apart from it, so the attention
+/// result of one workgroup is buffered on the stack before the pack reads it.
+/// Halves the largest M tile until that buffer fits in half the stack limit;
+/// N stays whole because splitting it recomputes Q @ K.
+static void boundAttentionTileForUnfusedPack(
+    mlir::FunctionOpInterface entryPointFn,
+    IREE::LinalgExt::OnlineAttentionOp attnOp,
+    const IREE::LinalgExt::AttentionOpDetail &opInfo, ArrayRef<int64_t> ubs,
+    SmallVectorImpl<int64_t> &distTileSizes) {
+  bool hasPack =
+      entryPointFn.walk([](linalg::PackOp) { return WalkResult::interrupt(); })
+          .wasInterrupted();
+  if (!hasPack) {
+    return;
+  }
+  int64_t maxStackBytes = 32 * 1024;
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(attnOp)) {
+    maxStackBytes =
+        getConfigMaxStackAllocationSize(targetAttr.getConfiguration())
+            .value_or(maxStackBytes);
+  }
+  int64_t elementBytes =
+      llvm::divideCeil(getElementTypeOrSelf(attnOp.getOutput().getType())
+                           .getIntOrFloatBitWidth(),
+                       8);
+  auto tileBytes = [&]() -> std::optional<int64_t> {
+    int64_t bytes = elementBytes;
+    for (AffineExpr expr : attnOp.getOutputMap().getResults()) {
+      int64_t dim = cast<AffineDimExpr>(expr).getPosition();
+      int64_t size = distTileSizes[dim] ? distTileSizes[dim] : ubs[dim];
+      if (ShapedType::isDynamic(size)) {
+        return std::nullopt;
+      }
+      bytes *= size;
+    }
+    return bytes;
+  };
+  for (std::optional<int64_t> bytes = tileBytes();
+       bytes && *bytes > maxStackBytes / 2; bytes = tileBytes()) {
+    int64_t *largest = nullptr;
+    for (int64_t dim : opInfo.getMDims()) {
+      int64_t &size = distTileSizes[dim];
+      if (size > 1 && (!largest || size > *largest)) {
+        largest = &size;
+      }
+    }
+    if (!largest) {
+      return;
+    }
+    *largest = llvm::divideCeil(*largest, 2);
+  }
+}
+
+/// Vector tiles that keep static head dimensions whole: a tile of the value
+/// head dimension recomputes Q @ K, and the generic limits shrink the query
+/// rows first, down to one row per Q @ K. Rows and keys maximise the work of a
+/// step, rows x keys, preferring them balanced, while the f32 accumulator of
+/// the rows fills at most twice the register file, the K and V tiles of the
+/// keys fit in half of a conservative L1 data cache, and both contractions
+/// stay under the large-vector check. Returns nullopt when the register file is
+/// unknown, or a head dimension is dynamic or not a multiple of `vectorSize`.
+static std::optional<SmallVector<int64_t>> getWholeHeadAttentionVectorTiles(
+    IREE::LinalgExt::OnlineAttentionOp attnOp,
+    const IREE::LinalgExt::AttentionOpDetail &opInfo,
+    IREE::HAL::ExecutableTargetAttr targetAttr, ArrayRef<int64_t> bounds,
+    int64_t vectorSize) {
+  // Most CPU cores this backend targets have at least 32 KiB of L1 data cache.
+  constexpr int64_t kConservativeL1Bytes = 32 * 1024;
+  int64_t registerBits = getRegisterSpaceBitsIfKnown(targetAttr);
+  if (!registerBits || opInfo.getMDims().empty() ||
+      opInfo.getK2Dims().empty()) {
+    return std::nullopt;
+  }
+  auto headSize = [&](ArrayRef<int64_t> dims) -> std::optional<int64_t> {
+    int64_t elements = 1;
+    for (int64_t dim : dims) {
+      if (ShapedType::isDynamic(bounds[dim])) {
+        return std::nullopt;
+      }
+      elements *= bounds[dim];
+    }
+    if (elements % vectorSize != 0) {
+      return std::nullopt;
+    }
+    return elements;
+  };
+  std::optional<int64_t> keyHead = headSize(opInfo.getK1Dims());
+  std::optional<int64_t> valueHead = headSize(opInfo.getNDims());
+  if (!keyHead || !valueHead) {
+    return std::nullopt;
+  }
+  // The innermost dimension that is not a unit one carries the rows or keys.
+  auto pick = [&](ArrayRef<int64_t> dims) {
+    auto it = llvm::find_if(llvm::reverse(dims),
+                            [&](int64_t dim) { return bounds[dim] != 1; });
+    return it == llvm::reverse(dims).end() ? dims.back() : *it;
+  };
+  int64_t rowDim = pick(opInfo.getMDims());
+  int64_t keyDim = pick(opInfo.getK2Dims());
+  if (ShapedType::isDynamic(bounds[rowDim])) {
+    return std::nullopt;
+  }
+  auto floorPow2 = [](int64_t value) -> int64_t {
+    return value < 1 ? 0 : llvm::bit_floor(static_cast<uint64_t>(value));
+  };
+  int64_t kvBytesPerKey =
+      *keyHead *
+          IREE::Util::getTypeBitWidth(
+              getElementTypeOrSelf(attnOp.getKey().getType())) /
+          8 +
+      *valueHead *
+          IREE::Util::getTypeBitWidth(
+              getElementTypeOrSelf(attnOp.getValue().getType())) /
+          8;
+  int64_t maxKeys = floorPow2(kConservativeL1Bytes / 2 / kvBytesPerKey);
+  if (ShapedType::isStatic(bounds[keyDim])) {
+    maxKeys = std::min(maxKeys, floorPow2(bounds[keyDim]));
+  }
+  // The accumulator is f32; an accumulator past the register file stays in L1
+  // at little cost, measured up to twice its size.
+  int64_t maxRows = std::min(floorPow2(bounds[rowDim]),
+                             floorPow2(2 * registerBits / 32 / *valueHead));
+  int64_t contractionElements =
+      getMaxVectorSizeForLargeVectorCheck(targetAttr) * 8 / 32;
+  int64_t head = std::max(*keyHead, *valueHead);
+  int64_t rows = 0, keys = 0;
+  for (int64_t r = 1; r <= maxRows; r *= 2) {
+    // Strictly under the check.
+    int64_t k =
+        std::min(maxKeys, floorPow2((contractionElements - 1) / r / head));
+    if (k < 1) {
+      break;
+    }
+    auto imbalance = [](int64_t a, int64_t b) {
+      return std::abs(static_cast<int64_t>(llvm::Log2_64(a)) -
+                      static_cast<int64_t>(llvm::Log2_64(b)));
+    };
+    if (r * k > rows * keys ||
+        (r * k == rows * keys && imbalance(r, k) <= imbalance(rows, keys))) {
+      rows = r;
+      keys = k;
+    }
+  }
+  if (rows < 1) {
+    return std::nullopt;
+  }
+  SmallVector<int64_t> tiles(bounds.size(), 1);
+  for (ArrayRef<int64_t> dims : {opInfo.getK1Dims(), opInfo.getNDims()}) {
+    for (int64_t dim : dims) {
+      tiles[dim] = bounds[dim];
+    }
+  }
+  tiles[rowDim] = rows;
+  tiles[keyDim] = keys;
+  return tiles;
+}
+
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    IREE::LinalgExt::OnlineAttentionOp attnOp) {
   FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
@@ -2192,6 +2349,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(attnOp, config);
+  boundAttentionTileForUnfusedPack(entryPointFn, attnOp, opInfo, ubs,
+                                   distTileSizes);
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   SmallVector<int64_t> vecTileSizeBounds(attnOp.getIterationDomainRank());
@@ -2200,16 +2359,11 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
 
   // K1 dimensions (head_dim) are typically small. Per AttentionOpDetail docs
-  // (IndexingUtils.h), K1 is generally 64 or 128. When K1 is static and within
-  // this typical range, we leave it untiled. However, for dynamic K1 or
-  // unusually large K1, we must tile to avoid unbounded allocations.
-  constexpr int64_t kTypicalK1Threshold = 128;
+  // (IndexingUtils.h), K1 is generally 64 or 128. We leave it untiled: a K1
+  // tile would hand the softmax partial scores.
   SmallVector<int64_t> vecTileSizes(vecTileSizeBounds.size(), 1);
   for (int i : opInfo.getK1Dims()) {
-    int64_t k1Size = ubs[i];
-    if (ShapedType::isStatic(k1Size) && k1Size <= kTypicalK1Threshold) {
-      vecTileSizes[i] = 0;
-    }
+    vecTileSizes[i] = 0;
   }
   for (auto i : llvm::seq<int64_t>(0, vecTileSizeBounds.size())) {
     if (vecTileSizes[i] == 0) {
@@ -2222,8 +2376,12 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(attnOp);
 
-  // Limit large vector sizes.
-  {
+  if (std::optional<SmallVector<int64_t>> headTiles =
+          getWholeHeadAttentionVectorTiles(attnOp, opInfo, targetAttr,
+                                           vecTileSizeBounds, vectorSize)) {
+    vecTileSizes = std::move(*headTiles);
+  } else {
+    // Limit large vector sizes.
     // TODO: These aren't the best heuristics and we can do much much better if
     // we reuse the matmul heuristics here. limitVectorTileSizes doesn't try to
     // convert the matmul into a square matmul, which is bad.
