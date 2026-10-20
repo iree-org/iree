@@ -22,7 +22,10 @@
 
 namespace mlir::iree_compiler::stablehlo {
 
-// Handlers follow matchAndRewrite: failure leaves the operation unchanged.
+// Handlers receive the original operation, including all operands and regions.
+// Decomposition fallback requires its complete signature and unchanged IR.
+// Validate applicability before changing IR, including helper symbols and
+// attributes. Success replaces the operation; failure makes no IR changes.
 // Captured handler state must support concurrent calls from pass clones.
 class TargetRegistry {
 public:
