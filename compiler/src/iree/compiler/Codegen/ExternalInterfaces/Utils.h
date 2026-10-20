@@ -210,10 +210,16 @@ public:
           auto swizzle = *encodingInfo.swizzle;
           SmallVector<int64_t> newShape(packedType.getShape().drop_back(
               encodingInfo.innerTileSizes.size()));
-          SmallVector<int64_t> swizzledTileShape =
-              IREE::Codegen::getExpandedTileShape(swizzle.expandShape());
+          SmallVector<std::pair<int64_t, bool>> swizzledTileShape =
+              IREE::Codegen::getExpandedTileShapeWithScalableFlags(
+                  swizzle.expandShape());
           applyPermutationToVector(swizzledTileShape, swizzle.permutation());
-          newShape.append(swizzledTileShape);
+          // Scalable expanded dims (e.g., SVE `internal(4, ArmSveVL...)`) have
+          // a runtime extent of `base * vscale`, so they must be dynamic in
+          // the materialized type.
+          for (auto [size, scalable] : swizzledTileShape) {
+            newShape.push_back(scalable ? ShapedType::kDynamic : size);
+          }
           return RankedTensorType::get(newShape, packedType.getElementType());
         })
         .Case([&](IREE::TensorExt::DispatchTensorType dispatchTensorType) {
