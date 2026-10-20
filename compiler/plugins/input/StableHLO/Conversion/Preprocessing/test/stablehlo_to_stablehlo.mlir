@@ -1032,7 +1032,7 @@ func.func @scatter_dynamic_batching_dims(
 // CHECK: linalg.generic
 // CHECK: arith.index_cast
 // CHECK: linalg.yield
-// CHECK: } -> tensor<256x?x2xi32>
+// CHECK: } -> tensor<256x?x2xi64>
 // CHECK: stablehlo.scatter
 func.func @scatter_dynamic_updates_static_batch(
     %operand: tensor<256x5xi32>, %indices: tensor<256x?x1xui8>,
@@ -1169,17 +1169,18 @@ func.func @scatter_i64_large_constant_indices(
 
 // -----
 
-// Batch coordinates that fit the source width preserve unsigned index bits
-// without materializing a wider index tensor.
+// Unsigned batched indices widen inside the generated index region, so the
+// widened index tensor is never materialized.
 // CHECK-LABEL: func.func @scatter_batching_unsigned_dynamic_indices
 // CHECK-SAME:    (%{{.+}}: tensor<6x4xi32>, %[[INDICES:.+]]: tensor<6x?x1xui8>
 // CHECK-NOT:     stablehlo.convert %[[INDICES]] : (tensor<6x?x1xui8>) -> tensor<6x?x1xi64>
 // CHECK:         %[[NARROW:.+]] = stablehlo.convert %[[INDICES]] : (tensor<6x?x1xui8>) -> tensor<6x?x1xi8>
 // CHECK:         linalg.generic
 // CHECK:           %[[INDEX:.+]] = tensor.extract %[[NARROW]]
-// CHECK:           scf.yield %[[INDEX]] : i8
-// CHECK:         } -> tensor<6x?x2xi8>
-// CHECK:         stablehlo.convert %{{.+}} : (tensor<6x?x2xui8>) -> tensor<6x?x2xi32>
+// CHECK:           %[[WIDE:.+]] = arith.extui %[[INDEX]] : i8 to i64
+// CHECK:           scf.yield %[[WIDE]] : i64
+// CHECK:         } -> tensor<6x?x2xi64>
+// CHECK:         stablehlo.convert %{{.+}} : (tensor<6x?x2xi64>) -> tensor<6x?x2xi32>
 func.func @scatter_batching_unsigned_dynamic_indices(%operand: tensor<6x4xi32>, %indices: tensor<6x?x1xui8>, %updates: tensor<6x?xi32>) -> tensor<6x4xi32> {
   %0 = "stablehlo.scatter"(%operand, %indices, %updates) ({
   ^bb0(%current: tensor<i32>, %update: tensor<i32>):
