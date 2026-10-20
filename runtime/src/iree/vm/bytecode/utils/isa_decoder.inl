@@ -301,8 +301,10 @@
       (const iree_vm_register_list_t*)&IREE_VM_ISA_BYTECODE_DATA \
           [IREE_VM_ISA_PC];                                      \
   IREE_VM_ISA_PC += IREE_REGISTER_ORDINAL_SIZE;                  \
-  IREE_VM_ISA_REQUIRE((name)->size* IREE_REGISTER_ORDINAL_SIZE); \
-  IREE_VM_ISA_PC += (name)->size * IREE_REGISTER_ORDINAL_SIZE
+  IREE_VM_ISA_REQUIRE(iree_unaligned_load_le_u16(&(name)->size) * \
+                      IREE_REGISTER_ORDINAL_SIZE);               \
+  IREE_VM_ISA_PC += iree_unaligned_load_le_u16(&(name)->size) *   \
+                    IREE_REGISTER_ORDINAL_SIZE
 
 #define IREE_VM_ISA_DECODE_VARIADIC_RESULTS(name) \
   IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(name)
@@ -321,8 +323,10 @@
       (const iree_vm_register_remap_list_t*)&IREE_VM_ISA_BYTECODE_DATA \
           [IREE_VM_ISA_PC];                                            \
   IREE_VM_ISA_PC += IREE_REGISTER_ORDINAL_SIZE;                        \
-  IREE_VM_ISA_REQUIRE((name)->size * 2 * IREE_REGISTER_ORDINAL_SIZE);  \
-  IREE_VM_ISA_PC += (name)->size * 2 * IREE_REGISTER_ORDINAL_SIZE
+  IREE_VM_ISA_REQUIRE(iree_unaligned_load_le_u16(&(name)->size) * 2 *   \
+                      IREE_REGISTER_ORDINAL_SIZE);                     \
+  IREE_VM_ISA_PC += iree_unaligned_load_le_u16(&(name)->size) * 2 *     \
+                    IREE_REGISTER_ORDINAL_SIZE
 
 //===----------------------------------------------------------------------===//
 // Operand/result mapping

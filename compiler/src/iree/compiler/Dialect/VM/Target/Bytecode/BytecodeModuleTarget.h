@@ -51,6 +51,14 @@ struct BytecodeTargetOptions {
   // should be disabled in release builds.
   bool emitPolyglotZip = true;
 
+  // Emits rodata (embedded constants/weights) in big-endian byte order.
+  // The bytecode instruction stream stays little-endian (the VM decoder swaps
+  // it on read), but rodata is bulk tensor data consumed by native typed loads
+  // on the device, so it must match the target device's endianness. Default is
+  // little-endian; set when targeting a big-endian runtime (e.g. mips64 BE).
+  // [BE spike]
+  bool targetBigEndianRodata = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<BytecodeTargetOptions>;
 };

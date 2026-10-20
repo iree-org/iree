@@ -42,11 +42,11 @@
 static void iree_vm_bytecode_dispatch_remap_branch_registers(
     int32_t* IREE_RESTRICT regs_i32, iree_vm_ref_t* IREE_RESTRICT regs_ref,
     const iree_vm_register_remap_list_t* IREE_RESTRICT remap_list) {
-  for (int i = 0; i < remap_list->size; ++i) {
+  for (int i = 0; i < iree_unaligned_load_le_u16(&remap_list->size); ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
     // Could write two arrays: one for prims and one for refs.
-    uint16_t src_reg = remap_list->pairs[i].src_reg;
-    uint16_t dst_reg = remap_list->pairs[i].dst_reg;
+    uint16_t src_reg = iree_unaligned_load_le_u16(&remap_list->pairs[i].src_reg);
+    uint16_t dst_reg = iree_unaligned_load_le_u16(&remap_list->pairs[i].dst_reg);
     if (src_reg & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) {
       iree_vm_ref_retain_or_move(
           src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
@@ -63,7 +63,7 @@ static inline iree_vm_source_offset_t iree_vm_bytecode_dispatch_branch_to(
     iree_vm_source_offset_t target_pc,
     const iree_vm_register_remap_list_t* IREE_RESTRICT remap_list,
     iree_vm_source_offset_t pc_delta) {
-  if (IREE_UNLIKELY(remap_list->size > 0)) {
+  if (IREE_UNLIKELY(iree_unaligned_load_le_u16(&remap_list->size) > 0)) {
     iree_vm_bytecode_dispatch_remap_branch_registers(regs_i32, regs_ref,
                                                      remap_list);
   }
@@ -84,9 +84,9 @@ static inline iree_vm_source_offset_t iree_vm_bytecode_dispatch_branch_to_block(
 static void iree_vm_bytecode_dispatch_discard_registers(
     iree_vm_ref_t* IREE_RESTRICT regs_ref,
     const iree_vm_register_list_t* IREE_RESTRICT reg_list) {
-  for (int i = 0; i < reg_list->size; ++i) {
+  for (int i = 0; i < iree_unaligned_load_le_u16(&reg_list->size); ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
-    uint16_t reg = reg_list->registers[i];
+    uint16_t reg = iree_unaligned_load_le_u16(&reg_list->registers[i]);
     if ((reg & (IREE_VM_ISA_REF_REGISTER_TYPE_BIT |
                 IREE_VM_ISA_REF_REGISTER_MOVE_BIT)) ==
         (IREE_VM_ISA_REF_REGISTER_TYPE_BIT |
@@ -184,8 +184,8 @@ static iree_status_t iree_vm_bytecode_function_enter(
   // (header, frame, and register storage) as a single pointer bump below.
 
   // We've verified all register storage prior to execution.
-  uint32_t i32_register_count = target_descriptor->i32_register_count;
-  uint32_t ref_register_count = target_descriptor->ref_register_count;
+  uint32_t i32_register_count = iree_vm_FunctionDescriptor_i32_register_count(target_descriptor);
+  uint32_t ref_register_count = iree_vm_FunctionDescriptor_ref_register_count(target_descriptor);
   IREE_ASSERT_LE(i32_register_count, IREE_VM_ISA_I32_REGISTER_MASK);
   IREE_ASSERT_LE(ref_register_count, IREE_VM_ISA_REF_REGISTER_MASK);
 
@@ -308,7 +308,7 @@ static iree_status_t iree_vm_bytecode_external_leave(
   iree_string_view_t cconv_results = stack_storage->cconv_results;
   uint8_t* p = results.data;
   for (iree_host_size_t i = 0; i < cconv_results.size; ++i) {
-    uint16_t src_reg = src_reg_list->registers[i];
+    uint16_t src_reg = iree_unaligned_load_le_u16(&src_reg_list->registers[i]);
     switch (cconv_results.data[i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
@@ -385,10 +385,10 @@ static iree_status_t iree_vm_bytecode_internal_enter(
   iree_vm_registers_t* dst_regs = out_callee_registers;
   int i32_reg_offset = 0;
   int ref_reg_offset = 0;
-  for (int i = 0; i < src_reg_list->size; ++i) {
+  for (int i = 0; i < iree_unaligned_load_le_u16(&src_reg_list->size); ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
     // Could write two arrays: one for prims and one for refs.
-    uint16_t src_reg = src_reg_list->registers[i];
+    uint16_t src_reg = iree_unaligned_load_le_u16(&src_reg_list->registers[i]);
     switch (cconv_arguments.data[i]) {
       case IREE_VM_CCONV_TYPE_I32:
       case IREE_VM_CCONV_TYPE_F32:
@@ -441,8 +441,8 @@ static iree_status_t iree_vm_bytecode_internal_leave(
           caller_frame);
   const iree_vm_register_list_t* dst_reg_list =
       caller_storage->return_registers;
-  IREE_ASSERT_LE(src_reg_list->size, dst_reg_list->size);
-  if (IREE_UNLIKELY(src_reg_list->size > dst_reg_list->size)) {
+  IREE_ASSERT_LE(iree_unaligned_load_le_u16(&src_reg_list->size), iree_unaligned_load_le_u16(&dst_reg_list->size));
+  if (IREE_UNLIKELY(iree_unaligned_load_le_u16(&src_reg_list->size) > iree_unaligned_load_le_u16(&dst_reg_list->size))) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "src/dst reg count mismatch on internal return");
   }
@@ -452,11 +452,11 @@ static iree_status_t iree_vm_bytecode_internal_leave(
       (iree_vm_bytecode_frame_storage_t*)iree_vm_stack_frame_storage(
           callee_frame);
   iree_string_view_t cconv_results = callee_storage->cconv_results;
-  for (int i = 0; i < src_reg_list->size; ++i) {
+  for (int i = 0; i < iree_unaligned_load_le_u16(&src_reg_list->size); ++i) {
     // TODO(benvanik): change encoding to avoid this branching.
     // Could write two arrays: one for prims and one for refs.
-    uint16_t src_reg = src_reg_list->registers[i];
-    uint16_t dst_reg = dst_reg_list->registers[i];
+    uint16_t src_reg = iree_unaligned_load_le_u16(&src_reg_list->registers[i]);
+    uint16_t dst_reg = iree_unaligned_load_le_u16(&dst_reg_list->registers[i]);
     switch (cconv_results.data[i]) {
       case IREE_VM_CCONV_TYPE_I32:
       case IREE_VM_CCONV_TYPE_F32:
@@ -508,20 +508,20 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
         break;
       case IREE_VM_CCONV_TYPE_I32:
       case IREE_VM_CCONV_TYPE_F32: {
-        memcpy(p, &caller_registers.i32[src_reg_list->registers[reg_i++]],
+        memcpy(p, &caller_registers.i32[iree_unaligned_load_le_u16(&src_reg_list->registers[reg_i++])],
                sizeof(int32_t));
         p += sizeof(int32_t);
       } break;
       case IREE_VM_CCONV_TYPE_I64:
       case IREE_VM_CCONV_TYPE_F64: {
         p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
-        memcpy(p, &caller_registers.i32[src_reg_list->registers[reg_i++]],
+        memcpy(p, &caller_registers.i32[iree_unaligned_load_le_u16(&src_reg_list->registers[reg_i++])],
                sizeof(int64_t));
         p += sizeof(int64_t);
       } break;
       case IREE_VM_CCONV_TYPE_REF: {
         p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
-        uint16_t src_reg = src_reg_list->registers[reg_i++];
+        uint16_t src_reg = iree_unaligned_load_le_u16(&src_reg_list->registers[reg_i++]);
         iree_vm_ref_retain_or_move(
             src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
             &caller_registers.ref[src_reg & IREE_VM_ISA_REF_REGISTER_MASK],
@@ -530,7 +530,7 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
       } break;
       case IREE_VM_CCONV_TYPE_SPAN_START: {
         IREE_ASSERT(segment_size_list);
-        int32_t span_count = segment_size_list->registers[seg_i];
+        int32_t span_count = iree_unaligned_load_le_u16(&segment_size_list->registers[seg_i]);
         memcpy(p, &span_count, sizeof(int32_t));
         p += sizeof(int32_t);
         if (!span_count) {
@@ -576,7 +576,7 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
               case IREE_VM_CCONV_TYPE_I32:
               case IREE_VM_CCONV_TYPE_F32: {
                 memcpy(p,
-                       &caller_registers.i32[src_reg_list->registers[reg_i++]],
+                       &caller_registers.i32[iree_unaligned_load_le_u16(&src_reg_list->registers[reg_i++])],
                        sizeof(int32_t));
                 p += sizeof(int32_t);
               } break;
@@ -584,13 +584,13 @@ static void iree_vm_bytecode_populate_import_cconv_arguments(
               case IREE_VM_CCONV_TYPE_F64: {
                 p = iree_vm_bytecode_align_ptr(p, sizeof(int64_t));
                 memcpy(p,
-                       &caller_registers.i32[src_reg_list->registers[reg_i++]],
+                       &caller_registers.i32[iree_unaligned_load_le_u16(&src_reg_list->registers[reg_i++])],
                        sizeof(int64_t));
                 p += sizeof(int64_t);
               } break;
               case IREE_VM_CCONV_TYPE_REF: {
                 p = iree_vm_bytecode_align_ptr(p, iree_alignof(iree_vm_ref_t));
-                uint16_t src_reg = src_reg_list->registers[reg_i++];
+                uint16_t src_reg = iree_unaligned_load_le_u16(&src_reg_list->registers[reg_i++]);
                 iree_vm_ref_retain_or_move(
                     src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
                     &caller_registers
@@ -634,7 +634,7 @@ static void iree_vm_bytecode_release_import_cconv_arguments(
         break;
       case IREE_VM_CCONV_TYPE_SPAN_START: {
         IREE_ASSERT(segment_size_list);
-        int32_t span_count = segment_size_list->registers[seg_i];
+        int32_t span_count = iree_unaligned_load_le_u16(&segment_size_list->registers[seg_i]);
         p += sizeof(int32_t);
         if (!span_count) {
           do {
@@ -738,9 +738,9 @@ static iree_status_t iree_vm_bytecode_issue_import_call(
   // Marshal outputs from the ABI results buffer to registers.
   iree_vm_registers_t caller_registers = *out_caller_registers;
   uint8_t* IREE_RESTRICT p = call.results.data;
-  for (iree_host_size_t i = 0; i < cconv_results.size && i < dst_reg_list->size;
+  for (iree_host_size_t i = 0; i < cconv_results.size && i < iree_unaligned_load_le_u16(&dst_reg_list->size);
        ++i) {
-    uint16_t dst_reg = dst_reg_list->registers[i];
+    uint16_t dst_reg = iree_unaligned_load_le_u16(&dst_reg_list->registers[i]);
     switch (cconv_results.data[i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
@@ -959,9 +959,9 @@ static iree_status_t iree_vm_bytecode_call_import_yieldable(
   iree_vm_registers_t regs = *out_caller_registers;
   uint8_t* IREE_RESTRICT p = call.results.data;
   iree_string_view_t cconv_results = import->results;
-  for (iree_host_size_t i = 0; i < cconv_results.size && i < dst_reg_list->size;
+  for (iree_host_size_t i = 0; i < cconv_results.size && i < iree_unaligned_load_le_u16(&dst_reg_list->size);
        ++i) {
-    uint16_t dst_reg = dst_reg_list->registers[i];
+    uint16_t dst_reg = iree_unaligned_load_le_u16(&dst_reg_list->registers[i]);
     switch (cconv_results.data[i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
@@ -1072,9 +1072,9 @@ static iree_status_t iree_vm_bytecode_call_import_variadic_yieldable(
   iree_vm_registers_t regs = *out_caller_registers;
   uint8_t* IREE_RESTRICT p = call.results.data;
   iree_string_view_t cconv_results = import->results;
-  for (iree_host_size_t i = 0; i < cconv_results.size && i < dst_reg_list->size;
+  for (iree_host_size_t i = 0; i < cconv_results.size && i < iree_unaligned_load_le_u16(&dst_reg_list->size);
        ++i) {
-    uint16_t dst_reg = dst_reg_list->registers[i];
+    uint16_t dst_reg = iree_unaligned_load_le_u16(&dst_reg_list->registers[i]);
     switch (cconv_results.data[i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
@@ -1197,8 +1197,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
       (iree_vm_bytecode_module_state_t*)current_frame->module_state;
   const uint8_t* IREE_RESTRICT bytecode_data =
       module->bytecode_data.data +
-      module->function_descriptor_table[current_frame->function.ordinal]
-          .bytecode_offset;
+      iree_vm_FunctionDescriptor_bytecode_offset(
+          &module->function_descriptor_table[current_frame->function.ordinal]);
 
   int32_t* IREE_RESTRICT regs_i32 = regs.i32;
   IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
@@ -1394,8 +1394,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
 
     IREE_VM_ISA_DISPATCH_OP(CORE, DiscardRefs, {
       IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(reg_list);
-      for (int i = 0; i < reg_list->size; ++i) {
-        uint16_t reg = reg_list->registers[i];
+      for (int i = 0; i < iree_unaligned_load_le_u16(&reg_list->size); ++i) {
+        uint16_t reg = iree_unaligned_load_le_u16(&reg_list->registers[i]);
         // All registers in this list are refs; unconditionally release.
         iree_vm_ref_release(&regs_ref[reg & IREE_VM_ISA_REF_REGISTER_MASK]);
       }
@@ -1889,8 +1889,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
       IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I32(default_value);
       IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
       IREE_VM_ISA_DISPATCH_DECODE_RESULT_I32(result);
-      if (index >= 0 && index < value_reg_list->size) {
-        *result = regs_i32[value_reg_list->registers[index]];
+      if (index >= 0 && index < iree_unaligned_load_le_u16(&value_reg_list->size)) {
+        *result = regs_i32[iree_unaligned_load_le_u16(&value_reg_list->registers[index])];
       } else {
         *result = default_value;
       }
@@ -1901,8 +1901,12 @@ static iree_status_t iree_vm_bytecode_dispatch(
       IREE_VM_ISA_DISPATCH_DECODE_OPERAND_I64(default_value);
       IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
       IREE_VM_ISA_DISPATCH_DECODE_RESULT_I64(result);
-      if (index >= 0 && index < value_reg_list->size) {
-        *result = regs_i32[value_reg_list->registers[index]];
+      if (index >= 0 && index < iree_unaligned_load_le_u16(&value_reg_list->size)) {
+        // The result is 64-bit: read the full i64 from the register pair rather
+        // than a single i32 slot (reading one slot drops the upper 32 bits and,
+        // on big-endian hosts, returns the high half instead of the value).
+        *result = *(
+            (int64_t*)&regs_i32[iree_unaligned_load_le_u16(&value_reg_list->registers[index])]);
       } else {
         *result = default_value;
       }
@@ -1914,10 +1918,10 @@ static iree_status_t iree_vm_bytecode_dispatch(
       IREE_VM_ISA_DISPATCH_DECODE_OPERAND_REF_MOVE(default_value);
       IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
       IREE_VM_ISA_DISPATCH_DECODE_RESULT_REF_MOVE(result);
-      if (index >= 0 && index < value_reg_list->size) {
-        bool is_move = value_reg_list->registers[index] &
+      if (index >= 0 && index < iree_unaligned_load_le_u16(&value_reg_list->size)) {
+        bool is_move = iree_unaligned_load_le_u16(&value_reg_list->registers[index]) &
                        IREE_VM_ISA_REF_REGISTER_MOVE_BIT;
-        iree_vm_ref_t* new_value = &regs_ref[value_reg_list->registers[index] &
+        iree_vm_ref_t* new_value = &regs_ref[iree_unaligned_load_le_u16(&value_reg_list->registers[index]) &
                                              IREE_VM_ISA_REF_REGISTER_MASK];
         IREE_RETURN_IF_ERROR(iree_vm_ref_retain_or_move_checked(
             is_move, new_value, iree_vm_type_def_as_ref(type_def), result));
@@ -2160,7 +2164,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
             src_reg_list, dst_reg_list, &current_frame, &regs));
         bytecode_data =
             module->bytecode_data.data +
-            module->function_descriptor_table[function_ordinal].bytecode_offset;
+            iree_vm_FunctionDescriptor_bytecode_offset(
+          &module->function_descriptor_table[function_ordinal]);
       }
 
       // Restore the local dispatch variables that may have changed during the
@@ -2246,7 +2251,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
             src_reg_list, dst_reg_list, &current_frame, &regs));
         bytecode_data =
             module->bytecode_data.data +
-            module->function_descriptor_table[function_ordinal].bytecode_offset;
+            iree_vm_FunctionDescriptor_bytecode_offset(
+          &module->function_descriptor_table[function_ordinal]);
       }
 
       // Restore dispatch state (may have changed during call/enter).
@@ -2320,8 +2326,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
       // Reset dispatch state so we can continue executing in the caller.
       bytecode_data =
           module->bytecode_data.data +
-          module->function_descriptor_table[current_frame->function.ordinal]
-              .bytecode_offset;
+          iree_vm_FunctionDescriptor_bytecode_offset(
+          &module->function_descriptor_table[current_frame->function.ordinal]);
       regs_i32 = regs.i32;
       IREE_BUILTIN_ASSUME_ALIGNED(regs_i32, sizeof(iree_max_align_t));
       regs_ref = regs.ref;
@@ -2529,8 +2535,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
         IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F32(default_value);
         IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
         IREE_VM_ISA_DISPATCH_DECODE_RESULT_F32(result);
-        if (index >= 0 && index < value_reg_list->size) {
-          *result = *((float*)&regs_i32[value_reg_list->registers[index]]);
+        if (index >= 0 && index < iree_unaligned_load_le_u16(&value_reg_list->size)) {
+          *result = *((float*)&regs_i32[iree_unaligned_load_le_u16(&value_reg_list->registers[index])]);
         } else {
           *result = default_value;
         }
@@ -2821,8 +2827,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
         IREE_VM_ISA_DISPATCH_DECODE_OPERAND_F64(default_value);
         IREE_VM_ISA_DECODE_VARIADIC_OPERANDS(value_reg_list);
         IREE_VM_ISA_DISPATCH_DECODE_RESULT_F64(result);
-        if (index >= 0 && index < value_reg_list->size) {
-          *result = *((double*)&regs_i32[value_reg_list->registers[index]]);
+        if (index >= 0 && index < iree_unaligned_load_le_u16(&value_reg_list->size)) {
+          *result = *((double*)&regs_i32[iree_unaligned_load_le_u16(&value_reg_list->registers[index])]);
         } else {
           *result = default_value;
         }

@@ -989,8 +989,16 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_fill_buffer,  //
   uint64_t pattern = (uint64_t)args->i5;
   uint32_t pattern_length = (uint32_t)args->i6;
   iree_hal_fill_flags_t flags = (iree_hal_fill_flags_t)args->i7;
+  // [BE spike] The fill replicates the low-order |pattern_length| bytes of the
+  // scalar pattern. Those live at the start of the storage on little-endian but
+  // at the end on big-endian; point at them explicitly so the written bytes
+  // match the target's native layout.
+  const void* pattern_bytes = &pattern;
+#if defined(IREE_ENDIANNESS_BIG)
+  pattern_bytes = (const uint8_t*)&pattern + (sizeof(pattern) - pattern_length);
+#endif  // IREE_ENDIANNESS_BIG
   return iree_hal_command_buffer_fill_buffer(command_buffer, target_ref,
-                                             &pattern, pattern_length, flags);
+                                             pattern_bytes, pattern_length, flags);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_update_buffer,  //
@@ -1415,10 +1423,16 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_fill,  //
   uint64_t pattern = args->i7;
   iree_host_size_t pattern_length = iree_hal_cast_host_size(args->i8);
   iree_hal_fill_flags_t flags = (iree_hal_fill_flags_t)args->i9;
+  // [BE spike] See command_buffer_fill_buffer: the low-order |pattern_length|
+  // bytes of the scalar pattern live at the end of the storage on big-endian.
+  const void* pattern_bytes = &pattern;
+#if defined(IREE_ENDIANNESS_BIG)
+  pattern_bytes = (const uint8_t*)&pattern + (sizeof(pattern) - pattern_length);
+#endif  // IREE_ENDIANNESS_BIG
   return iree_hal_device_queue_fill(
       device, queue_affinity, iree_hal_fence_semaphore_list(wait_fence),
       iree_hal_fence_semaphore_list(signal_fence), target_buffer, target_offset,
-      length, &pattern, pattern_length, flags);
+      length, pattern_bytes, pattern_length, flags);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_update,  //

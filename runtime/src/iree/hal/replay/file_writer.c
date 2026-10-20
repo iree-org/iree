@@ -11,9 +11,19 @@
 #include "iree/hal/replay/digest.h"
 #include "iree/io/stream.h"
 
-#if !defined(IREE_ENDIANNESS_LITTLE) || !IREE_ENDIANNESS_LITTLE
-#error "IREE HAL replay file serialization requires little-endian hosts"
-#endif  // !IREE_ENDIANNESS_LITTLE
+// Replay file serialization reads/writes multi-byte fields in host-native order
+// and the on-disk format is defined as little-endian. Rather than silently
+// producing incompatible files on big-endian hosts (or failing to build), the
+// public entry points below fail at runtime. This feature is off the VMVX
+// inference path and is opt-in (--device_replay_output=).
+#if defined(IREE_ENDIANNESS_BIG)
+#define IREE_HAL_REPLAY_REQUIRE_LITTLE_ENDIAN()                            \
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,                       \
+                          "IREE HAL replay file serialization is only "    \
+                          "supported on little-endian hosts")
+#else
+#define IREE_HAL_REPLAY_REQUIRE_LITTLE_ENDIAN()
+#endif  // IREE_ENDIANNESS_BIG
 
 struct iree_hal_replay_file_writer_t {
   // Host allocator used for writer lifetime.
@@ -94,6 +104,7 @@ IREE_API_EXPORT iree_status_t iree_hal_replay_file_writer_create(
   IREE_ASSERT_ARGUMENT(file_handle);
   IREE_ASSERT_ARGUMENT(out_writer);
   *out_writer = NULL;
+  IREE_HAL_REPLAY_REQUIRE_LITTLE_ENDIAN();
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_io_stream_t* stream = NULL;

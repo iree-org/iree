@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "iree/base/alignment.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
@@ -130,12 +131,14 @@ IREE_API_EXPORT iree_status_t iree_vm_function_call_compute_cconv_fragment_size(
         break;
       case IREE_VM_CCONV_TYPE_SPAN_START: {
         if (IREE_UNLIKELY(!segment_size_list) ||
-            IREE_UNLIKELY(seg_i >= segment_size_list->size)) {
+            IREE_UNLIKELY(seg_i >=
+                          iree_unaligned_load_le_u16(&segment_size_list->size))) {
           return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                   "variadic argument found but segment size "
                                   "list is missing/underflowed");
         }
-        iree_host_size_t span_count = segment_size_list->registers[seg_i];
+        iree_host_size_t span_count =
+            iree_unaligned_load_le_u16(&segment_size_list->registers[seg_i]);
         required_size += sizeof(int32_t);  // count
         // Compute size of one span element with proper alignment.
         iree_host_size_t span_size = 0;

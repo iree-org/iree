@@ -190,32 +190,32 @@ iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
        i < iree_vm_FunctionDescriptor_vec_len(function_descriptors); ++i) {
     iree_vm_FunctionDescriptor_struct_t function_descriptor =
         iree_vm_FunctionDescriptor_vec_at(function_descriptors, i);
-    if (function_descriptor->block_count == 0) {
+    if (iree_vm_FunctionDescriptor_block_count(function_descriptor) == 0) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
           "functions[%zu] descriptor block count is 0; "
           "functions must have at least 1 block, expected %d",
-          i, function_descriptor->block_count);
+          i, iree_vm_FunctionDescriptor_block_count(function_descriptor));
     }
-    if (function_descriptor->bytecode_length == 0) {
+    if (iree_vm_FunctionDescriptor_bytecode_length(function_descriptor) == 0) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "functions[%zu] descriptor bytecode reports 0 "
                               "length; functions must have at least one block",
                               i);
     }
-    if (function_descriptor->bytecode_offset < 0 ||
-        function_descriptor->bytecode_offset +
-                function_descriptor->bytecode_length >
+    if (iree_vm_FunctionDescriptor_bytecode_offset(function_descriptor) < 0 ||
+        iree_vm_FunctionDescriptor_bytecode_offset(function_descriptor) +
+                iree_vm_FunctionDescriptor_bytecode_length(function_descriptor) >
             flatbuffers_uint8_vec_len(bytecode_data)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "functions[%zu] descriptor bytecode span out of "
                               "range (0 < %d < %zu)",
-                              i, function_descriptor->bytecode_offset,
+                              i, iree_vm_FunctionDescriptor_bytecode_offset(function_descriptor),
                               flatbuffers_uint8_vec_len(bytecode_data));
     }
-    if (function_descriptor->i32_register_count >
+    if (iree_vm_FunctionDescriptor_i32_register_count(function_descriptor) >
             IREE_VM_ISA_I32_REGISTER_COUNT ||
-        function_descriptor->ref_register_count >
+        iree_vm_FunctionDescriptor_ref_register_count(function_descriptor) >
             IREE_VM_ISA_REF_REGISTER_COUNT) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
@@ -297,11 +297,11 @@ iree_status_t iree_vm_bytecode_function_verify(
   const iree_vm_FeatureBits_enum_t available_features =
       iree_vm_bytecode_available_features();
   const iree_vm_FeatureBits_enum_t required_features =
-      function_descriptor->requirements;
+      iree_vm_FunctionDescriptor_requirements(function_descriptor);
   IREE_RETURN_IF_ERROR(iree_vm_check_feature_mismatch(
       __FILE__, __LINE__, required_features, available_features));
 
-  if (function_descriptor->block_count == 0) {
+  if (iree_vm_FunctionDescriptor_block_count(function_descriptor) == 0) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "no blocks defined; functions must have at least one block");
@@ -340,9 +340,9 @@ iree_status_t iree_vm_bytecode_function_verify(
   // Ensure the register storage (rounded to the nearest power of 2) won't
   // exceed the maximum allowed registers.
   verify_state.i32_register_count = iree_math_round_up_to_pow2_u32(
-      iree_max(1, function_descriptor->i32_register_count));
+      iree_max(1, iree_vm_FunctionDescriptor_i32_register_count(function_descriptor)));
   verify_state.ref_register_count = iree_math_round_up_to_pow2_u32(
-      iree_max(1, function_descriptor->ref_register_count));
+      iree_max(1, iree_vm_FunctionDescriptor_ref_register_count(function_descriptor)));
   if (IREE_UNLIKELY(verify_state.i32_register_count >
                     IREE_VM_ISA_I32_REGISTER_MASK) ||
       IREE_UNLIKELY(verify_state.ref_register_count >
@@ -366,22 +366,22 @@ iree_status_t iree_vm_bytecode_function_verify(
 
   // NOTE: module verification ensures the function descriptor has a valid
   // bytecode range so we can assume that's true here.
-  IREE_ASSERT(function_descriptor->bytecode_length > 0);
-  IREE_ASSERT(function_descriptor->bytecode_offset >= 0);
-  IREE_ASSERT(function_descriptor->bytecode_offset +
-                  function_descriptor->bytecode_length <=
+  IREE_ASSERT(iree_vm_FunctionDescriptor_bytecode_length(function_descriptor) > 0);
+  IREE_ASSERT(iree_vm_FunctionDescriptor_bytecode_offset(function_descriptor) >= 0);
+  IREE_ASSERT(iree_vm_FunctionDescriptor_bytecode_offset(function_descriptor) +
+                  iree_vm_FunctionDescriptor_bytecode_length(function_descriptor) <=
               module->bytecode_data.data_length);
   iree_const_byte_span_t bytecode_data = iree_make_const_byte_span(
-      module->bytecode_data.data + function_descriptor->bytecode_offset,
-      function_descriptor->bytecode_length);
+      module->bytecode_data.data + iree_vm_FunctionDescriptor_bytecode_offset(function_descriptor),
+      iree_vm_FunctionDescriptor_bytecode_length(function_descriptor));
   const iree_vm_source_offset_t max_pc =
-      (iree_vm_source_offset_t)function_descriptor->bytecode_length;
+      (iree_vm_source_offset_t)iree_vm_FunctionDescriptor_bytecode_length(function_descriptor);
 
   // Reserve the block list. As we walk the bytecode we'll declare/define blocks
   // and then afterward verify all were found.
-  IREE_ASSERT(function_descriptor->block_count > 0);
+  IREE_ASSERT(iree_vm_FunctionDescriptor_block_count(function_descriptor) > 0);
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_block_list_initialize(
-      function_descriptor->block_count, scratch_allocator,
+      iree_vm_FunctionDescriptor_block_count(function_descriptor), scratch_allocator,
       &verify_state.block_list));
 
   // Perform bytecode verification by performing a single-pass walk of all
@@ -459,11 +459,11 @@ iree_status_t iree_vm_bytecode_function_verify(
 
 // Bails if the function doesn't have the given |required_features| declared.
 #define IREE_VM_VERIFY_REQUIREMENT(required_features)                         \
-  if (IREE_UNLIKELY(!iree_all_bits_set(function_descriptor->requirements,     \
+  if (IREE_UNLIKELY(!iree_all_bits_set(iree_vm_FunctionDescriptor_requirements(function_descriptor),     \
                                        (required_features)))) {               \
     return iree_vm_check_feature_mismatch(__FILE__, __LINE__,                 \
                                           (required_features),                \
-                                          function_descriptor->requirements); \
+                                          iree_vm_FunctionDescriptor_requirements(function_descriptor)); \
   }
 
 // Bails if the register ordinal for the given register type is out of bounds.
@@ -606,9 +606,9 @@ iree_status_t iree_vm_bytecode_function_verify(
 
 #define IREE_VM_ISA_VERIFY_BRANCH_OPERANDS(name)        \
   IREE_VM_ISA_DECODE_BRANCH_OPERANDS(name);             \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) {   \
-    IREE_VM_VERIFY_REG_ANY((name)->pairs[__i].src_reg); \
-    IREE_VM_VERIFY_REG_ANY((name)->pairs[__i].dst_reg); \
+  for (uint16_t __i = 0; __i < iree_unaligned_load_le_u16(&(name)->size); ++__i) {   \
+    IREE_VM_VERIFY_REG_ANY(iree_unaligned_load_le_u16(&(name)->pairs[__i].src_reg)); \
+    IREE_VM_VERIFY_REG_ANY(iree_unaligned_load_le_u16(&(name)->pairs[__i].dst_reg)); \
   }
 
 #define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name) \
@@ -618,34 +618,34 @@ iree_status_t iree_vm_bytecode_function_verify(
 
 #define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_I32(name) \
   IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name);          \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) {  \
-    IREE_VM_VERIFY_REG_I32((name)->registers[__i]);    \
+  for (uint16_t __i = 0; __i < iree_unaligned_load_le_u16(&(name)->size); ++__i) {  \
+    IREE_VM_VERIFY_REG_I32(iree_unaligned_load_le_u16(&(name)->registers[__i]));    \
   }
 #define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_I64(name) \
   IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name);          \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) {  \
-    IREE_VM_VERIFY_REG_I64((name)->registers[__i]);    \
+  for (uint16_t __i = 0; __i < iree_unaligned_load_le_u16(&(name)->size); ++__i) {  \
+    IREE_VM_VERIFY_REG_I64(iree_unaligned_load_le_u16(&(name)->registers[__i]));    \
   }
 #define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_F32(name) \
   IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name);          \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) {  \
-    IREE_VM_VERIFY_REG_F32((name)->registers[__i]);    \
+  for (uint16_t __i = 0; __i < iree_unaligned_load_le_u16(&(name)->size); ++__i) {  \
+    IREE_VM_VERIFY_REG_F32(iree_unaligned_load_le_u16(&(name)->registers[__i]));    \
   }
 #define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_F64(name) \
   IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name);          \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) {  \
-    IREE_VM_VERIFY_REG_F64((name)->registers[__i]);    \
+  for (uint16_t __i = 0; __i < iree_unaligned_load_le_u16(&(name)->size); ++__i) {  \
+    IREE_VM_VERIFY_REG_F64(iree_unaligned_load_le_u16(&(name)->registers[__i]));    \
   }
 #define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_REF(name, type_def) \
   IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name);                    \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) {            \
-    IREE_VM_VERIFY_REG_REF((name)->registers[__i]);              \
+  for (uint16_t __i = 0; __i < iree_unaligned_load_le_u16(&(name)->size); ++__i) {            \
+    IREE_VM_VERIFY_REG_REF(iree_unaligned_load_le_u16(&(name)->registers[__i]));              \
   }                                                              \
   (void)(type_def)
 #define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(name) \
   IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name);          \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) {  \
-    IREE_VM_VERIFY_REG_ANY((name)->registers[__i]);    \
+  for (uint16_t __i = 0; __i < iree_unaligned_load_le_u16(&(name)->size); ++__i) {  \
+    IREE_VM_VERIFY_REG_ANY(iree_unaligned_load_le_u16(&(name)->registers[__i]));    \
   }
 
 #define IREE_VM_ISA_VERIFY_VARIADIC_RESULTS_ANY(name) \
@@ -861,23 +861,23 @@ static iree_status_t iree_vm_bytecode_function_verify_arguments(
 static iree_status_t iree_vm_bytecode_function_verify_cconv_register(
     const iree_vm_bytecode_verify_state_t* verify_state, char cconv_type,
     const iree_vm_register_list_t* IREE_RESTRICT reg_list, int reg_i) {
-  if (reg_i >= reg_list->size) {
+  if (reg_i >= iree_unaligned_load_le_u16(&reg_list->size)) {
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "register list underflow (have %u, trying to access %u)",
-        reg_list->size, reg_i);
+        iree_unaligned_load_le_u16(&reg_list->size), reg_i);
   }
   switch (cconv_type) {
     case IREE_VM_CCONV_TYPE_I32:
     case IREE_VM_CCONV_TYPE_F32: {
-      IREE_VM_VERIFY_REG_ORDINAL_X32(reg_list->registers[reg_i], "i32/f32");
+      IREE_VM_VERIFY_REG_ORDINAL_X32(iree_unaligned_load_le_u16(&reg_list->registers[reg_i]), "i32/f32");
     } break;
     case IREE_VM_CCONV_TYPE_I64:
     case IREE_VM_CCONV_TYPE_F64: {
-      IREE_VM_VERIFY_REG_ORDINAL_X64(reg_list->registers[reg_i], "i64/f64");
+      IREE_VM_VERIFY_REG_ORDINAL_X64(iree_unaligned_load_le_u16(&reg_list->registers[reg_i]), "i64/f64");
     } break;
     case IREE_VM_CCONV_TYPE_REF: {
-      IREE_VM_VERIFY_REG_REF(reg_list->registers[reg_i]);
+      IREE_VM_VERIFY_REG_REF(iree_unaligned_load_le_u16(&reg_list->registers[reg_i]));
     } break;
     default:
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
@@ -910,13 +910,13 @@ static iree_status_t iree_vm_bytecode_function_verify_cconv_registers(
           return iree_make_status(
               IREE_STATUS_INVALID_ARGUMENT,
               "function is variadic but no segment size list provided");
-        } else if (seg_i >= segment_size_list->size) {
+        } else if (seg_i >= iree_unaligned_load_le_u16(&segment_size_list->size)) {
           return iree_make_status(
               IREE_STATUS_OUT_OF_RANGE,
               "segment size list underflow (have %u, trying to access %u)",
-              segment_size_list->size, seg_i);
+              iree_unaligned_load_le_u16(&segment_size_list->size), seg_i);
         }
-        uint16_t span_count = segment_size_list->registers[seg_i];
+        uint16_t span_count = iree_unaligned_load_le_u16(&segment_size_list->registers[seg_i]);
         if (!span_count) {
           // No items; skip the span.
           do {
@@ -1004,7 +1004,7 @@ static iree_status_t iree_vm_bytecode_function_verify_call(
 #define UNHANDLED_VERIFY_PREFIX(op_name, ext)                                 \
   case IREE_VM_OP_CORE_##op_name: {                                           \
     return iree_vm_check_feature_mismatch(__FILE__, __LINE__, ext,            \
-                                          function_descriptor->requirements); \
+                                          iree_vm_FunctionDescriptor_requirements(function_descriptor)); \
   }
 
 static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
