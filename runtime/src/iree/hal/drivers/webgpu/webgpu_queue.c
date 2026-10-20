@@ -162,12 +162,11 @@ static iree_status_t iree_hal_webgpu_queue_execute_scratch_builder(
 
   uint32_t result = iree_hal_webgpu_import_execute_instructions(
       queue->device_handle, queue->queue_handle,
-      (uint32_t)(uintptr_t)iree_hal_webgpu_builder_block_table(builder),
+      (uintptr_t)iree_hal_webgpu_builder_block_table(builder),
       iree_hal_webgpu_builder_block_count(builder),
       iree_hal_webgpu_builder_block_word_capacity(builder),
       iree_hal_webgpu_builder_last_block_word_count(builder),
-      (uint32_t)(uintptr_t)entries, total_slots,
-      (uint32_t)(uintptr_t)&builtins_descriptor);
+      (uintptr_t)entries, total_slots, (uintptr_t)&builtins_descriptor);
 
   if (entries != inline_entries) {
     iree_allocator_free(queue->host_allocator, entries);
@@ -727,7 +726,7 @@ static void iree_hal_webgpu_queue_op_wait_completion(
         if (iree_status_is_ok(work_status)) {
           iree_hal_webgpu_import_queue_write_buffer(
               queue->queue_handle, gpu_handle, gpu_offset,
-              (uint32_t)(uintptr_t)mapping.contents.data, state->read.length);
+              (uintptr_t)mapping.contents.data, state->read.length);
           iree_hal_buffer_unmap_range(&mapping);
         }
       } else {
@@ -1309,7 +1308,7 @@ static iree_status_t iree_hal_webgpu_queue_read_inline(
     if (iree_status_is_ok(status)) {
       iree_hal_webgpu_import_queue_write_buffer(
           queue->queue_handle, gpu_handle, gpu_offset,
-          (uint32_t)(uintptr_t)mapping.contents.data, length);
+          (uintptr_t)mapping.contents.data, length);
       iree_hal_buffer_unmap_range(&mapping);
     }
   } else {
@@ -1584,7 +1583,7 @@ static void iree_hal_webgpu_queue_write_phase3(
     if (iree_status_is_ok(status)) {
       iree_hal_webgpu_import_buffer_get_mapped_range(
           state->staging_handle, /*offset=*/0, state->length,
-          (uint32_t)(uintptr_t)mapping.contents.data);
+          (uintptr_t)mapping.contents.data);
       iree_hal_buffer_unmap_range(&mapping);
     }
   } else {
@@ -2079,8 +2078,7 @@ static iree_status_t iree_hal_webgpu_queue_execute_recording(
   }
 
   uint32_t result = iree_hal_webgpu_import_execute_recording(
-      recording_handle, queue->queue_handle,
-      (uint32_t)(uintptr_t)dynamic_entries);
+      recording_handle, queue->queue_handle, (uintptr_t)dynamic_entries);
 
   if (dynamic_entries != inline_entries) {
     iree_allocator_free(queue->host_allocator, dynamic_entries);
@@ -2125,12 +2123,11 @@ static iree_status_t iree_hal_webgpu_queue_execute_one_shot(
 
   uint32_t result = iree_hal_webgpu_import_execute_instructions(
       queue->device_handle, queue->queue_handle,
-      (uint32_t)(uintptr_t)iree_hal_webgpu_builder_block_table(builder),
+      (uintptr_t)iree_hal_webgpu_builder_block_table(builder),
       iree_hal_webgpu_builder_block_count(builder),
       iree_hal_webgpu_builder_block_word_capacity(builder),
       iree_hal_webgpu_builder_last_block_word_count(builder),
-      (uint32_t)(uintptr_t)entries, total_slots,
-      (uint32_t)(uintptr_t)&builtins_descriptor);
+      (uintptr_t)entries, total_slots, (uintptr_t)&builtins_descriptor);
 
   if (entries != inline_entries) {
     iree_allocator_free(queue->host_allocator, entries);
