@@ -2651,8 +2651,7 @@ getElementwiseVectorSizes(mlir::FunctionOpInterface entryPointFn,
   scalableFlags = SmallVector<bool>(tileSizes.size(), false);
   // Check if target supports scalable vectors.
   bool hasAArch64ScalableSupport =
-      isAArch64(config) &&
-      (hasFeature(config, "+sve") || hasFeature(config, "+sve2"));
+      isAArch64(config) && hasAnySVEFeature(config);
   if (hasSMEFeature(config) && isScalableVectorizationEnabled() &&
       (hasAArch64ScalableSupport || isArmStreamingForced())) {
     scalableFlags.back() = true;
