@@ -322,6 +322,15 @@ ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
 // #stream.parameter.named<...>
 //===----------------------------------------------------------------------===//
 
+int64_t NamedParameterAttr::getStorageOffset() const {
+  if (auto configAttr = getConfig()) {
+    if (auto offsetAttr = configAttr.getAs<IntegerAttr>("offset")) {
+      return offsetAttr.getInt();
+    }
+  }
+  return 0;
+}
+
 int64_t NamedParameterAttr::getStorageSize() const {
   if (auto configAttr = getConfig()) {
     if (auto lengthAttr = configAttr.getAs<IntegerAttr>("length")) {
