@@ -1,8 +1,10 @@
-// RUN: not iree-compile --iree-input-type=stablehlo --iree-hal-target-backends=llvm-cpu %s -o /dev/null 2>&1 | FileCheck %s
+// RUN: iree-compile --iree-input-type=stablehlo --iree-hal-target-backends=vmvx --compile-to=flow %s | FileCheck %s
+// RUN: iree-compile --iree-input-type=stablehlo --iree-hal-target-backends=vmvx %s -o /dev/null
+// RUN: iree-compile --iree-input-type=stablehlo --iree-hal-target-backends=llvm-cpu %s -o /dev/null
 
-// CPU dispatches cannot lower status checks. Reject this form rather than
-// dropping the assertion from the scatter update.
-// CHECK: error: failed to legalize operation 'util.status.check_ok' that was explicitly marked illegal
+// The assertion inside the scatter region must survive dispatch formation.
+// CHECK: flow.executable
+// CHECK: util.status.check_ok {{.*}}"negative current"
 func.func @scatter_effect(%operand: tensor<4xf32>, %updates: tensor<2xf32>) -> tensor<4xf32> {
   %indices = stablehlo.constant dense<[[1], [2]]> : tensor<2x1xi32>
   %result = "stablehlo.scatter"(%operand, %indices, %updates) ({

@@ -148,6 +148,11 @@ static iree_status_t iree_hal_system_executable_query_library(
   executable->library.header =
       query_fn(IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
                &executable->base.environment);
+  // Libraries built for exactly v0.6 answer only a v0.6 query.
+  if (!executable->library.header) {
+    executable->library.header = query_fn(
+        IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_6, &executable->base.environment);
+  }
   if (!executable->library.header) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
@@ -156,6 +161,9 @@ static iree_status_t iree_hal_system_executable_query_library(
   }
   const iree_hal_executable_library_header_t* header =
       *executable->library.header;
+
+  // A query may answer with a header of another version.
+  IREE_RETURN_IF_ERROR(iree_hal_executable_library_check_version(header));
 
   // Ensure that if the library is built for a particular sanitizer that we also
   // were compiled with that sanitizer enabled.
@@ -200,6 +208,7 @@ static iree_status_t iree_hal_system_executable_query_library(
 
   executable->identifier = iree_make_cstring_view(header->name);
   executable->base.dispatch_attrs = executable->library.v0->exports.attrs;
+  executable->base.library_version = executable->library.v0->header->version;
   executable->base.dispatch_ptrs = executable->library.v0->exports.ptrs;
   executable->base.export_count = executable->library.v0->exports.count;
   executable->base.export_names = executable->library.v0->exports.names;
@@ -329,11 +338,8 @@ static iree_status_t iree_hal_system_executable_issue_call(
                                             ordinal);
   IREE_TRACE_ZONE_END(z0);
 
-  return ret == 0 ? iree_ok_status()
-                  : iree_make_status(
-                        IREE_STATUS_INTERNAL,
-                        "executable entry point returned catastrophic error %d",
-                        ret);
+  return iree_hal_local_executable_status_from_ret(base_executable, ordinal,
+                                                   ret);
 }
 
 static iree_host_size_t iree_hal_system_executable_export_count(
