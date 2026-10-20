@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_test")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
@@ -44,5 +45,79 @@ iree_lit_test_suite(
         "//tools:iree-compile",
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
+    ],
+)
+
+iree_compiler_cc_test(
+    name = "TargetRegistryTest",
+    testonly = True,
+    srcs = ["TargetRegistryTest.cpp"],
+    deps = [
+        "//compiler/plugins/input/StableHLO/Conversion:TargetRegistry",
+        "//compiler/src/iree/testing:gtest_main",
+        "@com_google_googletest//:gtest",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:AsmParser",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:Transforms",
+        "@stablehlo//:stablehlo_ops",
+        "@stablehlo//:stablehlo_passes",
+    ],
+)
+
+iree_compiler_cc_test(
+    name = "TargetPreprocessingTest",
+    testonly = True,
+    srcs = ["TargetPreprocessingTest.cpp"],
+    deps = [
+        "//compiler/plugins/input/StableHLO/Conversion",
+        "//compiler/plugins/input/StableHLO/Conversion:CustomCallMetadata",
+        "//compiler/plugins/input/StableHLO/Conversion:TargetPreprocessing",
+        "//compiler/plugins/input/StableHLO/Conversion:TargetRegistry",
+        "//compiler/src/iree/testing:gtest_main",
+        "@com_google_googletest//:gtest",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@stablehlo//:stablehlo_ops",
+        "@stablehlo//:stablehlo_passes",
+    ],
+)
+
+iree_compiler_cc_test(
+    name = "TargetPipelineTest",
+    testonly = True,
+    srcs = ["TargetPipelineTest.cpp"],
+    deps = [
+        "//compiler/plugins/input/StableHLO/Conversion",
+        "//compiler/plugins/input/StableHLO/Conversion:CustomCallMetadata",
+        "//compiler/plugins/input/StableHLO/Conversion:TargetPreprocessing",
+        "//compiler/plugins/input/StableHLO/Conversion:TargetRegistry",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target",
+        "//compiler/src/iree/compiler/Pipelines",
+        "//compiler/src/iree/compiler/Pipelines:Options",
+        "//compiler/src/iree/compiler/PluginAPI",
+        "//compiler/src/iree/testing:gtest_main",
+        "@com_google_googletest//:gtest",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:ControlFlowDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FuncExtensions",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:Transforms",
+        "@stablehlo//:stablehlo_ops",
+        "@stablehlo//:stablehlo_passes",
     ],
 )
