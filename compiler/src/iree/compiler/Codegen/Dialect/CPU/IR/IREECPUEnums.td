@@ -213,6 +213,14 @@ def MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32
 def MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32
     : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32", 0x3127>;
 
+// RISC-V V `vfwmaccbf16.vf` (bf16×bf16→f32). Lane count is vlen/8. The vector
+// operand stays bf16 (LMUL=2) and the accumulator is f32 (LMUL=4).
+// Requires +zvfbfwma.
+def MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16
+    : I32EnumAttrCase<"MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16", 0x3130>;
+def MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16
+    : I32EnumAttrCase<"MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16", 0x3131>;
+
 // Architecture-agnostic, type-polymorphic generic-scalar fallback. Tile
 // shape is 1×1×1, lowering is a single `vector.contract` over the
 // unrolled (`intrinsics_m`, `intrinsics_n`, `intrinsics_k`) tile. Unlike
@@ -272,6 +280,8 @@ def IREECPU_MMAIntrinsic
            MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32,
            MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32,
            MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32,
+           MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16,
+           MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16,
 
            // Architecture-agnostic generic-scalar fallback (type-polymorphic).
            MMA_GENERIC_SCALAR_1x1x1_REG8, MMA_GENERIC_SCALAR_1x1x1_REG16]>;
