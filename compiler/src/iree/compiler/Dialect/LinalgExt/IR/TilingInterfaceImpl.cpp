@@ -3411,6 +3411,41 @@ static Operation *getPermutedSlice(OpBuilder &b, Location loc, Value val,
   return querySliceOp;
 }
 
+/// Adds `offsets[d]` to every `iree_linalg_ext.index d` in `body`.
+static void offsetIndices(OpBuilder &b, Block *body,
+                          ArrayRef<OpFoldResult> offsets) {
+  IRRewriter rewriter(b);
+  for (auto indexOp : body->getOps<IREE::LinalgExt::IndexOp>()) {
+    if (indexOp.getDim() >= offsets.size() || !offsets[indexOp.getDim()]) {
+      continue;
+    }
+    OpBuilder::InsertionGuard guard(b);
+    rewriter.setInsertionPointAfter(indexOp);
+    AffineExpr index, offset;
+    bindDims(b.getContext(), index, offset);
+    OpFoldResult applied = affine::makeComposedFoldedAffineApply(
+        rewriter, indexOp.getLoc(), index + offset,
+        {getAsOpFoldResult(indexOp.getResult()), offsets[indexOp.getDim()]});
+    Value materialized =
+        getValueOrCreateConstantIndexOp(b, indexOp.getLoc(), applied);
+    rewriter.replaceUsesWithIf(indexOp, materialized, [&](OpOperand &use) {
+      return use.getOwner() != materialized.getDefiningOp();
+    });
+  }
+}
+
+/// Attention indices are score coordinates, so each takes the offset of the
+/// iteration dim its score map result names.
+static void offsetAttentionIndices(OpBuilder &b, Block *body,
+                                   const AttentionOpDetail &opInfo,
+                                   ArrayRef<OpFoldResult> offsets) {
+  SmallVector<OpFoldResult> scoreOffsets =
+      llvm::map_to_vector(opInfo.getSMap().getResults(), [&](AffineExpr expr) {
+        return offsets[cast<AffineDimExpr>(expr).getPosition()];
+      });
+  offsetIndices(b, body, scoreOffsets);
+}
+
 //===----------------------------------------------------------------------===//
 // AttentionOp
 //===----------------------------------------------------------------------===//
@@ -3435,12 +3470,6 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
                                     ArrayRef<OpFoldResult> sizes) {
   assert(offsets.size() == getIterationDomainRank());
   assert(sizes.size() == getIterationDomainRank());
-
-  // TODO: Add support for linalg_ext.index operations in the region.
-  // Currently, tiling will break if index operations are present.
-  if (!getBody()->getOps<IREE::LinalgExt::IndexOp>().empty()) {
-    return failure();
-  }
 
   Location loc = getLoc();
 
@@ -3506,6 +3535,13 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  FailureOr<AttentionOpDetail> opInfo = AttentionOpDetail::get(
+      getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
+  if (failed(opInfo)) {
+    return failure();
+  }
+  offsetAttentionIndices(builder, &tiledOp->getRegion(0).front(), *opInfo,
+                         offsets);
 
   return TilingResult{
       {tiledOp}, SmallVector<Value>(tiledOp->getResults()), slices};
@@ -3665,6 +3701,13 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+  FailureOr<AttentionOpDetail> opInfo = AttentionOpDetail::get(
+      getQueryMap(), getKeyMap(), getValueMap(), getOutputMap());
+  if (failed(opInfo)) {
+    return failure();
+  }
+  offsetAttentionIndices(builder, &tiledOp->getRegion(0).front(), *opInfo,
+                         offsets);
 
   return TilingResult{
       {tiledOp}, SmallVector<Value>(tiledOp->getResults()), slices};
@@ -3844,6 +3887,20 @@ FailureOr<TilingResult> OnlineAttentionOp::tileToPartialReduction(
   auto tiledOp = cast<OnlineAttentionOp>(
       mlir::clone(b, getOperation(), slicedInits.getTypes(), tiledOperands));
   tiledOp.setIndexingMapsAttr(b.getAffineMapArrayAttr(indexingMaps));
+  // K2 in the partial results makes it a batch dim, which reorders the score
+  // coordinates.
+  FailureOr<AttentionOpDetail> tiledOpInfo =
+      AttentionOpDetail::get(tiledOp.getQueryMap(), tiledOp.getKeyMap(),
+                             tiledOp.getValueMap(), tiledOp.getOutputMap());
+  if (failed(tiledOpInfo)) {
+    return failure();
+  }
+  IRRewriter rewriter(b);
+  remapAttentionScoreIndices(
+      rewriter, tiledOp.getBody(), opInfo.getSMap(), tiledOpInfo->getSMap(),
+      [](OpBuilder &, Location, unsigned oldDim,
+         function_ref<Value(unsigned)> newIndex) { return newIndex(oldDim); });
+  offsetAttentionIndices(b, tiledOp.getBody(), *tiledOpInfo, offsets);
 
   return TilingResult{
       {tiledOp}, SmallVector<Value>(tiledOp->getResults()), slices};
@@ -4213,28 +4270,6 @@ makeCustomOpTiledShapes(OpBuilder &builder, Location loc, CustomOp customOp,
   return tiledShapes;
 }
 
-static void offsetCustomOpIndices(OpBuilder &b, CustomOp customOp,
-                                  ArrayRef<OpFoldResult> offsets) {
-  IRRewriter rewriter(b);
-  for (auto indexOp : customOp.getBody()->getOps<IREE::LinalgExt::IndexOp>()) {
-    if (indexOp.getDim() >= offsets.size() || !offsets[indexOp.getDim()]) {
-      continue;
-    }
-    OpBuilder::InsertionGuard guard(b);
-    rewriter.setInsertionPointAfter(indexOp);
-    AffineExpr index, offset;
-    bindDims(b.getContext(), index, offset);
-    OpFoldResult applied = affine::makeComposedFoldedAffineApply(
-        rewriter, indexOp.getLoc(), index + offset,
-        {getAsOpFoldResult(indexOp.getResult()), offsets[indexOp.getDim()]});
-    Value materialized =
-        getValueOrCreateConstantIndexOp(b, indexOp.getLoc(), applied);
-    rewriter.replaceUsesWithIf(indexOp, materialized, [&](OpOperand &use) {
-      return use.getOwner() != materialized.getDefiningOp();
-    });
-  }
-}
-
 FailureOr<TilingResult>
 CustomOp::getTiledImplementation(OpBuilder &builder,
                                  ArrayRef<OpFoldResult> offsets,
@@ -4263,7 +4298,7 @@ CustomOp::getTiledImplementation(OpBuilder &builder,
 
   Operation *tiledOp =
       mlir::clone(builder, customOp, resultTensorTypes, tiledOperands);
-  offsetCustomOpIndices(builder, cast<CustomOp>(tiledOp), offsets);
+  offsetIndices(builder, cast<CustomOp>(tiledOp).getBody(), offsets);
 
   return TilingResult{
       {tiledOp}, SmallVector<Value>(tiledOp->getResults()), generatedSlices};

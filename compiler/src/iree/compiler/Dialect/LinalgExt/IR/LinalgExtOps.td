@@ -1031,6 +1031,11 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     If an additional mask argument M is included, the result of the first matmul is modified according to:
 
     Q @ K.T += M
+
+    The mask excludes positions. A false boolean entry or a -inf additive
+    entry removes its position from attention whatever its key holds; any
+    other additive entry, finite or NaN, is added to the score. Values at an
+    excluded position still enter the P @ V product with weight zero.
   }];
 
   let arguments = (ins AnyShaped:$query,
@@ -1148,6 +1153,14 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     If an additional mask argument M is included, the result of the first matmul is modified according to:
 
     Q @ K.T += M
+
+    The mask excludes positions. A false boolean entry or a -inf additive
+    entry removes its position from attention whatever its key holds; any
+    other additive entry, finite or NaN, is added to the score. Values at an
+    excluded position still enter the P @ V product with weight zero.
+
+    With a finite running_max and finite values, a row whose positions are all
+    excluded leaves its output, running_max and running_sum unchanged.
 
     The advantage of this online_normalizer is that it can be tiled along
     its reduction dimension, making the online_attention operator:
