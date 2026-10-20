@@ -565,7 +565,7 @@ struct MergeIndexSwitchPattern : OpRewritePattern<scf::IndexSwitchOp> {
       for (auto yieldValue : yieldB.getOperands()) {
         // Track the new local values yielded by the region, ensuring we check
         // what the first region may have produced and been captured implicitly.
-        yieldValues.push_back(localMapping.lookupOrNull(yieldValue));
+        yieldValues.push_back(localMapping.lookupOrDefault(yieldValue));
       }
 
       // Add the merged yield containing results from both regions.

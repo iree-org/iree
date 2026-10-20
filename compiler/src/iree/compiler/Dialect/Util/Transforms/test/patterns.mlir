@@ -258,6 +258,46 @@ util.func @mergeIndexSwitchesNoResult(%case: index) {
 
 // -----
 
+// Cases may yield values defined above both switches; they are used as-is in
+// the merged switch.
+
+// CHECK-LABEL: @mergeIndexSwitchesYieldingOuterValues
+// CHECK-SAME: (%[[CASE:.+]]: index, %[[X:.+]]: i32, %[[Y:.+]]: i32, %[[Z:.+]]: i32)
+util.func @mergeIndexSwitchesYieldingOuterValues(%case: index, %x: i32, %y: i32, %z: i32) -> (i32, i32) {
+  // CHECK: %[[RESULTS:.+]]:2 = scf.index_switch %[[CASE]] -> i32, i32
+  %result0 = scf.index_switch %case -> i32
+  // CHECK-NEXT: case 0 {
+  case 0 {
+    // CHECK-NEXT: scf.yield %[[X]], %[[Y]] : i32, i32
+    scf.yield %x : i32
+  }
+  // CHECK: case 1 {
+  case 1 {
+    // CHECK-NEXT: scf.yield %[[Y]], %[[Z]] : i32, i32
+    scf.yield %y : i32
+  }
+  // CHECK: default {
+  default {
+    // CHECK-NEXT: scf.yield %[[Z]], %[[X]] : i32, i32
+    scf.yield %z : i32
+  }
+  // CHECK-NOT: scf.index_switch
+  %result1 = scf.index_switch %case -> i32
+  case 0 {
+    scf.yield %y : i32
+  }
+  case 1 {
+    scf.yield %z : i32
+  }
+  default {
+    scf.yield %x : i32
+  }
+  // CHECK: util.return %[[RESULTS]]#0, %[[RESULTS]]#1
+  util.return %result0, %result1 : i32, i32
+}
+
+// -----
+
 // CHECK-LABEL: @mergeIndexSwitchesIntoEmptyDefault
 // CHECK-SAME: (%[[CASE:.+]]: index)
 util.func @mergeIndexSwitchesIntoEmptyDefault(%case: index) {
