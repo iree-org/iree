@@ -2637,7 +2637,7 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
                             CPUPipeline::DoubleTilingExpert));
 }
 
-static std::optional<SizesAndScalableFlags>
+static SizesAndScalableFlags
 getElementwiseVectorSizes(mlir::FunctionOpInterface entryPointFn,
                           linalg::GenericOp genericOp,
                           const LinalgOpInfo &linalgOpInfo,
@@ -2684,13 +2684,9 @@ static LogicalResult setElementwiseGenericOpRootConfig(
 
   DistributionHeuristicConfig distConfig;
   distConfig.allowIncompleteTile = true;
-  std::optional<SizesAndScalableFlags> vecDims = getElementwiseVectorSizes(
+  auto [vecSizes, vecScalableDims] = getElementwiseVectorSizes(
       entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
-  if (!vecDims) {
-    return failure();
-  }
 
-  auto [vecSizes, vecScalableDims] = *vecDims;
   distConfig.minTileSizes = vecSizes;
   distConfig.maxTileSizes.append(numLoops, clDefaultDistTileSize);
   SmallVector<int64_t> distTileSizes =
