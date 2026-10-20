@@ -111,6 +111,24 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
+    name = "TorchAttention",
+    srcs = ["StableHLOTorchAttention.cpp"],
+    hdrs = ["StableHLOTorchAttention.h"],
+    deps = [
+        ":TargetRegistry",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
+        "@stablehlo//:stablehlo_ops",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "Conversion",
     srcs = [
         "Passes.cpp",
@@ -121,6 +139,8 @@ iree_compiler_cc_library(
     deps = [
         ":PassHeaders",
         ":StableHLOLegalization",
+        ":TargetRegistry",
+        ":TorchAttention",
         "//compiler/plugins/input/StableHLO/Conversion/Preprocessing",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
