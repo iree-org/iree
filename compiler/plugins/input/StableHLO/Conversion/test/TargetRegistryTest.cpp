@@ -346,20 +346,18 @@ TEST_F(TargetRegistryTest, CompositeDispatchFallsBackByVersionAndAttributes) {
   EXPECT_EQ(referenceCalls, 2);
 }
 
-// JAX passes its dimension variables, and the platform index of a
-// multi-platform export, as leading composite operands that the decomposition
-// marks with jax.global_constant; handlers see only the composite's own.
-TEST_F(TargetRegistryTest, CompositeDispatchSkipsGlobalConstantOperands) {
+TEST_F(TargetRegistryTest, CompositeDispatchPreservesGlobalConstantOperands) {
   TargetRegistry registry;
   std::vector<size_t> inputCounts;
   auto handler = [&inputCounts](mlir::stablehlo::CompositeOp op,
                                 PatternRewriter &rewriter) -> LogicalResult {
     inputCounts.push_back(op.getInputs().size());
+    EXPECT_TRUE(succeeded(verify(op)));
     auto mode = op.getCompositeAttributes().getAs<StringAttr>("mode");
     if (!mode || mode.getValue() != "identity") {
       return failure();
     }
-    rewriter.replaceOp(op, op.getInputs());
+    rewriter.replaceOp(op, op.getInputs().take_back(1));
     return success();
   };
   ASSERT_TRUE(succeeded(registry.addComposite("test.identity", 1, handler)));
@@ -403,7 +401,7 @@ TEST_F(TargetRegistryTest, CompositeDispatchSkipsGlobalConstantOperands) {
   ASSERT_TRUE(runRewritePass(*module, registry));
   ASSERT_FALSE(inputCounts.empty());
   for (size_t count : inputCounts) {
-    EXPECT_EQ(count, 1u);
+    EXPECT_TRUE(count == 2u || count == 3u);
   }
   auto run = module->lookupSymbol<func::FuncOp>("run");
   auto returned = cast<func::ReturnOp>(run.getBody().front().getTerminator());
@@ -416,6 +414,127 @@ TEST_F(TargetRegistryTest, CompositeDispatchSkipsGlobalConstantOperands) {
   ASSERT_EQ(remaining.size(), 1u);
   EXPECT_EQ(remaining.front().getInputs().size(), 2u);
   EXPECT_EQ(returned.getOperand(2), remaining.front().getResult(0));
+}
+
+TEST_F(TargetRegistryTest, ChainedDeclinesPreserveDecompositionFallback) {
+  auto module = parseModule(R"mlir(
+    module {
+      func.func @run(%s: tensor<i64>, %x: tensor<?x7xf32>) -> tensor<?x7xf32> {
+        %a = stablehlo.composite "test.identity" %s, %x {
+          decomposition = @reference, version = 1 : i32
+        } : (tensor<i64>, tensor<?x7xf32>) -> tensor<?x7xf32>
+        %b = stablehlo.composite "test.identity" %s, %a {
+          decomposition = @reference, version = 1 : i32
+        } : (tensor<i64>, tensor<?x7xf32>) -> tensor<?x7xf32>
+        return %b : tensor<?x7xf32>
+      }
+      func.func private @reference(
+          %s: tensor<i64> {jax.global_constant = "s"},
+          %x: tensor<?x7xf32>) -> tensor<?x7xf32> {
+        return %x : tensor<?x7xf32>
+      }
+    }
+  )mlir");
+  ASSERT_TRUE(module);
+  std::string before = print(*module);
+  TargetRegistry registry;
+  unsigned calls = 0;
+  ASSERT_TRUE(succeeded(registry.addComposite(
+      "test.identity", 1,
+      [&calls](mlir::stablehlo::CompositeOp op,
+               PatternRewriter &) -> LogicalResult {
+        ++calls;
+        EXPECT_EQ(op.getInputs().size(), 2u);
+        EXPECT_TRUE(succeeded(verify(op)));
+        return failure();
+      })));
+  ASSERT_TRUE(runRewritePass(*module, registry));
+  EXPECT_GE(calls, 2u);
+  EXPECT_EQ(print(*module), before);
+
+  PassManager fallback(&context);
+  fallback.addNestedPass<func::FuncOp>(
+      mlir::stablehlo::createStablehloLegalizeCompositeToCallPass(
+          mlir::stablehlo::StablehloLegalizeCompositeToCallPassOptions{
+              /*exceptListOption=*/{}}));
+  ASSERT_TRUE(succeeded(fallback.run(*module)));
+  EXPECT_TRUE(succeeded(verify(*module)));
+  unsigned referenceCalls = 0;
+  module->walk([&](func::CallOp call) {
+    EXPECT_EQ(call.getCallee(), "reference");
+    EXPECT_EQ(call.getNumOperands(), 2u);
+    ++referenceCalls;
+  });
+  EXPECT_EQ(referenceCalls, 2u);
+  module->walk([](mlir::stablehlo::CompositeOp) {
+    ADD_FAILURE() << "Composite did not decompose";
+  });
+}
+
+TEST_F(TargetRegistryTest, DeclinedRegionsRemainAvailableToLaterHandlers) {
+  auto module = parseModule(R"mlir(
+    module {
+      func.func @run(%s: tensor<i64>, %x: tensor<f32>) -> tensor<f32> {
+        %r = "stablehlo.composite"(%s, %x) ({
+          ^bb0(%value: tensor<f32>):
+            "stablehlo.return"(%value) : (tensor<f32>) -> ()
+        }) {name = "test.region", decomposition = @reference,
+            version = 1 : i32} : (tensor<i64>, tensor<f32>) -> tensor<f32>
+        return %r : tensor<f32>
+      }
+      func.func private @reference(
+          %s: tensor<i64> {jax.global_constant = "s"},
+          %x: tensor<f32>) -> tensor<f32> {
+        return %x : tensor<f32>
+      }
+    }
+  )mlir");
+  ASSERT_TRUE(module);
+  auto run = module->lookupSymbol<func::FuncOp>("run");
+  auto original = *run.getOps<mlir::stablehlo::CompositeOp>().begin();
+  Block *originalBody = &original->getRegion(0).front();
+  std::string before = print(*module);
+  TargetRegistry declining;
+  unsigned declines = 0;
+  ASSERT_TRUE(succeeded(declining.addComposite(
+      "test.region", 1,
+      [original, originalBody, &declines](mlir::stablehlo::CompositeOp op,
+                                          PatternRewriter &) -> LogicalResult {
+        ++declines;
+        EXPECT_EQ(op, original);
+        EXPECT_EQ(op.getInputs().size(), 2u);
+        EXPECT_TRUE(succeeded(verify(op)));
+        EXPECT_EQ(op->getNumRegions(), 1u);
+        if (op->getNumRegions() == 1) {
+          EXPECT_EQ(&op->getRegion(0).front(), originalBody);
+        }
+        return failure();
+      })));
+  ASSERT_TRUE(runRewritePass(*module, declining));
+  EXPECT_GE(declines, 1u);
+  EXPECT_EQ(print(*module), before);
+
+  TargetRegistry accepting;
+  unsigned calls = 0;
+  ASSERT_TRUE(succeeded(accepting.addComposite(
+      "test.region", 1,
+      [original, originalBody, &calls](mlir::stablehlo::CompositeOp op,
+                                      PatternRewriter &rewriter) -> LogicalResult {
+        ++calls;
+        EXPECT_EQ(op, original);
+        EXPECT_TRUE(succeeded(verify(op)));
+        EXPECT_EQ(op->getNumRegions(), 1u);
+        if (op->getNumRegions() == 1) {
+          EXPECT_EQ(&op->getRegion(0).front(), originalBody);
+        }
+        rewriter.replaceOp(op, op.getInputs().take_back(1));
+        return success();
+      })));
+  ASSERT_TRUE(runRewritePass(*module, accepting));
+  EXPECT_EQ(calls, 1u);
+  EXPECT_TRUE(succeeded(verify(*module)));
+  auto returned = cast<func::ReturnOp>(run.getBody().front().getTerminator());
+  EXPECT_EQ(returned.getOperand(0), run.getArgument(1));
 }
 
 } // namespace
