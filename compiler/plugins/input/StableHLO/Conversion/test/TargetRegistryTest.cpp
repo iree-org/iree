@@ -439,15 +439,15 @@ TEST_F(TargetRegistryTest, ChainedDeclinesPreserveDecompositionFallback) {
   std::string before = print(*module);
   TargetRegistry registry;
   unsigned calls = 0;
-  ASSERT_TRUE(succeeded(registry.addComposite(
-      "test.identity", 1,
-      [&calls](mlir::stablehlo::CompositeOp op,
-               PatternRewriter &) -> LogicalResult {
-        ++calls;
-        EXPECT_EQ(op.getInputs().size(), 2u);
-        EXPECT_TRUE(succeeded(verify(op)));
-        return failure();
-      })));
+  ASSERT_TRUE(succeeded(
+      registry.addComposite("test.identity", 1,
+                            [&calls](mlir::stablehlo::CompositeOp op,
+                                     PatternRewriter &) -> LogicalResult {
+                              ++calls;
+                              EXPECT_EQ(op.getInputs().size(), 2u);
+                              EXPECT_TRUE(succeeded(verify(op)));
+                              return failure();
+                            })));
   ASSERT_TRUE(runRewritePass(*module, registry));
   EXPECT_GE(calls, 2u);
   EXPECT_EQ(print(*module), before);
@@ -518,8 +518,9 @@ TEST_F(TargetRegistryTest, DeclinedRegionsRemainAvailableToLaterHandlers) {
   unsigned calls = 0;
   ASSERT_TRUE(succeeded(accepting.addComposite(
       "test.region", 1,
-      [original, originalBody, &calls](mlir::stablehlo::CompositeOp op,
-                                      PatternRewriter &rewriter) -> LogicalResult {
+      [original, originalBody,
+       &calls](mlir::stablehlo::CompositeOp op,
+               PatternRewriter &rewriter) -> LogicalResult {
         ++calls;
         EXPECT_EQ(op, original);
         EXPECT_TRUE(succeeded(verify(op)));
