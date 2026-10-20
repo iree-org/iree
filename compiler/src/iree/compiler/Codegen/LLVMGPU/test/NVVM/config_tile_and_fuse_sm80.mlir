@@ -166,3 +166,65 @@ func.func @matmul_256x256x256_bf16_f32() {
 //  CHECK-SAME:     reduction = [0, 0, 8]
 //  CHECK-SAME:     subgroup = [2, 4, 0]
 //  CHECK-SAME:     workgroup = [64, 64, 0]
+
+// -----
+
+// Tile outer K dimensions to bound vector contraction expansion.
+
+// CHECK-LABEL: func.func @multi_reduction(
+// CHECK-SAME: #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
+// CHECK: linalg.generic
+// CHECK-SAME: lowering_config = #iree_gpu.lowering_config<{reduction = [0, 0, 1, 1, 1]
+#lhs = affine_map<(m, n, k0, k1, k2) -> (m, k0, k1, k2)>
+#rhs = affine_map<(m, n, k0, k1, k2) -> (n, k0, k1, k2)>
+#out = affine_map<(m, n, k0, k1, k2) -> (m, n)>
+module {
+  func.func @multi_reduction(
+      %lhs: tensor<2x8x8x32xf32>,
+      %rhs: tensor<3x8x8x32xbf16>,
+      %acc: tensor<2x3xf32>) -> tensor<2x3xf32> {
+    %r = linalg.generic {
+      indexing_maps = [#lhs, #rhs, #out],
+      iterator_types = ["parallel", "parallel", "reduction", "reduction", "reduction"]
+    } ins(%lhs, %rhs : tensor<2x8x8x32xf32>, tensor<3x8x8x32xbf16>)
+      outs(%acc : tensor<2x3xf32>) {
+    ^bb0(%a: f32, %b: bf16, %c: f32):
+      %b32 = arith.extf %b : bf16 to f32
+      %product = arith.mulf %a, %b32 : f32
+      %sum = arith.addf %c, %product : f32
+      linalg.yield %sum : f32
+    } -> tensor<2x3xf32>
+    return %r : tensor<2x3xf32>
+  }
+}
+
+// -----
+
+// Use inferred K indices when parallel and reduction loops are interleaved.
+
+// CHECK-LABEL: func.func @interleaved_multi_reduction(
+// CHECK-SAME: #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse>
+// CHECK: linalg.generic
+// CHECK-SAME: lowering_config = #iree_gpu.lowering_config<{reduction = [1, 0, 1, 1, 0]
+#lhs = affine_map<(k0, m, k1, k2, n) -> (m, k0, k1, k2)>
+#rhs = affine_map<(k0, m, k1, k2, n) -> (n, k0, k1, k2)>
+#out = affine_map<(k0, m, k1, k2, n) -> (m, n)>
+module {
+  func.func @interleaved_multi_reduction(
+      %lhs: tensor<2x8x8x32xf32>,
+      %rhs: tensor<3x8x8x32xbf16>,
+      %acc: tensor<2x3xf32>) -> tensor<2x3xf32> {
+    %r = linalg.generic {
+      indexing_maps = [#lhs, #rhs, #out],
+      iterator_types = ["reduction", "parallel", "reduction", "reduction", "parallel"]
+    } ins(%lhs, %rhs : tensor<2x8x8x32xf32>, tensor<3x8x8x32xbf16>)
+      outs(%acc : tensor<2x3xf32>) {
+    ^bb0(%a: f32, %b: bf16, %c: f32):
+      %b32 = arith.extf %b : bf16 to f32
+      %product = arith.mulf %a, %b32 : f32
+      %sum = arith.addf %c, %product : f32
+      linalg.yield %sum : f32
+    } -> tensor<2x3xf32>
+    return %r : tensor<2x3xf32>
+  }
+}
