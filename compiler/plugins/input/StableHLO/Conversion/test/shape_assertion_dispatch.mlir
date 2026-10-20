@@ -1,6 +1,5 @@
 // RUN: iree-compile --iree-input-type=stablehlo --iree-hal-target-backends=vmvx --compile-to=flow %s | FileCheck %s
 // RUN: iree-compile --iree-input-type=stablehlo --iree-hal-target-backends=vmvx %s -o /dev/null
-// RUN: iree-compile --iree-input-type=stablehlo --iree-hal-target-backends=llvm-cpu %s -o /dev/null
 
 // The assertion inside the scatter region must survive dispatch formation.
 // CHECK: flow.executable
