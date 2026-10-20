@@ -7,7 +7,6 @@
 #include "compiler/plugins/input/StableHLO/Conversion/TargetRegistry.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::stablehlo {
@@ -110,24 +109,6 @@ struct CustomCallDispatch final
   RegistrySnapshot registry;
 };
 
-// Counts the leading composite operands whose decomposition argument carries
-// jax.global_constant: the dimension variables and platform index JAX passes.
-static unsigned countGlobalConstantOperands(mlir::stablehlo::CompositeOp op) {
-  auto decomposition = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-      op, op.getDecompositionAttr());
-  if (!decomposition) {
-    return 0;
-  }
-  unsigned limit =
-      std::min(decomposition.getNumArguments(), op->getNumOperands());
-  unsigned count = 0;
-  while (count < limit &&
-         decomposition.getArgAttr(count, "jax.global_constant")) {
-    ++count;
-  }
-  return count;
-}
-
 struct CompositeDispatch final
     : OpRewritePattern<mlir::stablehlo::CompositeOp> {
   CompositeDispatch(MLIRContext *context, RegistrySnapshot registry)
@@ -145,31 +126,12 @@ struct CompositeDispatch final
             "numerical_profile")) {
       provenance += (" (" + profile.getValue() + ")").str();
     }
-    // A handler takes the composite's own operands; the original keeps the
-    // global constants its decomposition needs if the handler declines.
-    unsigned globalConstants = countGlobalConstantOperands(op);
-    mlir::stablehlo::CompositeOp target = op;
-    if (globalConstants) {
-      rewriter.setInsertionPoint(op);
-      target = mlir::stablehlo::CompositeOp::create(
-          rewriter, op.getLoc(), op.getResultTypes(),
-          op.getInputs().drop_front(globalConstants), op->getAttrs());
-      rewriter.replaceAllUsesWith(op->getResults(), target->getResults());
-    }
     OpBuilder::Listener *listener = rewriter.getListener();
     ProvenanceListener provenanceListener(listener,
                                           rewriter.getStringAttr(provenance));
     rewriter.setListener(&provenanceListener);
-    LogicalResult result = (*handler)(target, rewriter);
+    LogicalResult result = (*handler)(op, rewriter);
     rewriter.setListener(listener);
-    if (target != op) {
-      if (succeeded(result)) {
-        rewriter.eraseOp(op);
-      } else {
-        rewriter.replaceAllUsesWith(target->getResults(), op->getResults());
-        rewriter.eraseOp(target);
-      }
-    }
     return result;
   }
 
