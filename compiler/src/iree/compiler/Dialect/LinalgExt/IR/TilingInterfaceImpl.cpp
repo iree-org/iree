@@ -429,8 +429,8 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 //===----------------------------------------------------------------------===//
 
 SmallVector<utils::IteratorType> GeneralScatterOp::getLoopIteratorTypes() {
-  // A generic scatter cannot assume that expanded window coordinates are
-  // unique. Keep the update schedule sequential until a safe mapping exists.
+  // Use a sequential update schedule because expanded window coordinates may
+  // overlap.
   return SmallVector<utils::IteratorType>(
       cast<ShapedType>(getUpdates().front().getType()).getRank(),
       utils::IteratorType::reduction);

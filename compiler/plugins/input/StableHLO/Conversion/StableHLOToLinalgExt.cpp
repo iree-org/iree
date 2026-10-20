@@ -438,14 +438,14 @@ struct ScatterOpConversion final
                   ConversionPatternRewriter &rewriter) const override {
     const char *generalBlocker = getGeneralScatterBlocker(op);
 
-    // Keep the established lowering for its contiguous-window fast path.
     if (takesWholeWindowPath(op)) {
       Value original = adaptor.getInputs().front();
       Value indices = adaptor.getScatterIndices();
       Value updates = adaptor.getUpdates().front();
       SmallVector<std::pair<int64_t, int64_t>> unproven =
           getUnprovenWindowDims(op, original, updates);
-      // Without a general fallback, runtime windows stay unchecked as before.
+      // The whole-window path accepts index types unsupported by the general
+      // fallback.
       if (unproven.empty() || generalBlocker) {
         rewriter.replaceOp(
             op, createWindowScatter(op, original, indices, updates,
