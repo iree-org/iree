@@ -56,6 +56,7 @@ iree_compiler_cc_library(
         "TransposeGenericOps.cpp",
     ],
     hdrs = [
+        "CollapseDimensions.h",
         "FusionUtils.h",
         "MaterializedLayoutTarget.h",
         "Passes.h",

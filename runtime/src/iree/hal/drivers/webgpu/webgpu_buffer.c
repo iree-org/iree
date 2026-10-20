@@ -344,8 +344,7 @@ static iree_status_t iree_hal_webgpu_buffer_map_range(
     iree_hal_webgpu_import_buffer_get_mapped_range(
         buffer->buffer_handle, (uint64_t)local_byte_offset,
         (uint64_t)local_byte_length,
-        (uint32_t)(uintptr_t)((uint8_t*)buffer->shadow_buffer +
-                              local_byte_offset));
+        (uintptr_t)((uint8_t*)buffer->shadow_buffer + local_byte_offset));
   }
 
   ++buffer->mapping_count;
@@ -381,8 +380,7 @@ static iree_status_t iree_hal_webgpu_buffer_unmap_range(
   iree_hal_webgpu_import_buffer_set_mapped_range(
       buffer->buffer_handle, (uint64_t)local_byte_offset,
       (uint64_t)local_byte_length,
-      (uint32_t)(uintptr_t)((uint8_t*)buffer->shadow_buffer +
-                            local_byte_offset));
+      (uintptr_t)((uint8_t*)buffer->shadow_buffer + local_byte_offset));
 
   // For mappedAtCreation buffers, unmap transitions the buffer to the
   // unmapped state permanently (it cannot be re-mapped for writing).

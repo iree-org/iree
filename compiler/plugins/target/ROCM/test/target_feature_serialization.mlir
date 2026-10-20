@@ -54,13 +54,25 @@
 // IR-ECCOFF-DAG: !{i32 1, !"amdgpu.sramecc", i32 0}
 // IR-ECCOFF-DAG: !{i32 1, !"amdgpu.xnack", i32 1}
 
-// RUN: not iree-opt --iree-hal-transformation-pipeline --iree-hal-target-device=hip \
-// RUN:   --iree-rocm-target=mi455x --iree-rocm-target-features=-xnack %s -o /dev/null 2>&1 | FileCheck %s --check-prefix=CDNA5OFF
-// CDNA5OFF: invalid ROCM target ID 'gfx1250:xnack-'
+// gfx1250 supports selectable XNACK on/off modes (LLVM 05e432a8597f), so these
+// target IDs are valid and the modes reach LLVM as module flags.
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: iree-opt --iree-hal-transformation-pipeline --iree-hal-target-device=hip \
+// RUN:   --iree-rocm-target=mi455x --iree-rocm-target-features=-xnack \
+// RUN:   --iree-hal-dump-executable-intermediates-to=%t --iree-rocm-container-type=hsaco %s | FileCheck %s --check-prefix=ELF-CDNA5OFF
+// RUN: cat %t/*.linked.ll | FileCheck %s --check-prefix=IR-CDNA5OFF
+// ELF-CDNA5OFF: data = dense<"0x7F454C46{{([0-9A-F]{88})}}49060000
+// IR-CDNA5OFF: target triple = "amdgpu12.50-amd-amdhsa"
+// IR-CDNA5OFF-DAG: !{i32 1, !"amdgpu.xnack", i32 0}
 
-// RUN: not iree-opt --iree-hal-transformation-pipeline --iree-hal-target-device=hip \
-// RUN:   --iree-rocm-target=cdna5 --iree-rocm-target-features=+xnack %s -o /dev/null 2>&1 | FileCheck %s --check-prefix=CDNA5ON
-// CDNA5ON: invalid ROCM target ID 'gfx1250:xnack+'
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: iree-opt --iree-hal-transformation-pipeline --iree-hal-target-device=hip \
+// RUN:   --iree-rocm-target=cdna5 --iree-rocm-target-features=+xnack \
+// RUN:   --iree-hal-dump-executable-intermediates-to=%t --iree-rocm-container-type=hsaco %s | FileCheck %s --check-prefix=ELF-CDNA5ON
+// RUN: cat %t/*.linked.ll | FileCheck %s --check-prefix=IR-CDNA5ON
+// ELF-CDNA5ON: data = dense<"0x7F454C46{{([0-9A-F]{88})}}49070000
+// IR-CDNA5ON: target triple = "amdgpu12.50-amd-amdhsa"
+// IR-CDNA5ON-DAG: !{i32 1, !"amdgpu.xnack", i32 1}
 
 // RUN: not iree-opt --iree-hal-transformation-pipeline --iree-hal-target-device=hip \
 // RUN:   --iree-rocm-target=gfx1100 --iree-rocm-target-features=+sramecc %s -o /dev/null 2>&1 | FileCheck %s --check-prefix=INVALIDFEATURE

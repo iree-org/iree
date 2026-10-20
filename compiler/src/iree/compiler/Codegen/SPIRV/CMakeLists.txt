@@ -85,6 +85,7 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAffineUtils
     MLIRAnalysis
+    MLIRArithCommonConversion
     MLIRArithDialect
     MLIRArithToSPIRV
     MLIRArithTransforms
