@@ -88,7 +88,7 @@ struct UnrollInnerTiledPattern final
            "vector unrolling expects the native shape or native shape call "
            "back function to be set");
     std::optional<SmallVector<int64_t, 4>> maybeUnrollShape =
-        tiledOp.getShapeForUnroll();
+        tiledOp.getIterationShapeToUnroll();
     if (!maybeUnrollShape) {
       return rewriter.notifyMatchFailure(
           tiledOp, "unexpected failure to get unroll shape");
