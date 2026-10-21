@@ -51,4 +51,22 @@ vm.func @two() -> () {
   EXPECT_EQ(module_.functions[1].bytecode_length, 4u);
 }
 
+TEST_F(VMBytecodeAssemblerParserTest, CountsUnusedFunctionArgumentRegisters) {
+  static const char kSource[] = R"(
+vm.module @parser_test version 0
+
+vm.func @unused_args(%i0: i32, %r0: !vm.ref<?>) -> () {
+^bb0:
+  vm.return
+}
+)";
+
+  IREE_ASSERT_OK(iree_vm_bytecode_assembler_parse_source(
+      &module_, iree_make_string_view(kSource, sizeof(kSource) - 1)));
+
+  ASSERT_EQ(module_.function_count, 1u);
+  EXPECT_EQ(module_.functions[0].i32_register_count, 1u);
+  EXPECT_EQ(module_.functions[0].ref_register_count, 1u);
+}
+
 }  // namespace
