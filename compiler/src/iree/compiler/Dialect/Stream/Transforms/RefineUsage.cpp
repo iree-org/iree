@@ -168,7 +168,20 @@ struct UsageRefinementPattern : OpRewritePattern<OpT> {
     } else if (oldType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
       // Transitioning from one lifetime to another; insert a transfer
       // placeholder (as we may later decide it's ok to transition on a
-      // particular device).
+      // particular device). Note that the consumer may be a transfer in which
+      // case we don't need to insert the op.
+      if (result.hasOneUse()) {
+        auto consumerOp =
+            dyn_cast<IREE::Stream::AsyncTransferOp>(*result.getUsers().begin());
+        if (consumerOp) {
+          auto finalType = cast<IREE::Stream::ResourceType>(
+              consumerOp.getResult().getType());
+          if (finalType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
+            // Already consumed by a transfer to a concrete lifetime.
+            return false;
+          }
+        }
+      }
       auto resultSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
           op->getLoc(), result, /*affinity=*/IREE::Stream::AffinityAttr{});
       auto affinityAttr = getOpAffinity(op);
@@ -216,7 +229,7 @@ struct UsageRefinementPattern : OpRewritePattern<OpT> {
           auto finalType = cast<IREE::Stream::ResourceType>(
               consumerOp.getResult().getType());
           if (finalType.getLifetime() != IREE::Stream::Lifetime::Unknown) {
-            // Already have a transfer to the new lifetime.
+            // Already consumed by a transfer to a concrete lifetime.
             return false;
           }
         }
