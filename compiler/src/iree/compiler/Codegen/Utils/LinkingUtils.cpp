@@ -207,6 +207,76 @@ replaceEntryPointUses(mlir::ModuleOp moduleOp,
   }
 }
 
+// Retargets the root references to |executableOp|, of which only some
+// variants were linked into |linkedExecutableOp|. Must run after the variant
+// and export refs have been replaced.
+//
+// A root reference names only an executable (`@exe`, as hal.executable.lookup
+// does), unlike the nested references to one of its variants or exports
+// (`@exe::@variant`, `@exe::@variant::@export`) that indicate which variant
+// they mean. Once the variants of an executable are split across executables
+// its root references cannot be renamed as a whole. Conversion emits one lookup
+// per dispatch variant, so each lookup follows its function lookups, whose
+// export refs have already been remapped. IR outside that form cannot be
+// retargeted and is rejected.
+static LogicalResult
+retargetRootReferences(mlir::ModuleOp moduleOp,
+                       IREE::HAL::ExecutableOp executableOp,
+                       IREE::HAL::ExecutableOp linkedExecutableOp) {
+  auto uses =
+      SymbolTable::getSymbolUses(executableOp, &moduleOp.getBodyRegion());
+  if (!uses) {
+    return executableOp.emitOpError()
+           << "has uses that cannot be enumerated; cannot retarget its root "
+              "references after partially linking it into "
+           << SymbolRefAttr::get(linkedExecutableOp);
+  }
+  for (const SymbolTable::SymbolUse &use : *uses) {
+    if (!use.getSymbolRef().getNestedReferences().empty()) {
+      continue; // refs to variants/exports that were not linked
+    }
+    auto lookupOp = dyn_cast<IREE::HAL::ExecutableLookupOp>(use.getUser());
+    if (!lookupOp) {
+      return use.getUser()->emitOpError()
+             << "references partially linked executable "
+             << SymbolRefAttr::get(executableOp)
+             << "; only hal.executable.lookup root references can be "
+                "retargeted";
+    }
+    // The dispatch ops consume the looked-up executable and the function id
+    // independently, so all functions must come from the same executable.
+    StringAttr functionExecutable;
+    for (Operation *user : lookupOp->getUsers()) {
+      if (isa<IREE::HAL::CommandBufferDispatchOp,
+              IREE::HAL::CommandBufferDispatchIndirectOp>(user)) {
+        continue;
+      }
+      auto functionOp = dyn_cast<IREE::HAL::ExecutableLookupFunctionOp>(user);
+      if (!functionOp) {
+        // Forwarded (call, yield, ...) functions cannot be analyzed.
+        return lookupOp.emitOpError()
+               << "of partially linked executable "
+               << SymbolRefAttr::get(executableOp) << " is used by '"
+               << user->getName()
+               << "'; cannot determine which variant it resolves to";
+      }
+      StringAttr root = functionOp.getEntryPoint().getRootReference();
+      if (functionExecutable && functionExecutable != root) {
+        return lookupOp.emitOpError()
+               << "of executable " << SymbolRefAttr::get(executableOp)
+               << " resolves functions from multiple executables after "
+                  "linking; all functions of a lookup must come from one "
+                  "variant";
+      }
+      functionExecutable = root;
+    }
+    if (functionExecutable) {
+      lookupOp.setExecutableAttr(FlatSymbolRefAttr::get(functionExecutable));
+    }
+  }
+  return success();
+}
+
 LogicalResult linkExecutablesInto(
     mlir::ModuleOp moduleOp,
     SmallVectorImpl<IREE::HAL::ExecutableOp> &sourceExecutableOps,
@@ -223,6 +293,15 @@ LogicalResult linkExecutablesInto(
   int nextEntryPointOrdinal = 0;
   DenseMap<StringRef, Operation *> targetSymbolMap;
   SymbolReplacements symbolReplacements;
+  // Source executables partially linked by this call, whose root references
+  // are retargeted per lookup (see retargetRootReferences). For example, when
+  // linking llvm-cpu:
+  //
+  //   source executable  variants      linked here  result
+  //   @dispatch_cpu      cpu           all          erased, refs renamed
+  //   @dispatch_shared   cpu, vmvx     cpu only     kept, added to this list
+  //   @dispatch_vmvx     vmvx          none         untouched
+  SmallVector<IREE::HAL::ExecutableOp> partiallyLinkedExecutables;
 
   auto linkedTargetBuilder =
       OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
@@ -242,24 +321,31 @@ LogicalResult linkExecutablesInto(
       continue; // 1+ variants without bodies
     }
 
-    // Remap root executable refs.
-    //
-    // NOTE: this is currently risky as we assume that all targets need to link
-    // consistently but there's nothing ensuring that here. If some targets
-    // decide to link some subset of variants and others don't we'll still have
-    // replaced the executable name here. We may have to ensure root executable
-    // names are never used at the time this runs, or perform the linking as a
-    // global pipeline that uses each TargetBackend to link instead of running
-    // it per-backend/pass.
-    symbolReplacements.executableRefs[SymbolRefAttr::get(sourceExecutableOp)] =
-        SymbolRefAttr::get(linkedExecutableOp);
+    // Only variants of the linked target are processed.
+    // TODO(benvanik): allow for grouping when multi-versioning is supported?
+    // We could, for example, link all aarch64 variants together and then
+    // use function multi-versioning to let LLVM insert runtime switches.
+    auto isLinkedVariant =
+        [&linkedTargetOp](IREE::HAL::ExecutableVariantOp variantOp) {
+          return variantOp.getTarget() == linkedTargetOp.getTarget();
+        };
+
+    // Remap root executable refs. When every variant is linked the source
+    // executable is erased below and all root refs follow it. A multi-target
+    // executable (the same dispatch placed on different devices, or a device
+    // with several backends) keeps the variants of the other targets and is
+    // linked by each backend in turn; its root refs are retargeted per lookup
+    // once the variant/export refs are known (see retargetRootReferences).
+    if (llvm::all_of(variantOps, isLinkedVariant)) {
+      symbolReplacements
+          .executableRefs[SymbolRefAttr::get(sourceExecutableOp)] =
+          SymbolRefAttr::get(linkedExecutableOp);
+    } else if (llvm::any_of(variantOps, isLinkedVariant)) {
+      partiallyLinkedExecutables.push_back(sourceExecutableOp);
+    }
 
     for (auto variantOp : variantOps) {
-      // Only process compatible targets.
-      // TODO(benvanik): allow for grouping when multi-versioning is supported?
-      // We could, for example, link all aarch64 variants together and then
-      // use function multi-versioning to let LLVM insert runtime switches.
-      if (variantOp.getTarget() != linkedTargetOp.getTarget()) {
+      if (!isLinkedVariant(variantOp)) {
         continue;
       }
 
@@ -373,6 +459,14 @@ LogicalResult linkExecutablesInto(
 
   // Update references to @executable::@target::@entry symbols.
   replaceEntryPointUses(moduleOp, symbolReplacements);
+
+  // Update root references to executables that kept variants of other targets.
+  for (auto executableOp : partiallyLinkedExecutables) {
+    if (failed(retargetRootReferences(moduleOp, executableOp,
+                                      linkedExecutableOp))) {
+      return failure();
+    }
+  }
 
   // Remove if we didn't add anything.
   if (linkedTargetOp.getExportOps().empty()) {
