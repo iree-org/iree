@@ -9,6 +9,7 @@
 #include "iree/hal/drivers/webgpu/webgpu_buffer.h"
 #include "iree/hal/drivers/webgpu/webgpu_executable.h"
 #include "iree/hal/drivers/webgpu/webgpu_imports.h"
+#include "iree/hal/utils/resource_set.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_webgpu_command_buffer_t
@@ -22,6 +23,9 @@ typedef struct iree_hal_webgpu_command_buffer_t {
 
   // Pre-created compute pipelines for fill/copy. Borrowed from the device.
   const iree_hal_webgpu_builtins_t* builtins;
+
+  // Resources referenced by recorded commands must outlive submission.
+  iree_hal_resource_set_t* resource_set;
 
   // Instruction stream builder.
   iree_hal_webgpu_builder_t builder;
@@ -88,6 +92,17 @@ iree_status_t iree_hal_webgpu_command_buffer_create(
     return status;
   }
 
+  if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNRETAINED)) {
+    status = iree_hal_resource_set_allocate(block_pool,
+                                            &command_buffer->resource_set);
+  }
+  if (!iree_status_is_ok(status)) {
+    iree_hal_webgpu_builder_deinitialize(&command_buffer->builder);
+    iree_allocator_free(host_allocator, command_buffer);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
+
   *out_command_buffer = &command_buffer->base;
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -126,6 +141,7 @@ static void iree_hal_webgpu_command_buffer_destroy(
   }
 
   iree_hal_webgpu_builder_deinitialize(&command_buffer->builder);
+  iree_hal_resource_set_free(command_buffer->resource_set);
   iree_allocator_free(host_allocator, command_buffer);
   IREE_TRACE_ZONE_END(z0);
 }
@@ -197,6 +213,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_end(
     }
   }
 
+  iree_hal_resource_set_freeze(command_buffer->resource_set);
   return iree_ok_status();
 }
 
@@ -261,6 +278,19 @@ static iree_status_t iree_hal_webgpu_command_buffer_advise_buffer(
 }
 
 //===----------------------------------------------------------------------===//
+// Buffer references
+//===----------------------------------------------------------------------===//
+
+static iree_status_t iree_hal_webgpu_command_buffer_retain_buffer_refs(
+    iree_hal_webgpu_command_buffer_t* command_buffer, iree_host_size_t count,
+    const iree_hal_buffer_ref_t* buffer_refs) {
+  if (!command_buffer->resource_set) return iree_ok_status();
+  return iree_hal_resource_set_insert_strided(
+      command_buffer->resource_set, count, buffer_refs,
+      offsetof(iree_hal_buffer_ref_t, buffer), sizeof(buffer_refs[0]));
+}
+
+//===----------------------------------------------------------------------===//
 // fill_buffer
 //===----------------------------------------------------------------------===//
 
@@ -270,6 +300,8 @@ static iree_status_t iree_hal_webgpu_command_buffer_fill_buffer(
     iree_host_size_t pattern_length, iree_hal_fill_flags_t flags) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
+  IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_retain_buffer_refs(
+      command_buffer, 1, &target_ref));
   return iree_hal_webgpu_builder_fill_buffer(
       &command_buffer->builder, target_ref, pattern, pattern_length);
 }
@@ -284,6 +316,8 @@ static iree_status_t iree_hal_webgpu_command_buffer_update_buffer(
     iree_hal_update_flags_t flags) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
+  IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_retain_buffer_refs(
+      command_buffer, 1, &target_ref));
   return iree_hal_webgpu_builder_update_buffer(
       &command_buffer->builder, source_buffer, source_offset, target_ref);
 }
@@ -298,6 +332,9 @@ static iree_status_t iree_hal_webgpu_command_buffer_copy_buffer(
     iree_hal_copy_flags_t flags) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
+  const iree_hal_buffer_ref_t buffer_refs[] = {source_ref, target_ref};
+  IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_retain_buffer_refs(
+      command_buffer, IREE_ARRAYSIZE(buffer_refs), buffer_refs));
   return iree_hal_webgpu_builder_copy_buffer(&command_buffer->builder,
                                              source_ref, target_ref);
 }
@@ -321,6 +358,13 @@ static iree_status_t iree_hal_webgpu_command_buffer_dispatch(
     iree_hal_buffer_ref_list_t bindings, iree_hal_dispatch_flags_t flags) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
       iree_hal_webgpu_command_buffer_cast(base_command_buffer);
+
+  if (command_buffer->resource_set) {
+    IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+        command_buffer->resource_set, 1, &executable));
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_webgpu_command_buffer_retain_buffer_refs(
+      command_buffer, bindings.count, bindings.values));
 
   iree_hal_webgpu_handle_t pipeline_handle =
       iree_hal_webgpu_executable_pipeline_handle(executable, function);
