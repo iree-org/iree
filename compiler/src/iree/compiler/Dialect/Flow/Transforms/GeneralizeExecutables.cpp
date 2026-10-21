@@ -21,11 +21,12 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/bit.h"
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/OwningOpRef.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
@@ -48,7 +49,8 @@ struct Slot {
 };
 
 struct Signature {
-  std::string key;
+  OwningOpRef<Operation *> normalizedFunc;
+  llvm::hash_code hash = {};
   SmallVector<Slot> slots;
 };
 
@@ -70,88 +72,79 @@ static int64_t constantBits(arith::ConstantOp c) {
   return cast<IntegerAttr>(c.getValue()).getValue().getSExtValue();
 }
 
-template <typename OpT>
-static void signOffsets(OpT op, llvm::raw_string_ostream &os,
-                        SmallVector<Slot> &slots) {
-  os << " offsets(";
+template <typename OpT, typename NormalizedOpT>
+static void normalizeOffsets(OpT op, NormalizedOpT normalizedOp,
+                             SmallVector<Slot> &slots) {
+  SmallVector<int64_t> normalizedOffsets;
   for (auto [i, v] : llvm::enumerate(op.getStaticOffsets())) {
     if (ShapedType::isDynamic(v)) {
-      os << "d,";
+      normalizedOffsets.push_back(v);
     } else {
-      os << "s,";
       slots.push_back(
           {op.getOperation(), int(i), v, IndexType::get(op.getContext())});
+      normalizedOffsets.push_back(0);
     }
   }
-  os << ")";
+  normalizedOp.setStaticOffsets(normalizedOffsets);
 }
 
-// The structure of |funcOp| with the slots' values left out, and the slots in
-// walk order.
-static Signature sign(func::FuncOp funcOp) {
+// Clones |funcOp| and normalizes the values that this pass may promote. The
+// clone can then be compared with MLIR's structural equivalence utilities;
+// the original values and operations are retained as slots in walk order.
+static Signature buildSignature(func::FuncOp funcOp) {
   Signature sig;
-  llvm::raw_string_ostream os(sig.key);
-  DenseMap<Value, unsigned> ids;
-  auto id = [&](Value v) {
-    auto it = ids.find(v);
-    if (it != ids.end()) {
-      return it->second;
-    }
-    unsigned n = ids.size();
-    ids[v] = n;
-    return n;
-  };
-  os << funcOp.getFunctionType();
-  funcOp.walk<WalkOrder::PreOrder>([&](Operation *op) {
-    if (op == funcOp.getOperation()) {
-      return;
-    }
-    os << "\n" << op->getName() << "(";
-    for (Value v : op->getOperands()) {
-      os << id(v) << ",";
-    }
-    os << ")->(";
-    for (Value r : op->getResults()) {
-      id(r);
-      os << r.getType() << ",";
-    }
-    os << ")";
-    for (Region &region : op->getRegions()) {
-      os << " region{";
-      for (Block &block : region) {
-        os << "block(";
-        for (BlockArgument a : block.getArguments()) {
-          id(a);
-          os << a.getType() << ",";
-        }
-        os << ")";
-      }
-      os << "}";
-    }
-    StringRef skip;
+  sig.normalizedFunc = funcOp->clone();
+  SmallVector<Operation *> originalOps;
+  SmallVector<Operation *> normalizedOps;
+  funcOp.getBody().walk<WalkOrder::PreOrder>(
+      [&](Operation *op) { originalOps.push_back(op); });
+  cast<func::FuncOp>(*sig.normalizedFunc)
+      .getBody()
+      .walk<WalkOrder::PreOrder>(
+          [&](Operation *op) { normalizedOps.push_back(op); });
+  assert(originalOps.size() == normalizedOps.size());
+  for (auto [op, normalizedOp] : llvm::zip(originalOps, normalizedOps)) {
     if (isScalarGeneralizableConstant(op)) {
       auto c = cast<arith::ConstantOp>(op);
       sig.slots.push_back({op, -1, constantBits(c), c.getType()});
-      skip = "value";
+      Attribute value = c.getType().isF32()
+                            ? Attribute(FloatAttr::get(c.getType(), 0.0))
+                            : Attribute(IntegerAttr::get(c.getType(), 0));
+      normalizedOp->setAttr("value", value);
     } else if (auto load =
                    dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(op)) {
-      signOffsets(load, os, sig.slots);
-      skip = "static_offsets";
+      normalizeOffsets(
+          load,
+          cast<IREE::TensorExt::DispatchTensorLoadOp>(normalizedOp),
+          sig.slots);
     } else if (auto store =
                    dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(op)) {
-      signOffsets(store, os, sig.slots);
-      skip = "static_offsets";
+      normalizeOffsets(
+          store,
+          cast<IREE::TensorExt::DispatchTensorStoreOp>(normalizedOp),
+          sig.slots);
     }
-    os << " {";
-    for (NamedAttribute a : op->getAttrs()) {
-      if (a.getName() == skip) {
-        continue;
-      }
-      os << a.getName() << "=" << a.getValue() << ",";
-    }
-    os << "}";
+  }
+  func::FuncOp normalizedFunc = cast<func::FuncOp>(*sig.normalizedFunc);
+  sig.hash =
+      llvm::hash_value(normalizedFunc.getFunctionType().getAsOpaquePointer());
+  normalizedFunc.getBody().walk([&](Operation *op) {
+    sig.hash = llvm::hash_combine(
+        sig.hash, OperationEquivalence::computeHash(
+                      op, OperationEquivalence::ignoreHashValue,
+                      OperationEquivalence::ignoreHashValue,
+                      OperationEquivalence::IgnoreLocations));
   });
   return sig;
+}
+
+static bool areEquivalent(const Signature &lhs, const Signature &rhs) {
+  func::FuncOp lhsFunc = cast<func::FuncOp>(*lhs.normalizedFunc);
+  func::FuncOp rhsFunc = cast<func::FuncOp>(*rhs.normalizedFunc);
+  return lhsFunc.getFunctionType() == rhsFunc.getFunctionType() &&
+         OperationEquivalence::isRegionEquivalentTo(
+             &lhsFunc.getBody(), &rhsFunc.getBody(),
+             OperationEquivalence::IgnoreLocations);
 }
 
 template <typename OpT>
@@ -236,23 +229,28 @@ class GeneralizeExecutablesPass
       }
     });
 
-    // Group by signature (in module order, so the result is deterministic).
-    llvm::MapVector<StringRef, SmallVector<Member *>> byKey;
+    // Hash normalized functions into candidate buckets, then confirm full
+    // structural equivalence. Hash equality alone is never sufficient.
+    llvm::MapVector<size_t, SmallVector<size_t>> groupsByHash;
+    SmallVector<SmallVector<Member *>> groups;
     for (auto &[name, m] : members) {
       if (m.callers.empty()) {
         continue;
       }
-      m.sig = sign(m.funcOp);
-    }
-    for (auto &[name, m] : members) {
-      if (m.callers.empty()) {
-        continue;
+      m.sig = buildSignature(m.funcOp);
+      auto &candidateGroups = groupsByHash[size_t(m.sig.hash)];
+      auto it = llvm::find_if(candidateGroups, [&](size_t group) {
+        return areEquivalent(groups[group].front()->sig, m.sig);
+      });
+      if (it == candidateGroups.end()) {
+        candidateGroups.push_back(groups.size());
+        groups.push_back({&m});
+      } else {
+        groups[*it].push_back(&m);
       }
-      byKey[m.sig.key].push_back(&m);
     }
 
-    for (auto &entry : byKey) {
-      SmallVector<Member *> &group = entry.second;
+    for (SmallVector<Member *> &group : groups) {
       if (group.size() < 2) {
         continue;
       }
