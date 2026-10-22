@@ -138,3 +138,20 @@ util.func public @no_collapse_pointwise(%input: tensor<2x3x4xf32>, %init: tensor
   } -> tensor<2x3x4xf32>
   util.return %result : tensor<2x3x4xf32>
 }
+
+// -----
+
+// A named contraction with a preset lowering config keeps its loop space too.
+// CHECK-LABEL: @no_collapse_named_lowering_config(
+// CHECK:         linalg.batch_matmul
+// CHECK-SAME:      lowering_config =
+// CHECK:         util.return {{.*}} : tensor<2x3x4xf32>
+util.func public @no_collapse_named_lowering_config(%a: tensor<2x3x8xf32>, %b: tensor<8x4xf32>, %init: tensor<2x3x4xf32>) -> tensor<2x3x4xf32> {
+  %result = linalg.batch_matmul
+      indexing_maps = [affine_map<(b, m, n, k) -> (b, m, k)>,
+                       affine_map<(b, m, n, k) -> (k, n)>,
+                       affine_map<(b, m, n, k) -> (b, m, n)>] {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0]]>}
+      ins(%a, %b : tensor<2x3x8xf32>, tensor<8x4xf32>)
+      outs(%init : tensor<2x3x4xf32>) -> tensor<2x3x4xf32>
+  util.return %result : tensor<2x3x4xf32>
+}
