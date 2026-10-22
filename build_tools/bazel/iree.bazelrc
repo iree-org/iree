@@ -80,6 +80,15 @@ build:localdev --experimental_merged_skyframe_analysis_execution
 build:android_arm64 --platforms=//build_tools/bazel/android:android_arm64
 
 ###############################################################################
+# Experimental Qualcomm Hexagon DSP HAL driver for Android aarch64, see
+# experimental/runtime/src/iree/hal/drivers/hexagon/README.md.
+# Use with: bazel build --config=hexagon //tools:iree-run-module
+###############################################################################
+
+build:hexagon --config=android_arm64
+build:hexagon --//runtime/src/iree/hal/drivers:external_drivers=//experimental/runtime/src/iree/hal/drivers/hexagon/registration:driver
+
+###############################################################################
 # Options for "generic_gcc" builds
 ###############################################################################
 
