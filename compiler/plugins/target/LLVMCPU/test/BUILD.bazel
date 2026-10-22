@@ -17,6 +17,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "executable_object_data.mlir",
             "hal_target_device_attributes.mlir",
             "materialize_homogeneous_encodings.mlir",
             "smoketest_embedded.mlir",
