@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Utils/EquivalenceUtils.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/IR/SymbolTable.h"
@@ -158,8 +159,166 @@ struct SymbolReplacements {
   DenseMap<Attribute, Attribute> exportRefs;
 };
 
-// Replaces each usage of an entry point with its original symbol name with a
-// new symbol name.
+// Returns the executable that |exportRef| names once |exportRefReplacements|
+// are applied.
+static StringAttr getLinkedExecutableName(
+    SymbolRefAttr exportRef,
+    const DenseMap<Attribute, Attribute> &exportRefReplacements) {
+  if (auto linkedExportRef = dyn_cast_if_present<SymbolRefAttr>(
+          exportRefReplacements.lookup(exportRef))) {
+    return linkedExportRef.getRootReference();
+  }
+  return exportRef.getRootReference();
+}
+
+// Points the hal.executable.lookup feeding |functionLookupOp| at
+// |linkedExecutableName|, the executable its function's export is moved to.
+//
+// A hal.executable.lookup names its executable by root reference only; the
+// variant it must resolve to is known only from the
+// hal.executable.lookup.function ops consuming its result. When the variants of
+// |sourceExecutableName| are linked into different executables (each backend
+// links its own variants) the lookup cannot be renamed with the executable and
+// instead follows the export of its function lookups. The dispatch ops consume
+// the executable and the function id independently, so all function lookups of
+// a lookup must end up in the same executable.
+static LogicalResult retargetExecutableLookup(
+    IREE::HAL::ExecutableLookupFunctionOp functionLookupOp,
+    StringAttr sourceExecutableName, StringAttr linkedExecutableName,
+    const DenseMap<Attribute, Attribute> &exportRefReplacements) {
+  auto lookupOp = functionLookupOp.getExecutable()
+                      .getDefiningOp<IREE::HAL::ExecutableLookupOp>();
+  if (!lookupOp) {
+    return functionLookupOp.emitOpError()
+           << "of partially linked executable @"
+           << sourceExecutableName.getValue()
+           << " does not take its executable from a hal.executable.lookup; "
+              "cannot retarget the executable to @"
+           << linkedExecutableName.getValue();
+  }
+  StringAttr lookupExecutableName = lookupOp.getExecutableAttr().getAttr();
+  if (lookupExecutableName == linkedExecutableName) {
+    return success(); // already retargeted for another function lookup
+  }
+  if (lookupExecutableName != sourceExecutableName) {
+    return lookupOp.emitOpError()
+           << "of executable @" << lookupExecutableName.getValue()
+           << " resolves a function of executable @"
+           << sourceExecutableName.getValue();
+  }
+  for (Operation *lookupUserOp : lookupOp->getUsers()) {
+    if (isa<IREE::HAL::CommandBufferDispatchOp,
+            IREE::HAL::CommandBufferDispatchIndirectOp>(lookupUserOp)) {
+      continue;
+    }
+    auto siblingFunctionLookupOp =
+        dyn_cast<IREE::HAL::ExecutableLookupFunctionOp>(lookupUserOp);
+    if (!siblingFunctionLookupOp) {
+      // A forwarded (call, yield, ...) executable may have functions resolved
+      // elsewhere.
+      return lookupOp.emitOpError()
+             << "of partially linked executable @"
+             << sourceExecutableName.getValue() << " is used by '"
+             << lookupUserOp->getName()
+             << "'; cannot determine which variant it resolves to";
+    }
+    if (getLinkedExecutableName(siblingFunctionLookupOp.getEntryPoint(),
+                                exportRefReplacements) !=
+        linkedExecutableName) {
+      return lookupOp.emitOpError()
+             << "of executable @" << sourceExecutableName.getValue()
+             << " resolves functions from multiple executables after "
+                "linking; all functions of a lookup must come from one "
+                "variant";
+    }
+  }
+  lookupOp.setExecutableAttr(FlatSymbolRefAttr::get(linkedExecutableName));
+  return success();
+}
+
+// Returns the op preventing the enumeration of symbol uses in |moduleOp|: an
+// unregistered op with a region that may be a symbol table.
+static Operation *findUnknownSymbolTableOp(mlir::ModuleOp moduleOp) {
+  Operation *unknownOp = nullptr;
+  moduleOp.getBody()->walk<WalkOrder::PreOrder>([&unknownOp](Operation *op) {
+    if (op->getNumRegions() == 1 && !op->getDialect()) {
+      unknownOp = op;
+      return WalkResult::interrupt();
+    }
+    // Nested symbol tables are not entered when enumerating uses.
+    return op->hasTrait<OpTrait::SymbolTable>() ? WalkResult::skip()
+                                                : WalkResult::advance();
+  });
+  return unknownOp;
+}
+
+// Returns the symbol uses of the host program: those in the module body
+// outside of the executables, which are nested symbol tables and not entered.
+static FailureOr<SymbolTable::UseRange>
+getHostSymbolUses(mlir::ModuleOp moduleOp) {
+  std::optional<SymbolTable::UseRange> hostSymbolUses =
+      SymbolTable::getSymbolUses(&moduleOp.getBodyRegion());
+  if (!hostSymbolUses) {
+    Operation *unknownOp = findUnknownSymbolTableOp(moduleOp);
+    (unknownOp ? unknownOp : moduleOp.getOperation())->emitOpError()
+        << "prevents enumerating symbol uses; references to linked "
+           "executables cannot be updated";
+    return failure();
+  }
+  return std::move(*hostSymbolUses);
+}
+
+// Replaces each host program use of a key of |refReplacements| (a source
+// executable, variant, or export ref) with its linked ref.
+//
+// The hal.executable.lookup of a function lookup whose export is moved out of
+// one of the |partiallyLinkedExecutableNames| is retargeted along with the
+// export ref (see retargetExecutableLookup); only export refs can match a
+// function lookup as those always name an export.
+static LogicalResult replaceEntryPointRefs(
+    mlir::ModuleOp moduleOp,
+    const DenseMap<Attribute, Attribute> &refReplacements,
+    const DenseSet<StringAttr> &partiallyLinkedExecutableNames) {
+  FailureOr<SymbolTable::UseRange> hostSymbolUses = getHostSymbolUses(moduleOp);
+  if (failed(hostSymbolUses)) {
+    return failure();
+  }
+  for (SymbolTable::SymbolUse hostSymbolUse : *hostSymbolUses) {
+    SymbolRefAttr sourceRef = hostSymbolUse.getSymbolRef();
+    auto linkedRef =
+        dyn_cast_if_present<SymbolRefAttr>(refReplacements.lookup(sourceRef));
+    if (!linkedRef) {
+      continue;
+    }
+    Operation *userOp = hostSymbolUse.getUser();
+    auto functionLookupOp =
+        dyn_cast<IREE::HAL::ExecutableLookupFunctionOp>(userOp);
+    if (functionLookupOp &&
+        partiallyLinkedExecutableNames.contains(sourceRef.getRootReference())) {
+      if (failed(retargetExecutableLookup(
+              functionLookupOp, sourceRef.getRootReference(),
+              linkedRef.getRootReference(), refReplacements))) {
+        return failure();
+      }
+    }
+    auto replacedAttrDictionary = userOp->getAttrDictionary().replace(
+        [sourceRef,
+         linkedRef](Attribute attr) -> std::pair<Attribute, WalkResult> {
+          if (attr == sourceRef) {
+            return {linkedRef, WalkResult::skip()};
+          } else if (isa<SymbolRefAttr>(attr)) {
+            // Don't recurse into symbol refs - we only want to match roots.
+            return {attr, WalkResult::skip()};
+          }
+          // Non-symbol ref attr.
+          return {attr, WalkResult::advance()};
+        });
+    userOp->setAttrs(cast<DictionaryAttr>(replacedAttrDictionary));
+  }
+  return success();
+}
+
+// Replaces each use of a linked entry point with its new symbol name.
 //
 // Due to replaceSubElements recursing into symbol refs we need to perform
 // replacement in descending symbol ref length; otherwise replacing the
@@ -167,112 +326,51 @@ struct SymbolReplacements {
 // `@new_executable::@old_export` and an export update would then not match the
 // new/old mismatched ref. This means we have to do three walks over the entire
 // module in order to do the replacements; not great.
-static void
-replaceEntryPointUses(mlir::ModuleOp moduleOp,
-                      const SymbolReplacements &symbolReplacements) {
-  auto replaceSymbolRefs = [](Operation *rootOp,
-                              const DenseMap<Attribute, Attribute> &map) {
-    auto allUses = SymbolTable::getSymbolUses(rootOp);
-    if (!allUses) {
-      return;
-    }
-    for (auto use : *allUses) {
-      auto oldAttr = use.getSymbolRef();
-      auto newAttr = map.lookup(oldAttr);
-      if (!newAttr) {
-        continue;
-      }
-      auto newDict = use.getUser()->getAttrDictionary().replace(
-          [&](Attribute attr) -> std::pair<Attribute, WalkResult> {
-            if (attr == oldAttr) {
-              // Found old->new replacement.
-              return {newAttr, WalkResult::skip()};
-            } else if (isa<SymbolRefAttr>(attr)) {
-              // Don't recurse into symbol refs - we only want to match roots.
-              return {attr, WalkResult::skip()};
-            }
-            // Non-symbol ref attr.
-            return {attr, WalkResult::advance()};
-          });
-      use.getUser()->setAttrs(cast<DictionaryAttr>(newDict));
-    }
-  };
-  replaceSymbolRefs(moduleOp, symbolReplacements.exportRefs);
-  replaceSymbolRefs(moduleOp, symbolReplacements.variantRefs);
-  replaceSymbolRefs(moduleOp, symbolReplacements.executableRefs);
-  for (auto funcLikeOp : moduleOp.getOps<FunctionOpInterface>()) {
-    replaceSymbolRefs(funcLikeOp, symbolReplacements.exportRefs);
-    replaceSymbolRefs(funcLikeOp, symbolReplacements.variantRefs);
-    replaceSymbolRefs(funcLikeOp, symbolReplacements.executableRefs);
+//
+// Root references to the executables in |partiallyLinkedExecutableNames| are
+// not renamed as a whole: the lookup of each moved export is retargeted when
+// the export ref of its function lookup is replaced (see
+// retargetExecutableLookup).
+static LogicalResult replaceEntryPointUses(
+    mlir::ModuleOp moduleOp, const SymbolReplacements &symbolReplacements,
+    const DenseSet<StringAttr> &partiallyLinkedExecutableNames) {
+  if (failed(replaceEntryPointRefs(moduleOp, symbolReplacements.exportRefs,
+                                   partiallyLinkedExecutableNames)) ||
+      failed(replaceEntryPointRefs(moduleOp, symbolReplacements.variantRefs,
+                                   partiallyLinkedExecutableNames)) ||
+      failed(replaceEntryPointRefs(moduleOp, symbolReplacements.executableRefs,
+                                   partiallyLinkedExecutableNames))) {
+    return failure();
   }
+  return success();
 }
 
-// Retargets the root references to |executableOp|, of which only some
-// variants were linked into |linkedExecutableOp|. Must run after the variant
-// and export refs have been replaced.
-//
-// A root reference names only an executable (`@exe`, as hal.executable.lookup
-// does), unlike the nested references to one of its variants or exports
-// (`@exe::@variant`, `@exe::@variant::@export`) that indicate which variant
-// they mean. Once the variants of an executable are split across executables
-// its root references cannot be renamed as a whole. Conversion emits one lookup
-// per dispatch variant, so each lookup follows its function lookups, whose
-// export refs have already been remapped. IR outside that form cannot be
-// retargeted and is rejected.
-static LogicalResult
-retargetRootReferences(mlir::ModuleOp moduleOp,
-                       IREE::HAL::ExecutableOp executableOp,
-                       IREE::HAL::ExecutableOp linkedExecutableOp) {
-  auto uses =
-      SymbolTable::getSymbolUses(executableOp, &moduleOp.getBodyRegion());
-  if (!uses) {
-    return executableOp.emitOpError()
-           << "has uses that cannot be enumerated; cannot retarget its root "
-              "references after partially linking it into "
-           << SymbolRefAttr::get(linkedExecutableOp);
+// Verifies that the executables in |partiallyLinkedExecutableNames| are only
+// referenced by root from hal.executable.lookup ops. Lookups whose functions
+// were not moved legitimately still name the executable; any other root
+// reference cannot be attributed to a variant and may be stale.
+static LogicalResult verifyPartiallyLinkedExecutableReferences(
+    mlir::ModuleOp moduleOp,
+    const DenseSet<StringAttr> &partiallyLinkedExecutableNames) {
+  if (partiallyLinkedExecutableNames.empty()) {
+    return success();
   }
-  for (const SymbolTable::SymbolUse &use : *uses) {
-    if (!use.getSymbolRef().getNestedReferences().empty()) {
-      continue; // refs to variants/exports that were not linked
+  FailureOr<SymbolTable::UseRange> hostSymbolUses = getHostSymbolUses(moduleOp);
+  if (failed(hostSymbolUses)) {
+    return failure();
+  }
+  for (SymbolTable::SymbolUse hostSymbolUse : *hostSymbolUses) {
+    SymbolRefAttr hostRef = hostSymbolUse.getSymbolRef();
+    if (!hostRef.getNestedReferences().empty() ||
+        !partiallyLinkedExecutableNames.contains(hostRef.getRootReference()) ||
+        isa<IREE::HAL::ExecutableLookupOp>(hostSymbolUse.getUser())) {
+      continue;
     }
-    auto lookupOp = dyn_cast<IREE::HAL::ExecutableLookupOp>(use.getUser());
-    if (!lookupOp) {
-      return use.getUser()->emitOpError()
-             << "references partially linked executable "
-             << SymbolRefAttr::get(executableOp)
-             << "; only hal.executable.lookup root references can be "
-                "retargeted";
-    }
-    // The dispatch ops consume the looked-up executable and the function id
-    // independently, so all functions must come from the same executable.
-    StringAttr functionExecutable;
-    for (Operation *user : lookupOp->getUsers()) {
-      if (isa<IREE::HAL::CommandBufferDispatchOp,
-              IREE::HAL::CommandBufferDispatchIndirectOp>(user)) {
-        continue;
-      }
-      auto functionOp = dyn_cast<IREE::HAL::ExecutableLookupFunctionOp>(user);
-      if (!functionOp) {
-        // Forwarded (call, yield, ...) functions cannot be analyzed.
-        return lookupOp.emitOpError()
-               << "of partially linked executable "
-               << SymbolRefAttr::get(executableOp) << " is used by '"
-               << user->getName()
-               << "'; cannot determine which variant it resolves to";
-      }
-      StringAttr root = functionOp.getEntryPoint().getRootReference();
-      if (functionExecutable && functionExecutable != root) {
-        return lookupOp.emitOpError()
-               << "of executable " << SymbolRefAttr::get(executableOp)
-               << " resolves functions from multiple executables after "
-                  "linking; all functions of a lookup must come from one "
-                  "variant";
-      }
-      functionExecutable = root;
-    }
-    if (functionExecutable) {
-      lookupOp.setExecutableAttr(FlatSymbolRefAttr::get(functionExecutable));
-    }
+    return hostSymbolUse.getUser()->emitOpError()
+           << "references partially linked executable @"
+           << hostRef.getRootReference().getValue()
+           << "; only hal.executable.lookup root references can be "
+              "retargeted";
   }
   return success();
 }
@@ -293,15 +391,15 @@ LogicalResult linkExecutablesInto(
   int nextEntryPointOrdinal = 0;
   DenseMap<StringRef, Operation *> targetSymbolMap;
   SymbolReplacements symbolReplacements;
-  // Source executables partially linked by this call, whose root references
-  // are retargeted per lookup (see retargetRootReferences). For example, when
-  // linking llvm-cpu:
+  // Source executables of which only some variants are linked by this call.
+  // Their root references are retargeted per lookup instead of being renamed
+  // (see retargetExecutableLookup). For example, when linking llvm-cpu:
   //
   //   source executable  variants      linked here  result
   //   @dispatch_cpu      cpu           all          erased, refs renamed
-  //   @dispatch_shared   cpu, vmvx     cpu only     kept, added to this list
+  //   @dispatch_shared   cpu, vmvx     cpu only     kept, added to this set
   //   @dispatch_vmvx     vmvx          none         untouched
-  SmallVector<IREE::HAL::ExecutableOp> partiallyLinkedExecutables;
+  DenseSet<StringAttr> partiallyLinkedExecutableNames;
 
   auto linkedTargetBuilder =
       OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
@@ -334,14 +432,14 @@ LogicalResult linkExecutablesInto(
     // executable is erased below and all root refs follow it. A multi-target
     // executable (the same dispatch placed on different devices, or a device
     // with several backends) keeps the variants of the other targets and is
-    // linked by each backend in turn; its root refs are retargeted per lookup
-    // once the variant/export refs are known (see retargetRootReferences).
+    // linked by each backend in turn; the lookups of its moved exports are
+    // retargeted individually (see retargetExecutableLookup).
     if (llvm::all_of(variantOps, isLinkedVariant)) {
       symbolReplacements
           .executableRefs[SymbolRefAttr::get(sourceExecutableOp)] =
           SymbolRefAttr::get(linkedExecutableOp);
     } else if (llvm::any_of(variantOps, isLinkedVariant)) {
-      partiallyLinkedExecutables.push_back(sourceExecutableOp);
+      partiallyLinkedExecutableNames.insert(sourceExecutableOp.getNameAttr());
     }
 
     for (auto variantOp : variantOps) {
@@ -458,14 +556,11 @@ LogicalResult linkExecutablesInto(
   }
 
   // Update references to @executable::@target::@entry symbols.
-  replaceEntryPointUses(moduleOp, symbolReplacements);
-
-  // Update root references to executables that kept variants of other targets.
-  for (auto executableOp : partiallyLinkedExecutables) {
-    if (failed(retargetRootReferences(moduleOp, executableOp,
-                                      linkedExecutableOp))) {
-      return failure();
-    }
+  if (failed(replaceEntryPointUses(moduleOp, symbolReplacements,
+                                   partiallyLinkedExecutableNames)) ||
+      failed(verifyPartiallyLinkedExecutableReferences(
+          moduleOp, partiallyLinkedExecutableNames))) {
+    return failure();
   }
 
   // Remove if we didn't add anything.
