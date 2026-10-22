@@ -178,7 +178,8 @@ func.func @root_reference() attributes {executable_ref = @dispatch_shared} {
 // -----
 
 // Symbol uses below an unregistered op with a region cannot be enumerated, so
-// a lookup inside it could not be retargeted.
+// a lookup inside it could not be retargeted. The op is reported rather than
+// the executable.
 
 #cpu_target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
 #vmvx_target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
@@ -186,7 +187,6 @@ func.func @root_reference() attributes {executable_ref = @dispatch_shared} {
   #hal.pipeline.binding<storage_buffer>
 ]>
 
-// expected-error @+1 {{has uses that cannot be enumerated}}
 hal.executable private @dispatch_shared {
   hal.executable.variant @embedded_elf_x86_64 target(#cpu_target) {
     hal.executable.export public @dispatch_shared ordinal(0) layout(#pipeline_layout) count(%arg0: !hal.device) -> (index, index, index) {
@@ -228,6 +228,7 @@ hal.executable private @dispatch_cpu {
   }
 }
 func.func @unknown_region() {
+  // expected-error @+1 {{prevents enumerating symbol uses}}
   "unknown.region"() ({
     %c0 = arith.constant 0 : index
     %device = hal.devices.get %c0 : !hal.device
