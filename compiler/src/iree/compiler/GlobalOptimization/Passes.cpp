@@ -187,10 +187,9 @@ void buildGlobalOptimizationPassPipeline(
                          createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
-      // Convert broadcast + batch_matmul before transpose propagation so we
-      // can match the pure broadcast patterns before they get fused with
-      // transposes.
-      .addPass(GlobalOptimization::createConvertBatchMatmulToMatmulPass);
+      // Fold broadcasts into batch_matmul indexing maps before transpose
+      // propagation so the contraction consumes its producers directly.
+      .addPass(createFoldBroadcastIntoBatchMatmulPass);
 
   FunctionLikeNest(mainPassManager)
       // Propagate transposes immediately before set encoding/data tiling
@@ -228,6 +227,11 @@ void buildGlobalOptimizationPassPipeline(
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.dataTiling) {
     FunctionLikeNest(mainPassManager)
+        // Data tiling wants a single M, N and K dim. Collapse contractions
+        // whose loops merge, such as a batch_matmul with a batch-broadcast
+        // weight after the fold above, before annotating them. The dispatch
+        // creation data tiling path collapses after dispatch formation instead.
+        .addPass(DispatchCreation::createCollapseContractionDimensionsPass)
         .addPass(DispatchCreation::createAnnotateDataTilingHintsPass)
         .addPass([&]() {
           return DispatchCreation::createSetEncodingPass(

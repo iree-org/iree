@@ -16,7 +16,6 @@ iree_lit_test_suite(
   SRCS
     "cleanup_numeric_narrowing.mlir"
     "conv_to_im2col.mlir"
-    "convert_batch_matmul_to_matmul.mlir"
     "convert_qdq_to_integer_math_algebra.mlir"
     "convert_qdq_to_integer_math_maps.mlir"
     "convert_qdq_to_integer_math_negative.mlir"
@@ -26,6 +25,8 @@ iree_lit_test_suite(
     "demote_contraction_inputs.mlir"
     "detach_elementwise_from_named_ops.mlir"
     "expand_tensor_shapes.mlir"
+    "fold_broadcast_into_batch_matmul.mlir"
+    "fold_broadcast_into_batch_matmul_pipeline.mlir"
     "fuse_dequantization_matmul.mlir"
     "generalize_named_ops.mlir"
     "global_loop_invariant_code_motion.mlir"

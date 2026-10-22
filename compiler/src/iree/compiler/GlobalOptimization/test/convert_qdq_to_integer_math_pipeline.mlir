@@ -168,3 +168,46 @@ util.func public @transposed_dequantized_rhs(
 // DISABLED: iree_linalg_ext.dequantize_affine
 // DISABLED: linalg.matmul
 // DISABLED-SAME: outs(%{{.+}} : tensor<4x3xf32>)
+
+// -----
+
+// A weight broadcast along the batch dim folds into the batch_matmul's
+// indexing maps, so the contraction reads both dequantize results directly.
+util.func public @broadcast_dequantized_rhs(
+    %aq: tensor<4x8x16xi8>, %bq: tensor<16x12xi8>, %sa: f32, %sb: f32,
+    %za: i8, %zb: i8) -> tensor<4x8x12xf32> {
+  %ai = tensor.empty() : tensor<4x8x16xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(b, m, k) -> (b, m, k)>,
+                        affine_map<(b, m, k) -> ()>,
+                        affine_map<(b, m, k) -> ()>,
+                        affine_map<(b, m, k) -> (b, m, k)>]>
+      ins(%aq, %sa, %za : tensor<4x8x16xi8>, f32, i8)
+      outs(%ai : tensor<4x8x16xf32>) -> tensor<4x8x16xf32>
+  %bi = tensor.empty() : tensor<16x12xf32>
+  %b = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(k, n) -> (k, n)>,
+                        affine_map<(k, n) -> ()>,
+                        affine_map<(k, n) -> ()>,
+                        affine_map<(k, n) -> (k, n)>]>
+      ins(%bq, %sb, %zb : tensor<16x12xi8>, f32, i8)
+      outs(%bi : tensor<16x12xf32>) -> tensor<16x12xf32>
+  %bcast_init = tensor.empty() : tensor<4x16x12xf32>
+  %bcast = linalg.broadcast ins(%b : tensor<16x12xf32>)
+      outs(%bcast_init : tensor<4x16x12xf32>) dimensions = [0]
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<4x8x12xf32>
+  %init = linalg.fill ins(%zero : f32) outs(%empty : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.batch_matmul ins(%a, %bcast : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+      outs(%init : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  util.return %result : tensor<4x8x12xf32>
+}
+// CHECK-LABEL: util.func public @broadcast_dequantized_rhs(
+// CHECK-NOT: linalg.broadcast
+// CHECK: arith.muli %{{.+}}, %{{.+}} : i32
+// CHECK: arith.sitofp
+// DISABLED-LABEL: util.func public @broadcast_dequantized_rhs(
+// DISABLED: iree_linalg_ext.dequantize_affine
+// DISABLED-NOT: linalg.broadcast
+// DISABLED: linalg.batch_matmul
+// DISABLED-SAME: indexing_maps
