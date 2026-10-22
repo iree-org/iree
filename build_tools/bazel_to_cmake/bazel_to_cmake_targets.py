@@ -181,6 +181,11 @@ class TargetConverter:
                 "@com_google_googletest//:gtest": ["gmock", "gtest"],
                 "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
                 "@hsa_runtime_headers": ["hsa_runtime::headers"],
+                # Hexagon SDK (see build_tools/cmake/iree_hexagon_sdk.cmake).
+                "@hexagon_sdk//:cdsprpc_android_aarch64": [
+                    "hexagon_sdk::cdsprpc_android_aarch64"
+                ],
+                "@hexagon_sdk//:fastrpc_headers": ["hexagon_sdk::fastrpc_headers"],
                 "@libbacktrace": ["libbacktrace::libbacktrace"],
                 "@webgpu_headers": [],
                 # py_binary targets have no CMake equivalent.
@@ -297,6 +302,13 @@ class TargetConverter:
 
         # Map //runtime/src/iree/(.*) -> iree::\1
         m = re.match(f"^{iree_core_repo}//runtime/src/iree/(.+)", target)
+        if m:
+            return ["iree::" + self._convert_to_cmake_path(m.group(1))]
+
+        # Map //experimental/runtime/src/iree/(.*) -> iree::\1
+        # experimental/runtime/src/ is a separate package root that mirrors
+        # runtime/src/ (see experimental/runtime/src/CMakeLists.txt).
+        m = re.match(f"^{iree_core_repo}//experimental/runtime/src/iree/(.+)", target)
         if m:
             return ["iree::" + self._convert_to_cmake_path(m.group(1))]
 

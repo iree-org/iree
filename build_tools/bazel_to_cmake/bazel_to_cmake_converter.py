@@ -42,6 +42,7 @@ _PLATFORM_CMAKE_SYSTEM_NAME = {
     "@platforms//os:macos": "Darwin",
     "@platforms//os:windows": "Windows",
     # CPU architecture constraints.
+    "@platforms//cpu:aarch64": "arm_64",
     "@platforms//cpu:wasm32": "wasm_32",
 }
 
@@ -1227,6 +1228,37 @@ class BuildFileFunctions(object):
         self._converter.body += (
             f"# External HAL driver '{name}' is registered for CMake with\n"
             f"# iree_register_external_hal_driver().\n\n"
+        )
+
+    def iree_hexagon_interface(self, name, idl, **kwargs):
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        idl_block = self._convert_string_arg_block("IDL", idl)
+
+        self._converter.body += (
+            f"iree_hexagon_interface(\n" f"{name_block}" f"{idl_block}" f")\n\n"
+        )
+
+    def iree_hexagon_dsp_library(
+        self, name, srcs, interface, arch="v79", copts=None, linkopts=None, **kwargs
+    ):
+        name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        interface_block = self._convert_target_block("INTERFACE", interface)
+        arch_block = self._convert_string_arg_block("ARCH", arch, quote=False)
+        srcs_block = self._convert_srcs_block(srcs)
+        copts_block = self._convert_string_list_block("COPTS", copts, sort=False)
+        linkopts_block = self._convert_string_list_block(
+            "LINKOPTS", linkopts, sort=False
+        )
+
+        self._converter.body += (
+            f"iree_hexagon_dsp_library(\n"
+            f"{name_block}"
+            f"{interface_block}"
+            f"{arch_block}"
+            f"{srcs_block}"
+            f"{copts_block}"
+            f"{linkopts_block}"
+            f")\n\n"
         )
 
     def iree_hal_amdgpu_source_device_binaries(self):
