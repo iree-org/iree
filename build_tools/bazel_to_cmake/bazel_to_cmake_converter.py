@@ -1223,6 +1223,12 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
+    def iree_hal_external_driver(self, name, **kwargs):
+        self._converter.body += (
+            f"# External HAL driver '{name}' is registered for CMake with\n"
+            f"# iree_register_external_hal_driver().\n\n"
+        )
+
     def iree_hal_amdgpu_source_device_binaries(self):
         self._converter.body += (
             "# Source-built AMDGPU device binary targets are wired manually by\n"

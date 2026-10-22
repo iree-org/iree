@@ -6,6 +6,11 @@
 
 load("@bazel_skylib//rules:common_settings.bzl", "string_list_flag")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load(
+    "//build_tools/bazel:iree_hal_external_driver.bzl",
+    "iree_hal_external_driver",
+    "iree_hal_external_driver_init_c",
+)
 
 package(
     default_visibility = ["//visibility:public"],
@@ -68,11 +73,35 @@ config_setting(
     },
 )
 
+# External HAL drivers that live outside of this directory, see
+# build_tools/bazel/iree_hal_external_driver.bzl. Select with:
+#   --//runtime/src/iree/hal/drivers:external_drivers=<iree_hal_external_driver>
+label_flag(
+    name = "external_drivers",
+    build_setting_default = ":no_external_drivers",
+)
+
+iree_hal_external_driver(
+    name = "no_external_drivers",
+)
+
+iree_hal_external_driver_init_c(
+    name = "init_external_c",
+    out = "init_external.c",
+    drivers = ":external_drivers",
+    template = "init_external.c.in",
+)
+
 iree_runtime_cc_library(
     name = "drivers",
-    srcs = ["init.c"],
+    srcs = [
+        "init.c",
+        "init_external.c",
+    ],
     hdrs = ["init.h"],
+    local_defines = ["IREE_HAVE_HAL_EXTERNAL_DRIVERS=1"],
     deps = [
+               ":external_drivers",
                "//runtime/src/iree/base",
                "//runtime/src/iree/hal",
            ] + select({
