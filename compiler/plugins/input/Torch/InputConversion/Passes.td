@@ -31,13 +31,14 @@ def ConvertTorchUnstructuredToLinalgExtPass :
 
 def ConvertTorchQuantizationToLinalgExtPass :
     InterfacePass<"torch-iree-torch-quantization-to-linalg-ext", "mlir::FunctionOpInterface"> {
-  let summary = "Convert PT2E quantization operations to LinalgExt";
+  let summary = "Convert PT2E and torchao quantization operations to LinalgExt";
   let description = [{
     Preserves PT2E per-tensor, per-channel, per-channel-group, and per-token
-    quantization as `iree_linalg_ext.quantize_affine` and `dequantize_affine`
-    operations. This pass runs before Torch-to-Linalg expands the PT2E
-    operations into generic arithmetic so later IREE optimization can still
-    identify quantized computations.
+    quantization and torchao affine quantization as
+    `iree_linalg_ext.quantize_affine` and `dequantize_affine` operations. This
+    pass runs before Torch-to-Linalg expands the PT2E and torchao operations
+    into generic arithmetic so later IREE optimization can still identify
+    quantized computations.
   }];
 }
 
