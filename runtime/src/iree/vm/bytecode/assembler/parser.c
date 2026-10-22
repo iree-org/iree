@@ -587,15 +587,6 @@ static iree_status_t iree_vm_bytecode_assembler_parse_function_header(
                             "expected '{' after function signature");
   }
 
-  iree_string_builder_reset(&state->argument_cconv_builder);
-  iree_string_builder_reset(&state->result_cconv_builder);
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_assembler_parse_typed_register_list(
-      state, arguments, /*require_sequential=*/true,
-      &state->argument_cconv_builder, &state->argument_count));
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_assembler_parse_result_type_list(
-      results, &state->result_cconv_builder, &state->result_count));
-  IREE_RETURN_IF_ERROR(iree_vm_bytecode_assembler_build_cconv(state));
-
   state->in_function = true;
   state->has_terminator = false;
   state->function_requirements = 0;
@@ -604,6 +595,14 @@ static iree_status_t iree_vm_bytecode_assembler_parse_function_header(
   state->ref_register_count = 0;
   state->label_count = 0;
   state->fixup_count = 0;
+  iree_string_builder_reset(&state->argument_cconv_builder);
+  iree_string_builder_reset(&state->result_cconv_builder);
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_assembler_parse_typed_register_list(
+      state, arguments, /*require_sequential=*/true,
+      &state->argument_cconv_builder, &state->argument_count));
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_assembler_parse_result_type_list(
+      results, &state->result_cconv_builder, &state->result_count));
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_assembler_build_cconv(state));
   state->function_bytecode_offset =
       (uint32_t)iree_string_builder_size(&state->bytecode_builder);
   IREE_RETURN_IF_ERROR(
