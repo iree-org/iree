@@ -213,8 +213,10 @@ iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
                               i, function_descriptor->bytecode_offset,
                               flatbuffers_uint8_vec_len(bytecode_data));
     }
-    if (function_descriptor->i32_register_count >
+    if (function_descriptor->i32_register_count < 0 ||
+        function_descriptor->i32_register_count >
             IREE_VM_ISA_I32_REGISTER_COUNT ||
+        function_descriptor->ref_register_count < 0 ||
         function_descriptor->ref_register_count >
             IREE_VM_ISA_REF_REGISTER_COUNT) {
       return iree_make_status(
@@ -337,21 +339,23 @@ iree_status_t iree_vm_bytecode_function_verify(
         iree_vm_ModuleStateDef_global_ref_count(module_state_def);
   }
 
-  // Ensure the register storage (rounded to the nearest power of 2) won't
-  // exceed the maximum allowed registers.
-  verify_state.i32_register_count = iree_math_round_up_to_pow2_u32(
-      iree_max(1, function_descriptor->i32_register_count));
-  verify_state.ref_register_count = iree_math_round_up_to_pow2_u32(
-      iree_max(1, function_descriptor->ref_register_count));
-  if (IREE_UNLIKELY(verify_state.i32_register_count >
+  // Use the exact register counts declared by the function descriptor so
+  // register ordinal bounds checks match the frame storage allocated on entry.
+  if (IREE_UNLIKELY(function_descriptor->i32_register_count < 0) ||
+      IREE_UNLIKELY((uint32_t)function_descriptor->i32_register_count >
                     IREE_VM_ISA_I32_REGISTER_MASK) ||
-      IREE_UNLIKELY(verify_state.ref_register_count >
+      IREE_UNLIKELY(function_descriptor->ref_register_count < 0) ||
+      IREE_UNLIKELY((uint32_t)function_descriptor->ref_register_count >
                     IREE_VM_ISA_REF_REGISTER_MASK)) {
     // Register count overflow. A valid compiler should never produce files that
     // hit this.
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "register count overflow");
   }
+  verify_state.i32_register_count =
+      (uint32_t)function_descriptor->i32_register_count;
+  verify_state.ref_register_count =
+      (uint32_t)function_descriptor->ref_register_count;
 
   // Grab the cconv fragments declaring the arguments/results of the function.
   verify_state.cconv_arguments = iree_string_view_empty();
@@ -537,7 +541,7 @@ iree_status_t iree_vm_bytecode_function_verify(
 #define IREE_VM_ISA_REQUIRE(bytes) IREE_VM_VERIFY_PC_RANGE(pc + (bytes), max_pc)
 
 // Verifier wants strict bounds checks on type IDs.
-#define IREE_VM_ISA_VERIFY_TYPE_ID(type_id)                       \
+#define IREE_VM_ISA_VALIDATE_TYPE_ID(type_id)                     \
   do {                                                            \
     if (IREE_UNLIKELY((type_id) >= module->type_count)) {         \
       return iree_make_status(                                    \
@@ -555,33 +559,33 @@ iree_status_t iree_vm_bytecode_function_verify(
   } while (0)
 
 // Register validation uses the verifier's current register-count limits.
-#define IREE_VM_ISA_VERIFY_REG_I32(ordinal) \
-  do {                                      \
-    IREE_VM_VERIFY_REG_I32(ordinal);        \
+#define IREE_VM_ISA_VALIDATE_REG_I32(ordinal) \
+  do {                                        \
+    IREE_VM_VERIFY_REG_I32(ordinal);          \
   } while (0)
-#define IREE_VM_ISA_VERIFY_REG_I64(ordinal) \
-  do {                                      \
-    IREE_VM_VERIFY_REG_I64(ordinal);        \
+#define IREE_VM_ISA_VALIDATE_REG_I64(ordinal) \
+  do {                                        \
+    IREE_VM_VERIFY_REG_I64(ordinal);          \
   } while (0)
-#define IREE_VM_ISA_VERIFY_REG_F32(ordinal) \
-  do {                                      \
-    IREE_VM_VERIFY_REG_F32(ordinal);        \
+#define IREE_VM_ISA_VALIDATE_REG_F32(ordinal) \
+  do {                                        \
+    IREE_VM_VERIFY_REG_F32(ordinal);          \
   } while (0)
-#define IREE_VM_ISA_VERIFY_REG_F64(ordinal) \
-  do {                                      \
-    IREE_VM_VERIFY_REG_F64(ordinal);        \
+#define IREE_VM_ISA_VALIDATE_REG_F64(ordinal) \
+  do {                                        \
+    IREE_VM_VERIFY_REG_F64(ordinal);          \
   } while (0)
-#define IREE_VM_ISA_VERIFY_REG_ANY(ordinal) \
-  do {                                      \
-    IREE_VM_VERIFY_REG_ANY(ordinal);        \
+#define IREE_VM_ISA_VALIDATE_REG_ANY(ordinal) \
+  do {                                        \
+    IREE_VM_VERIFY_REG_ANY(ordinal);          \
   } while (0)
 
 // Ref register validation differs based on whether the op supports MOVE.
-#define IREE_VM_ISA_VERIFY_REG_REF_ALLOW_MOVE(ordinal) \
-  do {                                                 \
-    IREE_VM_VERIFY_REG_REF(ordinal);                   \
+#define IREE_VM_ISA_VALIDATE_REG_REF_ALLOW_MOVE(ordinal) \
+  do {                                                   \
+    IREE_VM_VERIFY_REG_REF(ordinal);                     \
   } while (0)
-#define IREE_VM_ISA_VERIFY_REG_REF_NO_MOVE(ordinal)                        \
+#define IREE_VM_ISA_VALIDATE_REG_REF_NO_MOVE(ordinal)                      \
   do {                                                                     \
     IREE_VM_VERIFY_REG_REF(ordinal);                                       \
     if (IREE_UNLIKELY((ordinal) & IREE_VM_ISA_REF_REGISTER_MOVE_BIT)) {    \
@@ -604,11 +608,16 @@ iree_status_t iree_vm_bytecode_function_verify(
       &verify_state->block_list, (name), &name##_block));  \
   (void)(name##_block)
 
-#define IREE_VM_ISA_VERIFY_BRANCH_OPERANDS(name)        \
-  IREE_VM_ISA_DECODE_BRANCH_OPERANDS(name);             \
-  for (uint16_t __i = 0; __i < (name)->size; ++__i) {   \
-    IREE_VM_VERIFY_REG_ANY((name)->pairs[__i].src_reg); \
-    IREE_VM_VERIFY_REG_ANY((name)->pairs[__i].dst_reg); \
+#define IREE_VM_ISA_VERIFY_BRANCH_OPERANDS(name)                          \
+  IREE_VM_ISA_DECODE_BRANCH_OPERANDS(name);                               \
+  for (uint16_t __i = 0; __i < (name)->size; ++__i) {                     \
+    if ((name)->pairs[__i].src_reg & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) { \
+      IREE_VM_VERIFY_REG_REF((name)->pairs[__i].src_reg);                 \
+      IREE_VM_VERIFY_REG_REF((name)->pairs[__i].dst_reg);                 \
+    } else {                                                              \
+      IREE_VM_VERIFY_REG_I32((name)->pairs[__i].src_reg);                 \
+      IREE_VM_VERIFY_REG_I32((name)->pairs[__i].dst_reg);                 \
+    }                                                                     \
   }
 
 #define IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS(name) \
@@ -892,8 +901,8 @@ static iree_status_t iree_vm_bytecode_function_verify_cconv_registers(
     iree_string_view_t cconv_fragment,
     const iree_vm_register_list_t* IREE_RESTRICT segment_size_list,
     const iree_vm_register_list_t* IREE_RESTRICT reg_list) {
-  for (uint16_t i = 0, seg_i = 0, reg_i = 0; i < cconv_fragment.size;
-       ++i, ++seg_i) {
+  uint32_t reg_i = 0;
+  for (uint16_t i = 0, seg_i = 0; i < cconv_fragment.size; ++i, ++seg_i) {
     switch (cconv_fragment.data[i]) {
       case IREE_VM_CCONV_TYPE_VOID:
         break;
@@ -958,6 +967,12 @@ static iree_status_t iree_vm_bytecode_function_verify_cconv_registers(
                                 "unsupported cconv fragment char '%c'",
                                 cconv_fragment.data[i]);
     }
+  }
+  if (reg_i != reg_list->size) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "register list size mismatch (have %u, expected %u)",
+        (uint32_t)reg_list->size, reg_i);
   }
   return iree_ok_status();
 }
@@ -1145,8 +1160,9 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     IREE_VM_ISA_VERIFY_OP(CORE, ConstRefZero,
                           { IREE_VM_ISA_DECODE_RESULT_REF_MOVE(result); });
 
-    IREE_VM_ISA_VERIFY_OP(CORE, DiscardRefs,
-                          { IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_ANY(refs); });
+    IREE_VM_ISA_VERIFY_OP(CORE, DiscardRefs, {
+      IREE_VM_ISA_VERIFY_VARIADIC_OPERANDS_REF(refs, 1);
+    });
 
     IREE_VM_ISA_VERIFY_OP(CORE, AssignRef, {
       IREE_VM_ISA_DECODE_OPERAND_REF_MOVE(source);
