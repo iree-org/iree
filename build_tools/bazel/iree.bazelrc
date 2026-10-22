@@ -72,6 +72,14 @@ query:localdev --output=label
 build:localdev --experimental_merged_skyframe_analysis_execution
 
 ###############################################################################
+# Android aarch64 cross-compilation using the Android NDK r28 found via the
+# ANDROID_NDK (or ANDROID_NDK_HOME) environment variable.
+# Use with: bazel build --config=android_arm64 //tools:iree-run-module
+###############################################################################
+
+build:android_arm64 --platforms=//build_tools/bazel/android:android_arm64
+
+###############################################################################
 # Options for "generic_gcc" builds
 ###############################################################################
 
