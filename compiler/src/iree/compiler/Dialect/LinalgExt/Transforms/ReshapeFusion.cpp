@@ -967,6 +967,36 @@ struct FoldWithConsumerReshapeByExpansion final
       return failure();
     }
 
+    // Rank-zero expansion adds unit dimensions without splitting an existing
+    // dimension, so ExpansionInfo cannot represent it. Expand the dequantize's
+    // input and output while keeping its scalar parameters unchanged.
+    if constexpr (std::is_same_v<OpTy, DequantizeAffineOp>) {
+      if (op.getInputType().getRank() == 0) {
+        Location loc = expandOp.getLoc();
+        RankedTensorType resultType = expandOp.getResultType();
+        Value input = tensor::ExpandShapeOp::create(
+            rewriter, loc, resultType.clone(op.getInputType().getElementType()),
+            op.getInput(), expandOp.getReassociationIndices(),
+            expandOp.getMixedOutputShape());
+        Value init = tensor::EmptyOp::create(rewriter, loc,
+                                             expandOp.getMixedOutputShape(),
+                                             resultType.getElementType());
+        SmallVector<Value> operands = op->getOperands();
+        operands.front() = input;
+        operands.back() = init;
+        auto expandedOp = cast<OpTy>(
+            mlir::clone(rewriter, op, expandOp->getResultTypes(), operands));
+        unsigned rank = resultType.getRank();
+        SmallVector<AffineMap> maps(
+            operands.size(),
+            AffineMap::get(rank, 0, {}, rewriter.getContext()));
+        maps.front() = maps.back() = rewriter.getMultiDimIdentityMap(rank);
+        expandedOp.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(maps));
+        rewriter.replaceOp(expandOp, expandedOp->getResults());
+        return success();
+      }
+    }
+
     std::optional<SmallVector<Value>> replacementValues =
         fuseWithReshapeByExpansion(
             op, expandOp, op.getTiedOpOperand(producerResult), rewriter);
