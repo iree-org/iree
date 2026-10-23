@@ -468,3 +468,160 @@ func.func @matmul_f16_widenf32_zvfhmin_zvl256b(%arg0 : tensor<?x?xf16>, %arg1 : 
 //       CHECK:   %[[PACK_RHS:.+]] = linalg.pack {{.*}}inner_tiles = [32, 1]
 //       CHECK:   %[[INNER:.+]] = iree_codegen.inner_tiled
 //  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32, intrinsics_m = 6, vlen = 256>
+
+// -----
+
+// bf16×bf16→f32 vfwmaccbf16.vf. RHS stays bf16, so intrinsics_m = 7.
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+#rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+#acc = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+func.func @matmul_bf16_zvl128b(%arg0 : tensor<?x?xbf16>, %arg1 : tensor<?x?xbf16>, %m: index, %n: index, %k: index) -> tensor<?x?xf32> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple = "riscv64-unknown-unknown-eabi-elf", cpu_features = "+m,+a,+f,+d,+c,+v,+zvfbfwma,+zvl128b", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0 : f32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xbf16>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xbf16>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %n, %k} : tensor<?x?xbf16> -> tensor<?x?xbf16, #lhs>
+  %1 = iree_encoding.set_encoding %arg1 encoding_dims{%m, %n, %k} : tensor<?x?xbf16> -> tensor<?x?xbf16, #rhs>
+  %2 = tensor.empty(%d0, %d1) : tensor<?x?xf32, #acc>
+  %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<?x?xf32, #acc>) -> tensor<?x?xf32, #acc>
+  %4 = linalg.matmul ins(%0, %1 : tensor<?x?xbf16, #lhs>, tensor<?x?xbf16, #rhs>)
+      outs(%3 : tensor<?x?xf32, #acc>) -> tensor<?x?xf32, #acc>
+  %5 = iree_encoding.unset_encoding %4 encoding_dims{%m, %n, %k} : tensor<?x?xf32, #acc> -> tensor<?x?xf32>{%d0, %d1}
+  return %5 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func @matmul_bf16_zvl128b(
+//       CHECK:   %[[PACK_LHS:.+]] = linalg.pack {{.*}}inner_tiles = [7, 1]
+//  CHECK-SAME:       -> tensor<?x?x7x1xbf16>
+//       CHECK:   %[[PACK_RHS:.+]] = linalg.pack {{.*}}inner_tiles = [16, 1]
+//       CHECK:   %[[INNER:.+]] = iree_codegen.inner_tiled
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16, intrinsics_m = 7, vlen = 128>
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+#rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+#acc = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+func.func @matmul_bf16_zvl256b(%arg0 : tensor<?x?xbf16>, %arg1 : tensor<?x?xbf16>, %m: index, %n: index, %k: index) -> tensor<?x?xf32> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple = "riscv64-unknown-unknown-eabi-elf", cpu_features = "+m,+a,+f,+d,+c,+v,+zvfbfwma,+zvl256b", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0 : f32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xbf16>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xbf16>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %n, %k} : tensor<?x?xbf16> -> tensor<?x?xbf16, #lhs>
+  %1 = iree_encoding.set_encoding %arg1 encoding_dims{%m, %n, %k} : tensor<?x?xbf16> -> tensor<?x?xbf16, #rhs>
+  %2 = tensor.empty(%d0, %d1) : tensor<?x?xf32, #acc>
+  %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<?x?xf32, #acc>) -> tensor<?x?xf32, #acc>
+  %4 = linalg.matmul ins(%0, %1 : tensor<?x?xbf16, #lhs>, tensor<?x?xbf16, #rhs>)
+      outs(%3 : tensor<?x?xf32, #acc>) -> tensor<?x?xf32, #acc>
+  %5 = iree_encoding.unset_encoding %4 encoding_dims{%m, %n, %k} : tensor<?x?xf32, #acc> -> tensor<?x?xf32>{%d0, %d1}
+  return %5 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func @matmul_bf16_zvl256b(
+//       CHECK:   %[[PACK_RHS:.+]] = linalg.pack {{.*}}inner_tiles = [32, 1]
+//       CHECK:   %[[INNER:.+]] = iree_codegen.inner_tiled
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16, intrinsics_m = 7, vlen = 256>
+
+// -----
+
+// Narrow-N bf16. The swapped tile keeps the vector operand at bf16, so
+// intrinsics_n = 7.
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, 8, ?]>
+#rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, 8, ?]>
+#acc = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, 8, ?]>
+func.func @matmul_bf16_zvl256b_narrow_n(%arg0 : tensor<?x?xbf16>, %arg1 : tensor<?x?xbf16>, %m: index, %k: index) -> tensor<?x?xf32> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple = "riscv64-unknown-unknown-eabi-elf", cpu_features = "+m,+a,+f,+d,+c,+v,+zvfbfwma,+zvl256b", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0 : f32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xbf16>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xbf16>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %k} : tensor<?x?xbf16> -> tensor<?x?xbf16, #lhs>
+  %1 = iree_encoding.set_encoding %arg1 encoding_dims{%m, %k} : tensor<?x?xbf16> -> tensor<?x?xbf16, #rhs>
+  %2 = tensor.empty(%d0, %d1) : tensor<?x?xf32, #acc>
+  %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<?x?xf32, #acc>) -> tensor<?x?xf32, #acc>
+  %4 = linalg.matmul ins(%0, %1 : tensor<?x?xbf16, #lhs>, tensor<?x?xbf16, #rhs>)
+      outs(%3 : tensor<?x?xf32, #acc>) -> tensor<?x?xf32, #acc>
+  %5 = iree_encoding.unset_encoding %4 encoding_dims{%m, %k} : tensor<?x?xf32, #acc> -> tensor<?x?xf32>{%d0, %d1}
+  return %5 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func @matmul_bf16_zvl256b_narrow_n(
+//       CHECK:   %[[PACK_LHS:.+]] = linalg.pack {{.*}}inner_tiles = [32, 1]
+//       CHECK:   %[[PACK_RHS:.+]] = linalg.pack {{.*}}inner_tiles = [7, 1]
+//       CHECK:   %[[INNER:.+]] = iree_codegen.inner_tiled
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16, intrinsics_n = 7, vlen = 256>
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+#rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+#acc = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+func.func @matmul_bf16_zvl512b(%arg0 : tensor<?x?xbf16>, %arg1 : tensor<?x?xbf16>, %m: index, %n: index, %k: index) -> tensor<?x?xf32> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple = "riscv64-unknown-unknown-eabi-elf", cpu_features = "+m,+a,+f,+d,+c,+v,+zvfbfwma,+zvl512b", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0 : f32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xbf16>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xbf16>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %n, %k} : tensor<?x?xbf16> -> tensor<?x?xbf16, #lhs>
+  %1 = iree_encoding.set_encoding %arg1 encoding_dims{%m, %n, %k} : tensor<?x?xbf16> -> tensor<?x?xbf16, #rhs>
+  %2 = tensor.empty(%d0, %d1) : tensor<?x?xf32, #acc>
+  %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<?x?xf32, #acc>) -> tensor<?x?xf32, #acc>
+  %4 = linalg.matmul ins(%0, %1 : tensor<?x?xbf16, #lhs>, tensor<?x?xbf16, #rhs>)
+      outs(%3 : tensor<?x?xf32, #acc>) -> tensor<?x?xf32, #acc>
+  %5 = iree_encoding.unset_encoding %4 encoding_dims{%m, %n, %k} : tensor<?x?xf32, #acc> -> tensor<?x?xf32>{%d0, %d1}
+  return %5 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func @matmul_bf16_zvl512b(
+//       CHECK:   %[[PACK_RHS:.+]] = linalg.pack {{.*}}inner_tiles = [64, 1]
+//       CHECK:   %[[INNER:.+]] = iree_codegen.inner_tiled
+//  CHECK-SAME:       kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16, intrinsics_m = 7, vlen = 512>
+
+// -----
+
+// +v without +zvfbfwma cannot select vfwmaccbf16.
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+#rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+#acc = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
+func.func @matmul_bf16_no_zvfbfwma(%arg0 : tensor<?x?xbf16>, %arg1 : tensor<?x?xbf16>, %m: index, %n: index, %k: index) -> tensor<?x?xf32> attributes {
+   hal.executable.target = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {target_triple = "riscv64-unknown-unknown-eabi-elf", cpu_features = "+m,+a,+f,+d,+c,+v,+zvl256b", enable_inner_tiled = true, iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0 : f32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xbf16>
+  %d1 = tensor.dim %arg1, %c1 : tensor<?x?xbf16>
+  %0 = iree_encoding.set_encoding %arg0 encoding_dims{%m, %n, %k} : tensor<?x?xbf16> -> tensor<?x?xbf16, #lhs>
+  %1 = iree_encoding.set_encoding %arg1 encoding_dims{%m, %n, %k} : tensor<?x?xbf16> -> tensor<?x?xbf16, #rhs>
+  %2 = tensor.empty(%d0, %d1) : tensor<?x?xf32, #acc>
+  %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<?x?xf32, #acc>) -> tensor<?x?xf32, #acc>
+  %4 = linalg.matmul ins(%0, %1 : tensor<?x?xbf16, #lhs>, tensor<?x?xbf16, #rhs>)
+      outs(%3 : tensor<?x?xf32, #acc>) -> tensor<?x?xf32, #acc>
+  %5 = iree_encoding.unset_encoding %4 encoding_dims{%m, %n, %k} : tensor<?x?xf32, #acc> -> tensor<?x?xf32>{%d0, %d1}
+  return %5 : tensor<?x?xf32>
+}
+// CHECK-LABEL: func @matmul_bf16_no_zvfbfwma(
+//       CHECK:   iree_codegen.inner_tiled
+//  CHECK-SAME:       intrinsic = MMA_GENERIC_SCALAR_1x1x1_REG16
+//   CHECK-NOT:       vlen

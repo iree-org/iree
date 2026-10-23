@@ -496,7 +496,9 @@ getIntrinsicMNKShape(MMAIntrinsic intrinsic, int64_t vlen) {
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32:
   case MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32:
-  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32: {
+  case MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16: {
     int64_t vl = vlen / 8;
     return isMNSwapped(intrinsic) ? Tuple{vl, 1, 1} : Tuple{1, vl, 1};
   }
@@ -768,6 +770,8 @@ std::tuple<Type, Type, Type> getABCElementTypes(MLIRContext *ctx,
     return {f16, f16, f16};
   case MMAIntrinsic::MMA_X86_AVX512BF16_1x16x2_F32_BF16:
   case MMAIntrinsic::MMA_X86_AVX512BF16_16x1x2_F32_BF16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16:
+  case MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16:
     return {bf16, bf16, f32};
   case MMAIntrinsic::MMA_X86_AVX512_1x16x2_I32_I16:
   case MMAIntrinsic::MMA_X86_AVX512VNNI_1x16x2_I32_I16:
@@ -1013,7 +1017,7 @@ static Value extractNxv8ToFixed(OpBuilder &b, Location loc, Value v,
   return vector::ScalableExtractOp::create(b, loc, fixedTy, v, /*pos=*/0);
 }
 
-// RVV `.vf` FMA (`vfmacc` / `vfwmacc`). Enum bit 0 selects which operand
+// RVV `.vf` FMA (`vfmacc` / `vfwmacc` / `vfwmaccbf16`). Enum bit 0 selects which operand
 // is the scalar (swapped => RHS). The vector operand is inserted into nxv8 so
 // 8 * vscale == vlen/8 lanes. ACC is left scalable when the caller already
 // legalized it (hoisted out of K). frm=7 is DYN; policy=1 is tail-agnostic.
@@ -1086,6 +1090,11 @@ static Value createCpuMmaIntrinsicCall(OpBuilder &builder, Location loc,
       intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACC_8VLsx1x1_F32_F16) {
     return lowerRiscvVFmaccLike(builder, loc, intrinsic, vlen, lhs, rhs, acc,
                                 "llvm.riscv.vfwmacc");
+  }
+  if (intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16) {
+    return lowerRiscvVFmaccLike(builder, loc, intrinsic, vlen, lhs, rhs, acc,
+                                "llvm.riscv.vfwmaccbf16");
   }
   // Sign-/float-extend a vector to a wider element type. Used by the
   // *_CASTF32 (f16 → f32) and *_CASTI16 (i8 → i16) variants where the
@@ -1388,6 +1397,8 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
       intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16 ||
       intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACC_1x8VLsx1_F32_F16 ||
       intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACC_8VLsx1x1_F32_F16 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_1x8VLsx1_F32_BF16 ||
+      intrinsic == MMAIntrinsic::MMA_RISCV_V_VFWMACCBF16_8VLsx1x1_F32_BF16 ||
       intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32 ||
       intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32 ||
       intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32 ||
