@@ -198,6 +198,9 @@ const char *getIreeArchNameForTargetTriple(llvm::Triple triple) {
   if (triple.isRISCV32()) {
     return "riscv_32";
   }
+  if (triple.isMIPS64()) {
+    return "mips_64";
+  }
   return "unknown";
 }
 

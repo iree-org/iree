@@ -196,6 +196,21 @@ function(iree_cc_test)
     )
     iree_configure_test(${_NAME_PATH})
     list(APPEND _ENVIRONMENT_VARS "QEMU_CPU_FLAGS=${RISCV_QEMU_CPU_FLAGS}")
+    elseif(IREE_ARCH STREQUAL "mips_64" AND
+         CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # The test target needs to run within the QEMU emulator for MIPS64 Linux
+    # crosscompile build or on-device.
+    add_test(
+      NAME
+        ${_NAME_PATH}
+      COMMAND
+       "${IREE_ROOT_DIR}/build_tools/cmake/run_mips_test.sh"
+        -L "${MIPS_SYSROOT}"
+        "$<TARGET_FILE:${_NAME}>"
+        ${_RULE_ARGS}
+    )
+    iree_configure_test(${_NAME_PATH})
+    list(APPEND _ENVIRONMENT_VARS "QEMU_CPU_FLAGS=${MIPS_QEMU_CPU_FLAGS}")
   elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "wasm32")
     # WASI: bundle the .wasm binary with JS companions and run via Node.js.
     # Uses _iree_wasm_setup_bundler for order-independent collection of JS
