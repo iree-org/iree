@@ -33,6 +33,7 @@ iree_cc_library(
     "ConvertToLoops.cpp"
     "DecomposeAggregatedOps.cpp"
     "DecomposeAttention.cpp"
+    "DecomposeGroupMmt4D.cpp"
     "DecomposeIm2col.cpp"
     "DecomposeMapStore.cpp"
     "DecomposeWinograd.cpp"
@@ -76,6 +77,8 @@ iree_cc_library(
     MLIRTransforms
     MLIRValueBoundsOpInterface
     MLIRVectorDialect
+    iree::compiler::Codegen::Dialect::CPU::IR::IREECPUDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Util::IR
