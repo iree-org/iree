@@ -6892,9 +6892,14 @@ transformation when reference floating-point semantics are required with
 or a zero <code>tensor.pad</code> whose padded dimensions do not index the scale and
 whose zero point is per-tensor, before <code>iree_linalg_ext.dequantize_affine</code>.
 These shape operations then run on quantized values. A consumer-side
-<code>linalg.transpose</code> is fused into the dequantize's output map instead. When
-a contraction consumes the result, the dequantize becomes its direct
-producer so the integer contraction rewrite can match it.</p>
+<code>linalg.transpose</code> is fused into the dequantize's output map instead. A
+<code>tensor.collapse_shape</code> of a dequantized value is absorbed by a consuming
+<code>linalg.transpose</code>, or by a contraction whose inputs are all dequantized,
+by expanding the consumer's iteration space; a blockwise matmul over
+collapsed <code>[M, G, L]</code> and <code>[N, G, L]</code> operands thus iterates over
+<code>(m, n, g, l)</code>. When a contraction consumes the result, the dequantize
+becomes its direct producer so the integer contraction rewrite can match
+it.</p>
 <h3 id="-iree-global-opt-propagate-linalg-transpose"><code>-iree-global-opt-propagate-linalg-transpose</code><a class="headerlink" href="#-iree-global-opt-propagate-linalg-transpose" title="Permanent link">link</a></h3>
 <p><em>Propagates linalg.transpose through a restricted set of ops.</em></p>
 <h4 id="options_3">Options<a class="headerlink" href="#options_3" title="Permanent link">link</a></h4>
