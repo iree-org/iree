@@ -411,3 +411,58 @@ func.func @per_tensor_f64_result(%input: !torch.vtensor<[4,8],si8>)
         -> !torch.vtensor<[4,8],f64>
   return %result : !torch.vtensor<[4,8],f64>
 }
+
+// -----
+
+// Exports store the zero points of symmetric weights as float zeros. They are
+// dropped like a None zero point.
+// CHECK: #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-LABEL: func.func @float_zero_point_zeros(
+// CHECK: iree_linalg_ext.dequantize_affine
+// CHECK-SAME: indexing_maps = [#map, #map1, #map]
+// CHECK-SAME: ins({{.*}} : tensor<4x2x4xi8>, tensor<4x2xf32>)
+func.func @float_zero_point_zeros(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
+  %zero_points = torch.vtensor.literal(dense<0.000000e+00> : tensor<4x2xf32>)
+      : !torch.vtensor<[4,2],f32>
+  %minimum = torch.constant.int -7
+  %maximum = torch.constant.int 7
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %out_dtype = torch.constant.int 6
+  %result = torch.quantized_decomposed.dequantize_per_channel_group
+      %input, %scales, %zero_points, %minimum, %maximum, %dtype, %group_size,
+      %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>,
+        !torch.vtensor<[4,2],f32>, !torch.int, !torch.int, !torch.int,
+        !torch.int, !torch.int -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
+
+// -----
+
+// LinalgExt zero points are integers, so other float zero points, such as the
+// fractional ones of HQQ, are left for the Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @nonzero_float_zero_point(
+// CHECK: torch.quantized_decomposed.dequantize_per_channel_group
+// CHECK-NOT: iree_linalg_ext.dequantize_affine
+func.func @nonzero_float_zero_point(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
+  %zero_points = torch.vtensor.literal(dense<5.000000e-01> : tensor<4x2xf32>)
+      : !torch.vtensor<[4,2],f32>
+  %minimum = torch.constant.int -8
+  %maximum = torch.constant.int 7
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %out_dtype = torch.constant.int 6
+  %result = torch.quantized_decomposed.dequantize_per_channel_group
+      %input, %scales, %zero_points, %minimum, %maximum, %dtype, %group_size,
+      %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>,
+        !torch.vtensor<[4,2],f32>, !torch.int, !torch.int, !torch.int,
+        !torch.int, !torch.int -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}

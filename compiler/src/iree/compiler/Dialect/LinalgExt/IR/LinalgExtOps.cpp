@@ -2638,36 +2638,6 @@ LogicalResult DequantizeAffineOp::verify() {
 
 namespace {
 
-/// True when every byte of `data` is zero.
-static bool isAllZeroBytes(ArrayRef<char> data) {
-  return llvm::all_of(data, [](char byte) { return byte == 0; });
-}
-
-/// True when `value` is a constant that is zero in every element.
-static bool isKnownZero(Value value) {
-  Attribute constant;
-  if (!matchPattern(value, m_Constant(&constant))) {
-    return false;
-  }
-  if (auto intAttr = dyn_cast<IntegerAttr>(constant)) {
-    return intAttr.getValue().isZero();
-  }
-  // A splat answers from its one stored element rather than scanning a
-  // blockwise operand that has an entry per block.
-  auto elements = dyn_cast<ElementsAttr>(constant);
-  if (elements && elements.isSplat()) {
-    return elements.getSplatValue<APInt>().isZero();
-  }
-  if (auto dense = dyn_cast<DenseElementsAttr>(constant)) {
-    return isAllZeroBytes(dense.getRawData());
-  }
-  if (auto resource = dyn_cast<DenseResourceElementsAttr>(constant)) {
-    const AsmResourceBlob *blob = resource.getRawHandle().getBlob();
-    return blob && isAllZeroBytes(blob->getData());
-  }
-  return false;
-}
-
 /// Drops a zero point that is known to be zero: the ops treat a missing zero
 /// point as symmetric, and adding or subtracting zero changes nothing, so the
 /// operand and its indexing map go away.
