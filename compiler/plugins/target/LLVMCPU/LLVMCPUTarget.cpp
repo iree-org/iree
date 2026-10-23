@@ -728,9 +728,17 @@ public:
     for (auto [index, attr] : llvm::enumerate(linkerObjectAttrs)) {
       auto objectAttr = cast<IREE::HAL::ExecutableObjectAttr>(attr);
       if (auto dataAttr = objectAttr.getData()) {
-        objectFiles.push_back(Artifact::createTemporary(
+        auto objectFile = Artifact::createTemporary(
             objectFiles.front().path + "_object_" + std::to_string(index),
-            llvm::sys::path::extension(objectAttr.getPath())));
+            llvm::sys::path::extension(objectAttr.getPath()));
+        auto &os = objectFile.outputFile->os();
+        if (failed(dataAttr.serializeToStream(variantOp.getLoc(),
+                                              llvm::endianness::native, os))) {
+          return variantOp.emitError()
+                 << "failed to write object file " << objectAttr.getPath();
+        }
+        objectFile.close();
+        objectFiles.push_back(std::move(objectFile));
       } else {
         auto absolutePath = objectAttr.getAbsolutePath();
         if (failed(absolutePath)) {
