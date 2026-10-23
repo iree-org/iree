@@ -72,3 +72,27 @@ func.func @dequantize(
         -> !torch.vtensor<[4,8],f32>
   return %result : !torch.vtensor<[4,8],f32>
 }
+
+// -----
+
+// The pipeline converts torchao quantization to LinalgExt before
+// Torch-to-Linalg would expand it into generic arithmetic.
+// CHECK-LABEL: util.func public @torchao_dequantize$async(
+// CHECK: iree_linalg_ext.dequantize_affine
+func.func @torchao_dequantize(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scale: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
+  %one = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %dtype = torch.constant.int 1
+  %out_dtype = torch.constant.int 6
+  %none = torch.constant.none
+  %block_size = torch.prim.ListConstruct %one, %group_size
+      : (!torch.int, !torch.int) -> !torch.list<int>
+  %result = torch.torchao.dequantize_affine
+      %input, %block_size, %scale, %none, %dtype, %none, %none, %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.list<int>, !torch.vtensor<[4,2],f32>,
+        !torch.none, !torch.int, !torch.none, !torch.none, !torch.int
+        -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
