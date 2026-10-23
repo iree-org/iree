@@ -867,7 +867,7 @@ SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
-  Value source = getOperand(0);
+  Value source = getInputs()[0];
   for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
     loopBounds[dim].offset = zero;
     loopBounds[dim].size = getDim(builder, loc, source, dim);
@@ -886,16 +886,27 @@ SortOp::getTiledImplementation(OpBuilder &builder,
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
   SmallVector<Operation *> slices;
-  SmallVector<Value> tiledOperands(getOutputs().size());
+  SmallVector<Value> tiledInputs(getInputs().size());
+  SmallVector<Value> tiledOutputs(getOutputs().size());
+  SmallVector<Value> tiledOperands;
+  tiledOperands.reserve(getInputs().size() + getOutputs().size());
+  for (auto [idx, input] : llvm::enumerate(getInputs())) {
+    Operation *slice =
+        getSlice(builder, getLoc(), input, offsets, sizes, strides);
+    tiledInputs[idx] = slice->getResult(0);
+    tiledOperands.push_back(tiledInputs[idx]);
+    slices.push_back(slice);
+  }
   for (auto [idx, output] : llvm::enumerate(getOutputs())) {
     Operation *slice =
         getSlice(builder, getLoc(), output, offsets, sizes, strides);
-    tiledOperands[idx] = slice->getResult(0);
+    tiledOutputs[idx] = slice->getResult(0);
+    tiledOperands.push_back(tiledOutputs[idx]);
     slices.push_back(slice);
   }
   SmallVector<Type, 4> resultTypes;
   if (getNumResults()) {
-    resultTypes = llvm::map_to_vector<4>(tiledOperands,
+    resultTypes = llvm::map_to_vector<4>(tiledOutputs,
                                          [&](Value v) { return v.getType(); });
   }
   Operation *tiledSortOp =
@@ -978,14 +989,32 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
   auto sortDim = getDimension();
   Value zero = arith::ConstantIndexOp::create(b, loc, 0);
   Value one = arith::ConstantIndexOp::create(b, loc, 1);
-  Value ub;
+  Value sortDimSize;
   if (getOperandType(0).isDynamicDim(sortDim)) {
-    ub = memref::DimOp::create(b, loc, getOperand(0), sortDim);
+    sortDimSize = memref::DimOp::create(b, loc, getInputs()[0], sortDim);
   } else {
-    ub = arith::ConstantIndexOp::create(b, loc,
-                                        getOperandType(0).getDimSize(sortDim));
+    sortDimSize = arith::ConstantIndexOp::create(
+        b, loc, getOperandType(0).getDimSize(sortDim));
   }
-  ub = arith::SubIOp::create(b, loc, ub, one);
+  SmallVector<Value> indices(ivs);
+  Value firstSortPass = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::eq,
+                                              indices[sortDim], zero);
+  scf::IfOp::create(b, loc, firstSortPass, [&](OpBuilder &b, Location loc) {
+    scf::ForOp::create(
+        b, loc, zero, sortDimSize, one, ValueRange{},
+        [&](OpBuilder &b, Location loc, Value iv, ValueRange iters) {
+          SmallVector<Value> indices(ivs);
+          indices[sortDim] = iv;
+          for (auto [input, output] :
+               llvm::zip_equal(getDpsInputs(), getDpsInits())) {
+            Value v = memref::LoadOp::create(b, loc, input, indices);
+            memref::StoreOp::create(b, loc, v, output, indices);
+          }
+          scf::YieldOp::create(b, loc);
+        });
+    scf::YieldOp::create(b, loc);
+  });
+  Value ub = arith::SubIOp::create(b, loc, sortDimSize, one);
   SmallVector<Value> compareOperands(getDpsInits().begin(),
                                      getDpsInits().end());
   emitBubbleSortSweep(b, loc, zero, one, ub, sortDim, ivs, compareOperands,
