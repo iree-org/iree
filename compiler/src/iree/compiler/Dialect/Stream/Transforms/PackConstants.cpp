@@ -263,23 +263,11 @@ static ParameterSlice getParameterSlice(Location loc, Attribute value,
                                         IndexSet &indexSet,
                                         OpBuilder &builder) {
   auto parameterAttr = cast<IREE::Stream::NamedParameterAttr>(value);
-  Value sourceOffset;
-  Value sourceLength;
-  if (auto configAttr = parameterAttr.getConfig()) {
-    if (auto offsetAttr = configAttr.getAs<IntegerAttr>("offset")) {
-      sourceOffset = i64Set.get(offsetAttr.getValue());
-    }
-    if (auto lengthAttr = configAttr.getAs<IntegerAttr>("length")) {
-      sourceLength = indexSet.get(lengthAttr.getInt());
-    }
-  }
-  if (!sourceOffset) {
-    sourceOffset = i64Set.get(0);
-  }
-  if (!sourceLength) {
-    sourceLength = indexSet.get(parameterAttr.getStorageSize());
-  }
-  return ParameterSlice{parameterAttr, sourceOffset, sourceLength};
+  return ParameterSlice{
+      parameterAttr,
+      i64Set.get(parameterAttr.getStorageOffset()),
+      indexSet.get(parameterAttr.getStorageSize()),
+  };
 }
 
 static Value buildParameterLoad(Value awaitTimepoint,

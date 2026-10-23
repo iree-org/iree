@@ -265,6 +265,10 @@ def Stream_NamedParameterAttr :
     (`,` $config^)?
     `>`
   }];
+  let extraClassDeclaration = [{
+    // Returns the byte offset of the parameter subrange within its storage.
+    int64_t getStorageOffset() const;
+  }];
 }
 
 #endif  // IREE_DIALECT_STREAM_ATTRS
