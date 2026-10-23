@@ -143,6 +143,14 @@ LogicalResult LayoutAttr::verifyEncoding(
 
 bool PackedStorageAttr::isSerialized() const { return true; }
 
+bool PackedStorageAttr::canDropWithoutTensorMaterialization() const {
+  return true;
+}
+
+bool PackedStorageAttr::canSkipBufferViewAssertions() const { return true; }
+
+bool PackedStorageAttr::isInvariantUnderDimCollapse() const { return true; }
+
 bool PackedStorageAttr::isCompatibleWith(
     IREE::Encoding::SerializableAttr other) const {
   // The packed_storage encodings is compatible with empty encodings, because it
