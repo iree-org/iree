@@ -13,8 +13,8 @@
 stream.executable private @deduplicateBindingsEx {
   stream.executable.export public @dispatch attributes {stream.resources = #noaliasConfig}
   builtin.module  {
-    // CHECK:  util.func public @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_C:.+]]: !stream.binding,
-    // CHECK-SAME:           %[[OFFSET_A:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OFFSET_C:.+]]: index, %[[OPERAND:.+]]: index)
+    // CHECK: util.func public @dispatch(%[[BINDING_A:.+]]: !stream.binding {stream.binding_noalias = [1 : i32]}, %[[BINDING_C:.+]]: !stream.binding {stream.binding_noalias = [0 : i32]},
+    // CHECK-SAME: %[[OFFSET_A:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OFFSET_C:.+]]: index, %[[OPERAND:.+]]: index)
      util.func public @dispatch(%binding_a: !stream.binding, %binding_b: !stream.binding, %binding_c: !stream.binding, %operand: index) {
       %c0 = arith.constant 0 : index
       %c20 = arith.constant 20 : index
