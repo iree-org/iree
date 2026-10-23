@@ -65,6 +65,7 @@
 enum iree_arch_enum_e {
   IREE_ARCH_ENUM_ARM_32,
   IREE_ARCH_ENUM_ARM_64,
+  IREE_ARCH_ENUM_MIPS_64,
   IREE_ARCH_ENUM_RISCV_32,
   IREE_ARCH_ENUM_RISCV_64,
   IREE_ARCH_ENUM_WASM_32,
@@ -95,6 +96,16 @@ enum iree_arch_enum_e {
 #define IREE_ARCH_RISCV_64 1
 #endif  // RISCV
 
+#if defined(__mips__) && defined(_MIPS_SIM) && (_MIPS_SIM == _ABI64)
+#define IREE_ARCH "mips_64"
+#define IREE_ARCH_ENUM IREE_ARCH_ENUM_MIPS_64
+#define IREE_ARCH_MIPS_64 1
+#elif defined(__mips__) && defined(_MIPS_SIM) && (_MIPS_SIM == _ABIN32)
+#error MIPS n32 ABI is not supported by IREE. Use the n64 ABI (-mabi=64).
+#elif defined(__mips__)
+#error 32-bit MIPS is not supported by IREE. Use mips64el with n64 ABI (-mabi=64).
+#endif  // MIPS
+
 #if defined(__wasm32__)
 #define IREE_ARCH "wasm_32"
 #define IREE_ARCH_ENUM IREE_ARCH_ENUM_WASM_32
@@ -117,10 +128,11 @@ enum iree_arch_enum_e {
 #define IREE_ARCH_X86_64 1
 #endif  // X86
 
-#if !defined(IREE_ARCH_ARM_32) && !defined(IREE_ARCH_ARM_64) &&     \
-    !defined(IREE_ARCH_RISCV_32) && !defined(IREE_ARCH_RISCV_64) && \
-    !defined(IREE_ARCH_WASM_32) && !defined(IREE_ARCH_WASM_64) &&   \
-    !defined(IREE_ARCH_X86_32) && !defined(IREE_ARCH_X86_64)
+#if !defined(IREE_ARCH_ARM_32) && !defined(IREE_ARCH_ARM_64) &&    \
+    !defined(IREE_ARCH_MIPS_64) && !defined(IREE_ARCH_RISCV_32) && \
+    !defined(IREE_ARCH_RISCV_64) && !defined(IREE_ARCH_WASM_32) && \
+    !defined(IREE_ARCH_WASM_64) && !defined(IREE_ARCH_X86_32) &&   \
+    !defined(IREE_ARCH_X86_64)
 #error Unknown architecture.
 #endif  // all archs
 
@@ -140,6 +152,11 @@ enum iree_arch_enum_e {
 #else
 #error IREE endian detection needs to be set up for your compiler
 #endif  // __BYTE_ORDER__
+
+#if defined(IREE_ARCH_MIPS_64) && defined(IREE_ENDIANNESS_BIG)
+#error Big-endian MIPS is not supported by IREE. Use a little-endian target
+#error (mips64el).
+#endif
 
 //==============================================================================
 // IREE_MEMORY_ACCESS_*
