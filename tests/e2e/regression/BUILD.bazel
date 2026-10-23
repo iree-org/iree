@@ -79,6 +79,19 @@ iree_check_single_backend_test_suite(
     target_backend = "llvm-cpu",
 )
 
+iree_check_single_backend_test_suite(
+    name = "check_executable_generalization_llvm-cpu",
+    srcs = [
+        "generalize_executables.mlir",
+    ],
+    compiler_flags = [
+        "--iree-flow-enable-executable-generalization",
+        "--iree-llvmcpu-target-cpu=generic",
+    ],
+    driver = "local-task",
+    target_backend = "llvm-cpu",
+)
+
 # TODO(22013): Merge the test suite into the main one, after the issue is fixed.
 iree_check_single_backend_test_suite(
     name = "check_regression_dynamic_gather_attention_llvm-cpu",
@@ -135,6 +148,18 @@ iree_check_single_backend_test_suite(
     name = "check_regression_vulkan-spirv",
     # TODO(#10024): Fix layernorm.mlir on Pixel 6 and put in BACKEND_TESTS.
     srcs = BACKEND_TESTS,
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_executable_generalization_vulkan-spirv",
+    srcs = [
+        "generalize_executables.mlir",
+    ],
+    compiler_flags = [
+        "--iree-flow-enable-executable-generalization",
+    ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
