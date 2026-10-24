@@ -63,3 +63,44 @@ util.func public @basic_arg_compare(%arg0: tensor<4096xf32>)
 
   util.return %res_val, %res_idx : tensor<f32>, tensor<i32>
 }
+
+// -----
+
+// CHECK-LABEL: @coupled_argmax(
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<1025x8xi32>
+util.func public @coupled_argmax(%arg0: tensor<1025x8xi32>)
+    -> (tensor<8xi32>, tensor<8xi64>) {
+  // The coupled value/index combiner is not supported by the generic partial
+  // reduction implementation, so the pipeline must leave the op unsplit and
+  // still form a dispatch.
+  // CHECK: flow.dispatch.workgroups
+  // CHECK: util.return
+  %min = arith.constant -2147483648 : i32
+  %last = arith.constant 9223372036854775807 : i64
+  %empty_values = tensor.empty() : tensor<8xi32>
+  %values = linalg.fill ins(%min : i32)
+      outs(%empty_values : tensor<8xi32>) -> tensor<8xi32>
+  %empty_indices = tensor.empty() : tensor<8xi64>
+  %indices = linalg.fill ins(%last : i64)
+      outs(%empty_indices : tensor<8xi64>) -> tensor<8xi64>
+  %result:2 = linalg.generic {
+      indexing_maps = [affine_map<(r, c) -> (r, c)>,
+                       affine_map<(r, c) -> (c)>,
+                       affine_map<(r, c) -> (c)>],
+      iterator_types = ["reduction", "parallel"]
+  } ins(%arg0 : tensor<1025x8xi32>)
+    outs(%values, %indices : tensor<8xi32>, tensor<8xi64>) {
+  ^bb0(%incoming: i32, %best: i32, %best_index: i64):
+    %r = linalg.index 0 : index
+    %index = arith.index_cast %r : index to i64
+    %maximum = arith.maxsi %incoming, %best : i32
+    %greater = arith.cmpi sgt, %incoming, %best : i32
+    %equal = arith.cmpi eq, %incoming, %best : i32
+    %earlier = arith.cmpi slt, %index, %best_index : i64
+    %tie = arith.andi %equal, %earlier : i1
+    %take = arith.ori %greater, %tie : i1
+    %selected = arith.select %take, %index, %best_index : i64
+    linalg.yield %maximum, %selected : i32, i64
+  } -> (tensor<8xi32>, tensor<8xi64>)
+  util.return %result#0, %result#1 : tensor<8xi32>, tensor<8xi64>
+}
