@@ -1057,3 +1057,18 @@ util.func public @dontFoldTensorEncodeDifferentEncoding(%arg0: tensor<4x4xf32>) 
   %0 = flow.tensor.encode %arg0 : tensor<4x4xf32> -> tensor<4x4xf32, #encoding>
   util.return %0 : tensor<4x4xf32, #encoding>
 }
+
+// -----
+
+// A barrier keeps its operand's shape: the dim reads the empty tensor's size.
+
+// CHECK-LABEL: @dimThroughBarrier
+//  CHECK-SAME: (%[[ROWS:.+]]: index)
+util.func public @dimThroughBarrier(%rows: index) -> index {
+  %c0 = arith.constant 0 : index
+  %empty = flow.tensor.empty : tensor<?x4xf32>{%rows}
+  %hidden = util.optimization_barrier %empty : tensor<?x4xf32>
+  %dim = tensor.dim %hidden, %c0 : tensor<?x4xf32>
+  // CHECK: util.return %[[ROWS]]
+  util.return %dim : index
+}

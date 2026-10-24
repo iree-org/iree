@@ -301,6 +301,20 @@ std::optional<SizeProduct> factorSize(Value value, int depth,
       }
       return truncateSize(*input, *width, value);
     }
+    if (auto assume = value.getDefiningOp<IREE::Util::AssumeIntOp>()) {
+      unsigned index = cast<OpResult>(value).getResultNumber();
+      std::optional<SizeProduct> input =
+          factorSize(assume.getOperand(index), depth - 1, budget);
+      auto [umin, umax] = assume.getUnionedUnsignedRange(index);
+      if (input && input->constant == 1 && input->offset == 0 &&
+          input->symbols.size() == 1) {
+        if (umin && *umin >= 1) {
+          input->symbols.front().positive = true;
+        }
+        input->symbols.front().umax = umax;
+      }
+      return input;
+    }
     // Element `i` of a 0-d or 1-d size vector, as shape reification builds.
     if (auto extract = value.getDefiningOp<tensor::ExtractOp>()) {
       std::optional<int64_t> index = 0;

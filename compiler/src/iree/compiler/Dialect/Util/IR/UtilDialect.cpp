@@ -158,9 +158,17 @@ struct FoldDimOp : OpRewritePattern<DimOp> {
   LogicalResult matchAndRewrite(DimOp op,
                                 PatternRewriter &rewriter) const override {
     Value source = op.getSource();
-    while (auto assumeAlignmentOp =
-               source.getDefiningOp<memref::AssumeAlignmentOp>()) {
-      source = assumeAlignmentOp.getViewSource();
+    // Alignment assumptions and barriers keep their operand's shape.
+    while (true) {
+      if (auto assumeAlignmentOp =
+              source.getDefiningOp<memref::AssumeAlignmentOp>()) {
+        source = assumeAlignmentOp.getViewSource();
+      } else if (auto barrierOp =
+                     source.getDefiningOp<OptimizationBarrierOp>()) {
+        source = barrierOp.getOperand(cast<OpResult>(source).getResultNumber());
+      } else {
+        break;
+      }
     }
     auto shapeAwareOp =
         dyn_cast_if_present<ShapeAwareOpInterface>(source.getDefiningOp());

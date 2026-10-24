@@ -128,6 +128,23 @@ def LLVMCPUPeelPass :
   let summary = "Pass to perform peeling on non-distributed loops.";
 }
 
+def LLVMCPUPropagateDispatchStatusPass :
+    Pass<"iree-llvmcpu-propagate-dispatch-status", "ModuleOp"> {
+  let summary =
+      "Returns util.status.check_ok failures through the dispatch status result";
+  let description = [{
+    Functions holding a status check, and their callers within the executable,
+    gain an i32 status result. Each check becomes an early return of its status;
+    each call checks the callee's status. Public entry points that return a
+    status are marked `iree.returns_status` for the dispatch ABI.
+  }];
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::cf::ControlFlowDialect",
+    "::mlir::ub::UBDialect",
+  ];
+}
+
 def LLVMCPUSelectLoweringStrategyPass :
     Pass<"iree-llvmcpu-select-lowering-strategy", "ModuleOp"> {
   let summary =

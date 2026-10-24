@@ -1107,6 +1107,12 @@ struct ScatterToDynamicUpdateSlice final
       return rewriter.notifyMatchFailure(op, "unexpected update computation");
     }
     Block &block = region.front();
+    // Replacing the scatter removes its region, so any other operation could
+    // lose effects even when the terminator returns the update unchanged.
+    if (!llvm::hasSingleElement(block)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "not a plain overwrite computation");
+    }
     auto retOp = dyn_cast<mlir::stablehlo::ReturnOp>(block.getTerminator());
     if (!retOp || retOp.getNumOperands() != 1 ||
         retOp.getOperand(0) != block.getArgument(1)) {

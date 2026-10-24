@@ -64,6 +64,7 @@ iree_cc_library(
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUMmt4dVectorLowering.cpp"
     "LLVMCPUPeel.cpp"
+    "LLVMCPUPropagateDispatchStatus.cpp"
     "LLVMCPUSelectLoweringStrategy.cpp"
     "LLVMCPUSelectUKernels.cpp"
     "LLVMCPUSplitReduction.cpp"
