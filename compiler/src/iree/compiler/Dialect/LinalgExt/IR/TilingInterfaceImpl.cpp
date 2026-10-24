@@ -3361,7 +3361,6 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   }
 
   SmallVector<Type> resultTypes;
-  // Buffer-semantics ops write to their destinations and have no results.
   if (hasPureTensorSemantics()) {
     resultTypes.push_back(tiledOperands[tiledOperands.size() - 3].getType());
     resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());
