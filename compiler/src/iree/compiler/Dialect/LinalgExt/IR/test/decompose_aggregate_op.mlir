@@ -383,8 +383,13 @@ func.func @online_attention_f8_masked(%query: tensor<192x1024x64xf8E4M3FNUZ>,
 // S = S * scale
 // CHECK:   linalg.generic
 // CHECK:   arith.mulf
-// S = S + mask
-// CHECK:   arith.addf
+// S = mask == -inf ? -inf : S + mask
+// CHECK:   linalg.generic
+// CHECK:     arith.extf %{{.+}} : f8E4M3FNUZ to f32
+// CHECK:     arith.cmpf oeq
+// CHECK:     arith.addf
+// CHECK:     arith.select
+// CHECK:     linalg.yield
 // newMax = max(oldMax, rowMax(S))
 // CHECK: linalg.generic
 // CHECK:   arith.maximumf
@@ -407,6 +412,54 @@ func.func @online_attention_f8_masked(%query: tensor<192x1024x64xf8E4M3FNUZ>,
 // CHECK: linalg.generic
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
+
+// -----
+
+// Spec to decompose online attention op.
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.online_attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.decompose_aggregate_op %0 : (!transform.any_op) -> ()
+    transform.yield
+  }
+}
+
+#mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
+#mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
+#mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
+#mapS = affine_map<(batch, m, k1, k2, n) -> ()>
+#mapM = affine_map<(batch, m, k1, k2, n) -> (batch, m, k2)>
+#mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
+#mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
+
+func.func @online_attention_bool_mask(%query: tensor<2x3x4xf32>,
+                              %key: tensor<2x5x4xf32>,
+                              %value: tensor<2x5x6xf32>,
+                              %mask: tensor<2x3x5xi1>,
+                              %output: tensor<2x3x6xf32>,
+                              %max: tensor<2x3xf32>,
+                              %sum: tensor<2x3xf32>)
+                              -> (tensor<2x3x6xf32>, tensor<2x3xf32>, tensor<2x3xf32>) {
+  %scale = arith.constant 0.5 : f32
+
+  %out:3 = iree_linalg_ext.online_attention
+        < indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR] >
+        ins(%query, %key, %value, %scale, %mask : tensor<2x3x4xf32>, tensor<2x5x4xf32>, tensor<2x5x6xf32>, f32, tensor<2x3x5xi1>)
+        outs(%output, %max, %sum : tensor<2x3x6xf32>, tensor<2x3xf32>, tensor<2x3xf32>) {
+                      ^bb0(%score: f32):
+                        iree_linalg_ext.yield %score: f32
+                     }
+        -> tensor<2x3x6xf32>, tensor<2x3xf32>, tensor<2x3xf32>
+
+  return %out#0, %out#1, %out#2 : tensor<2x3x6xf32>, tensor<2x3xf32>, tensor<2x3xf32>
+}
+// CHECK-LABEL: @online_attention_bool_mask
+// CHECK-DAG:   %[[NEGINF:.+]] = arith.constant 0xFF800000 : f32
+// S = mask ? S : -inf
+// CHECK:       linalg.generic
+// CHECK:       ^bb0(%[[M:.+]]: i1, %[[S:.+]]: f32):
+// CHECK-NEXT:    %[[SEL:.+]] = arith.select %[[M]], %[[S]], %[[NEGINF]] : f32
+// CHECK-NEXT:    linalg.yield %[[SEL]] : f32
 
 // -----
 

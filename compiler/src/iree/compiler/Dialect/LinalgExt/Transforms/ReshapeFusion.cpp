@@ -11,7 +11,9 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
@@ -174,6 +176,9 @@ public:
   unsigned getExpandedNumLoops() const { return expandedOpNumDims; }
   ReassociationIndicesRef getExpandedLoops(unsigned i) const {
     return loopReassoc[i];
+  }
+  ArrayRef<DimSize> getExpandedShape(unsigned i) const {
+    return loopShapeMap[i];
   }
 
 private:
@@ -354,6 +359,17 @@ CollapsingInfo::initialize(unsigned origNumLoops,
   return success();
 }
 
+template <typename AttentionOpTy>
+static AffineMap getScoreMap(AttentionOpTy op) {
+  FailureOr<AttentionOpDetail> opInfo = AttentionOpDetail::get(
+      op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap());
+  assert(succeeded(opInfo) && "attention maps were verified");
+  return opInfo->getSMap();
+}
+
+/// Builds an index of the new op's iteration dim.
+using NewIndexFn = function_ref<Value(unsigned)>;
+
 /// Derives the reshape info of an op that states an indexing map for every
 /// operand, where each map is a projected permutation.
 template <typename OpTy>
@@ -530,6 +546,20 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(op);
 
+  // Sizes of the expanded loops, for linearising region indices; they must
+  // dominate the new op.
+  SmallVector<SmallVector<OpFoldResult>> expandedLoopSizes;
+  if constexpr (std::is_same_v<OpTy, AttentionOp> ||
+                std::is_same_v<OpTy, OnlineAttentionOp>) {
+    if (!op.getBody()->template getOps<IndexOp>().empty()) {
+      for (unsigned i = 0, e = info.getOrigNumLoops(); i < e; ++i) {
+        expandedLoopSizes.push_back(llvm::map_to_vector(
+            info.getExpandedShape(i),
+            [&](const DimSize &size) { return size.materialize(rewriter); }));
+      }
+    }
+  }
+
   IRMapping mapping;
   for (OpOperand &operand : op->getOpOperands()) {
     std::optional<Value> maybeNewOperand =
@@ -553,6 +583,22 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
         }));
     newOp.setIndexingMapsAttr(
         rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps));
+    if constexpr (std::is_same_v<OpTy, AttentionOp> ||
+                  std::is_same_v<OpTy, OnlineAttentionOp>) {
+      remapAttentionScoreIndices(
+          rewriter, newOp.getBody(), getScoreMap(op), getScoreMap(newOp),
+          [&](OpBuilder &b, Location loc, unsigned oldDim,
+              NewIndexFn newIndex) -> Value {
+            ReassociationIndicesRef loops = info.getExpandedLoops(oldDim);
+            if (loops.size() == 1) {
+              return newIndex(loops.front());
+            }
+            SmallVector<Value> indices = llvm::map_to_vector(
+                loops, [&](int64_t loop) { return newIndex(loop); });
+            return affine::AffineLinearizeIndexOp::create(
+                b, loc, indices, expandedLoopSizes[oldDim], /*disjoint=*/true);
+          });
+    }
   }
 
   SmallVector<Value> replacements;
@@ -1108,6 +1154,12 @@ static Operation *createCollapsedOp(AttentionOpTy origOp,
       llvm::map_range(origOp.getIndexingMapsArray(), [&](AffineMap map) {
         return getCollapsedOpIndexingMap(map, collapsingInfo);
       }));
+  // Sizes of the original loops, for delinearising region indices.
+  SmallVector<OpFoldResult> loopSizes;
+  if (!origOp.getBody()->template getOps<IndexOp>().empty()) {
+    loopSizes = llvm::map_to_vector(origOp.getIterationDomain(rewriter),
+                                    [](Range range) { return range.size; });
+  }
 
   auto collapsedOp = AttentionOpTy::create(
       rewriter, origOp.getLoc(), resultTypes, inputOperands, outputOperands,
@@ -1116,6 +1168,24 @@ static Operation *createCollapsedOp(AttentionOpTy origOp,
   collapsedOp->setDiscardableAttrs(origOp->getDiscardableAttrDictionary());
   rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),
                               collapsedOp.getRegion().begin());
+  remapAttentionScoreIndices(
+      rewriter, collapsedOp.getBody(), getScoreMap(origOp),
+      getScoreMap(collapsedOp),
+      [&](OpBuilder &b, Location loc, unsigned oldDim,
+          NewIndexFn newIndex) -> Value {
+        auto [newDim, position] =
+            collapsingInfo.getOrigOpToCollapsedOpMapping()[oldDim];
+        ReassociationIndicesRef group =
+            collapsingInfo.getCollapsedOpToOrigOpMapping()[newDim];
+        if (group.size() == 1) {
+          return newIndex(newDim);
+        }
+        SmallVector<OpFoldResult> basis = llvm::map_to_vector(
+            group, [&](int64_t loop) { return loopSizes[loop]; });
+        return affine::AffineDelinearizeIndexOp::create(b, loc,
+                                                        newIndex(newDim), basis)
+            .getResult(position);
+      });
   return collapsedOp;
 }
 
@@ -1214,27 +1284,6 @@ SmallVector<unsigned> defaultControlDropUnitDims(Operation *op) {
   return llvm::to_vector(llvm::seq<unsigned>(0, fusionOp.getNumLoops()));
 }
 
-static void
-replaceUnitDimIndexOps(Block *body,
-                       const llvm::SmallDenseSet<unsigned> &unitDims,
-                       RewriterBase &rewriter) {
-  for (IndexOp indexOp : llvm::make_early_inc_range(body->getOps<IndexOp>())) {
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPoint(indexOp);
-    if (unitDims.contains(indexOp.getDim())) {
-      rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(indexOp, 0);
-      continue;
-    }
-
-    unsigned droppedDimsBefore = llvm::count_if(
-        unitDims, [&](unsigned dim) { return dim < indexOp.getDim(); });
-    if (droppedDimsBefore != 0) {
-      rewriter.replaceOpWithNewOp<IndexOp>(indexOp, indexOp.getDim() -
-                                                        droppedDimsBefore);
-    }
-  }
-}
-
 /// Drops unit dims from an op that states an indexing map for every operand,
 /// by cloning it with the reduced operands and maps that `linalg::dropUnitDims`
 /// computes. Ops carrying a body additionally need their `linalg.index` uses
@@ -1269,7 +1318,18 @@ struct DropMappedOperandsUnitDims final : OpRewritePattern<OpTy> {
       if constexpr (std::is_same_v<OpTy, AttentionOp> ||
                     std::is_same_v<OpTy, OnlineAttentionOp>) {
         IRRewriter rewriter(b);
-        replaceUnitDimIndexOps(newOp.getBody(), droppedDims, rewriter);
+        remapAttentionScoreIndices(
+            rewriter, newOp.getBody(), getScoreMap(op), getScoreMap(newOp),
+            [&](OpBuilder &b, Location loc, unsigned oldDim,
+                NewIndexFn newIndex) -> Value {
+              if (droppedDims.contains(oldDim)) {
+                return arith::ConstantIndexOp::create(b, loc, 0);
+              }
+              return newIndex(oldDim -
+                              llvm::count_if(droppedDims, [&](unsigned dim) {
+                                return dim < oldDim;
+                              }));
+            });
       }
       return newOp;
     };
