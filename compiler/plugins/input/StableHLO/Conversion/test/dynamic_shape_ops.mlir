@@ -302,7 +302,6 @@ func.func @dynamic_broadcast_undecidable(%a: tensor<?xf32>, %s: tensor<2xi64>) -
 }
 
 
-
 // -----
 
 // Two unknown dimensions use runtime expansion checks; the static 1 expands
@@ -321,7 +320,6 @@ func.func @dynamic_broadcast_mixed_permuted(%a: tensor<?x1x?xf32>, %s: tensor<4x
 }
 
 
-
 // -----
 
 // A partial annotation leaves one dynamic dimension for the runtime path.
@@ -336,7 +334,6 @@ func.func @dynamic_broadcast_partial_annotation(%a: tensor<?x?xf32>, %s: tensor<
   %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [0, 1] {known_nonexpanding_dimensions = array<i64: 0>} : (tensor<?x?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
   return %r : tensor<?x?xf32>
 }
-
 
 
 // -----
@@ -357,7 +354,6 @@ func.func @dynamic_broadcast_truncated_size(%a: tensor<?x3xf32>, %n: index) -> t
   %r = stablehlo.dynamic_broadcast_in_dim %tied, %shape, dims = [0, 1] : (tensor<?x3xf32>, tensor<2xi64>) -> tensor<?x3xf32>
   return %r : tensor<?x3xf32>
 }
-
 
 
 // -----
@@ -407,7 +403,6 @@ func.func @dynamic_broadcast_squaring_chain(%a: tensor<?x2xf32>, %n: tensor<i32>
 }
 
 
-
 // -----
 
 // A fully known expansion stays on the upstream affine-indexing path.
@@ -422,7 +417,6 @@ func.func @dynamic_broadcast_known_expanding(%a: tensor<?xf32>, %s: tensor<2xi64
   %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [1] {known_expanding_dimensions = array<i64: 0>} : (tensor<?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
   return %r : tensor<?x?xf32>
 }
-
 
 
 // -----
@@ -451,7 +445,6 @@ func.func @dynamic_broadcast_inferred_nonexpanding(%a: tensor<?x?xf32>, %n: inde
 }
 
 
-
 // -----
 
 // Without an upper bound on s, s + 1 truncated to i32 may wrap to a size of
@@ -476,7 +469,6 @@ func.func @dynamic_broadcast_unbounded_sum(%cache: tensor<2x?x16xf32>, %row: ten
 }
 
 
-
 // -----
 
 // An i32 product of x and y may wrap: 641 * 6700417 = 2^32 + 1 gives one row,
@@ -499,7 +491,6 @@ func.func @dynamic_broadcast_wrapped_product(%a: tensor<?x3xf32>, %x: i32, %y: i
 }
 
 
-
 // -----
 
 // Runtime slice sizes determine the offset dimensions of the result.
@@ -520,7 +511,6 @@ func.func @dynamic_gather_dynamic_result(%a: tensor<3x4x2xi32>, %i: tensor<2x3x2
 }
 
 
-
 // -----
 
 // Batching uses the result batch index, while the index vector follows the
@@ -539,7 +529,6 @@ func.func @dynamic_gather_batching(%a: tensor<3x8x5xi32>, %i: tensor<3x7x1xi64>,
 }
 
 
-
 // -----
 
 // index_vector_dim=0 and batching dim 1 use batch index 0 after removing the
@@ -555,7 +544,6 @@ func.func @dynamic_gather_leading_index_vector(%a: tensor<3x8xi32>, %i: tensor<1
   } : (tensor<3x8xi32>, tensor<1x3x2xi64>, tensor<2xi64>) -> tensor<3x2xi32>
   return %r : tensor<3x2xi32>
 }
-
 
 
 // -----
@@ -576,7 +564,6 @@ func.func @dynamic_gather_narrow_indices(%a: tensor<256x1xi32>, %i: tensor<2x1xi
 }
 
 
-
 // -----
 
 // Unsigned full-width indices clamp in their unsigned type before conversion
@@ -592,7 +579,6 @@ func.func @dynamic_gather_unsigned_indices(%a: tensor<5x1xi32>, %i: tensor<2x1xu
   } : (tensor<5x1xi32>, tensor<2x1xui64>, tensor<2xi64>) -> tensor<2x1xi32>
   return %r : tensor<2x1xi32>
 }
-
 
 
 // -----
@@ -667,4 +653,136 @@ func.func @gather_unsigned_dynamic_operand(%a: tensor<?x4xi32>, %i: tensor<2x1xu
     slice_sizes = array<i64: 1, 4>
   } : (tensor<?x4xi32>, tensor<2x1xui64>) -> tensor<2x4xi32>
   return %r : tensor<2x4xi32>
+}
+
+// -----
+
+// Dynamic output dimensions use the dynamic input's runtime extent.
+// CHECK-LABEL: @dynamic_reduce_window_strided
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?xi32>
+// CHECK: tensor.dim %[[ARG0]], %c0
+// CHECK: linalg.generic
+// CHECK: arith.addi
+// CHECK: return %{{.+}} : tensor<?xi32>
+func.func @dynamic_reduce_window_strided(%a: tensor<?xi32>, %init: tensor<i32>) -> tensor<?xi32> {
+  %r = "stablehlo.reduce_window"(%a, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    "stablehlo.return"(%sum) : (tensor<i32>) -> ()
+  }) {window_dimensions = array<i64: 2>, window_strides = array<i64: 2>} : (tensor<?xi32>, tensor<i32>) -> tensor<?xi32>
+  return %r : tensor<?xi32>
+}
+
+
+// -----
+
+// A window larger than the runtime input has a zero-sized result.
+// CHECK-LABEL: @dynamic_reduce_window_empty
+// CHECK: arith.cmpi sge
+// CHECK: arith.select
+// CHECK: linalg.generic
+func.func @dynamic_reduce_window_empty(%a: tensor<?xi32>, %init: tensor<i32>) -> tensor<?xi32> {
+  %r = "stablehlo.reduce_window"(%a, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    "stablehlo.return"(%sum) : (tensor<i32>) -> ()
+  }) {window_dimensions = array<i64: 3>} : (tensor<?xi32>, tensor<i32>) -> tensor<?xi32>
+  return %r : tensor<?xi32>
+}
+
+
+// -----
+
+// Padding and base dilation affect the runtime output extent and values.
+// CHECK-LABEL: @dynamic_reduce_window_pad_base_dilation
+// CHECK: tensor.insert_slice %[[ARG0:.+]] into %{{.+}}[1] [%{{.+}}] [2] : tensor<?xi32> into tensor<?xi32>
+// CHECK: arith.cmpi sge
+// CHECK: linalg.generic
+func.func @dynamic_reduce_window_pad_base_dilation(%a: tensor<?xi32>, %init: tensor<i32>) -> tensor<?xi32> {
+  %r = "stablehlo.reduce_window"(%a, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    "stablehlo.return"(%sum) : (tensor<i32>) -> ()
+  }) {window_dimensions = array<i64: 3>, window_strides = array<i64: 2>, base_dilations = array<i64: 2>, padding = dense<[[1, 1]]> : tensor<1x2xi64>} : (tensor<?xi32>, tensor<i32>) -> tensor<?xi32>
+  return %r : tensor<?xi32>
+}
+
+
+// -----
+
+// Window dilation changes the effective window size in the shape formula.
+// CHECK-LABEL: @dynamic_reduce_window_window_dilation
+// CHECK: linalg.generic
+// CHECK: return %{{.+}} : tensor<?xi32>
+func.func @dynamic_reduce_window_window_dilation(%a: tensor<?xi32>, %init: tensor<i32>) -> tensor<?xi32> {
+  %r = "stablehlo.reduce_window"(%a, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    "stablehlo.return"(%sum) : (tensor<i32>) -> ()
+  }) {window_dimensions = array<i64: 2>, window_strides = array<i64: 1>, window_dilations = array<i64: 2>} : (tensor<?xi32>, tensor<i32>) -> tensor<?xi32>
+  return %r : tensor<?xi32>
+}
+
+
+// -----
+
+// Multi-result lowering shares one generic iteration space while preserving
+// each result's reducer and initial value.
+// CHECK-LABEL: @dynamic_reduce_window_multi_result
+// CHECK: linalg.generic
+// CHECK: arith.addi
+// CHECK: arith.subi
+func.func @dynamic_reduce_window_multi_result(%a: tensor<?xi32>, %b: tensor<?xi32>, %init0: tensor<i32>, %init1: tensor<i32>) -> (tensor<?xi32>, tensor<?xi32>) {
+  %r:2 = "stablehlo.reduce_window"(%a, %b, %init0, %init1) ({
+  ^bb0(%lhs0: tensor<i32>, %lhs1: tensor<i32>, %rhs0: tensor<i32>, %rhs1: tensor<i32>):
+    %sum = stablehlo.add %lhs0, %rhs0 : tensor<i32>
+    %difference = stablehlo.subtract %lhs1, %rhs1 : tensor<i32>
+    "stablehlo.return"(%sum, %difference) : (tensor<i32>, tensor<i32>) -> ()
+  }) {window_dimensions = array<i64: 1>} : (tensor<?xi32>, tensor<?xi32>, tensor<i32>, tensor<i32>) -> (tensor<?xi32>, tensor<?xi32>)
+  return %r#0, %r#1 : tensor<?xi32>, tensor<?xi32>
+}
+
+
+// -----
+
+// Per-dim window, stride and padding: only the dynamic dim takes the runtime
+// output formula.
+// CHECK-LABEL: @dynamic_reduce_window_rank2
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x7xi32>
+// CHECK: %[[PADDED:.+]] = tensor.pad %[[ARG0]] low[1, 0] high[2, 3]
+// CHECK: } : tensor<?x7xi32> to tensor<?x10xi32>
+// CHECK: %[[DIM:.+]] = tensor.dim %[[PADDED]], %c0 : tensor<?x10xi32>
+// CHECK: %[[SPAN:.+]] = arith.subi %[[DIM]], %c3 : index
+// CHECK: %[[QUOTIENT:.+]] = arith.divsi %[[SPAN]], %c2 : index
+// CHECK: tensor.empty(%{{.+}}) : tensor<?x9xi32>
+// CHECK: linalg.generic
+// CHECK-SAME: ins(%[[PADDED]], %{{.+}} : tensor<?x10xi32>, tensor<3x2xi32>)
+// CHECK: return %{{.+}} : tensor<?x9xi32>
+func.func @dynamic_reduce_window_rank2(%a: tensor<?x7xi32>, %init: tensor<i32>) -> tensor<?x9xi32> {
+  %r = "stablehlo.reduce_window"(%a, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    "stablehlo.return"(%sum) : (tensor<i32>) -> ()
+  }) {window_dimensions = array<i64: 3, 2>, window_strides = array<i64: 2, 1>, padding = dense<[[1, 2], [0, 3]]> : tensor<2x2xi64>} : (tensor<?x7xi32>, tensor<i32>) -> tensor<?x9xi32>
+  return %r : tensor<?x9xi32>
+}
+
+
+// -----
+
+// A dynamic batch keeps the named pooling op; only spatial dims need be static.
+// CHECK-LABEL: func.func @dynamic_batch_max_pool
+// CHECK: linalg.pooling_nhwc_max
+// CHECK-SAME: strides = dense<[2, 3]> : vector<2xi64>
+// CHECK-SAME: ins(%{{.+}}, %{{.+}} : tensor<?x13x11x5xf32>, tensor<3x2xf32>)
+func.func @dynamic_batch_max_pool(%input: tensor<?x13x11x5xf32>) -> tensor<?x6x4x5xf32> {
+  %init = stablehlo.constant dense<0xFF800000> : tensor<f32>
+  %0 = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%a: tensor<f32>, %b: tensor<f32>):
+    %max = stablehlo.maximum %a, %b : tensor<f32>
+    stablehlo.return %max : tensor<f32>
+  }) {window_dimensions = array<i64: 1, 3, 2, 1>,
+      window_strides = array<i64: 1, 2, 3, 1>}
+    : (tensor<?x13x11x5xf32>, tensor<f32>) -> tensor<?x6x4x5xf32>
+  return %0 : tensor<?x6x4x5xf32>
 }
