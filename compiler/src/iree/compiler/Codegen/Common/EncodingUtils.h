@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -114,6 +115,13 @@ void populateMaterializeEncodingPatterns(
 void populateLoadStoreMaterializeEncodingPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter);
+
+/// Returns true if encodings resolved for `targetAttr` can be materialized in
+/// host code, before dispatch creation, into data-tiled ops that the target's
+/// default codegen handles. This holds for LLVM CPU targets on x86_64 and
+/// AArch64 that use the CPU encoding resolver without inner-tiled layouts.
+bool isHostEncodingMaterializationSupported(
+    IREE::HAL::ExecutableTargetAttr targetAttr);
 
 } // namespace mlir::iree_compiler
 
