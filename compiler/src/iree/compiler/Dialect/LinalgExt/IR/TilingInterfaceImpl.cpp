@@ -3361,9 +3361,12 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   }
 
   SmallVector<Type> resultTypes;
-  resultTypes.push_back(tiledOperands[tiledOperands.size() - 3].getType());
-  resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());
-  resultTypes.push_back(tiledOperands[tiledOperands.size() - 1].getType());
+  // Buffer-semantics ops write to their destinations and have no results.
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(tiledOperands[tiledOperands.size() - 3].getType());
+    resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());
+    resultTypes.push_back(tiledOperands[tiledOperands.size() - 1].getType());
+  }
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
