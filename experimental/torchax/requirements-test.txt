@@ -1,0 +1,6 @@
+# Versions used for the stateless export and symbolic attention tests.
+torch==2.14.1
+torchax==0.0.14.dev20261007
+jax==0.12.0.dev20261016
+jaxlib==0.12.0.dev20261016
+numpy==2.5.3
