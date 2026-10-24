@@ -512,6 +512,36 @@ TEST_P(BufferMappingTest, MapRangeWrite) {
   iree_hal_buffer_release(buffer);
 }
 
+TEST_P(BufferMappingTest, MapRangeMultipleMappings) {
+  iree_hal_buffer_params_t params = {0};
+  params.type =
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  params.usage =
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED;
+  Ref<iree_hal_buffer_t> buffer;
+  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(device_allocator_, params,
+                                                    32, buffer.out()));
+
+  iree_hal_buffer_mapping_t mappings[3] = {};
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                           IREE_HAL_MEMORY_ACCESS_WRITE, 0, 32,
+                                           &mappings[0]));
+  std::memset(mappings[0].contents.data, 0x12, 32);
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                           IREE_HAL_MEMORY_ACCESS_READ, 0, 16,
+                                           &mappings[1]));
+  EXPECT_EQ(mappings[1].contents.data[0], 0x12);
+  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mappings[0]));
+  EXPECT_EQ(mappings[1].contents.data[0], 0x12);
+
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                           IREE_HAL_MEMORY_ACCESS_WRITE, 16, 16,
+                                           &mappings[2]));
+  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mappings[1]));
+  std::memset(mappings[2].contents.data, 0x34, 16);
+  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mappings[2]));
+}
+
 CTS_REGISTER_TEST_SUITE(BufferMappingTest);
 
 }  // namespace iree::hal::cts
