@@ -429,17 +429,6 @@ iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     "-pdbpagesize:32768"
 )
 
-# Link options for executables that run the compiler pipelines in-process.
-# Windows reserves only 1 MB of stack by default, which is not enough for some
-# compiler paths (e.g. the TOSA profile compliance table initialization in
-# TosaValidation). Reserve 10 MB like LLVM does for its own tools.
-# Keep in sync with IREE_COMPILER_TOOL_LINKOPTS in
-# build_tools/bazel/build_defs.oss.bzl.
-iree_select_compiler_opts(IREE_COMPILER_TOOL_LINKOPTS
-  MSVC_OR_CLANG_CL
-    "LINKER:/STACK:10000000"
-)
-
 if(EMSCRIPTEN AND IREE_EXTERNAL_WEBGPU_HAL_DRIVER_FOUND)
   iree_select_compiler_opts(IREE_DEFAULT_LINKOPTS
     ALL
