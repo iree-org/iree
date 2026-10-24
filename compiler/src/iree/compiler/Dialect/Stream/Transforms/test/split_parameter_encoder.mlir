@@ -6,6 +6,122 @@
 // RUN: iree-opt --split-input-file --iree-stream-split-parameter-encoder='output-scope=my_custom_scope' %s | FileCheck %s --check-prefix=SCOPE
 // RUN: iree-opt --split-input-file --iree-stream-split-parameter-encoder='max-encoding-growth-factor=2.0' %s | FileCheck %s --check-prefix=GROWTH2
 // RUN: iree-opt --split-input-file --iree-stream-split-parameter-encoder='mode=overlay' %s | FileCheck %s --check-prefix=EMPTY
+// RUN: iree-opt --split-input-file --iree-stream-split-parameter-encoder='mode=consolidate output-scope=encoded' %s | FileCheck %s --check-prefix=CONSOLIDATE --implicit-check-not='#stream.parameter.named<"model"::'
+// RUN: iree-opt --split-input-file --iree-stream-split-parameter-encoder='mode=consolidate output-scope=encoded hoist-parameter-expressions=false' %s | FileCheck %s --check-prefix=NO-HOIST --implicit-check-not='#stream.parameter.named<"model"::'
+
+// Consolidation covers both transformed outputs and parameter inputs still
+// consumed by the main module, including inputs shared between the two.
+// CONSOLIDATE-LABEL: module @encoder
+// CONSOLIDATE: arith.constant 3072 : i64
+// CONSOLIDATE: util.func public @__encode_parameters_all
+// CONSOLIDATE: %[[SOURCE:.+]] = util.buffer.constant : !util.buffer = "model"
+// CONSOLIDATE: %[[A_KEY:.+]] = util.buffer.constant : !util.buffer = "a"
+// CONSOLIDATE: stream.async.parameter.load {{.*}} %[[SOURCE]]::%[[A_KEY]]
+// CONSOLIDATE: stream.async.fill
+// CONSOLIDATE: stream.async.parameter.scatter
+// CONSOLIDATE: stream.async.parameter.load {{.*}} %[[SOURCE]]::%[[A_KEY]]
+// CONSOLIDATE: stream.async.parameter.scatter
+// CONSOLIDATE: %[[B_KEY:.+]] = util.buffer.constant : !util.buffer = "b"
+// CONSOLIDATE: stream.async.parameter.load {{.*}} %[[SOURCE]]::%[[B_KEY]]
+// CONSOLIDATE: stream.async.parameter.scatter
+// CONSOLIDATE-LABEL: module @mixed_consolidation
+// CONSOLIDATE: %[[SLAB_SIZE:.+]] = arith.constant 3072 : index
+// CONSOLIDATE: %[[ZERO:.+]] = arith.constant 0 : index
+// CONSOLIDATE: %[[A_OFFSET:.+]] = arith.constant 1024 : index
+// CONSOLIDATE: %[[B_OFFSET:.+]] = arith.constant 2048 : index
+// CONSOLIDATE: %[[A_SLAB:.+]] = stream.async.constant {{.*}} #stream.parameter.named<"encoded"::"parameter0">
+// CONSOLIDATE-NEXT: %[[A:.+]] = stream.resource.subview %[[A_SLAB]][%[[A_OFFSET]]]
+// CONSOLIDATE: %[[B_SLAB:.+]] = stream.async.constant {{.*}} #stream.parameter.named<"encoded"::"parameter0">
+// CONSOLIDATE-NEXT: %[[B:.+]] = stream.resource.subview %[[B_SLAB]][%[[B_OFFSET]]]
+// CONSOLIDATE: %[[ENCODED_SLAB:.+]] = stream.async.constant {{.*}} #stream.parameter.named<"encoded"::"parameter0">
+// CONSOLIDATE-NEXT: %[[ENCODED:.+]] = stream.resource.subview %[[ENCODED_SLAB]][%[[ZERO]]]
+// CONSOLIDATE-NEXT: util.global.store %[[ENCODED]], @encoded
+// CONSOLIDATE: %[[PADDED:.+]] = stream.async.splat
+// CONSOLIDATE-NEXT: %[[EXPANDED:.+]] = stream.async.update %[[B]], %[[PADDED]]
+// CONSOLIDATE-NEXT: util.global.store %[[EXPANDED]], @expanded
+// CONSOLIDATE-NEXT: %[[SHARED:.+]] = util.optimization_barrier %[[A]]
+// CONSOLIDATE-NEXT: util.global.store %[[SHARED]], @shared
+// CONSOLIDATE-NEXT: util.return
+// OVERLAY-LABEL: module @mixed_consolidation
+// OVERLAY: %[[A:.+]] = stream.async.constant {{.*}} #stream.parameter.named<"model"::"a">
+// OVERLAY: %[[B:.+]] = stream.async.constant {{.*}} #stream.parameter.named<"model"::"b">
+// OVERLAY: %[[ENCODED:.+]] = stream.async.constant {{.*}} #stream.parameter.named<""::"parameter0">
+// OVERLAY-NEXT: util.global.store %[[ENCODED]], @encoded
+// OVERLAY: stream.async.update %[[B]],
+// OVERLAY: util.optimization_barrier %[[A]]
+// NO-HOIST-LABEL: module @encoder
+// NO-HOIST: arith.constant 2048 : i64
+// NO-HOIST-LABEL: module @mixed_consolidation
+// NO-HOIST: stream.async.constant {{.*}} #stream.parameter.named<"encoded"::"parameter0">
+// NO-HOIST: %[[A:.+]] = stream.resource.subview
+// NO-HOIST: stream.async.constant {{.*}} #stream.parameter.named<"encoded"::"parameter0">
+// NO-HOIST: %[[B:.+]] = stream.resource.subview
+// NO-HOIST: %[[FILLED:.+]] = stream.async.fill {{.*}}, %[[A]][
+// NO-HOIST-NEXT: util.global.store %[[FILLED]], @encoded
+// NO-HOIST: stream.async.update %[[B]],
+// NO-HOIST: util.optimization_barrier %[[A]]
+module @mixed_consolidation {
+  util.global private @encoded : !stream.resource<constant>
+  util.global private @expanded : !stream.resource<constant>
+  util.global private @shared : !stream.resource<constant>
+  util.initializer {
+    %c0 = arith.constant 0 : index
+    %c256 = arith.constant 256 : index
+    %c1024 = arith.constant 1024 : index
+    %c2048 = arith.constant 2048 : index
+    %c0_i32 = arith.constant 0 : i32
+    %c42_i32 = arith.constant 42 : i32
+    %a = stream.async.constant : !stream.resource<constant>{%c1024} =
+      #stream.parameter.named<"model"::"a"> : vector<1024xi8>
+    %b = stream.async.constant : !stream.resource<constant>{%c1024} =
+      #stream.parameter.named<"model"::"b"> : vector<1024xi8>
+    %filled = stream.async.fill %c42_i32, %a[%c0 to %c256 for %c256] :
+      i32 -> %a as !stream.resource<constant>{%c1024}
+    util.global.store %filled, @encoded : !stream.resource<constant>
+    %padded = stream.async.splat %c0_i32 : i32 -> !stream.resource<constant>{%c2048}
+    %expanded = stream.async.update %b, %padded[%c0 to %c1024] :
+      !stream.resource<constant>{%c1024} -> %padded as !stream.resource<constant>{%c2048}
+    util.global.store %expanded, @expanded : !stream.resource<constant>
+    %shared = util.optimization_barrier %a : !stream.resource<constant>
+    util.global.store %shared, @shared : !stream.resource<constant>
+    util.return
+  }
+}
+
+// -----
+
+// Parameters used inside runtime control flow are consolidated without moving
+// that control flow into the encoder. The load keeps its runtime dependency.
+// CONSOLIDATE-LABEL: module @encoder
+// CONSOLIDATE: util.func public @__encode_parameters_all
+// CONSOLIDATE: %[[KEY:.+]] = util.buffer.constant : !util.buffer = "conditional"
+// CONSOLIDATE: stream.async.parameter.load {{.*}}::%[[KEY]]
+// CONSOLIDATE: stream.async.parameter.scatter
+// CONSOLIDATE-LABEL: module @retained_in_function
+// CONSOLIDATE: util.func public @load(%[[COND:.+]]: i1, %[[TP:.+]]: !stream.timepoint)
+// CONSOLIDATE: scf.if %[[COND]]
+// CONSOLIDATE: %[[PARAM:.+]] = stream.async.constant await(%[[TP]]) {{.*}} #stream.parameter.named<"encoded"::"parameter0">
+// CONSOLIDATE-NEXT: scf.yield %[[PARAM]]
+// OVERLAY-NOT: module @encoder
+// OVERLAY-LABEL: module @retained_in_function
+// OVERLAY: stream.async.constant await({{.*}}) {{.*}} #stream.parameter.named<"model"::"conditional">
+module @retained_in_function {
+  util.func public @load(%condition: i1, %timepoint: !stream.timepoint) -> !stream.resource<constant> {
+    %c1024 = arith.constant 1024 : index
+    %result = scf.if %condition -> (!stream.resource<constant>) {
+      %param = stream.async.constant await(%timepoint) : !stream.resource<constant>{%c1024} =
+        #stream.parameter.named<"model"::"conditional"> : vector<1024xi8>
+      scf.yield %param : !stream.resource<constant>
+    } else {
+      %c0_i32 = arith.constant 0 : i32
+      %zero = stream.async.splat %c0_i32 : i32 -> !stream.resource<constant>{%c1024}
+      scf.yield %zero : !stream.resource<constant>
+    }
+    util.return %result : !stream.resource<constant>
+  }
+}
+
+// -----
 
 // Tests simple constant with splat initialization.
 // This is the most basic case - a global initialized with a constant splat.
@@ -788,21 +904,27 @@ util.initializer {
 
 // -----
 
-// Tests just over 1.2x growth (1.21x) - should reject.
+// Above the growth threshold the computation stays in the main module and
+// only its original input is consolidated.
 
+// CHECK: module @encoder
+// CHECK: util.buffer.constant : !util.buffer = "over_threshold"
+// CHECK: stream.async.parameter.load
+// CHECK: stream.async.parameter.scatter
 // CHECK-LABEL: module {
-// CHECK-NOT: module @encoder
 // CHECK: util.global private @over_growth_threshold : !stream.resource<constant>
 util.global private @over_growth_threshold : !stream.resource<constant>
 
 // CHECK: util.initializer {
 util.initializer {
+  // CHECK-DAG: %[[C1024:.+]] = arith.constant 1024 : index
   // CHECK-DAG: %[[C1000:.+]] = arith.constant 1000 : index
   %c1000 = arith.constant 1000 : index
   // CHECK-DAG: %[[C1210:.+]] = arith.constant 1210 : index
   %c1210 = arith.constant 1210 : index  // 1.21x - over threshold
 
-  // CHECK: %[[PARAM:.+]] = stream.async.constant : !stream.resource<constant>{%[[C1000]]} = #stream.parameter.named<"model"::"over_threshold">
+  // CHECK: %[[SLAB:.+]] = stream.async.constant : !stream.resource<constant>{%[[C1024]]} = #stream.parameter.named<""::"parameter0">
+  // CHECK: %[[PARAM:.+]] = stream.resource.subview %[[SLAB]][%{{.+}}] : !stream.resource<constant>{%[[C1024]]} -> !stream.resource<constant>{%[[C1000]]}
   %param = stream.async.constant : !stream.resource<constant>{%c1000} =
     #stream.parameter.named<"model"::"over_threshold"> : vector<1000xi8>
 
