@@ -438,11 +438,20 @@ void addCPULinalgExtTileAndVectorizePipeline(
   addTileAndDistributePasses(funcPassManager, pipelineOpt);
   funcPassManager.addPass(createLLVMCPUTileAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles));
+  // A consumer the root's tiles cannot fuse, such as a pack whose inner tile
+  // spans several root rows, takes its own vector tile sizes.
+  funcPassManager.addPass(createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
+      IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
       IREE::CPU::TilingLevel::VectorReductionTiles));
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
-  funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
+  {
+    IREE::LinalgExt::DecomposeAttentionPassOptions options;
+    options.skipMaskedTiles = true;
+    funcPassManager.addPass(
+        IREE::LinalgExt::createDecomposeAttentionPass(options));
+  }
   funcPassManager.addPass(iree_compiler::createForallToForPass());
 
   {

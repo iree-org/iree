@@ -1274,9 +1274,9 @@ func.func @attention(%4: tensor<20x4096x64xf16>, %5: tensor<20x4096x64xf16>, %6:
     } -> tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
   return %13#0 : tensor<20x4096x64xf32>
 }
-//      CHECK: #[[ATTN_CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 16]>
-//      CHECK: #[[ATTN_CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
-//      CHECK: #[[ATTN_CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 1, 0, 0, 16], vector_reduction = [0, 0, 0, 1, 0]>
+//      CHECK: #[[ATTN_CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 2, 64]>
+//      CHECK: #[[ATTN_CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 2]>
+//      CHECK: #[[ATTN_CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 2, 0, 0, 64], vector_reduction = [0, 0, 64, 32, 0]>
 //      CHECK: #[[ATTN_MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
 //      CHECK: #[[ATTN_MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
 //      CHECK: #[[ATTN_MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
@@ -1337,10 +1337,63 @@ func.func @attention_with_downstream_propagated_pack(
       : tensor<2x4096x10x64xf16> -> tensor<2x256x10x64x16x1xf16>
   return %pack : tensor<2x256x10x64x16x1xf16>
 }
-//      CHECK: #[[ATTN_PACK_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 1, 0, 0, 16], vector_reduction = [0, 0, 0, 1, 0]>
+//      CHECK: #[[ATTN_PACK_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 2, 0, 0, 64], vector_reduction = [0, 0, 64, 32, 0]>
 //      CHECK: func.func @attention_with_downstream_propagated_pack
 //      CHECK: iree_linalg_ext.online_attention
 // CHECK-SAME:   lowering_config = #[[ATTN_PACK_CONFIG]]
+
+// -----
+
+// The pack after attention is tiled on its own, so a workgroup's attention
+// result waits on the stack: its tile is bounded to half the stack limit.
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
+      cpu = "znver4", cpu_features = "+avx512f,+avx512vl,+avx512bw,+avx512dq,+avx2,+fma",
+      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+      native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
+#q = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+#k = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d5, d4)>
+#v = affine_map<(d0, d1, d2, d3, d4, d5) -> (d5, d0, d3)>
+#s = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+#m = affine_map<(d0, d1, d2, d3, d4, d5) -> (d2, d5)>
+#o = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#r = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+#tin = affine_map<(d0, d1, d2, d3) -> (d1, d2, d0, d3)>
+#tout = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+func.func @attention_with_store_side_pack_stack_bound(
+    %query: tensor<3x2x256x32xf32>, %key: tensor<3x128x32xf32>,
+    %value: tensor<128x3x64xf32>, %mask: tensor<256x128xi1>) -> tensor<16x3x2x64x16x1xf32>
+    attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %scale = arith.constant 0.125 : f32
+  %zero = arith.constant 0.000000e+00 : f32
+  %neg_max = arith.constant -3.40282347E+38 : f32
+  %out = tensor.empty() : tensor<3x2x256x64xf32>
+  %stat = tensor.empty() : tensor<3x2x256xf32>
+  %filled_out = linalg.fill ins(%zero : f32) outs(%out : tensor<3x2x256x64xf32>) -> tensor<3x2x256x64xf32>
+  %filled_max = linalg.fill ins(%neg_max : f32) outs(%stat : tensor<3x2x256xf32>) -> tensor<3x2x256xf32>
+  %filled_sum = linalg.fill ins(%zero : f32) outs(%stat : tensor<3x2x256xf32>) -> tensor<3x2x256xf32>
+  %attention:3 = iree_linalg_ext.online_attention <indexing_maps = [#q, #k, #v, #s, #m, #o, #r, #r]>
+    ins(%query, %key, %value, %scale, %mask : tensor<3x2x256x32xf32>, tensor<3x128x32xf32>, tensor<128x3x64xf32>, f32, tensor<256x128xi1>)
+    outs(%filled_out, %filled_max, %filled_sum : tensor<3x2x256x64xf32>, tensor<3x2x256xf32>, tensor<3x2x256xf32>) {
+  ^bb0(%score: f32):
+    iree_linalg_ext.yield %score : f32
+  } -> tensor<3x2x256x64xf32>, tensor<3x2x256xf32>, tensor<3x2x256xf32>
+  %transposed_out = tensor.empty() : tensor<256x3x2x64xf32>
+  %transposed = linalg.generic {indexing_maps = [#tin, #tout], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%attention#0 : tensor<3x2x256x64xf32>) outs(%transposed_out : tensor<256x3x2x64xf32>) {
+  ^bb0(%in: f32, %out_elem: f32):
+    linalg.yield %in : f32
+  } -> tensor<256x3x2x64xf32>
+  %pack_out = tensor.empty() : tensor<16x3x2x64x16x1xf32>
+  %pack = linalg.pack %transposed outer_dims_perm = [0, 1, 2, 3]
+      inner_dims_pos = [0, 3] inner_tiles = [16, 1] into %pack_out
+      : tensor<256x3x2x64xf32> -> tensor<16x3x2x64x16x1xf32>
+  return %pack : tensor<16x3x2x64x16x1xf32>
+}
+//      CHECK: #[[ATTN_STACK_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 2, 32, 64, 0, 0]
+//      CHECK: func.func @attention_with_store_side_pack_stack_bound
+//      CHECK: iree_linalg_ext.online_attention
+// CHECK-SAME:   lowering_config = #[[ATTN_STACK_CONFIG]]
 
 // -----
 
@@ -1384,9 +1437,9 @@ func.func @attention_transpose_distribute_4d(%29: index, %37: tensor<4x4x?x128xf
   } -> tensor<4x?x4x128xf32>
   return %49 : tensor<4x?x4x128xf32>
 }
-//      CHECK: #[[ATTN4D_CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 1, 4]>
-//      CHECK: #[[ATTN4D_CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 1]>
-//      CHECK: #[[ATTN4D_CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 64, 64, 0, 0, 0, 0], vector_common_parallel = [1, 1, 1, 4, 0, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 0, 1, 1, 1]>
+//      CHECK: #[[ATTN4D_CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 2, 64]>
+//      CHECK: #[[ATTN4D_CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 2]>
+//      CHECK: #[[ATTN4D_CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 64, 64, 0, 0, 0, 0], vector_common_parallel = [1, 1, 2, 64, 0, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 128, 16, 1, 1]>
 //      CHECK: #[[ATTN4D_MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d4)>
 //      CHECK: #[[ATTN4D_MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7, d4)>
 //      CHECK: #[[ATTN4D_MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d5, d6, d7, d3)>
@@ -1710,9 +1763,9 @@ func.func @attention_reshape_pack(%arg0: index, %arg1: tensor<4x2x?x32xf16>, %ar
   %pack = linalg.pack %collapsed padding_value(%cst : f32) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [1, 1] into %13 : tensor<?x256xf32> -> tensor<?x256x1x1xf32>
   return %pack : tensor<?x256x1x1xf32>
 }
-//      CHECK: #[[RESHAPE_GENERIC_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 8, 16]>
-//      CHECK: #[[RESHAPE_FILL_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 8]>
-//      CHECK: #[[RESHAPE_ROOT_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 64, 32, 0, 0], vector_common_parallel = [1, 1, 8, 16, 0, 0], vector_reduction = [0, 0, 0, 0, 0, 16]>
+//      CHECK: #[[RESHAPE_GENERIC_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 16, 32]>
+//      CHECK: #[[RESHAPE_FILL_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 16]>
+//      CHECK: #[[RESHAPE_ROOT_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 64, 32, 0, 0], vector_common_parallel = [1, 1, 16, 32, 0, 0], vector_reduction = [0, 0, 0, 0, 32, 8]>
 //      CHECK: #[[RESHAPE_MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
 //      CHECK: #[[RESHAPE_MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d5, d0, d4)>
 //      CHECK: #[[RESHAPE_MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d5, d0, d3)>
@@ -1770,7 +1823,7 @@ func.func @attention_dynamic_3d(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf3
 }
 //      CHECK: #[[DYN_CONFIG0:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 16, 16]>
 //      CHECK: #[[DYN_CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 16]>
-//      CHECK: #[[DYN_CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 16, 0, 0, 16], vector_reduction = [0, 0, 16, 16, 0]>
+//      CHECK: #[[DYN_CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [1, 64, 0, 0, 64], vector_common_parallel = [1, 16, 0, 0, 16], vector_reduction = [0, 0, 0, 16, 0]>
 //      CHECK: #[[DYN_MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
 //      CHECK: #[[DYN_MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>
 //      CHECK: #[[DYN_MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
@@ -1887,3 +1940,119 @@ func.func @inner_tiled_avx512_1x16x1_f32(%lhs: tensor<2x4x2x1xf32>, %rhs: tensor
 //  CHECK-SAME:     translation_info = #[[INNER_TILED_TRANSLATION]]
 //       CHECK:   iree_codegen.inner_tiled
 //  CHECK-SAME:       lowering_config = #[[INNER_TILED_CONFIG]]
+
+// -----
+
+// Heads stay whole; the rows' accumulator fits twice the register file (32
+// zmm), and rows x keys share the large-vector budget evenly.
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
+      cpu_features = "+avx512f",
+      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+      native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
+#q = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+#k = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d5, d4)>
+#v = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d5, d3)>
+#s = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+#o = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#r = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+func.func @attention_whole_heads_avx512(%query: tensor<2x3x256x32xf32>, %key: tensor<2x128x32xf32>,
+    %value: tensor<2x128x64xf32>) -> tensor<2x3x256x64xf32>
+    attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %scale = arith.constant 0.125 : f32
+  %zero = arith.constant 0.000000e+00 : f32
+  %neg_max = arith.constant -3.40282347E+38 : f32
+  %out = tensor.empty() : tensor<2x3x256x64xf32>
+  %stat = tensor.empty() : tensor<2x3x256xf32>
+  %filled_out = linalg.fill ins(%zero : f32) outs(%out : tensor<2x3x256x64xf32>) -> tensor<2x3x256x64xf32>
+  %filled_max = linalg.fill ins(%neg_max : f32) outs(%stat : tensor<2x3x256xf32>) -> tensor<2x3x256xf32>
+  %filled_sum = linalg.fill ins(%zero : f32) outs(%stat : tensor<2x3x256xf32>) -> tensor<2x3x256xf32>
+  %attention:3 = iree_linalg_ext.online_attention <indexing_maps = [#q, #k, #v, #s, #o, #r, #r]>
+    ins(%query, %key, %value, %scale : tensor<2x3x256x32xf32>, tensor<2x128x32xf32>, tensor<2x128x64xf32>, f32)
+    outs(%filled_out, %filled_max, %filled_sum : tensor<2x3x256x64xf32>, tensor<2x3x256xf32>, tensor<2x3x256xf32>) {
+  ^bb0(%score: f32):
+    iree_linalg_ext.yield %score : f32
+  } -> tensor<2x3x256x64xf32>, tensor<2x3x256xf32>, tensor<2x3x256xf32>
+  return %attention#0 : tensor<2x3x256x64xf32>
+}
+//      CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [{{.+}}], vector_common_parallel = [1, 1, 8, 64, 0, 0], vector_reduction = [0, 0, 0, 0, 32, 8]>
+//      CHECK: func.func @attention_whole_heads_avx512
+//      CHECK:   iree_linalg_ext.online_attention
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+// AVX2 has a quarter of AVX-512's register space and half its vector budget.
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
+      cpu_features = "+avx,+avx2,+fma",
+      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+      native_vector_size = 32 : index, target_triple = "x86_64-none-elf"}>
+#q = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4)>
+#k = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d5, d4)>
+#v = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d5, d3)>
+#s = affine_map<(d0, d1, d2, d3, d4, d5) -> ()>
+#o = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>
+#r = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+func.func @attention_whole_heads_avx2(%query: tensor<2x3x256x32xf32>, %key: tensor<2x128x32xf32>,
+    %value: tensor<2x128x64xf32>) -> tensor<2x3x256x64xf32>
+    attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %scale = arith.constant 0.125 : f32
+  %zero = arith.constant 0.000000e+00 : f32
+  %neg_max = arith.constant -3.40282347E+38 : f32
+  %out = tensor.empty() : tensor<2x3x256x64xf32>
+  %stat = tensor.empty() : tensor<2x3x256xf32>
+  %filled_out = linalg.fill ins(%zero : f32) outs(%out : tensor<2x3x256x64xf32>) -> tensor<2x3x256x64xf32>
+  %filled_max = linalg.fill ins(%neg_max : f32) outs(%stat : tensor<2x3x256xf32>) -> tensor<2x3x256xf32>
+  %filled_sum = linalg.fill ins(%zero : f32) outs(%stat : tensor<2x3x256xf32>) -> tensor<2x3x256xf32>
+  %attention:3 = iree_linalg_ext.online_attention <indexing_maps = [#q, #k, #v, #s, #o, #r, #r]>
+    ins(%query, %key, %value, %scale : tensor<2x3x256x32xf32>, tensor<2x128x32xf32>, tensor<2x128x64xf32>, f32)
+    outs(%filled_out, %filled_max, %filled_sum : tensor<2x3x256x64xf32>, tensor<2x3x256xf32>, tensor<2x3x256xf32>) {
+  ^bb0(%score: f32):
+    iree_linalg_ext.yield %score : f32
+  } -> tensor<2x3x256x64xf32>, tensor<2x3x256xf32>, tensor<2x3x256xf32>
+  return %attention#0 : tensor<2x3x256x64xf32>
+}
+//      CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [{{.+}}], vector_common_parallel = [1, 1, 4, 64, 0, 0], vector_reduction = [0, 0, 0, 0, 32, 8]>
+//      CHECK: func.func @attention_whole_heads_avx2
+//      CHECK:   iree_linalg_ext.online_attention
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+// A static head above 128 stays whole: a tile of K1 would hand the softmax
+// partial scores.
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
+      cpu_features = "+avx512f",
+      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+      native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
+#q = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3)>
+#k = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d3)>
+#v = affine_map<(d0, d1, d2, d3, d4) -> (d0, d4, d2)>
+#s = affine_map<(d0, d1, d2, d3, d4) -> ()>
+#o = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+#r = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+func.func @attention_large_static_head(%query: tensor<4x96x160xf32>, %key: tensor<4x80x160xf32>,
+    %value: tensor<4x80x48xf32>) -> tensor<4x96x48xf32>
+    attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %scale = arith.constant 0.125 : f32
+  %zero = arith.constant 0.000000e+00 : f32
+  %neg_max = arith.constant -3.40282347E+38 : f32
+  %out = tensor.empty() : tensor<4x96x48xf32>
+  %stat = tensor.empty() : tensor<4x96xf32>
+  %filled_out = linalg.fill ins(%zero : f32) outs(%out : tensor<4x96x48xf32>) -> tensor<4x96x48xf32>
+  %filled_max = linalg.fill ins(%neg_max : f32) outs(%stat : tensor<4x96xf32>) -> tensor<4x96xf32>
+  %filled_sum = linalg.fill ins(%zero : f32) outs(%stat : tensor<4x96xf32>) -> tensor<4x96xf32>
+  %attention:3 = iree_linalg_ext.online_attention <indexing_maps = [#q, #k, #v, #s, #o, #r, #r]>
+    ins(%query, %key, %value, %scale : tensor<4x96x160xf32>, tensor<4x80x160xf32>, tensor<4x80x48xf32>, f32)
+    outs(%filled_out, %filled_max, %filled_sum : tensor<4x96x48xf32>, tensor<4x96xf32>, tensor<4x96xf32>) {
+  ^bb0(%score: f32):
+    iree_linalg_ext.yield %score : f32
+  } -> tensor<4x96x48xf32>, tensor<4x96xf32>, tensor<4x96xf32>
+  return %attention#0 : tensor<4x96x48xf32>
+}
+//      CHECK: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [{{.+}}], vector_common_parallel = [{{.+}}], vector_reduction = [0, 0, 0, 160, {{[0-9]+}}]>
+//      CHECK: func.func @attention_large_static_head
+//      CHECK:   iree_linalg_ext.online_attention
+// CHECK-SAME:     lowering_config = #[[CONFIG]]

@@ -17,6 +17,7 @@ iree_check_single_backend_test_suite(
     "arg_compare.mlir"
     "attention.mlir"
     "attention_i1_mask.mlir"
+    "attention_large_head.mlir"
     "dynamic_attention.mlir"
     "gather.mlir"
     "map_load.mlir"
