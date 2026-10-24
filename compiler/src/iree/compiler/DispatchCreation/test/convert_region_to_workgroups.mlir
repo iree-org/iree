@@ -47,3 +47,182 @@ util.func public @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: te
   //      CHECK: util.return %[[r0]], %[[r1]]
   util.return %r0, %r1 : tensor<?x?xf32>, tensor<5x11xf32>
 }
+
+// -----
+
+util.global private @device : !hal.device
+
+// The unused comparator result needs storage, but Sort initializes it itself.
+// CHECK-LABEL: util.func public @sort_workspace
+// CHECK: %[[WORKSPACE:.+]] = flow.tensor.alloca : tensor<?xi64>
+// CHECK-NOT: flow.tensor.alloca
+// CHECK-NOT: linalg.copy
+// CHECK: %[[DISPATCH:.+]]:2 = flow.dispatch.workgroups
+// CHECK-SAME: -> (tensor<?xi64>{{.*}}, %[[WORKSPACE]]
+// CHECK-SAME: stream.affinity = #hal.device.affinity<@device>
+// CHECK: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?xi64>>
+// CHECK: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?xi64>>
+// CHECK: %[[SORT:.+]]:2 = iree_linalg_ext.sort dimension(0) ins(
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#1
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#0
+// CHECK: count(%[[N:.+]]: index)
+// CHECK: flow.return %[[N]], %{{.+}}, %{{.+}} : index, index, index
+// CHECK-NOT: flow.dispatch.workgroups
+// CHECK: util.return %[[DISPATCH]]#0
+util.func public @sort_workspace(%keys: tensor<?xi64>, %labels: tensor<?xi64>)
+    -> tensor<?xi64> {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %keys, %c0 : tensor<?xi64>
+  %result = flow.dispatch.region[%n] -> (tensor<?xi64>{%n}) attributes {
+    stream.affinity = #hal.device.affinity<@device>
+  } {
+    %empty = tensor.empty(%n) : tensor<?xi64>
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        ins(%keys, %labels : tensor<?xi64>, tensor<?xi64>)
+        outs(%empty, %empty : tensor<?xi64>, tensor<?xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sle, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<?xi64>, tensor<?xi64>
+    flow.return %sorted#1 : tensor<?xi64>
+  } count(%workload: index) -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    flow.return %workload, %c1, %c1 : index, index, index
+  }
+  util.return %result : tensor<?xi64>
+}
+
+// -----
+
+// Live dispatch results already provide destinations for both Sort outputs.
+// CHECK-LABEL: util.func public @sort_returned_keys
+// CHECK-NOT: flow.tensor.alloca
+// CHECK: %[[DISPATCH:.+]]:2 = flow.dispatch.workgroups
+// CHECK: %[[SORT:.+]]:2 = iree_linalg_ext.sort
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#0
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#1
+// CHECK-NOT: flow.tensor.alloca
+// CHECK: util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1
+util.func public @sort_returned_keys(%keys: tensor<4xi64>, %labels: tensor<4xi64>)
+    -> (tensor<4xi64>, tensor<4xi64>) {
+  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
+    %empty = tensor.empty() : tensor<4xi64>
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        ins(%keys, %labels : tensor<4xi64>, tensor<4xi64>)
+        outs(%empty, %empty : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sle, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<4xi64>, tensor<4xi64>
+  }
+  util.return %result#0, %result#1 : tensor<4xi64>, tensor<4xi64>
+}
+
+// -----
+
+// Equal inputs do not give two independently mutated outputs the same storage.
+// CHECK-LABEL: util.func public @sort_shared_keys
+// CHECK: %[[WORK0:.+]] = flow.tensor.alloca
+// CHECK: %[[WORK1:.+]] = flow.tensor.alloca
+// CHECK-NOT: flow.tensor.alloca
+// CHECK: %[[DISPATCH:.+]]:3 = flow.dispatch.workgroups
+// CHECK-SAME: -> (tensor<4xi64>, %[[WORK0]], %[[WORK1]])
+// CHECK: %[[SORT:.+]]:3 = iree_linalg_ext.sort
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#2
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#0
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#1
+// CHECK: util.return %[[DISPATCH]]#0
+util.func public @sort_shared_keys(%keys: tensor<4xi64>, %labels: tensor<4xi64>)
+    -> tensor<4xi64> {
+  %result = flow.dispatch.region -> (tensor<4xi64>) {
+    %empty = tensor.empty() : tensor<4xi64>
+    %sorted:3 = iree_linalg_ext.sort dimension(0)
+        ins(%keys, %keys, %labels : tensor<4xi64>, tensor<4xi64>, tensor<4xi64>)
+        outs(%empty, %empty, %empty : tensor<4xi64>, tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs1: i64, %rhs1: i64,
+         %lhs_label: i64, %rhs_label: i64):
+      %cmp0 = arith.cmpi sle, %lhs, %rhs : i64
+      %cmp1 = arith.cmpi sle, %lhs1, %rhs1 : i64
+      %cmp = arith.andi %cmp0, %cmp1 : i1
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<4xi64>, tensor<4xi64>, tensor<4xi64>
+    flow.return %sorted#2 : tensor<4xi64>
+  }
+  util.return %result : tensor<4xi64>
+}
+
+// -----
+
+// The hidden store must follow a unique update instead of pinning the earlier
+// Sort result. A shape observation does not require preserving its data.
+// CHECK-LABEL: util.func public @sort_updated_workspace
+// CHECK: %[[DISPATCH:.+]]:2 = flow.dispatch.workgroups
+// CHECK: %[[SORT:.+]]:2 = iree_linalg_ext.sort
+// CHECK: %[[UPDATED:.+]] = linalg.generic
+// CHECK: %[[COMBINED:.+]] = linalg.generic
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[COMBINED]]
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[UPDATED]]
+// CHECK-NOT: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#0
+// CHECK: util.return %[[DISPATCH]]#0
+util.func public @sort_updated_workspace(%keys: tensor<?xi64>, %labels: tensor<?xi64>)
+    -> tensor<?xi64> {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %keys, %c0 : tensor<?xi64>
+  %result = flow.dispatch.region -> (tensor<?xi64>{%n}) {
+    %empty = tensor.empty(%n) : tensor<?xi64>
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        ins(%keys, %labels : tensor<?xi64>, tensor<?xi64>)
+        outs(%empty, %empty : tensor<?xi64>, tensor<?xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sle, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<?xi64>, tensor<?xi64>
+    %size = tensor.dim %sorted#0, %c0 : tensor<?xi64>
+    %size_i64 = arith.index_cast %size : index to i64
+    %updated = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
+        outs(%sorted#0 : tensor<?xi64>) {
+    ^bb0(%key: i64):
+      %one = arith.constant 1 : i64
+      %sum = arith.addi %key, %one : i64
+      linalg.yield %sum : i64
+    } -> tensor<?xi64>
+    // Keep the updated tensor live without returning its data.
+    %observed = tensor.extract %updated[%c0] : tensor<?xi64>
+    %combined = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
+        outs(%sorted#1 : tensor<?xi64>) {
+    ^bb0(%label: i64):
+      %value = arith.addi %label, %observed : i64
+      %with_size = arith.addi %value, %size_i64 : i64
+      linalg.yield %with_size : i64
+    } -> tensor<?xi64>
+    flow.return %combined : tensor<?xi64>
+  }
+  util.return %result : tensor<?xi64>
+}
+
+// -----
+
+// An unused lane that does not participate in the comparator needs no storage.
+// CHECK-LABEL: util.func public @sort_unused_payload
+// CHECK-NOT: flow.tensor.alloca
+// CHECK: iree_linalg_ext.sort dimension(0) ins(%{{.+}} : tensor<4xi64>)
+// CHECK-NOT: flow.tensor.alloca
+// CHECK: util.return
+util.func public @sort_unused_payload(%keys: tensor<4xi64>, %labels: tensor<4xi64>)
+    -> tensor<4xi64> {
+  %result = flow.dispatch.region -> (tensor<4xi64>) {
+    %empty = tensor.empty() : tensor<4xi64>
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        ins(%keys, %labels : tensor<4xi64>, tensor<4xi64>)
+        outs(%empty, %empty : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sle, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    flow.return %sorted#0 : tensor<4xi64>
+  }
+  util.return %result : tensor<4xi64>
+}
