@@ -1,7 +1,6 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-distribute)))))' %s | FileCheck %s
 
-// Parse/verify succeeds. The invocation-tiling pass must not invent memref results
-// for a destination-style operation that already has pure buffer semantics.
+
 #layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
 hal.executable private @repro {
   hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb">) {
