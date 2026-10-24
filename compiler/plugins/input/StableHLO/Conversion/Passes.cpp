@@ -7,8 +7,11 @@
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Passes.h"
+#include "compiler/plugins/input/StableHLO/Conversion/StableHLOTorchAttention.h"
+#include "compiler/plugins/input/StableHLO/Conversion/TargetRegistry.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
@@ -46,6 +49,11 @@ void buildStableHLOInputConversionPassPipelineImpl(
   // If the input is StableHLO, this pass is considered a NOP.
   passManager.addPass(stablehlo::createCheckVHLOStableHloMixUsage());
   ::mlir::stablehlo::createStablehloDeserializePipeline(passManager);
+  TargetRegistry torchTargets;
+  if (failed(populateTorchAttentionTargetRegistry(torchTargets))) {
+    llvm::report_fatal_error("Torch attention registration failed");
+  }
+  passManager.addPass(createRewriteRegisteredTargetsPass(torchTargets));
   // Composite ops carry a symbol reference to a function implementing their
   // decomposition. Replace them with a call to that function so that the
   // conversions below only have to handle the decomposed form; the inliner

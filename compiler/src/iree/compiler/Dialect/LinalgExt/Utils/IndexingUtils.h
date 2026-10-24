@@ -64,6 +64,15 @@ private:
   int64_t domainRank;
 };
 
+/// Returns the indexing maps of an attention op over the iteration domain
+/// (batch..., m, n, k1, k2) with `numBatches` leading batch dimensions:
+/// Q (batch..., m, k1), K (batch..., k2, k1), V (batch..., k2, n), scale (),
+/// then a mask (batch..., m, k2) when `hasMask`, without the batch dimensions
+/// when `maskHasBatch` is false, and the result (batch..., m, n).
+SmallVector<AffineMap>
+getStandardAttentionIndexingMaps(MLIRContext *context, int64_t numBatches,
+                                 bool hasMask, bool maskHasBatch = true);
+
 }; // namespace mlir::iree_compiler::IREE::LinalgExt
 
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_INDEXINGUTILS_H_

@@ -37,6 +37,7 @@ iree_lit_test_suite(
     "stablehlo_custom_calls.mlir"
     "stablehlo_to_iree_input_dialects.mlir"
     "stablehlo_to_linalg_ext.mlir"
+    "torch_attention_composites.mlir"
     "verify_compiler_input_legality.mlir"
     "vhlo_stablehlo_mix_invalid.mlir"
   TOOLS

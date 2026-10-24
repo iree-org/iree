@@ -103,6 +103,27 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    TorchAttention
+  HDRS
+    "StableHLOTorchAttention.h"
+  SRCS
+    "StableHLOTorchAttention.cpp"
+  DEPS
+    ::TargetRegistry
+    LLVMSupport
+    MLIRArithDialect
+    MLIRIR
+    MLIRLinalgDialect
+    MLIRSupport
+    MLIRTensorDialect
+    StablehloOps
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Utils
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     Conversion
   HDRS
     "Passes.h"
@@ -111,6 +132,8 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::StableHLOLegalization
+    ::TargetRegistry
+    ::TorchAttention
     LLVMSupport
     MLIRFuncDialect
     MLIRFunctionInterfaces
