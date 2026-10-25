@@ -143,10 +143,15 @@ func.func @mmt4d_unit_dim(%lhs : tensor<1x?x?x?xf32>, %rhs : tensor<?x?x?x?xf32>
 // -----
 
 func.func @sort(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
+  %empty = tensor.empty(%d0, %d1) : tensor<?x?xf32>
   %0 = iree_linalg_ext.sort
       {__test_interface__ = true}
       dimension(0)
-      outs(%arg0 : tensor<?x?xf32>) {
+      ins(%arg0 : tensor<?x?xf32>) outs(%empty : tensor<?x?xf32>) {
         ^bb0(%arg1 : f32, %arg2 : f32):
           %1  = arith.cmpf ogt, %arg1, %arg2 : f32
           iree_linalg_ext.yield %1 : i1
@@ -159,10 +164,13 @@ func.func @sort(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32> {
 // -----
 
 func.func @sort_unit_dim(%arg0 : tensor<?x1xf32>) -> tensor<?x1xf32> {
+  %c0 = arith.constant 0 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x1xf32>
+  %empty = tensor.empty(%d0) : tensor<?x1xf32>
   %0 = iree_linalg_ext.sort
       {__test_interface__ = true}
       dimension(0)
-      outs(%arg0 : tensor<?x1xf32>) {
+      ins(%arg0 : tensor<?x1xf32>) outs(%empty : tensor<?x1xf32>) {
         ^bb0(%arg1 : f32, %arg2 : f32):
           %1  = arith.cmpf ogt, %arg1, %arg2 : f32
           iree_linalg_ext.yield %1 : i1

@@ -24,9 +24,23 @@ def ConvertBatchMatmulToMatmulPass :
   ];
 }
 
-def ConvertConv2DToImg2ColPass :
-    Pass<"iree-global-opt-convert-conv2d-to-img2col", ""> {
-  let summary = "Convert linalg convolution ops to matmul img2col based implementation";
+def ConvertConvToIm2ColPass :
+    Pass<"iree-global-opt-convert-conv-to-im2col", ""> {
+  let summary = "Rewrites convolutions as contractions over an im2col gather";
+  let description = [{
+    Rewrites every linalg op that implements a convolution, named or generic,
+    as an all-parallel `linalg.generic` that gathers the convolved input
+    windows, followed by a contraction over the gathered tensor with the
+    original payload. Contraction loops are collapsed wherever the operand
+    layouts allow, so standard layouts become plain or batched matmuls.
+    Convolutions without an output channel dimension, i.e. depthwise
+    convolutions with a unit multiplier and pooling ops, are left unchanged:
+    nothing reuses the gathered input, so the rewrite never pays off.
+
+    The pass expects quantization to be lowered already: quantized
+    convolutions such as `linalg.conv_2d_nhwc_hwcf_q` are not matched, and
+    dequantize producers are not looked through.
+  }];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "mlir::tensor::TensorDialect",
@@ -110,9 +124,14 @@ def PropagateAffineQuantizationPass :
     or a zero `tensor.pad` whose padded dimensions do not index the scale and
     whose zero point is per-tensor, before `iree_linalg_ext.dequantize_affine`.
     These shape operations then run on quantized values. A consumer-side
-    `linalg.transpose` is fused into the dequantize's output map instead. When
-    a contraction consumes the result, the dequantize becomes its direct
-    producer so the integer contraction rewrite can match it.
+    `linalg.transpose` is fused into the dequantize's output map instead. A
+    `tensor.collapse_shape` of a dequantized value is absorbed by a consuming
+    `linalg.transpose`, or by a contraction whose inputs are all dequantized,
+    by expanding the consumer's iteration space; a blockwise matmul over
+    collapsed `[M, G, L]` and `[N, G, L]` operands thus iterates over
+    `(m, n, g, l)`. When a contraction consumes the result, the dequantize
+    becomes its direct producer so the integer contraction rewrite can match
+    it.
   }];
 }
 

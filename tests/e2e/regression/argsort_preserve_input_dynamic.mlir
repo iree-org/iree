@@ -21,7 +21,8 @@ func.func @argsort_preserve_input(%input: tensor<?xi64>)
   } -> tensor<?xi64>
 
   %sorted:2 = iree_linalg_ext.sort dimension(0)
-      outs(%input, %indices : tensor<?xi64>, tensor<?xi64>) {
+      ins(%input, %indices : tensor<?xi64>, tensor<?xi64>)
+      outs(%indices_init, %indices_init : tensor<?xi64>, tensor<?xi64>) {
   ^bb0(%lhs_key: i64, %rhs_key: i64, %lhs_index: i64, %rhs_index: i64):
     %take_lhs = arith.cmpi sle, %lhs_key, %rhs_key : i64
     iree_linalg_ext.yield %take_lhs : i1

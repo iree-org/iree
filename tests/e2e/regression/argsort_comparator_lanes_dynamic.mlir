@@ -23,8 +23,10 @@ func.func @argsort_trailing_float_keys(%input: tensor<?xf32>)
     %value = arith.index_cast %index : index to i64
     linalg.yield %value : i64
   } -> tensor<?xi64>
+  %keys_init = tensor.empty(%n) : tensor<?xf32>
   %sorted:2 = iree_linalg_ext.sort dimension(0)
-      outs(%indices, %input : tensor<?xi64>, tensor<?xf32>) {
+      ins(%indices, %input : tensor<?xi64>, tensor<?xf32>)
+      outs(%empty, %keys_init : tensor<?xi64>, tensor<?xf32>) {
   ^bb0(%lhs_index: i64, %rhs_index: i64, %lhs: f32, %rhs: f32):
     %cmp = arith.cmpf ole, %lhs, %rhs : f32
     iree_linalg_ext.yield %cmp : i1
@@ -47,8 +49,8 @@ func.func @argsort_shared_keys(%input: tensor<?xi64>)
     linalg.yield %value : i64
   } -> tensor<?xi64>
   %sorted:3 = iree_linalg_ext.sort dimension(0)
-      outs(%input, %input, %indices
-           : tensor<?xi64>, tensor<?xi64>, tensor<?xi64>) {
+      ins(%input, %input, %indices : tensor<?xi64>, tensor<?xi64>, tensor<?xi64>)
+      outs(%empty, %empty, %empty : tensor<?xi64>, tensor<?xi64>, tensor<?xi64>) {
   ^bb0(%lhs0: i64, %rhs0: i64, %lhs1: i64, %rhs1: i64,
        %lhs_index: i64, %rhs_index: i64):
     %cmp0 = arith.cmpi sle, %lhs0, %rhs0 : i64
@@ -62,8 +64,12 @@ func.func @argsort_shared_keys(%input: tensor<?xi64>)
 // Carried values are labels; they need not identify positions in the keys.
 func.func @sort_carried_labels(%keys: tensor<?xi64>, %labels: tensor<?xi64>)
     -> (tensor<?xi64>, tensor<?xi64>, tensor<?xi64>) {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %keys, %c0 : tensor<?xi64>
+  %empty = tensor.empty(%n) : tensor<?xi64>
   %sorted:2 = iree_linalg_ext.sort dimension(0)
-      outs(%keys, %labels : tensor<?xi64>, tensor<?xi64>) {
+      ins(%keys, %labels : tensor<?xi64>, tensor<?xi64>)
+      outs(%empty, %empty : tensor<?xi64>, tensor<?xi64>) {
   ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
     %cmp = arith.cmpi sle, %lhs, %rhs : i64
     iree_linalg_ext.yield %cmp : i1
@@ -72,10 +78,14 @@ func.func @sort_carried_labels(%keys: tensor<?xi64>, %labels: tensor<?xi64>)
       : tensor<?xi64>, tensor<?xi64>, tensor<?xi64>
 }
 
-// A sole tensor use does not transfer ownership of the input buffer.
+// Sorting produces a new tensor while preserving the original input.
 func.func @sort_and_original(%input: tensor<?xi64>)
     -> (tensor<?xi64>, tensor<?xi64>) {
-  %sorted = iree_linalg_ext.sort dimension(0) outs(%input : tensor<?xi64>) {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %input, %c0 : tensor<?xi64>
+  %empty = tensor.empty(%n) : tensor<?xi64>
+  %sorted = iree_linalg_ext.sort dimension(0) ins(%input : tensor<?xi64>)
+      outs(%empty : tensor<?xi64>) {
   ^bb0(%lhs: i64, %rhs: i64):
     %cmp = arith.cmpi sle, %lhs, %rhs : i64
     iree_linalg_ext.yield %cmp : i1

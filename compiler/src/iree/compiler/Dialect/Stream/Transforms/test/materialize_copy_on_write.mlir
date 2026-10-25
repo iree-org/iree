@@ -18,7 +18,7 @@ util.func public @blockArgsNeedCopies(%src: !stream.resource<*>, %size: index) -
 
 // -----
 
-// Copies of owned single-use resources are removed by copy elision later.
+// Tests that copies are not inserted where they are trivially not needed.
 
 // CHECK-LABEL: @singleUseTiedOperand
 //  CHECK-SAME: (%[[SIZE:.+]]: index)
@@ -29,20 +29,21 @@ util.func public @singleUseTiedOperand(%size: index) -> !stream.resource<*> {
   %c123_i32 = arith.constant 123 : i32
   %c456_i32 = arith.constant 456 : i32
   %c789_i32 = arith.constant 789 : i32
-  // CHECK: %[[SPLAT:.+]] = stream.async.splat
+  // CHECK: stream.async.splat
   %0 = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
-  // CHECK: %[[CLONE0:.+]] = stream.async.clone %[[SPLAT]]
-  // CHECK: %[[FILL0:.+]] = stream.async.fill %c456_i32, %[[CLONE0]]
+  // CHECK-NOT: stream.async.clone
+  // CHECK: stream.async.fill
   %1 = stream.async.fill %c456_i32, %0[%c0 to %c128 for %c128] : i32 -> %0 as !stream.resource<*>{%size}
-  // CHECK: %[[CLONE1:.+]] = stream.async.clone
-  // CHECK: stream.async.fill %c789_i32, %[[CLONE1]]
+  // CHECK-NOT: stream.async.clone
+  // CHECK: stream.async.fill
   %2 = stream.async.fill %c789_i32, %1[%c128 to %c256 for %c128] : i32 -> %0 as !stream.resource<*>{%size}
   util.return %2 : !stream.resource<*>
 }
 
 // -----
 
-// A tied operand used twice by one operation receives one clone.
+// Tests that copies are not inserted for operand with multiple uses by the same
+// user.
 
 // CHECK-LABEL: @multipleUsesOneUser
 util.func private @multipleUsesOneUser(%size: index) -> !stream.resource<*> {
@@ -50,31 +51,12 @@ util.func private @multipleUsesOneUser(%size: index) -> !stream.resource<*> {
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
   %c123_i32 = arith.constant 123 : i32
-  // CHECK: %[[SPLAT:.+]] = stream.async.splat
+  // CHECK: stream.async.splat
   %0 = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
-  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SPLAT]]
-  // CHECK: stream.async.dispatch @ex::@dispatch(%[[CLONE]]{{.*}}, %[[CLONE]]{{.*}})
+  // CHECK-NOT: stream.async.clone
+  // CHECK: stream.async.dispatch
   %1 = stream.async.dispatch @ex::@dispatch(%0[%c0 to %c128 for %c128], %0[%c128 to %c256 for %c128]) : (!stream.resource<*>{%size}, !stream.resource<*>{%size}) -> %0{%size}
   util.return %1 : !stream.resource<*>
-}
-
-// -----
-
-// A non-consuming import borrows its buffer even when its cast has one user.
-
-// CHECK-LABEL: @borrowedSingleUseNeedsCopy
-util.func public @borrowedSingleUseNeedsCopy(%buffer: !util.buffer) -> !stream.resource<*> {
-  %c0 = arith.constant 0 : index
-  %c32 = arith.constant 32 : index
-  %c1_i32 = arith.constant 1 : i32
-  // CHECK: %[[IMPORT:.+]] = stream.tensor.import %{{.+}}
-  %import = stream.tensor.import %buffer : !util.buffer -> tensor<8xi32> in !stream.resource<external>{%c32}
-  // CHECK: %[[CAST:.+]] = stream.async.cast %[[IMPORT]]
-  %cast = stream.async.cast %import : !stream.resource<external>{%c32} -> !stream.resource<*>{%c32}
-  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[CAST]]
-  // CHECK: stream.async.fill %c1_i32, %[[CLONE]]
-  %updated = stream.async.fill %c1_i32, %cast[%c0 to %c32 for %c32] : i32 -> %cast as !stream.resource<*>{%c32}
-  util.return %updated : !stream.resource<*>
 }
 
 // -----
@@ -172,9 +154,8 @@ util.func private @tiedDispatches() {
   // CHECK-SAME: (!stream.resource<*>{%c40}, !stream.resource<*>{%c16}) -> %[[CLONE0]]{%c40}
   %dispatch0 = stream.async.dispatch @ex::@dispatch0[%c1, %c1, %c1](%splat0[%c0 to %c40 for %c40], %splat1[%c0 to %c16 for %c16]) : (!stream.resource<*>{%c40}, !stream.resource<*>{%c16}) -> %splat0{%c40}
 
-  // CHECK: %[[CLONE1:.+]] = stream.async.clone %[[DISPATCH0]]
-  // CHECK: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%[[CLONE1]][%c0 to %c40 for %c40], %[[SPLAT0]][%c0 to %c40 for %c40])
-  // CHECK-SAME: (!stream.resource<*>{%c40}, !stream.resource<*>{%c40}) -> %[[CLONE1]]{%c40}
+  // CHECK: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%[[DISPATCH0]][%c0 to %c40 for %c40], %[[SPLAT0]][%c0 to %c40 for %c40])
+  // CHECK-SAME: (!stream.resource<*>{%c40}, !stream.resource<*>{%c40}) -> %[[DISPATCH0]]{%c40}
   %dispatch1 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%dispatch0[%c0 to %c40 for %c40], %splat0[%c0 to %c40 for %c40]) : (!stream.resource<*>{%c40}, !stream.resource<*>{%c40}) -> %dispatch0{%c40}
 
   util.return

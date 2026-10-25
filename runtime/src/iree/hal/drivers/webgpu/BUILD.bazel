@@ -159,6 +159,7 @@ iree_runtime_cc_library(
         ":webgpu_imports",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/utils:resource_set",
     ],
 )
 

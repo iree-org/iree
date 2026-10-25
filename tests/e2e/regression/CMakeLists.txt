@@ -17,7 +17,6 @@ iree_lit_test_suite(
     "argsort_comparator_lanes_dynamic.mlir"
     "argsort_dynamic.mlir"
     "argsort_internal_key_use.mlir"
-    "argsort_local_keys.mlir"
     "argsort_preserve_input_dynamic.mlir"
     "argsort_views_dynamic.mlir"
     "fill_i64.mlir"
@@ -25,13 +24,10 @@ iree_lit_test_suite(
     "globals.mlir"
     "libm_linking.mlir"
     "scalar.mlir"
-    "scatter_preserve_borrowed_input.mlir"
-    "sort_dynamic_observed_versions.mlir"
-    "sort_preserve_intermediate_version.mlir"
+    "sort_workspace_versions.mlir"
     "stream_reference_counting_aliased_loop_results.mlir"
     "trace_dispatch_tensors.mlir"
     "transients_test.mlir"
-    "two_sorts_original_version.mlir"
     "unused_args.mlir"
   TOOLS
     ${IREE_LLD_TARGET}

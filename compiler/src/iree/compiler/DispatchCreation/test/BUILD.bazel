@@ -18,6 +18,7 @@ iree_lit_test_suite(
         # keep sorted
         [
             "annotate_data_tiling_hints.mlir",
+            "assign_data_tiling_encodings.mlir",
             "bitcast_unsupported_element_types.mlir",
             "bubble_up_expand_shapes.mlir",
             "bubble_up_extract_slice.mlir",
@@ -73,6 +74,8 @@ iree_lit_test_suite(
             "split_reduction.mlir",
             "tensor_pad_to_tensor_insert_slice.mlir",
             "transpose_generic_ops.mlir",
+            "verify_materialized_layout_target.mlir",
+            "verify_materialized_layout_target_invalid.mlir",
         ],
         include = ["*.mlir"],
     ),

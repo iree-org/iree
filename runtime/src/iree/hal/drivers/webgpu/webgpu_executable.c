@@ -162,9 +162,8 @@ static iree_status_t iree_hal_webgpu_executable_initialize_export(
 
   out_entry->pipeline_handle =
       iree_hal_webgpu_import_device_create_compute_pipeline(
-          device_handle, /*layout_handle=*/0, (uint32_t)(uintptr_t)wgsl_source,
-          (uint32_t)wgsl_source_length,
-          (uint32_t)(uintptr_t)out_entry->name.data,
+          device_handle, /*layout_handle=*/0, (uintptr_t)wgsl_source,
+          (uint32_t)wgsl_source_length, (uintptr_t)out_entry->name.data,
           (uint32_t)out_entry->name.size);
   if (out_entry->pipeline_handle == 0) {
     return iree_make_status(

@@ -22,7 +22,8 @@ func.func @argsort_collapsed_keys(%input: tensor<1x?xi64>)
     linalg.yield %value : i64
   } -> tensor<?xi64>
   %sorted:2 = iree_linalg_ext.sort dimension(0)
-      outs(%keys, %indices : tensor<?xi64>, tensor<?xi64>) {
+      ins(%keys, %indices : tensor<?xi64>, tensor<?xi64>)
+      outs(%empty, %empty : tensor<?xi64>, tensor<?xi64>) {
   ^bb0(%lhs: i64, %rhs: i64, %lhs_index: i64, %rhs_index: i64):
     %cmp = arith.cmpi sle, %lhs, %rhs : i64
     iree_linalg_ext.yield %cmp : i1
@@ -47,7 +48,8 @@ func.func @argsort_rows(%input: tensor<?x?xi64>)
     linalg.yield %value : i64
   } -> tensor<?x?xi64>
   %sorted:2 = iree_linalg_ext.sort dimension(1)
-      outs(%input, %indices : tensor<?x?xi64>, tensor<?x?xi64>) {
+      ins(%input, %indices : tensor<?x?xi64>, tensor<?x?xi64>)
+      outs(%empty, %empty : tensor<?x?xi64>, tensor<?x?xi64>) {
   ^bb0(%lhs: i64, %rhs: i64, %lhs_index: i64, %rhs_index: i64):
     %cmp = arith.cmpi sle, %lhs, %rhs : i64
     iree_linalg_ext.yield %cmp : i1

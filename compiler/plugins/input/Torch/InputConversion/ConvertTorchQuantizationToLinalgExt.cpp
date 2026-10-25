@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -136,6 +137,30 @@ static bool isUnsignedZeroPoint(Type zeroPointType) {
          cast<Torch::ValueTensorType>(zeroPointType).getDtype().isInteger(1);
 }
 
+// Sets the zero point of `quantization` from `torchZeroPoint` and its converted
+// value `zeroPoint`. A None zero point and a float one known to be zero leave
+// it unset, which denotes symmetric quantization. Other float zero points
+// prevent conversion, since LinalgExt zero points are integers.
+static LogicalResult matchZeroPoint(Operation *op, Value torchZeroPoint,
+                                    Value zeroPoint,
+                                    PT2EQuantization &quantization,
+                                    ConversionPatternRewriter &rewriter) {
+  if (isa<Torch::NoneType>(torchZeroPoint.getType())) {
+    return success();
+  }
+  if (isa<FloatType>(getElementTypeOrSelf(zeroPoint))) {
+    if (!IREE::LinalgExt::isKnownZero(torchZeroPoint)) {
+      return rewriter.notifyMatchFailure(
+          op, "expected integer or all-zero float zero points");
+    }
+    return success();
+  }
+  quantization.zeroPoint = zeroPoint;
+  quantization.zeroPointUnsigned =
+      isUnsignedZeroPoint(torchZeroPoint.getType());
+  return success();
+}
+
 // How each PT2E op class spells its operands is the only thing that differs
 // between the ops of one direction, so each class has its own reader.
 
@@ -180,12 +205,11 @@ static FailureOr<PT2EQuantization> readPT2EQuantization(
   PT2EQuantization quantization;
   quantization.input = adaptor.getInput();
   quantization.scale = adaptor.getScales();
-  quantization.zeroPoint = adaptor.getZeroPoints();
-  quantization.zeroPointUnsigned =
-      isUnsignedZeroPoint(op.getZeroPoints().getType());
   if (failed(matchConstantAxis(op, op.getAxis(), quantization, rewriter)) ||
       failed(matchConstantBounds(op, op.getQuantMin(), op.getQuantMax(),
-                                 quantization, rewriter))) {
+                                 quantization, rewriter)) ||
+      failed(matchZeroPoint(op, op.getZeroPoints(), adaptor.getZeroPoints(),
+                            quantization, rewriter))) {
     return failure();
   }
   return quantization;
@@ -198,15 +222,11 @@ static FailureOr<PT2EQuantization> readPT2EQuantization(
   PT2EQuantization quantization;
   quantization.input = adaptor.getInput();
   quantization.scale = adaptor.getScales();
-  // A None zero point denotes symmetric quantization.
-  if (!isa<Torch::NoneType>(op.getZeroPoints().getType())) {
-    quantization.zeroPoint = adaptor.getZeroPoints();
-    quantization.zeroPointUnsigned =
-        isUnsignedZeroPoint(op.getZeroPoints().getType());
-  }
   if (failed(matchConstantAxis(op, op.getAxis(), quantization, rewriter)) ||
       failed(matchConstantBounds(op, op.getQuantMin(), op.getQuantMax(),
-                                 quantization, rewriter))) {
+                                 quantization, rewriter)) ||
+      failed(matchZeroPoint(op, op.getZeroPoints(), adaptor.getZeroPoints(),
+                            quantization, rewriter))) {
     return failure();
   }
   return quantization;
@@ -219,13 +239,12 @@ static FailureOr<PT2EQuantization> readPT2EQuantization(
   PT2EQuantization quantization;
   quantization.input = adaptor.getInput();
   quantization.scale = adaptor.getScales();
-  quantization.zeroPoint = adaptor.getZeroPoints();
-  quantization.zeroPointUnsigned =
-      isUnsignedZeroPoint(op.getZeroPoints().getType());
   if (failed(matchConstantGroupSize(op, op.getGroupSize(), quantization,
                                     rewriter)) ||
       failed(matchConstantBounds(op, op.getQuantMin(), op.getQuantMax(),
-                                 quantization, rewriter))) {
+                                 quantization, rewriter)) ||
+      failed(matchZeroPoint(op, op.getZeroPoints(), adaptor.getZeroPoints(),
+                            quantization, rewriter))) {
     return failure();
   }
   return quantization;
@@ -238,16 +257,12 @@ static FailureOr<PT2EQuantization> readPT2EQuantization(
   PT2EQuantization quantization;
   quantization.input = adaptor.getInput();
   quantization.scale = adaptor.getScales();
-  // A None zero point denotes symmetric quantization.
-  if (!isa<Torch::NoneType>(op.getZeroPoints().getType())) {
-    quantization.zeroPoint = adaptor.getZeroPoints();
-    quantization.zeroPointUnsigned =
-        isUnsignedZeroPoint(op.getZeroPoints().getType());
-  }
   if (failed(matchConstantGroupSize(op, op.getGroupSize(), quantization,
                                     rewriter)) ||
       failed(matchConstantBounds(op, op.getQuantMin(), op.getQuantMax(),
-                                 quantization, rewriter))) {
+                                 quantization, rewriter)) ||
+      failed(matchZeroPoint(op, op.getZeroPoints(), adaptor.getZeroPoints(),
+                            quantization, rewriter))) {
     return failure();
   }
   return quantization;
@@ -260,12 +275,11 @@ static FailureOr<PT2EQuantization> readPT2EQuantization(
   PT2EQuantization quantization;
   quantization.input = adaptor.getInput();
   quantization.scale = adaptor.getScales();
-  quantization.zeroPoint = adaptor.getZeroPoints();
-  quantization.zeroPointUnsigned =
-      isUnsignedZeroPoint(op.getZeroPoints().getType());
   setTokenBlockSize(quantization);
   if (failed(matchConstantBounds(op, op.getQuantMin(), op.getQuantMax(),
-                                 quantization, rewriter))) {
+                                 quantization, rewriter)) ||
+      failed(matchZeroPoint(op, op.getZeroPoints(), adaptor.getZeroPoints(),
+                            quantization, rewriter))) {
     return failure();
   }
   return quantization;
@@ -278,12 +292,11 @@ static FailureOr<PT2EQuantization> readPT2EQuantization(
   PT2EQuantization quantization;
   quantization.input = adaptor.getInput();
   quantization.scale = adaptor.getScales();
-  quantization.zeroPoint = adaptor.getZeroPoints();
-  quantization.zeroPointUnsigned =
-      isUnsignedZeroPoint(op.getZeroPoints().getType());
   setTokenBlockSize(quantization);
   if (failed(matchConstantBounds(op, op.getQuantMin(), op.getQuantMax(),
-                                 quantization, rewriter))) {
+                                 quantization, rewriter)) ||
+      failed(matchZeroPoint(op, op.getZeroPoints(), adaptor.getZeroPoints(),
+                            quantization, rewriter))) {
     return failure();
   }
   return quantization;

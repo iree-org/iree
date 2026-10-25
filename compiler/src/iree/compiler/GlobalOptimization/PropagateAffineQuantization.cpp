@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/AffineMap.h"
@@ -144,6 +145,42 @@ static bool canPropagateAffineQuantizationReshape(OpOperand *operand) {
          operand->get().hasOneUse();
 }
 
+static bool isDequantizedOrCollapsedDequantized(Value value) {
+  if (auto collapse = value.getDefiningOp<tensor::CollapseShapeOp>()) {
+    value = collapse.getSrc();
+  }
+  return isa_and_nonnull<DequantizeAffineOp>(value.getDefiningOp());
+}
+
+/// Allows a consumer of a collapse_shape of a dequantized value to absorb the
+/// collapse_shape by expanding its iteration space:
+///
+/// - A transpose then produces a collapse_shape of a transposed dequantize,
+///   whose transpose folds into the dequantize's output map.
+/// - A contraction over `(m, n, k)` reading `collapse(dequantize : MxGxL)`
+///   becomes a contraction over `(m, n, g, l)` reading the dequantize
+///   directly. Its other inputs receive matching expand_shapes, which fold
+///   into their own collapse_shapes or propagate through their dequantizes.
+///   Every input must be dequantized so the expansion yields a contraction
+///   the integer rewrite can match rather than reshaping a real-valued
+///   operand.
+static bool canExpandOverCollapsedDequantize(OpOperand *operand) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(operand->getOwner());
+  if (!linalgOp || !linalgOp.isDpsInput(operand)) {
+    return false;
+  }
+  auto collapse = operand->get().getDefiningOp<tensor::CollapseShapeOp>();
+  if (!collapse || !collapse.getSrc().getDefiningOp<DequantizeAffineOp>()) {
+    return false;
+  }
+  if (isa<linalg::TransposeOp>(linalgOp)) {
+    return true;
+  }
+  return linalg::isaContractionOpInterface(linalgOp) &&
+         llvm::all_of(linalgOp.getDpsInputs(),
+                      isDequantizedOrCollapsedDequantized);
+}
+
 /// Restricts transpose rewrites to transposes of dequantized values. The
 /// general transpose propagation pass owns every other transpose.
 static bool isTransposeOfDequantize(OpOperand *operand) {
@@ -158,6 +195,11 @@ struct PropagateAffineQuantizationPass
     RewritePatternSet patterns(context);
     IREE::LinalgExt::populatePropagateAffineQuantizationReshapesPatterns(
         patterns, canPropagateAffineQuantizationReshape);
+    // The control function admits only a Linalg operand produced by a
+    // collapse_shape, so the pad and consumer expand_shape patterns this also
+    // adds never fire.
+    linalg::populateFoldReshapeOpsByExpansionPatterns(
+        patterns, canExpandOverCollapsedDequantize);
     populateSpecializeGenericTransposePattern(patterns,
                                               isTransposeOfDequantize);
     populateFuseTransposeIntoDequantizePattern(patterns,
