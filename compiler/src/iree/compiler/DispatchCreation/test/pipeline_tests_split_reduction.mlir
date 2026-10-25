@@ -70,9 +70,8 @@ util.func public @basic_arg_compare(%arg0: tensor<4096xf32>)
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<1025x8xi32>
 util.func public @coupled_argmax(%arg0: tensor<1025x8xi32>)
     -> (tensor<8xi32>, tensor<8xi64>) {
-  // The coupled value/index combiner is not supported by the generic partial
-  // reduction implementation, so the pipeline must leave the op unsplit and
-  // still form a dispatch.
+  // Check that dispatch formation succeeds for a coupled value/index reduction
+  // that cannot be split.
   // CHECK: flow.dispatch.workgroups
   // CHECK: util.return
   %min = arith.constant -2147483648 : i32

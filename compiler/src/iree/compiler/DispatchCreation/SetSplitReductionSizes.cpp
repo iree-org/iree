@@ -56,12 +56,8 @@ static std::optional<SmallVector<int64_t>> getReductionDimSizes(Operation *Op) {
   return reductionDimSizes;
 }
 
-/// Returns true if the generic Linalg partial-reduction implementation can
-/// handle every output of `op`. That implementation requires each output to be
-/// combined by a single recognized operation with a known neutral element, and
-/// returns failure otherwise. Coupled reductions, such as argmax over a
-/// value/index pair, do not meet these conditions and must not be annotated
-/// for splitting.
+/// Returns whether each output has a single combiner with a known neutral
+/// element, as required by generic Linalg partial reduction.
 static bool supportsGenericPartialReduction(linalg::LinalgOp op) {
   for (unsigned initIndex = 0, e = op->getNumResults(); initIndex < e;
        ++initIndex) {
@@ -619,10 +615,8 @@ struct SetSplitReductionSizesPass final
         return;
       }
 
-      // The split-reduction formation relies on the generic Linalg
-      // partial-reduction implementation. Skip Linalg ops whose reduction body
-      // it cannot handle instead of annotating them and failing later during
-      // dispatch formation. Other ops may provide their own implementation.
+      // Linalg ops use the generic partial-reduction implementation; other ops
+      // may provide their own.
       if (auto linalgOp = dyn_cast<linalg::LinalgOp>(tilingOp.getOperation())) {
         if (!supportsGenericPartialReduction(linalgOp)) {
           return;

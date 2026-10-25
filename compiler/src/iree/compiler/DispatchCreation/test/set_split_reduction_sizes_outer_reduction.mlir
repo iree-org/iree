@@ -299,8 +299,8 @@ util.func public @basic_multi_output(%arg0: tensor<1025x8xf32>)
 // CHECK-LABEL: @coupled_argmax_outer_reduction
 util.func public @coupled_argmax_outer_reduction(%arg0: tensor<1025x8xi32>)
     -> (tensor<8xi32>, tensor<8xi64>) {
-  // The index update depends on the value state, so the outputs are not
-  // independent scalar combiners. Leave the op unsplit.
+  // The index update depends on the value accumulator. Leave the coupled
+  // outputs unsplit.
   // CHECK-NOT: iree_linalg_ext.split_reduction
   %min = arith.constant -2147483648 : i32
   %last = arith.constant 9223372036854775807 : i64
