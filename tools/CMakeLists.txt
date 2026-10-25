@@ -476,8 +476,6 @@ if(IREE_BUILD_COMPILER)
       iree-compile
     SRCS
       "iree-compile-main.cc"
-    LINKOPTS
-      ${IREE_COMPILER_TOOL_LINKOPTS}
     DEPS
       iree::compiler::bindings::c::headers
       iree::compiler::API::Impl
@@ -493,8 +491,6 @@ if(IREE_BUILD_COMPILER)
       iree-reduce
     SRCS
       "iree-reduce.cc"
-    LINKOPTS
-      ${IREE_COMPILER_TOOL_LINKOPTS}
     DEPS
       iree::compiler::bindings::c::headers
       iree::compiler::API::Impl
@@ -541,8 +537,6 @@ if(IREE_BUILD_COMPILER)
       iree-opt
     SRCS
       "iree-opt-main.cc"
-    LINKOPTS
-      ${IREE_COMPILER_TOOL_LINKOPTS}
     DEPS
       iree::compiler::bindings::c::headers
       iree::compiler::API::Impl
@@ -558,8 +552,6 @@ if(IREE_BUILD_COMPILER)
       iree-mlir-lsp-server
     SRCS
       "iree-mlir-lsp-server.cc"
-    LINKOPTS
-      ${IREE_COMPILER_TOOL_LINKOPTS}
     DEPS
       iree::compiler::bindings::c::headers
       iree::compiler::API::Impl
@@ -572,8 +564,6 @@ if(IREE_BUILD_COMPILER)
       iree-run-mlir
     SRCS
       "iree-run-mlir-main.cc"
-    LINKOPTS
-      ${IREE_COMPILER_TOOL_LINKOPTS}
     DEPS
       iree::base
       iree::base::tooling::flags
