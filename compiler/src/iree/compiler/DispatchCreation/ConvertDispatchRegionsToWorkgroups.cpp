@@ -99,6 +99,11 @@ materializeSortWorkspaces(IREE::Flow::DispatchRegionOp &regionOp,
   // otherwise disconnect an earlier workspace from its exported result.
   auto sortOps = llvm::to_vector(body.getOps<IREE::LinalgExt::SortOp>());
   for (auto sortOp : llvm::reverse(sortOps)) {
+    // Static shapes already have bounded private storage. Exporting it can
+    // replace local accesses with slower global memory traffic on GPUs.
+    if (sortOp.getOperandType(0).hasStaticShape()) {
+      continue;
+    }
     auto comparatorArgs = sortOp.getRegion().front().getArguments();
     for (OpResult result : sortOp.getResults()) {
       unsigned index = result.getResultNumber();

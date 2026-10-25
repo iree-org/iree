@@ -570,10 +570,10 @@ def ConvertDispatchRegionsToWorkgroupsPass :
     Pass to convert dispatch regions to dispatch workgroups. This pass is
     intended to be used after dispatch regions have been formed.
 
-    Sort outputs used as internal working storage receive managed writable
-    bindings even when their final values do not escape the dispatch. Sort
-    initializes this storage from its inputs; it must cover the full sorting
-    axis and cannot rely on an unbounded private kernel allocation.
+    Dynamically shaped Sort outputs used as internal working storage receive
+    managed writable bindings when their sizes are available outside the
+    dispatch. Sort initializes this storage from its inputs; it must cover the
+    full sorting axis and cannot rely on an unbounded private kernel allocation.
   }];
   let dependentDialects = [
     "mlir::affine::AffineDialect",

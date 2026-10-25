@@ -103,20 +103,22 @@ util.func public @sort_workspace(%keys: tensor<?xi64>, %labels: tensor<?xi64>)
 // CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#1
 // CHECK-NOT: flow.tensor.alloca
 // CHECK: util.return %[[DISPATCH]]#0, %[[DISPATCH]]#1
-util.func public @sort_returned_keys(%keys: tensor<4xi64>, %labels: tensor<4xi64>)
-    -> (tensor<4xi64>, tensor<4xi64>) {
-  %result:2 = flow.dispatch.region -> (tensor<4xi64>, tensor<4xi64>) {
-    %empty = tensor.empty() : tensor<4xi64>
+util.func public @sort_returned_keys(%keys: tensor<?xi64>, %labels: tensor<?xi64>)
+    -> (tensor<?xi64>, tensor<?xi64>) {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %keys, %c0 : tensor<?xi64>
+  %result:2 = flow.dispatch.region -> (tensor<?xi64>{%n}, tensor<?xi64>{%n}) {
+    %empty = tensor.empty(%n) : tensor<?xi64>
     %sorted:2 = iree_linalg_ext.sort dimension(0)
-        ins(%keys, %labels : tensor<4xi64>, tensor<4xi64>)
-        outs(%empty, %empty : tensor<4xi64>, tensor<4xi64>) {
+        ins(%keys, %labels : tensor<?xi64>, tensor<?xi64>)
+        outs(%empty, %empty : tensor<?xi64>, tensor<?xi64>) {
     ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
       %cmp = arith.cmpi sle, %lhs, %rhs : i64
       iree_linalg_ext.yield %cmp : i1
-    } -> tensor<4xi64>, tensor<4xi64>
-    flow.return %sorted#0, %sorted#1 : tensor<4xi64>, tensor<4xi64>
+    } -> tensor<?xi64>, tensor<?xi64>
+    flow.return %sorted#0, %sorted#1 : tensor<?xi64>, tensor<?xi64>
   }
-  util.return %result#0, %result#1 : tensor<4xi64>, tensor<4xi64>
+  util.return %result#0, %result#1 : tensor<?xi64>, tensor<?xi64>
 }
 
 // -----
@@ -127,29 +129,31 @@ util.func public @sort_returned_keys(%keys: tensor<4xi64>, %labels: tensor<4xi64
 // CHECK: %[[WORK1:.+]] = flow.tensor.alloca
 // CHECK-NOT: flow.tensor.alloca
 // CHECK: %[[DISPATCH:.+]]:3 = flow.dispatch.workgroups
-// CHECK-SAME: -> (tensor<4xi64>, %[[WORK0]], %[[WORK1]])
+// CHECK-SAME: -> (tensor<?xi64>{%{{.+}}}, %[[WORK0]]{%{{.+}}}, %[[WORK1]]{%{{.+}}})
 // CHECK: %[[SORT:.+]]:3 = iree_linalg_ext.sort
 // CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#2
 // CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#0
 // CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#1
 // CHECK: util.return %[[DISPATCH]]#0
-util.func public @sort_shared_keys(%keys: tensor<4xi64>, %labels: tensor<4xi64>)
-    -> tensor<4xi64> {
-  %result = flow.dispatch.region -> (tensor<4xi64>) {
-    %empty = tensor.empty() : tensor<4xi64>
+util.func public @sort_shared_keys(%keys: tensor<?xi64>, %labels: tensor<?xi64>)
+    -> tensor<?xi64> {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %keys, %c0 : tensor<?xi64>
+  %result = flow.dispatch.region -> (tensor<?xi64>{%n}) {
+    %empty = tensor.empty(%n) : tensor<?xi64>
     %sorted:3 = iree_linalg_ext.sort dimension(0)
-        ins(%keys, %keys, %labels : tensor<4xi64>, tensor<4xi64>, tensor<4xi64>)
-        outs(%empty, %empty, %empty : tensor<4xi64>, tensor<4xi64>, tensor<4xi64>) {
+        ins(%keys, %keys, %labels : tensor<?xi64>, tensor<?xi64>, tensor<?xi64>)
+        outs(%empty, %empty, %empty : tensor<?xi64>, tensor<?xi64>, tensor<?xi64>) {
     ^bb0(%lhs: i64, %rhs: i64, %lhs1: i64, %rhs1: i64,
          %lhs_label: i64, %rhs_label: i64):
       %cmp0 = arith.cmpi sle, %lhs, %rhs : i64
       %cmp1 = arith.cmpi sle, %lhs1, %rhs1 : i64
       %cmp = arith.andi %cmp0, %cmp1 : i1
       iree_linalg_ext.yield %cmp : i1
-    } -> tensor<4xi64>, tensor<4xi64>, tensor<4xi64>
-    flow.return %sorted#2 : tensor<4xi64>
+    } -> tensor<?xi64>, tensor<?xi64>, tensor<?xi64>
+    flow.return %sorted#2 : tensor<?xi64>
   }
-  util.return %result : tensor<4xi64>
+  util.return %result : tensor<?xi64>
 }
 
 // -----
@@ -208,23 +212,25 @@ util.func public @sort_updated_workspace(%keys: tensor<?xi64>, %labels: tensor<?
 // An unused lane that does not participate in the comparator needs no storage.
 // CHECK-LABEL: util.func public @sort_unused_payload
 // CHECK-NOT: flow.tensor.alloca
-// CHECK: iree_linalg_ext.sort dimension(0) ins(%{{.+}} : tensor<4xi64>)
+// CHECK: iree_linalg_ext.sort dimension(0) ins(%{{.+}} : tensor<?xi64>)
 // CHECK-NOT: flow.tensor.alloca
 // CHECK: util.return
-util.func public @sort_unused_payload(%keys: tensor<4xi64>, %labels: tensor<4xi64>)
-    -> tensor<4xi64> {
-  %result = flow.dispatch.region -> (tensor<4xi64>) {
-    %empty = tensor.empty() : tensor<4xi64>
+util.func public @sort_unused_payload(%keys: tensor<?xi64>, %labels: tensor<?xi64>)
+    -> tensor<?xi64> {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %keys, %c0 : tensor<?xi64>
+  %result = flow.dispatch.region -> (tensor<?xi64>{%n}) {
+    %empty = tensor.empty(%n) : tensor<?xi64>
     %sorted:2 = iree_linalg_ext.sort dimension(0)
-        ins(%keys, %labels : tensor<4xi64>, tensor<4xi64>)
-        outs(%empty, %empty : tensor<4xi64>, tensor<4xi64>) {
+        ins(%keys, %labels : tensor<?xi64>, tensor<?xi64>)
+        outs(%empty, %empty : tensor<?xi64>, tensor<?xi64>) {
     ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
       %cmp = arith.cmpi sle, %lhs, %rhs : i64
       iree_linalg_ext.yield %cmp : i1
-    } -> tensor<4xi64>, tensor<4xi64>
-    flow.return %sorted#0 : tensor<4xi64>
+    } -> tensor<?xi64>, tensor<?xi64>
+    flow.return %sorted#0 : tensor<?xi64>
   }
-  util.return %result : tensor<4xi64>
+  util.return %result : tensor<?xi64>
 }
 
 // -----
@@ -261,4 +267,31 @@ util.func public @chained_output_inits(%keys: tensor<?xi64>, %labels: tensor<?xi
     flow.return %second#1 : tensor<?xi64>
   }
   util.return %result : tensor<?xi64>
+}
+
+// -----
+
+// Bounded static workspaces keep private storage instead of adding bindings.
+// CHECK-LABEL: util.func public @sort_static_workspace
+// CHECK-NOT: flow.tensor.alloca
+// CHECK: %[[DISPATCH:.+]] = flow.dispatch.workgroups
+// CHECK: %[[SORT:.+]]:2 = iree_linalg_ext.sort
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#1
+// CHECK-NOT: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#0
+// CHECK-NOT: flow.tensor.alloca
+// CHECK: util.return %[[DISPATCH]]
+util.func public @sort_static_workspace(%keys: tensor<4xi64>, %labels: tensor<4xi64>)
+    -> tensor<4xi64> {
+  %result = flow.dispatch.region -> (tensor<4xi64>) {
+    %empty = tensor.empty() : tensor<4xi64>
+    %sorted:2 = iree_linalg_ext.sort dimension(0)
+        ins(%keys, %labels : tensor<4xi64>, tensor<4xi64>)
+        outs(%empty, %empty : tensor<4xi64>, tensor<4xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sle, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<4xi64>, tensor<4xi64>
+    flow.return %sorted#1 : tensor<4xi64>
+  }
+  util.return %result : tensor<4xi64>
 }
