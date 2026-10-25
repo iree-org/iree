@@ -95,7 +95,10 @@ materializeSortWorkspaces(IREE::Flow::DispatchRegionOp &regionOp,
   SmallVector<Value> workspaceResults;
   SmallVector<SmallVector<Value>> workspaceDims;
   OpBuilder::InsertionGuard guard(rewriter);
-  for (auto sortOp : body.getOps<IREE::LinalgExt::SortOp>()) {
+  // Materialize consumers first: replacing a later Sort's destination can
+  // otherwise disconnect an earlier workspace from its exported result.
+  auto sortOps = llvm::to_vector(body.getOps<IREE::LinalgExt::SortOp>());
+  for (auto sortOp : llvm::reverse(sortOps)) {
     auto comparatorArgs = sortOp.getRegion().front().getArguments();
     for (OpResult result : sortOp.getResults()) {
       unsigned index = result.getResultNumber();

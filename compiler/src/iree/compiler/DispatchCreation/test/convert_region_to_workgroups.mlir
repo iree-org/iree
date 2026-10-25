@@ -226,3 +226,39 @@ util.func public @sort_unused_payload(%keys: tensor<4xi64>, %labels: tensor<4xi6
   }
   util.return %result : tensor<4xi64>
 }
+
+// -----
+
+// Replacing a later Sort destination must not disconnect the earlier workspace.
+// CHECK-LABEL: util.func public @chained_output_inits
+// CHECK: %[[DISPATCH:.+]]:4 = flow.dispatch.workgroups
+// CHECK: %[[FIRST:.+]]:2 = iree_linalg_ext.sort
+// CHECK: %[[SECOND:.+]]:2 = iree_linalg_ext.sort
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[SECOND]]#1
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[SECOND]]#0
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[FIRST]]#0
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[FIRST]]#1
+// CHECK: util.return %[[DISPATCH]]#0
+util.func public @chained_output_inits(%keys: tensor<?xi64>, %labels: tensor<?xi64>) -> tensor<?xi64> {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %keys, %c0 : tensor<?xi64>
+  %empty = tensor.empty(%n) : tensor<?xi64>
+  %result = flow.dispatch.region -> (tensor<?xi64>{%n}) {
+    %first:2 = iree_linalg_ext.sort dimension(0)
+        ins(%keys, %labels : tensor<?xi64>, tensor<?xi64>)
+        outs(%empty, %empty : tensor<?xi64>, tensor<?xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %ll: i64, %rl: i64):
+      %cmp = arith.cmpi sle, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<?xi64>, tensor<?xi64>
+    %second:2 = iree_linalg_ext.sort dimension(0)
+        ins(%keys, %first#1 : tensor<?xi64>, tensor<?xi64>)
+        outs(%first#0, %empty : tensor<?xi64>, tensor<?xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %ll: i64, %rl: i64):
+      %cmp = arith.cmpi sge, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<?xi64>, tensor<?xi64>
+    flow.return %second#1 : tensor<?xi64>
+  }
+  util.return %result : tensor<?xi64>
+}

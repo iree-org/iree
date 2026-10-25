@@ -78,7 +78,7 @@ func.func @sort_carried_labels(%keys: tensor<?xi64>, %labels: tensor<?xi64>)
       : tensor<?xi64>, tensor<?xi64>, tensor<?xi64>
 }
 
-// A sole tensor use does not transfer ownership of the input buffer.
+// Sorting produces a new tensor while preserving the original input.
 func.func @sort_and_original(%input: tensor<?xi64>)
     -> (tensor<?xi64>, tensor<?xi64>) {
   %c0 = arith.constant 0 : index

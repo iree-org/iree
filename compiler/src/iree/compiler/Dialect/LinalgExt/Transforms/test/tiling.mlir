@@ -4524,3 +4524,92 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+// An explicit full-axis tile has an induction-variable offset before the
+// single-iteration loop is folded.
+func.func @sort_full_axis_tensor(%arg0: tensor<4xi32>) -> tensor<4xi32> {
+  %empty = tensor.empty() : tensor<4xi32>
+  %sorted = iree_linalg_ext.sort dimension(0) ins(%arg0 : tensor<4xi32>) outs(%empty : tensor<4xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4xi32>
+  return %sorted : tensor<4xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_for %sort tile_sizes [4] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @sort_full_axis_tensor
+// CHECK: iree_linalg_ext.sort dimension(0) ins(
+// CHECK-SAME: outs(%{{.+}} : tensor<4xi32>)
+// CHECK: return
+
+// -----
+
+func.func @sort_full_axis_memref(%arg0: memref<4xi32>) {
+  iree_linalg_ext.sort dimension(0) ins(%arg0 : memref<4xi32>) outs(%arg0 : memref<4xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_for %sort tile_sizes [4] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @sort_full_axis_memref
+// CHECK: iree_linalg_ext.sort dimension(0) ins(
+// CHECK-SAME: outs(%{{.+}} : memref<4xi32{{.*}}>)
+// CHECK: return
+
+// -----
+
+// Sorting each part of the sort dimension cannot implement a full sort.
+func.func @sort_partial_axis(%arg0: tensor<4xi32>) -> tensor<4xi32> {
+  %empty = tensor.empty() : tensor<4xi32>
+  // expected-error @+1 {{failed to generate tiling loops}}
+  %sorted = iree_linalg_ext.sort dimension(0) ins(%arg0 : tensor<4xi32>) outs(%empty : tensor<4xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4xi32>
+  return %sorted : tensor<4xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_for %sort tile_sizes [2] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+// Buffer-form Sort has no result positions through which to reject this tile.
+func.func @sort_partial_axis_memref(%arg0: memref<4xi32>) {
+  // expected-error @+2 {{failed to tile operation}}
+  // expected-error @+1 {{failed to generate tiling loops}}
+  iree_linalg_ext.sort dimension(0) ins(%arg0 : memref<4xi32>) outs(%arg0 : memref<4xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_for %sort tile_sizes [2] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
