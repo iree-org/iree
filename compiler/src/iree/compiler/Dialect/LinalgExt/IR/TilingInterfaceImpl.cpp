@@ -859,18 +859,63 @@ LogicalResult MapStoreOp::generateScalarImplementation(OpBuilder &b,
 static bool isFullSortTile(SortOp sortOp, ArrayRef<OpFoldResult> offsets,
                            ArrayRef<OpFoldResult> sizes) {
   int64_t dimension = sortOp.getDimension();
-  // Prove zero even when an explicit full-axis tile uses a loop IV as offset.
-  auto zero = IntegerAttr::get(IndexType::get(sortOp.getContext()), 0);
-  auto startsAtZero = ValueBoundsConstraintSet::areEqual(
-      ValueBoundsConstraintSet::Variable(offsets[dimension]),
-      ValueBoundsConstraintSet::Variable(OpFoldResult(zero)));
-  if (failed(startsAtZero) || !*startsAtZero) {
+  using Bounds = ValueBoundsConstraintSet;
+  // An explicit dynamic full-axis tile generates a loop from zero to the
+  // dimension size with a step at least that large. Its IV is zero, but the
+  // generic bounds model cannot represent the resulting nonlinear trip count.
+  auto boundFullTileLoop = [](Value value, std::optional<int64_t> dim,
+                              Bounds &bounds) {
+    if (dim) {
+      return false;
+    }
+    auto loop = scf::getForInductionVarOwner(value);
+    if (!loop || value != loop.getInductionVar() ||
+        !isZeroInteger(loop.getLowerBound()) ||
+        !Bounds::compare(Bounds::Variable(loop.getUpperBound()), Bounds::LE,
+                         Bounds::Variable(loop.getStep()))) {
+      return false;
+    }
+    bounds.bound(value) == 0;
+    return true;
+  };
+  auto offset = Bounds::computeConstantBound(
+      presburger::BoundType::EQ, Bounds::Variable(offsets[dimension]),
+      boundFullTileLoop);
+  if (failed(offset) || *offset != 0) {
     return false;
   }
-  auto coversSortDimension = ValueBoundsConstraintSet::areEqual(
-      ValueBoundsConstraintSet::Variable(sizes[dimension]),
-      ValueBoundsConstraintSet::Variable(sortOp.getOperand(0), dimension));
-  return succeeded(coversSortDimension) && *coversSortDimension;
+  AffineExpr tileSize, fullSize;
+  bindDims(sortOp.getContext(), tileSize, fullSize);
+  auto getSizeDifference = [&](const Bounds::Variable &size) {
+    Bounds::Variable difference(
+        AffineMap::get(2, 0, tileSize - fullSize),
+        {size, Bounds::Variable(sortOp.getOperand(0), dimension)});
+    return Bounds::computeConstantBound(presburger::BoundType::EQ, difference,
+                                        boundFullTileLoop);
+  };
+  auto sizeDifference = getSizeDifference(Bounds::Variable(sizes[dimension]));
+  if (succeeded(sizeDifference) && *sizeDifference == 0) {
+    return true;
+  }
+  // The bounds model gives affine.min only upper bounds. A minimum whose
+  // candidates are all at least the full dimension and include that exact
+  // dimension also covers the full axis.
+  auto sizeValue = dyn_cast<Value>(sizes[dimension]);
+  auto minOp = sizeValue ? sizeValue.getDefiningOp<affine::AffineMinOp>()
+                         : affine::AffineMinOp();
+  if (!minOp) {
+    return false;
+  }
+  bool hasFullSize = false;
+  for (unsigned i : llvm::seq<unsigned>(0, minOp.getMap().getNumResults())) {
+    auto difference = getSizeDifference(
+        Bounds::Variable(minOp.getMap().getSubMap({i}), minOp.getOperands()));
+    if (failed(difference) || *difference < 0) {
+      return false;
+    }
+    hasFullSize |= *difference == 0;
+  }
+  return hasFullSize;
 }
 
 SmallVector<utils::IteratorType> SortOp::getLoopIteratorTypes() {
