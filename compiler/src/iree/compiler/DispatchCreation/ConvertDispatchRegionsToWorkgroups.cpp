@@ -99,9 +99,9 @@ materializeSortWorkspaces(IREE::Flow::DispatchRegionOp &regionOp,
   // otherwise disconnect an earlier workspace from its exported result.
   auto sortOps = llvm::to_vector(body.getOps<IREE::LinalgExt::SortOp>());
   for (auto sortOp : llvm::reverse(sortOps)) {
-    // Static shapes already have bounded private storage. Exporting it can
-    // replace local accesses with slower global memory traffic on GPUs.
-    if (sortOp.getOperandType(0).hasStaticShape()) {
+    // Only a dynamic sorting axis requires unbounded full-axis storage. Leave
+    // fixed sorting axes to ordinary tiling and private storage allocation.
+    if (!sortOp.getOperandType(0).isDynamicDim(sortOp.getDimension())) {
       continue;
     }
     auto comparatorArgs = sortOp.getRegion().front().getArguments();

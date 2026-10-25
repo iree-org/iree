@@ -295,3 +295,32 @@ util.func public @sort_static_workspace(%keys: tensor<4xi64>, %labels: tensor<4x
   }
   util.return %result : tensor<4xi64>
 }
+
+// -----
+
+// A dynamic batch does not require workspace bindings for a fixed sorting axis.
+// CHECK-LABEL: util.func public @sort_dynamic_batch_static_axis
+// CHECK-NOT: flow.tensor.alloca
+// CHECK: %[[DISPATCH:.+]] = flow.dispatch.workgroups
+// CHECK: %[[SORT:.+]]:2 = iree_linalg_ext.sort
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#1
+// CHECK-NOT: iree_tensor_ext.dispatch.tensor.store %[[SORT]]#0
+// CHECK-NOT: flow.tensor.alloca
+// CHECK: util.return %[[DISPATCH]]
+util.func public @sort_dynamic_batch_static_axis(%keys: tensor<?x4xi64>, %labels: tensor<?x4xi64>)
+    -> tensor<?x4xi64> {
+  %c0 = arith.constant 0 : index
+  %batch = tensor.dim %keys, %c0 : tensor<?x4xi64>
+  %result = flow.dispatch.region -> (tensor<?x4xi64>{%batch}) {
+    %empty = tensor.empty(%batch) : tensor<?x4xi64>
+    %sorted:2 = iree_linalg_ext.sort dimension(1)
+        ins(%keys, %labels : tensor<?x4xi64>, tensor<?x4xi64>)
+        outs(%empty, %empty : tensor<?x4xi64>, tensor<?x4xi64>) {
+    ^bb0(%lhs: i64, %rhs: i64, %lhs_label: i64, %rhs_label: i64):
+      %cmp = arith.cmpi sle, %lhs, %rhs : i64
+      iree_linalg_ext.yield %cmp : i1
+    } -> tensor<?x4xi64>, tensor<?x4xi64>
+    flow.return %sorted#1 : tensor<?x4xi64>
+  }
+  util.return %result : tensor<?x4xi64>
+}
