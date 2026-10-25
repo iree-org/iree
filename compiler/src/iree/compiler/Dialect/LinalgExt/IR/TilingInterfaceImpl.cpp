@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Utils/AffineCanonicalizationUtils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -868,11 +869,16 @@ static bool isFullSortTile(SortOp sortOp, ArrayRef<OpFoldResult> offsets,
     if (dim) {
       return false;
     }
-    auto loop = scf::getForInductionVarOwner(value);
-    if (!loop || value != loop.getInductionVar() ||
-        !isZeroInteger(loop.getLowerBound()) ||
-        !Bounds::compare(Bounds::Variable(loop.getUpperBound()), Bounds::LE,
-                         Bounds::Variable(loop.getStep()))) {
+    // matchForLikeLoop also matches scf.for iter_args via their owner.
+    if (auto loop = scf::getForInductionVarOwner(value);
+        loop && value != loop.getInductionVar()) {
+      return false;
+    }
+    OpFoldResult lower, upper, step;
+    if (failed(scf::matchForLikeLoop(value, lower, upper, step)) ||
+        !isZeroInteger(lower) ||
+        !Bounds::compare(Bounds::Variable(upper), Bounds::LE,
+                         Bounds::Variable(step))) {
       return false;
     }
     bounds.bound(value) == 0;
@@ -886,14 +892,16 @@ static bool isFullSortTile(SortOp sortOp, ArrayRef<OpFoldResult> offsets,
   }
   AffineExpr tileSize, fullSize;
   bindDims(sortOp.getContext(), tileSize, fullSize);
-  auto getSizeDifference = [&](const Bounds::Variable &size) {
+  auto getSizeDifference = [&](const Bounds::Variable &size,
+                               presburger::BoundType boundType) {
     Bounds::Variable difference(
         AffineMap::get(2, 0, tileSize - fullSize),
         {size, Bounds::Variable(sortOp.getOperand(0), dimension)});
-    return Bounds::computeConstantBound(presburger::BoundType::EQ, difference,
+    return Bounds::computeConstantBound(boundType, difference,
                                         boundFullTileLoop);
   };
-  auto sizeDifference = getSizeDifference(Bounds::Variable(sizes[dimension]));
+  auto sizeDifference = getSizeDifference(Bounds::Variable(sizes[dimension]),
+                                          presburger::BoundType::EQ);
   if (succeeded(sizeDifference) && *sizeDifference == 0) {
     return true;
   }
@@ -908,12 +916,17 @@ static bool isFullSortTile(SortOp sortOp, ArrayRef<OpFoldResult> offsets,
   }
   bool hasFullSize = false;
   for (unsigned i : llvm::seq<unsigned>(0, minOp.getMap().getNumResults())) {
-    auto difference = getSizeDifference(
-        Bounds::Variable(minOp.getMap().getSubMap({i}), minOp.getOperands()));
-    if (failed(difference) || *difference < 0) {
+    Bounds::Variable candidate(minOp.getMap().getSubMap({i}),
+                               minOp.getOperands());
+    auto difference = getSizeDifference(candidate, presburger::BoundType::EQ);
+    if (succeeded(difference) && *difference == 0) {
+      hasFullSize = true;
+      continue;
+    }
+    auto lowerBound = getSizeDifference(candidate, presburger::BoundType::LB);
+    if (failed(lowerBound) || *lowerBound < 0) {
       return false;
     }
-    hasFullSize |= *difference == 0;
   }
   return hasFullSize;
 }
