@@ -52,10 +52,10 @@ func.func @copy_outer_dynamic_4d(%src: tensor<?x8x14x14xf32>, %dst: tensor<?x8x1
   return %result : tensor<?x8x14x14xf32>
 }
 
-// CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 0, 64, 64]>
+// CHECK-DAG: #[[$OUTER_DYNAMIC_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 0, 64, 64]>
 // CHECK-LABEL: func.func @copy_outer_dynamic_4d
 // CHECK: linalg.generic
-// CHECK-SAME: lowering_config = #[[CONFIG]]
+// CHECK-SAME: lowering_config = #[[$OUTER_DYNAMIC_CONFIG]]
 
 // -----
 
@@ -73,10 +73,10 @@ func.func @copy_two_outer_dynamic_4d(%src: tensor<?x?x14x14xf32>, %dst: tensor<?
   return %result : tensor<?x?x14x14xf32>
 }
 
-// CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0, 64]>
+// CHECK-DAG: #[[$TWO_OUTER_DYNAMIC_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0, 64]>
 // CHECK-LABEL: func.func @copy_two_outer_dynamic_4d
 // CHECK: linalg.generic
-// CHECK-SAME: lowering_config = #[[CONFIG]]
+// CHECK-SAME: lowering_config = #[[$TWO_OUTER_DYNAMIC_CONFIG]]
 
 // -----
 
@@ -94,10 +94,10 @@ func.func @copy_static_4d(%src: tensor<2x8x14x14xf32>, %dst: tensor<2x8x14x14xf3
   return %result : tensor<2x8x14x14xf32>
 }
 
-// CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 64, 64, 64]>
+// CHECK-DAG: #[[$STATIC_4D_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 64, 64, 64]>
 // CHECK-LABEL: func.func @copy_static_4d
 // CHECK: linalg.generic
-// CHECK-SAME: lowering_config = #[[CONFIG]]
+// CHECK-SAME: lowering_config = #[[$STATIC_4D_CONFIG]]
 
 // -----
 
@@ -116,10 +116,10 @@ func.func @copy_outer_dynamic_large_channel(%src: tensor<?x128x8x14xf32>, %dst: 
   return %result : tensor<?x128x8x14xf32>
 }
 
-// CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0, 64]>
+// CHECK-DAG: #[[$LARGE_CHANNEL_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0, 64]>
 // CHECK-LABEL: func.func @copy_outer_dynamic_large_channel
 // CHECK: linalg.generic
-// CHECK-SAME: lowering_config = #[[CONFIG]]
+// CHECK-SAME: lowering_config = #[[$LARGE_CHANNEL_CONFIG]]
 
 // -----
 
