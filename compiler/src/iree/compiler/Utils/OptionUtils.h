@@ -12,6 +12,7 @@
 #include "llvm/Passes/OptimizationLevel.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/LibraryOptionsContext.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Support/LogicalResult.h"
@@ -24,6 +25,12 @@ inline raw_ostream &operator<<(raw_ostream &os,
 } // namespace llvm
 
 namespace mlir::iree_compiler {
+
+// Process-wide LLVM library options, populated during command-line parsing and
+// immutable during compilation. Empty (LLVM defaults) for embedding clients
+// that do not initialize command-line options. The storage lives until
+// llvm_shutdown(), outliving target machines.
+extern llvm::ManagedStatic<llvm::cl::LibraryOptionsContext> commandLineOptions;
 
 template <typename Ty>
 struct opt_initializer {

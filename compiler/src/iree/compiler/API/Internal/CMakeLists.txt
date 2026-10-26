@@ -19,6 +19,7 @@ iree_cc_library(
     "CompilerDriver.cpp"
     "Diagnostics.cpp"
   DEPS
+    LLVMCore
     LLVMPasses
     LLVMRemarks
     LLVMSupport
@@ -89,6 +90,7 @@ iree_cc_library(
     iree::compiler::PluginAPI::PluginManager
     iree::compiler::Tools::init_llvmir_translations
     iree::compiler::Tools::init_passes_and_dialects
+    iree::compiler::Utils
     iree::compiler::bindings::c::headers
   PUBLIC
 )

@@ -38,8 +38,17 @@ LogicalResult runLLVMIRPasses(const LLVMTarget &target,
       /*DebugLogging=*/false);
   standardInstrumentations.registerCallbacks(passInstrumentationCallbacks);
 
-  llvm::PassBuilder passBuilder(machine, target.pipelineTuningOptions, {},
-                                &passInstrumentationCallbacks);
+  llvm::PipelineTuningOptions tuningOptions(
+      &module->getContext().getLibraryOptions());
+  tuningOptions.LoopInterleaving =
+      target.pipelineTuningOptions.LoopInterleaving;
+  tuningOptions.LoopVectorization =
+      target.pipelineTuningOptions.LoopVectorization;
+  tuningOptions.LoopUnrolling = target.pipelineTuningOptions.LoopUnrolling;
+  tuningOptions.SLPVectorization =
+      target.pipelineTuningOptions.SLPVectorization;
+  llvm::PassBuilder passBuilder(module->getContext(), machine, tuningOptions,
+                                {}, &passInstrumentationCallbacks);
   llvm::AAManager aa = passBuilder.buildDefaultAAPipeline();
   functionAnalysisManager.registerPass([&] { return std::move(aa); });
 
