@@ -697,9 +697,12 @@ public:
                        variantOp.getName(), ".o", objectData);
       }
       auto objectFile = Artifact::createTemporary(libraryName, "o");
+      if (!objectFile.outputFile) {
+        return variantOp.emitError()
+               << "failed to create temporary file for the generated object";
+      }
       auto &os = objectFile.outputFile->os();
       os << objectData;
-      os.flush();
       os.close();
       objectFiles.push_back(std::move(objectFile));
     }
