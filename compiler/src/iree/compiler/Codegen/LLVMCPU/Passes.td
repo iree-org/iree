@@ -287,6 +287,10 @@ def LLVMCPUVirtualVectorLoweringPass :
     Option<"enableArmI8mm", "enable-arm-i8mm", "bool",
       /*default=*/ "false",
       "Enables arm i8mm lowering patterns">,
+    Option<"skipIntermediateRoundings", "skip-intermediate-roundings", "bool",
+      /*default=*/ "true",
+      "Allow skipping intermediate roundings, e.g. in f16 arithmetic "
+      "internally using f32">,
   ];
 }
 
