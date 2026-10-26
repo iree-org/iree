@@ -25,10 +25,10 @@
 // CONSOLIDATE: stream.async.parameter.load {{.*}} %[[SOURCE]]::%[[B_KEY]]
 // CONSOLIDATE: stream.async.parameter.scatter
 // CONSOLIDATE-LABEL: module @mixed_consolidation
-// CONSOLIDATE: %[[SLAB_SIZE:.+]] = arith.constant 3072 : index
-// CONSOLIDATE: %[[ZERO:.+]] = arith.constant 0 : index
-// CONSOLIDATE: %[[A_OFFSET:.+]] = arith.constant 1024 : index
-// CONSOLIDATE: %[[B_OFFSET:.+]] = arith.constant 2048 : index
+// CONSOLIDATE-DAG: %[[SLAB_SIZE:.+]] = arith.constant 3072 : index
+// CONSOLIDATE-DAG: %[[ZERO:.+]] = arith.constant 0 : index
+// CONSOLIDATE-DAG: %[[A_OFFSET:.+]] = arith.constant 1024 : index
+// CONSOLIDATE-DAG: %[[B_OFFSET:.+]] = arith.constant 2048 : index
 // CONSOLIDATE: %[[A_SLAB:.+]] = stream.async.constant {{.*}} #stream.parameter.named<"encoded"::"parameter0">
 // CONSOLIDATE-NEXT: %[[A:.+]] = stream.resource.subview %[[A_SLAB]][%[[A_OFFSET]]]
 // CONSOLIDATE: %[[B_SLAB:.+]] = stream.async.constant {{.*}} #stream.parameter.named<"encoded"::"parameter0">
