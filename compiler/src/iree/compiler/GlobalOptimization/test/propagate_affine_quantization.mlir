@@ -371,3 +371,156 @@ func.func @generic_transpose_after_dequantize(%q: tensor<2x3xi8>, %scale: f32)
 //   CHECK-NOT:   linalg.generic
 //   CHECK-NOT:   linalg.transpose
 //       CHECK:   return %[[DEQ]]
+
+// -----
+
+#id3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#block3 = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+// Blockwise operands as produced by the Torch frontend for a linear layer:
+// both dequantize over (rows, blocks, block elements) and collapse the blocks
+// back into K, and the weight is transposed. The transpose absorbs the weight
+// collapse_shape and folds into the dequantize, then the matmul absorbs both
+// collapse_shapes and iterates over (m, n, g, l), reading the dequantizes
+// directly.
+func.func @expand_matmul_over_collapsed_dequantizes(
+    %aq: tensor<?x2x32xi8>, %sa: tensor<?x2xf32>, %za: tensor<?x2xi64>,
+    %bq: tensor<8x2x32xi8>, %sb: tensor<8x2xf32>, %zb: tensor<8x2xi8>)
+    -> tensor<?x8xf32> {
+  %c0 = arith.constant 0 : index
+  %m = tensor.dim %aq, %c0 : tensor<?x2x32xi8>
+  %ainit = tensor.empty(%m) : tensor<?x2x32xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id3, #block3, #block3, #id3],
+       quant_min = -128, quant_max = 127>
+      ins(%aq, %sa, %za : tensor<?x2x32xi8>, tensor<?x2xf32>, tensor<?x2xi64>)
+      outs(%ainit : tensor<?x2x32xf32>) -> tensor<?x2x32xf32>
+  %ac = tensor.collapse_shape %a [[0], [1, 2]]
+      : tensor<?x2x32xf32> into tensor<?x64xf32>
+  %binit = tensor.empty() : tensor<8x2x32xf32>
+  %b = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id3, #block3, #block3, #id3],
+       quant_min = 0, quant_max = 255, input_unsigned, zp_unsigned>
+      ins(%bq, %sb, %zb : tensor<8x2x32xi8>, tensor<8x2xf32>, tensor<8x2xi8>)
+      outs(%binit : tensor<8x2x32xf32>) -> tensor<8x2x32xf32>
+  %bc = tensor.collapse_shape %b [[0], [1, 2]]
+      : tensor<8x2x32xf32> into tensor<8x64xf32>
+  %tinit = tensor.empty() : tensor<64x8xf32>
+  %bt = linalg.transpose ins(%bc : tensor<8x64xf32>)
+      outs(%tinit : tensor<64x8xf32>) permutation = [1, 0]
+  %cst = arith.constant 0.0 : f32
+  %init = tensor.empty(%m) : tensor<?x8xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<?x8xf32>)
+      -> tensor<?x8xf32>
+  %c = linalg.matmul ins(%ac, %bt : tensor<?x64xf32>, tensor<64x8xf32>)
+      outs(%fill : tensor<?x8xf32>) -> tensor<?x8xf32>
+  return %c : tensor<?x8xf32>
+}
+//   CHECK-DAG: #[[$LHS:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+//   CHECK-DAG: #[[$RHS:.+]] = affine_map<(d0, d1, d2, d3) -> (d2, d3, d1)>
+//   CHECK-DAG: #[[$OUT:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+//   CHECK-DAG: #[[$TRANSPOSED:.+]] = affine_map<(d0, d1, d2) -> (d1, d2, d0)>
+// CHECK-LABEL: func.func @expand_matmul_over_collapsed_dequantizes(
+//   CHECK-NOT:   tensor.collapse_shape
+//   CHECK-NOT:   linalg.transpose
+//       CHECK:   %[[A:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     -> tensor<?x2x32xf32>
+//       CHECK:   %[[B:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     #[[$TRANSPOSED]]]
+//  CHECK-SAME:     -> tensor<2x32x8xf32>
+//       CHECK:   %[[C:.+]] = linalg.generic
+//  CHECK-SAME:     indexing_maps = [#[[$LHS]], #[[$RHS]], #[[$OUT]]]
+//  CHECK-SAME:     iterator_types = ["parallel", "parallel", "reduction", "reduction"]
+//  CHECK-SAME:     ins(%[[A]], %[[B]] : tensor<?x2x32xf32>, tensor<2x32x8xf32>)
+//   CHECK-NOT:   tensor.collapse_shape
+//       CHECK:   return %[[C]]
+
+// -----
+
+#id3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#scalar3 = affine_map<(d0, d1, d2) -> ()>
+
+// A transpose of a collapsed dequantize moves the collapse_shape after itself,
+// so the transpose folds into the dequantize's output map.
+func.func @transpose_absorbs_collapsed_dequantize(%q: tensor<8x2x32xi8>,
+    %scale: f32) -> tensor<64x8xf32> {
+  %init = tensor.empty() : tensor<8x2x32xf32>
+  %d = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id3, #scalar3, #id3]>
+      ins(%q, %scale : tensor<8x2x32xi8>, f32)
+      outs(%init : tensor<8x2x32xf32>) -> tensor<8x2x32xf32>
+  %collapsed = tensor.collapse_shape %d [[0], [1, 2]]
+      : tensor<8x2x32xf32> into tensor<8x64xf32>
+  %tinit = tensor.empty() : tensor<64x8xf32>
+  %t = linalg.transpose ins(%collapsed : tensor<8x64xf32>)
+      outs(%tinit : tensor<64x8xf32>) permutation = [1, 0]
+  return %t : tensor<64x8xf32>
+}
+// CHECK-LABEL: func.func @transpose_absorbs_collapsed_dequantize(
+//   CHECK-NOT:   linalg.transpose
+//       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     -> tensor<2x32x8xf32>
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[DEQ]] {{\[}}[0, 1], [2]]
+//  CHECK-SAME:     tensor<2x32x8xf32> into tensor<64x8xf32>
+//       CHECK:   return %[[COLLAPSED]]
+
+// -----
+
+#id3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#scalar3 = affine_map<(d0, d1, d2) -> ()>
+
+// Expanding the matmul would reshape the real-valued rhs without producing a
+// contraction of dequantized operands, so the collapse_shape stays.
+func.func @decline_expand_matmul_with_real_operand(%aq: tensor<4x2x32xi8>,
+    %sa: f32, %b: tensor<64x8xf32>) -> tensor<4x8xf32> {
+  %ainit = tensor.empty() : tensor<4x2x32xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id3, #scalar3, #id3]>
+      ins(%aq, %sa : tensor<4x2x32xi8>, f32)
+      outs(%ainit : tensor<4x2x32xf32>) -> tensor<4x2x32xf32>
+  %ac = tensor.collapse_shape %a [[0], [1, 2]]
+      : tensor<4x2x32xf32> into tensor<4x64xf32>
+  %cst = arith.constant 0.0 : f32
+  %init = tensor.empty() : tensor<4x8xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<4x8xf32>)
+      -> tensor<4x8xf32>
+  %c = linalg.matmul ins(%ac, %b : tensor<4x64xf32>, tensor<64x8xf32>)
+      outs(%fill : tensor<4x8xf32>) -> tensor<4x8xf32>
+  return %c : tensor<4x8xf32>
+}
+// CHECK-LABEL: func.func @decline_expand_matmul_with_real_operand(
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape
+//       CHECK:   linalg.matmul ins(%[[COLLAPSED]],
+
+// -----
+
+#id3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#scalar3 = affine_map<(d0, d1, d2) -> ()>
+
+// Only contractions and transposes absorb the collapse_shape; an elementwise
+// consumer is left to the general reshape propagation.
+func.func @decline_expand_elementwise_consumer(%q: tensor<4x2x32xi8>,
+    %scale: f32) -> tensor<4x64xf32> {
+  %init = tensor.empty() : tensor<4x2x32xf32>
+  %d = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id3, #scalar3, #id3]>
+      ins(%q, %scale : tensor<4x2x32xi8>, f32)
+      outs(%init : tensor<4x2x32xf32>) -> tensor<4x2x32xf32>
+  %collapsed = tensor.collapse_shape %d [[0], [1, 2]]
+      : tensor<4x2x32xf32> into tensor<4x64xf32>
+  %einit = tensor.empty() : tensor<4x64xf32>
+  %e = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%collapsed : tensor<4x64xf32>) outs(%einit : tensor<4x64xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %neg = arith.negf %in : f32
+      linalg.yield %neg : f32
+    } -> tensor<4x64xf32>
+  return %e : tensor<4x64xf32>
+}
+// CHECK-LABEL: func.func @decline_expand_elementwise_consumer(
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[COLLAPSED]] :

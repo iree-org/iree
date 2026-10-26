@@ -169,7 +169,10 @@ class BuildFileFunctions(object):
     def _convert_platform_condition(self, constraint_label):
         """Returns a CMake condition string for a platform constraint label."""
         if constraint_label == "//build_tools/bazel:iree_is_wasm":
-            return 'IREE_ARCH STREQUAL "wasm_32"'
+            return (
+                'EMSCRIPTEN OR IREE_ARCH STREQUAL "wasm_32" '
+                'OR IREE_ARCH STREQUAL "wasm_64"'
+            )
         cmake_name = _PLATFORM_CMAKE_SYSTEM_NAME.get(constraint_label)
         if not cmake_name:
             return None

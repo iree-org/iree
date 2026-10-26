@@ -181,7 +181,7 @@ func.func @unpack(%arg0 : tensor<128x10x?x8x?xf32>) -> tensor<128x80x320xf32> at
   %unpack = linalg.unpack %arg0 outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [8, %c8_vscale] into %init : tensor<128x10x?x8x?xf32> -> tensor<128x80x320xf32>
   return %unpack : tensor<128x80x320xf32>
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 40, 64], vector_common_parallel = [1, 8, [8]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 40, 128], vector_common_parallel = [1, 8, [8]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>
 //
 // For SVE, we do not decompose unpacks.
@@ -203,7 +203,7 @@ func.func @unpack_outer_dynamic(%arg0 : tensor<?x?x32x?xi32>, %dim0 : index, %di
   %unpack = linalg.unpack %arg0 inner_dims_pos = [0, 1] inner_tiles = [32, %c8_vscale] into %init : tensor<?x?x32x?xi32> -> tensor<?x?xi32>
   return %unpack : tensor<?x?xi32>
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [32, [8]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 128], vector_common_parallel = [32, [8]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>
 //
 // For SVE, we do not decompose unpacks.
@@ -227,7 +227,7 @@ func.func @unpack_transposed(%arg0 : tensor<?x?x32x?xf32>, %dim0 : index, %dim1 
   %unpack = linalg.unpack %arg0 inner_dims_pos = [1, 0] inner_tiles = [32, %c8_vscale] into %init : tensor<?x?x32x?xf32> -> tensor<?x?xf32>
   return %unpack : tensor<?x?xf32>
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = {{\[\[}}8], 32]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [128, 64], vector_common_parallel = {{\[\[}}8], 32]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>
 //       CHECK: func.func @unpack_transposed
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -274,7 +274,7 @@ func.func @unpack_with_generic(%arg0 : tensor<128x10x?x8x?xf32>, %arg1 : tensor<
   return %generic : tensor<128x320x80xf32>
 }
 //   CHECK-DAG: #[[CONFIG_UNPACK:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 8, [8]]>
-//   CHECK-DAG: #[[CONFIG_GENERIC:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 40], vector_common_parallel = [1, [8], 8]>
+//   CHECK-DAG: #[[CONFIG_GENERIC:.+]] = #iree_cpu.lowering_config<distribution = [64, 128, 40], vector_common_parallel = [1, [8], 8]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>
 //       CHECK: func.func @unpack_with_generic
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -298,7 +298,7 @@ func.func @pack(%arg0: tensor<20x48xf32>) -> tensor<2x?x16x?xf32> attributes {ha
   %pack = linalg.pack %arg0 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [16, %c16_vscale] into %empty : tensor<20x48xf32> -> tensor<2x?x16x?xf32>
   return %pack : tensor<2x?x16x?xf32>
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 64], vector_common_parallel = [1, 1]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 256], vector_common_parallel = [1, 1]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DataTiling>>
 //      CHECK: func.func @pack(
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -326,7 +326,7 @@ func.func @elem_pack(%arg0: tensor<128x384xf32>) -> tensor<16x?x8x?xf32> attribu
   %pack = linalg.pack %filled inner_dims_pos = [0, 1] inner_tiles = [8, %c16_vscale] into %dest : tensor<128x384xf32> -> tensor<16x?x8x?xf32>
   return %pack : tensor<16x?x8x?xf32>
 }
-//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [8, [16]]>
+//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_cpu.lowering_config<distribution = [64, 256], vector_common_parallel = [8, [16]]>
 //  CHECK-DAG: #[[CONFIG2:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 //      CHECK: func.func @elem_pack(
@@ -405,7 +405,7 @@ func.func @transpose_pack(%arg0: tensor<30522x768xf32>) -> tensor<?x96x?x8xf32> 
   %pack = linalg.pack %0 padding_value(%cst : f32) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [%c16_vscale, 8] into %empty1 : tensor<768x30522xf32> -> tensor<?x96x?x8xf32>
   return %pack : tensor<?x96x?x8xf32>
 }
-//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [8, [16]]>
+//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_cpu.lowering_config<distribution = [64, 256], vector_common_parallel = [8, [16]]>
 //  CHECK-DAG: #[[CONFIG2:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 //      CHECK: func.func @transpose_pack(
@@ -442,7 +442,7 @@ func.func @reduction_pack(%arg0: tensor<384x1024x32xf32>, %arg1: tensor<384x1024
   return %pack : tensor<?x24x16x?xf32>
 }
 //  CHECK-DAG: #[[CONFIG1:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [16, [16]]>
-//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [32, 32, 0], vector_common_parallel = [16, [16], 0], vector_reduction = [0, 0, 4]>
+//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_cpu.lowering_config<distribution = [32, 256, 0], vector_common_parallel = [16, [16], 0], vector_reduction = [0, 0, 4]>
 //  CHECK-DAG: #[[CONFIG3:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
 //      CHECK: func.func @reduction_pack(

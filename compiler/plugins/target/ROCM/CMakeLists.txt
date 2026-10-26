@@ -28,7 +28,6 @@ iree_cc_library(
   DEPS
     LLVMAMDGPUCodeGen
     LLVMAnalysis
-    LLVMBinaryFormat
     LLVMBitWriter
     LLVMCore
     LLVMFrontendOffloading

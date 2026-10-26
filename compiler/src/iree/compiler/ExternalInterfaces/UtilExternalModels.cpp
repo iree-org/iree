@@ -649,6 +649,16 @@ struct LinalgOpTiedOpInterface
     return {linalgOp.getDpsInitsMutable()[resultIndex].getOperandNumber()};
   }
 
+  std::pair<unsigned, unsigned>
+  getTiedOperandsIndexAndLength(Operation *op) const {
+    auto linalgOp = cast<OpTy>(op);
+    MutableOperandRange inits = linalgOp.getDpsInitsMutable();
+    if (inits.empty()) {
+      return {op->getNumOperands(), 0};
+    }
+    return {inits.begin()->getOperandNumber(), inits.size()};
+  }
+
   SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
     SmallVector<int64_t> result;
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
