@@ -1,4 +1,6 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-virtual-vector-lowering))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-virtual-vector-lowering{skip-intermediate-roundings=false}))" --split-input-file %s | FileCheck %s --check-prefix=KEEP
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-virtual-vector-lowering{skip-intermediate-roundings=true}))" --split-input-file %s | FileCheck %s --check-prefix=SKIP
 
 // For an n-D row-major contiguous memref, the gather lowering should add the
 // gather index directly into the innermost offset rather than emit a per-lane
@@ -153,3 +155,47 @@ func.func @lower_avx512_1x16x1_f32(
 //   CHECK-NOT:   iree_codegen.inner_tiled
 //   CHECK-NOT:   util.hoistable_conversion
 //       CHECK:   llvm.call_intrinsic "llvm.fma.v16f32"({{.*}}) : (vector<16xf32>, vector<16xf32>, vector<16xf32>) -> vector<16xf32>
+
+// -----
+
+// Zvfhmin WIDENF32 f16 accumulator in a K loop. With
+// `skip-intermediate-roundings=false` the lossy extf/truncf accumulator pair
+// must stay inside the loop so each K iteration rounds back to f16. With the
+// default (`true`) the pair is hoisted/cancelled and the accumulator stays f32
+// across K.
+
+#contraction_accesses_widenf32 = [
+ affine_map<() -> ()>,
+ affine_map<() -> ()>,
+ affine_map<() -> ()>
+]
+func.func @widenf32_kloop(
+    %lhs: vector<1x1xf16>, %rhs: vector<32x1xf16>,
+    %acc_init: vector<1x32xf16>, %k: index) -> vector<1x32xf16> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %res = scf.for %i = %c0 to %k step %c1
+      iter_args(%acc = %acc_init) -> (vector<1x32xf16>) {
+    %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+      indexing_maps = #contraction_accesses_widenf32,
+      iterator_types = [],
+      kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32, vlen = 256>,
+      semantics = #iree_cpu.mma_semantics<>
+    > : vector<1x1xf16>, vector<32x1xf16> into vector<1x32xf16>
+    scf.yield %0 : vector<1x32xf16>
+  }
+  return %res : vector<1x32xf16>
+}
+
+// KEEP-LABEL: func.func @widenf32_kloop
+// KEEP: scf.for {{.*}} iter_args({{.*}}) -> (vector<1x32xf16>)
+// KEEP:   arith.extf {{.*}} : vector<32xf16> to vector<32xf32>
+// KEEP:   llvm.call_intrinsic "llvm.riscv.vfmacc"
+// KEEP:   arith.truncf {{.*}} : vector<32xf32> to vector<32xf16>
+// KEEP:   scf.yield {{.*}} : vector<1x32xf16>
+
+// SKIP-LABEL: func.func @widenf32_kloop
+// SKIP: scf.for {{.*}} iter_args({{.*}}) -> ({{.*}}vector<[8]xf32>)
+// SKIP-NOT: arith.truncf
+// SKIP: llvm.call_intrinsic "llvm.riscv.vfmacc"
+// SKIP-NEXT: scf.yield

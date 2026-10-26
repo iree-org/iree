@@ -1359,7 +1359,7 @@ static LogicalResult lowerGenericScalarToVectorContract(
 
 LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
-    SmallVectorImpl<Value> &results) const {
+    SmallVectorImpl<Value> &results, bool skipIntermediateRoundings) const {
   SmallVector<VectorType> regTypes;
   getDistributedTileTypes(regTypes);
   if (inputs.size() != 2 || outputs.size() != 1 ||
@@ -1401,7 +1401,8 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
                                      Value v) -> Value {
       // Zvfhmin has no f16 MAC. This pair is lossy (extf(truncf(x)) != x):
       // hoisting keeps the acc in f32 across K and skips per-K f16 rounding.
-      // TODO(#25058): honor --iree-llvmcpu-skip-intermediate-roundings=false.
+      // When skipping intermediate roundings is disabled, the pair is marked
+      // lossy below so `eliminateHoistableConversions` leaves it in the loop.
       if (widenF16Acc) {
         Type f32 = b.getF32Type();
         auto vt = cast<VectorType>(v.getType());
@@ -1420,12 +1421,13 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
       }
       return v;
     };
+    bool markLossyRoundtrip = widenF16Acc && !skipIntermediateRoundings;
     return Codegen::buildDataTiledMMAUnderlyingOperations(
         builder, loc, getSwizzle(*this, /*operandIdx=*/0),
         getSwizzle(*this, /*operandIdx=*/1),
         getSwizzle(*this, /*operandIdx=*/2), getIntrinsicsM(), getIntrinsicsN(),
         getIntrinsicsK(), inputs, outputs, emitIntrinsic, results, legalizeAcc,
-        restoreAcc);
+        restoreAcc, markLossyRoundtrip);
   }
   return Codegen::buildDataTiledMMAUnderlyingOperations(
       builder, loc, getSwizzle(*this, /*operandIdx=*/0),

@@ -97,6 +97,16 @@ struct SubrangeOperand {
 };
 
 //===----------------------------------------------------------------------===//
+// Hoistable conversion utilities
+//===----------------------------------------------------------------------===//
+
+// Marks a `util.hoistable_conversion` whose round-trip is numerically lossy
+// (e.g. f32 -> f16 -> f32). Such a pair is not a true inverse: cancelling or
+// hoisting it would drop a per-iteration rounding step. See issue #25058.
+inline constexpr llvm::StringLiteral kLossyRoundtripAttr =
+    "iree.lossy_roundtrip";
+
+//===----------------------------------------------------------------------===//
 // Op utilities common in util patterns and folders
 //===----------------------------------------------------------------------===//
 

@@ -101,8 +101,9 @@ void buildLLVMCPUVectorLoweringPipeline(
   // direct iter_arg match) and fall back to inlining-in-place.
   funcPassManager.addPass(createHoistInnerTiledAccReshapesPass());
   funcPassManager.addPass(createLLVMCPUVirtualVectorLoweringPass(
-      LLVMCPUVirtualVectorLoweringPassOptions{options.splitVectorTransfersTo,
-                                              options.enableArmI8mm}));
+      LLVMCPUVirtualVectorLoweringPassOptions{
+          options.splitVectorTransfersTo, options.enableArmI8mm,
+          options.skipIntermediateRoundings}));
 
   // Make sure we remove redundant vector ops (e.g., vector transposes) before
   // we lower them and can't be optimized away anymore.
@@ -163,6 +164,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(
     options.splitVectorTransfersTo = "linalg-copy";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     options.enableArmSME = pipelineOpt.enableAArch64SME;
+    options.skipIntermediateRoundings =
+        pipelineOpt.cpuOpts.skipIntermediateRoundings;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -263,6 +266,8 @@ void addMultiTilingExpertPassPipeline(
     options.splitVectorTransfersTo = "linalg-copy";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     options.enableArmSME = pipelineOpt.enableAArch64SME;
+    options.skipIntermediateRoundings =
+        pipelineOpt.cpuOpts.skipIntermediateRoundings;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -321,6 +326,8 @@ void addConvTileAndDecomposeExpertPassPipeline(
     options.splitVectorTransfersTo = "shuffle";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     options.enableArmSME = pipelineOpt.enableAArch64SME;
+    options.skipIntermediateRoundings =
+        pipelineOpt.cpuOpts.skipIntermediateRoundings;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -387,6 +394,8 @@ void addMmt4dTilingExpertPassPipeline(
   options.splitVectorTransfersTo = "linalg-copy";
   options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
   options.enableArmSME = pipelineOpt.enableAArch64SME;
+  options.skipIntermediateRoundings =
+      pipelineOpt.cpuOpts.skipIntermediateRoundings;
   buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
 }
 
@@ -429,6 +438,8 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
     options.splitVectorTransfersTo = "linalg-copy";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     options.enableArmSME = pipelineOpt.enableAArch64SME;
+    options.skipIntermediateRoundings =
+        pipelineOpt.cpuOpts.skipIntermediateRoundings;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -470,6 +481,8 @@ void addCPULinalgExtTileAndVectorizePipeline(
     options.splitVectorTransfersTo = "linalg-copy";
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     options.enableArmSME = pipelineOpt.enableAArch64SME;
+    options.skipIntermediateRoundings =
+        pipelineOpt.cpuOpts.skipIntermediateRoundings;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
