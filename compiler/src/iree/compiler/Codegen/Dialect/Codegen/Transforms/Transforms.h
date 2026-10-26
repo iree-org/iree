@@ -29,7 +29,12 @@ void populateFoldReshapeOpsByExpansionPatterns(
 /// `buildUnderlyingOperations` (e.g. `llvm.call_intrinsic` on CPU,
 /// `amdgpu.mfma` / `nvgpu.mma.sync` / etc. on GPU). Inserts shape_casts and
 /// hoistable conversion pairs around the accumulator as needed.
-void populateLowerInnerTiledPatterns(RewritePatternSet &patterns);
+///
+/// When `skipIntermediateRoundings` is false, lowered operations preserve
+/// numerically lossy intermediate rounding steps (e.g. an f16 accumulator
+/// widened to f32 for each MAC) even though that prevents conversion hoisting.
+void populateLowerInnerTiledPatterns(RewritePatternSet &patterns,
+                                     bool skipIntermediateRoundings = true);
 
 /// Populate patterns to drop unit iteration bounds from an
 /// `iree_codegen.inner_tiled` op, preparing it for

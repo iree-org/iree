@@ -233,6 +233,17 @@ def IREECodegen_InnerTileDescAttrInterface :
         to `getDistributedTileShapes()`, construct, if possible, the operations
         that implement this kind and place the results (which will be used to
         replace the inner_tiled op) into the `results` vector.
+
+        `skipIntermediateRoundings` reflects the corresponding compilation
+        option: when false, lowered operations must preserve intermediate
+        rounding steps even if that prevents conversion hoisting/cancellation.
+
+        TODO(#25274): Passing pipeline-specific options such as
+        `skipIntermediateRoundings` through this common interface is a
+        transitional hack. Refactor this so that pipeline-specific options are
+        consumed by the set of rewrite patterns that lower `inner_tiled` ops,
+        and have this interface accept that set of patterns, similar to how
+        `emitIntrinsic` is passed to `buildDataTiledMMAUnderlyingOperations`.
       }],
       /*retTy=*/"::mlir::LogicalResult",
       /*methodName=*/"buildUnderlyingOperations",
@@ -241,7 +252,8 @@ def IREECodegen_InnerTileDescAttrInterface :
         "::mlir::Location":$loc,
         "::mlir::ValueRange":$inputs,
         "::mlir::ValueRange":$outputs,
-        "::llvm::SmallVectorImpl<::mlir::Value>&":$results
+        "::llvm::SmallVectorImpl<::mlir::Value>&":$results,
+        "bool":$skipIntermediateRoundings
       ),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{

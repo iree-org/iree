@@ -254,7 +254,8 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
     // dimensions of `inner_tiled` itself, so they don't conflict.
     IREE::Codegen::populateUnrollInnerTiledPatterns(patterns);
     IREE::Codegen::populateDropInnerTiledUnitDimsPatterns(patterns);
-    IREE::Codegen::populateLowerInnerTiledPatterns(patterns);
+    IREE::Codegen::populateLowerInnerTiledPatterns(patterns,
+                                                   skipIntermediateRoundings);
 
     (void)applyPatternsGreedily(funcOp, std::move(patterns));
   }
