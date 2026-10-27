@@ -127,8 +127,7 @@ else()
     file(DOWNLOAD "${_amd_device_bc_url}" "${_platform_lib_archive}"
       EXPECTED_HASH SHA256=${_amd_device_bc_sha256})
     # Extract the .deb container and then only the required bitcode from its
-    # data tarball. CMake's archive support avoids a dependency on dpkg/ar and
-    # does not rely on compatibility symlinks installed by the package manager.
+    # data tarball.
     file(REMOVE_RECURSE "${_platform_lib_extractdir}")
     file(ARCHIVE_EXTRACT
       INPUT "${_platform_lib_archive}"
