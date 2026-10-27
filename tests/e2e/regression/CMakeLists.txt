@@ -14,11 +14,17 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "argsort_comparator_lanes_dynamic.mlir"
+    "argsort_dynamic.mlir"
+    "argsort_internal_key_use.mlir"
+    "argsort_preserve_input_dynamic.mlir"
+    "argsort_views_dynamic.mlir"
     "fill_i64.mlir"
     "force_single_dispatch.mlir"
     "globals.mlir"
     "libm_linking.mlir"
     "scalar.mlir"
+    "sort_workspace_versions.mlir"
     "stream_reference_counting_aliased_loop_results.mlir"
     "trace_dispatch_tensors.mlir"
     "transients_test.mlir"

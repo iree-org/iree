@@ -4524,3 +4524,237 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+// An explicit full-axis tile has an induction-variable offset before the
+// single-iteration loop is folded.
+func.func @sort_full_axis_tensor(%arg0: tensor<4xi32>) -> tensor<4xi32> {
+  %empty = tensor.empty() : tensor<4xi32>
+  %sorted = iree_linalg_ext.sort dimension(0) ins(%arg0 : tensor<4xi32>) outs(%empty : tensor<4xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4xi32>
+  return %sorted : tensor<4xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_for %sort tile_sizes [4] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @sort_full_axis_tensor
+// CHECK: iree_linalg_ext.sort dimension(0) ins(
+// CHECK-SAME: outs(%{{.+}} : tensor<4xi32>)
+// CHECK: return
+
+// -----
+
+func.func @sort_full_axis_memref(%arg0: memref<4xi32>) {
+  iree_linalg_ext.sort dimension(0) ins(%arg0 : memref<4xi32>) outs(%arg0 : memref<4xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_for %sort tile_sizes [4] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @sort_full_axis_memref
+// CHECK: iree_linalg_ext.sort dimension(0) ins(
+// CHECK-SAME: outs(%{{.+}} : memref<4xi32{{.*}}>)
+// CHECK: return
+
+// -----
+
+// Sorting each part of the sort dimension cannot implement a full sort.
+func.func @sort_partial_axis(%arg0: tensor<4xi32>) -> tensor<4xi32> {
+  %empty = tensor.empty() : tensor<4xi32>
+  // expected-error @+1 {{failed to generate tiling loops}}
+  %sorted = iree_linalg_ext.sort dimension(0) ins(%arg0 : tensor<4xi32>) outs(%empty : tensor<4xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<4xi32>
+  return %sorted : tensor<4xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_for %sort tile_sizes [2] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+// Buffer-form Sort has no result positions through which to reject this tile.
+func.func @sort_partial_axis_memref(%arg0: memref<4xi32>) {
+  // expected-error @+2 {{failed to tile operation}}
+  // expected-error @+1 {{failed to generate tiling loops}}
+  iree_linalg_ext.sort dimension(0) ins(%arg0 : memref<4xi32>) outs(%arg0 : memref<4xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_for %sort tile_sizes [2] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+// An explicit dynamic full-axis tile is a single iteration, even when its
+// upper bound and step are distinct SSA values for the same dimension.
+func.func @sort_dynamic_full_axis(%arg0: tensor<?xi32>) -> tensor<?xi32> {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %arg0, %c0 : tensor<?xi32>
+  %empty = tensor.empty(%n) : tensor<?xi32>
+  %sorted = iree_linalg_ext.sort dimension(0) ins(%arg0 : tensor<?xi32>) outs(%empty : tensor<?xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<?xi32>
+  return %sorted : tensor<?xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %size = transform.structured.match ops{["tensor.dim"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_for %sort tile_sizes [%size] : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @sort_dynamic_full_axis
+// CHECK: %[[N:.+]] = tensor.dim
+// CHECK: scf.for %{{.+}} = %{{.+}} to %[[N]] step %[[N]]
+// CHECK: iree_linalg_ext.sort dimension(0)
+// CHECK-SAME: outs(%{{.+}} : tensor<?xi32>)
+// CHECK: return
+
+// -----
+
+// A tile size larger than the dimension also generates a single full tile.
+func.func @sort_dynamic_full_axis_memref(%arg0: memref<?xi32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %n = memref.dim %arg0, %c0 : memref<?xi32>
+  %step = arith.addi %n, %c1 : index
+  iree_linalg_ext.sort dimension(0) ins(%arg0 : memref<?xi32>) outs(%arg0 : memref<?xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  }
+  return
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %size = transform.structured.match ops{["arith.addi"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_for %sort tile_sizes [%size] : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @sort_dynamic_full_axis_memref
+// CHECK: %[[N:.+]] = memref.dim
+// CHECK: %[[STEP:.+]] = arith.addi %[[N]],
+// CHECK: scf.for %{{.+}} = %{{.+}} to %[[N]] step %[[STEP]]
+// CHECK: iree_linalg_ext.sort dimension(0)
+// CHECK-SAME: outs(%{{.+}} : memref<?xi32{{.*}}>)
+// CHECK: return
+
+// -----
+
+// A full-axis tile must be accepted by the parallel tiler as well.
+func.func @sort_dynamic_full_axis_forall(%arg0: tensor<?xi32>) -> tensor<?xi32> {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %arg0, %c0 : tensor<?xi32>
+  %empty = tensor.empty(%n) : tensor<?xi32>
+  %sorted = iree_linalg_ext.sort dimension(0) ins(%arg0 : tensor<?xi32>) outs(%empty : tensor<?xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<?xi32>
+  return %sorted : tensor<?xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %size = transform.structured.match ops{["tensor.dim"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_forall %sort tile_sizes [%size] : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @sort_dynamic_full_axis_forall
+// CHECK: scf.forall
+// CHECK: iree_linalg_ext.sort dimension(0)
+// CHECK-SAME: outs(%{{.+}} : tensor<?xi32>)
+// CHECK: return
+
+// -----
+
+// A dynamic tile larger than the full axis must also remain legal.
+func.func @sort_dynamic_oversized_axis_forall(%arg0: tensor<?xi32>) -> tensor<?xi32> {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %arg0, %c0 : tensor<?xi32>
+  %step = arith.addi %n, %n : index
+  %empty = tensor.empty(%n) : tensor<?xi32>
+  %sorted = iree_linalg_ext.sort dimension(0) ins(%arg0 : tensor<?xi32>) outs(%empty : tensor<?xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<?xi32>
+  return %sorted : tensor<?xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %size = transform.structured.match ops{["arith.addi"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_forall %sort tile_sizes [%size] : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+// CHECK-LABEL: func.func @sort_dynamic_oversized_axis_forall
+// CHECK: scf.forall
+// CHECK: iree_linalg_ext.sort dimension(0)
+// CHECK-SAME: outs(%{{.+}} : tensor<?xi32>)
+// CHECK: return
+
+// -----
+
+// Multiple sorting-axis tiles cannot implement a complete sort.
+func.func @sort_dynamic_partial_axis_forall(%arg0: tensor<?xi32>) -> tensor<?xi32> {
+  %c0 = arith.constant 0 : index
+  %n = tensor.dim %arg0, %c0 : tensor<?xi32>
+  %step = affine.apply affine_map<(d0) -> (d0 ceildiv 2)>(%n)
+  %empty = tensor.empty(%n) : tensor<?xi32>
+  // expected-error @+2 {{failed to generate tiling loops}}
+  // expected-note @+1 {{when applied to this op}}
+  %sorted = iree_linalg_ext.sort dimension(0) ins(%arg0 : tensor<?xi32>) outs(%empty : tensor<?xi32>) {
+  ^bb0(%lhs: i32, %rhs: i32):
+    %cmp = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %cmp : i1
+  } -> tensor<?xi32>
+  return %sorted : tensor<?xi32>
+}
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %sort = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %size = transform.structured.match ops{["affine.apply"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    // expected-error @+1 {{tile_using_forall failed to apply}}
+    %tiled, %loop = transform.structured.tile_using_forall %sort tile_sizes [%size] : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
