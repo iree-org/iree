@@ -1408,13 +1408,13 @@ util.initializer {
   // CHECK-DAG: %[[C2048:.+]] = arith.constant 2048 : index
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
   // CHECK-DAG: %[[C1024:.+]] = arith.constant 1024 : index
-  // CHECK: %[[PARAM:.+]] = stream.async.constant : !stream.resource<constant>{%[[C2048]]} = #stream.parameter.named<""::"parameter0">
-  // CHECK: %[[SUBVIEW1:.+]] = stream.resource.subview %[[PARAM]][%[[C0]]] : !stream.resource<constant>{%[[C2048]]} -> !stream.resource<constant>{%[[C1024]]}
+  // CHECK-DAG: %[[SUBVIEW1:.+]] = stream.resource.subview %[[PARAM:.+]][%[[C0]]] : !stream.resource<constant>{%[[C2048]]} -> !stream.resource<constant>{%[[C1024]]}
+  // CHECK-DAG: %[[PARAM]] = stream.async.constant : !stream.resource<constant>{%[[C2048]]} = #stream.parameter.named<""::"parameter0">
+  // CHECK-DAG: %[[SUBVIEW2:.+]] = stream.resource.subview %[[PARAM_0:.+]][%[[C1024]]] : !stream.resource<constant>{%[[C2048]]} -> !stream.resource<constant>{%[[C1024]]}
+  // CHECK-DAG: %[[PARAM_0]] = stream.async.constant : !stream.resource<constant>{%[[C2048]]} = #stream.parameter.named<""::"parameter0">
   // CHECK: util.global.store %[[SUBVIEW1]], @mixed_transformed
   util.global.store %filled, @mixed_transformed : !stream.resource<constant>
 
-  // CHECK: %[[PARAM_0:.+]] = stream.async.constant : !stream.resource<constant>{%[[C2048]]} = #stream.parameter.named<""::"parameter0">
-  // CHECK: %[[SUBVIEW2:.+]] = stream.resource.subview %[[PARAM_0]][%[[C1024]]] : !stream.resource<constant>{%[[C2048]]} -> !stream.resource<constant>{%[[C1024]]}
   // CHECK: util.global.store %[[SUBVIEW2]], @mixed_passthrough
   util.global.store %param2, @mixed_passthrough : !stream.resource<constant>
   // CHECK: util.return

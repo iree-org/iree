@@ -785,6 +785,18 @@ static EncodingExprSet gatherEncodingExprSet(mlir::ModuleOp moduleOp,
     });
     Value storedValue = storeOp.getStoredGlobalValue();
 
+    if (policy.includeUnmodified) {
+      // In consolidate mode, unchanged parameter loads will be collected after
+      // hoisting of computations, and this won't be conditional on specifics of
+      // the hoisting policy. All uses of such loads will then be replaced
+      // together in a separate step. Simply skip here.
+      auto constantOp = findProducedValue(storedValue)
+                            .getDefiningOp<IREE::Stream::AsyncConstantOp>();
+      if (constantOp && isa<NamedParameterAttr>(constantOp.getValue())) {
+        continue;
+      }
+    }
+
     BackwardSliceOptions sliceOptions;
     sliceOptions.inclusive = true;
     bool foundAnyNonConstExprOps = false;
