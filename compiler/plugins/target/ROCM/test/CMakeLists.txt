@@ -45,14 +45,17 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "default_subgroup_size.mlir"
+    # FIXME(#25131): Temporarily disabled because of a missing ROCM bitcode artifact
+    # "default_subgroup_size.mlir"
     "emit_debug_info.mlir"
-    "external_function_validation.mlir"
-    "module_target_triple.mlir"
-    "smoketest.mlir"
-    "smoketest_hsaco.mlir"
+    # FIXME(#25131): Temporarily disabled because of a missing ROCM bitcode artifact
+    # "external_function_validation.mlir"
+    # "module_target_triple.mlir"
+    # "smoketest.mlir"
+    # "smoketest_hsaco.mlir"
     "target_device_features.mlir"
-    "target_feature_serialization.mlir"
+    # FIXME(#25131): Temporarily disabled because of a missing ROCM bitcode artifact
+    # "target_feature_serialization.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -84,6 +84,12 @@ function(iree_hal_cts_testdata)
     ${ARGN}
   )
 
+  # FIXME(#25131): Temporarily disabled because of a missing ROCM bitcode artifact
+  # Consumers already skip tests when their testdata targets are absent.
+  if(_RULE_TARGET_DEVICE STREQUAL "amdgpu" OR _RULE_TARGET_DEVICE STREQUAL "hip")
+    return()
+  endif()
+
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()

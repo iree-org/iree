@@ -36,16 +36,17 @@ jobs:
             runs-on: ubuntu-24.04
             extra-flags: ""
             cache-dir: /tmp/iree_tests_cache
-          - name: amdgpu_hip_gfx1100_O3
-            config-file:  torch_ops_gpu_hip_gfx1100_O3.json
-            runs-on: [Linux, X64, gfx1100]
-            cache-dir: /home/nod/iree_tests_cache
-            extra-flags: "--benchmark-with-rocprofv3"
-          - name: amdgpu_hip_gfx1201_O3
-            config-file: torch_ops_gpu_hip_gfx1201_O3.json
-            runs-on: [Linux, X64, gfx1201]
-            cache-dir: /home/nod/iree_tests_cache
-            extra-flags: "--benchmark-with-rocprofv3"
+          # FIXME(#25131): Temporarily disabled because of a missing ROCM bitcode artifact
+          # - name: amdgpu_hip_gfx1100_O3
+          #   config-file:  torch_ops_gpu_hip_gfx1100_O3.json
+          #   runs-on: [Linux, X64, gfx1100]
+          #   cache-dir: /home/nod/iree_tests_cache
+          #   extra-flags: "--benchmark-with-rocprofv3"
+          # - name: amdgpu_hip_gfx1201_O3
+          #   config-file: torch_ops_gpu_hip_gfx1201_O3.json
+          #   runs-on: [Linux, X64, gfx1201]
+          #   cache-dir: /home/nod/iree_tests_cache
+          #   extra-flags: "--benchmark-with-rocprofv3"
           - name: amdgpu_vulkan_rdna3_O3
             config-file: torch_ops_gpu_vulkan_rdna3_O3.json
             runs-on: [Linux, X64, rdna3]

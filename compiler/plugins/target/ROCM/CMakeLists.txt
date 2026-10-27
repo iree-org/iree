@@ -99,6 +99,10 @@ if(IREE_TARGET_BACKEND_ROCM_DEVICE_BC_PATH)
   # Don't fetch: Get from local directory.
   set(_platform_lib_srcdir "${IREE_TARGET_BACKEND_ROCM_DEVICE_BC_PATH}")
 else()
+  # FIXME(#25131): Temporarily disabled because of a missing ROCM bitcode artifact
+  # Skip fetching and packaging device libraries unless supplied locally.
+  return()
+
   # Fetch from remote archive.
   set(_platform_lib_archive "${CMAKE_CURRENT_BINARY_DIR}/_fetch_device_libs.tgz")
   set(_platform_lib_srcdir "${CMAKE_CURRENT_BINARY_DIR}/_fetch_device_libs")

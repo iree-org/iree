@@ -178,6 +178,12 @@ function(iree_single_backend_e2e_runner_test)
     ${ARGN}
   )
 
+  # FIXME(#25131): Temporarily disabled because of a missing ROCM bitcode artifact
+  # Suppress module generation for both source builds and packaged compilers.
+  if(_RULE_TARGET_BACKEND STREQUAL "rocm")
+    return()
+  endif()
+
   # ---------------------------------------------------------------------------
   # Bytecode module builds require
   #   1. the compiler, either in the same build or provided in IREE_HOST_BIN_DIR

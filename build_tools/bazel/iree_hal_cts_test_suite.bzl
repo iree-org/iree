@@ -176,6 +176,17 @@ def iree_hal_cts_testdata(
     """
     testdata_name = "testdata_%s" % format_name
 
+    # FIXME(#25131): Temporarily disabled because of a missing ROCM bitcode artifact
+    # Propagate incompatibility to consumers without resolving the bitcode repo.
+    if target_device in ["amdgpu", "hip"]:
+        for suffix in ["", "_lib"]:
+            iree_runtime_cc_library(
+                name = testdata_name + suffix,
+                testonly = testonly,
+                target_compatible_with = ["@platforms//:incompatible"],
+            )
+        return ":%s_lib" % testdata_name
+
     # iree_hal_executables() is a macro that inverts flag_values internally,
     # so pass the user-facing form directly.
     iree_hal_executables(

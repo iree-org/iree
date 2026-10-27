@@ -81,7 +81,8 @@ iree_ext = use_extension("//build_tools/bazel:extensions.bzl", "iree_extension")
 use_repo(
     iree_ext,
     "abseil_cpp",
-    "amdgpu_device_libs",
+    # FIXME(#25131): Temporarily disabled because of a missing ROCM bitcode artifact
+    # "amdgpu_device_libs",
     "com_github_dvidelabs_flatcc",
     "com_google_benchmark",
     "com_google_googletest",

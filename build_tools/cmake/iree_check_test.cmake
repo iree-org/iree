@@ -56,6 +56,12 @@ function(iree_check_test)
     ${ARGN}
   )
 
+  # FIXME(#25131): Temporarily disabled because of a missing ROCM bitcode artifact
+  # Suppress module generation for both source builds and packaged compilers.
+  if(_RULE_TARGET_BACKEND STREQUAL "rocm")
+    return()
+  endif()
+
   # Normalize some variables before using them.
   string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
   string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})

@@ -69,24 +69,26 @@ jobs:
         run: |
           source ./build_tools/cmake/setup_sccache.sh
           ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
-        env:
-          # Build the first rocjitsu target's test deps along with everything else.
-          IREE_ROCM_TEST_TARGET_CHIP: gfx942
+        # FIXME(#25131): Temporarily disabled because of a missing ROCM bitcode artifact
+        # env:
+        #   # Build the first rocjitsu target's test deps along with everything else.
+        #   IREE_ROCM_TEST_TARGET_CHIP: gfx942
 
       - name: Run CTest
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
         env:
           CTEST_PARALLEL_LEVEL: 32
 
-      - name: Run ROCm e2e tests under rocjitsu
-        if: ${{ !cancelled() && steps.build_iree.outcome == 'success' }}
-        timeout-minutes: 120
-        run: |
-          ./build_tools/cmake/test_rocm_targets_with_rocjitsu.sh \
-            "${BUILD_DIR}" gfx942 gfx950 gfx1100 gfx1151 gfx1201 gfx1250
-        env:
-          IREE_ROCJITSU_RUN_ID: ci
-          CTEST_PARALLEL_LEVEL: 8
+      # FIXME(#25131): Temporarily disabled because of a missing ROCM bitcode artifact
+      # - name: Run ROCm e2e tests under rocjitsu
+      #   if: ${{ !cancelled() && steps.build_iree.outcome == 'success' }}
+      #   timeout-minutes: 120
+      #   run: |
+      #     ./build_tools/cmake/test_rocm_targets_with_rocjitsu.sh \
+      #       "${BUILD_DIR}" gfx942 gfx950 gfx1100 gfx1151 gfx1201 gfx1250
+      #   env:
+      #     IREE_ROCJITSU_RUN_ID: ci
+      #     CTEST_PARALLEL_LEVEL: 8
 
       - name: Run Vulkan e2e and HAL CTS tests under rocjitsu
         if: ${{ !cancelled() && steps.build_iree.outcome == 'success' }}
