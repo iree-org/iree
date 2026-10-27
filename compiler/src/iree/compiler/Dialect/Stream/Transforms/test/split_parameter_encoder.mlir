@@ -114,14 +114,16 @@ util.initializer {
 // -----
 
 // Tests parameter transformation.
-// This tests loading a parameter and applying a transformation (fill operation).
-// This SHOULD be hoisted since it has a parameter input.
+// This tests loading a parameter subrange and applying a transformation (fill
+// operation). This SHOULD be hoisted since it has a parameter input.
 
 // CHECK: module @encoder
 // CHECK: util.func public @__encode_parameter_detect_target
 // CHECK: util.func public @__encode_parameter_indices_all
 // CHECK: util.func public @__encode_parameter_steps_all
 // CHECK: util.func public @__encode_parameters_all
+// CHECK-DAG: %[[PARAM_OFFSET:.+]] = arith.constant 2048 : i64
+// CHECK: stream.async.parameter.load {{.+}}[%[[PARAM_OFFSET]]] : !stream.resource<constant>
 
 // CHECK-LABEL: module {
 // CHECK: util.global private @parameter_transformed : !stream.resource<constant>
@@ -134,9 +136,11 @@ util.initializer {
   %c256 = arith.constant 256 : index
   %c1024 = arith.constant 1024 : index
 
-  // Load parameter from external source.
+  // Load a parameter subrange from an external source.
   %param = stream.async.constant : !stream.resource<constant>{%c1024} =
-    #stream.parameter.named<"model"::"param0"> : vector<1024xi8>
+    #stream.parameter.named<"model"::"param0", {
+      offset = 2048 : i64, length = 1024 : i64
+    }> : vector<1024xi8>
 
   // Fill a region with different value.
   // CHECK-NOT: stream.async.fill
