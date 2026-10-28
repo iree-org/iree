@@ -224,10 +224,16 @@ function(iree_renamed_shared_impl_finalize)
 
   # The closure is renamed too, or the references above find nothing. It keeps
   # selective extraction, so the same objects land as in an unrenamed link.
+  # Include the implementations used by the embedded MLIRCAPIGPU objects:
+  # object-library dependencies omit these owning C API library dependencies.
   iree_collect_static_link_closure(_closure_static_libs _closure_other
     ${_object_libs}
     MLIRExportSMTLIB
     MLIRTargetLLVMIRImport
+    MLIRGPUNVVMTransforms
+    MLIRGPUROCDLTransforms
+    MLIRGPUSPIRVTransforms
+    MLIRGPUXeVMTransforms
   )
   set(_closure_archives)
   foreach(_lib ${_closure_static_libs})

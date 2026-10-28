@@ -31,6 +31,7 @@
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitcode/BitcodeReader.h"
@@ -294,6 +295,7 @@ public:
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
     llvm::LLVMContext context;
+    context.getLibraryOptions().assign(*commandLineOptions);
     auto maybeTarget = getVariantTarget(variantOp);
     if (!maybeTarget) {
       return failure();

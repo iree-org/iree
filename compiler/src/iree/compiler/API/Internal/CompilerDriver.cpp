@@ -53,12 +53,14 @@
 #include "iree/compiler/Tools/init_passes.h"
 #include "iree/compiler/Tools/version.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/compiler/embedding_api.h"
 #include "iree/compiler/mlir_interop.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Support/Allocator.h"
@@ -385,6 +387,7 @@ struct GlobalInit {
 
   // Command line handling.
   bool usesCommandLine = false;
+  bool printPipelinePasses = false;
   // Populated and retained if we have to copy and handle our own permuted
   // argv (i.e. Windows). Otherwise, not used.
   llvm::SmallVector<const char *> retainedArgv;
@@ -1149,12 +1152,6 @@ void Invocation::dumpCompilationPhase(IREEVMPipelinePhase phase,
           std::string(path.begin(), path.end())}));
 }
 
-// Returns true if LLVM's -print-pipeline-passes flag was given.
-static bool shouldPrintPipelinePasses() {
-  llvm::PassBuilder passBuilder;
-  return passBuilder.getPrintPipelinePasses().has_value();
-}
-
 bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   auto passManager = createPassManager();
 
@@ -1242,7 +1239,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     return false;
   }
 
-  if (shouldPrintPipelinePasses()) {
+  if (session.globalInit.printPipelinePasses) {
     passManager->dump();
   }
   if (failed(passManager->run(parsedModule))) {
@@ -1260,7 +1257,7 @@ bool Invocation::runTextualPassPipeline(const char *textPassPipeline) {
     return false;
   }
 
-  if (shouldPrintPipelinePasses()) {
+  if (session.globalInit.printPipelinePasses) {
     passManager->dump();
   }
   if (failed(passManager->run(parsedModule))) {
@@ -1536,7 +1533,15 @@ void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
     llvm::install_out_of_memory_new_handler();
   }
 
-  llvm::cl::ParseCommandLineOptions(argc, argv, banner);
+  llvm::cl::parseCommandLineOptions(*mlir::iree_compiler::commandLineOptions,
+                                    llvm::ArrayRef<const char *>(argv, argc),
+                                    banner);
+  llvm::LLVMContext llvmContext;
+  llvmContext.getLibraryOptions().assign(
+      *mlir::iree_compiler::commandLineOptions);
+  llvm::PassBuilder passBuilder(llvmContext);
+  globalInit->printPipelinePasses =
+      passBuilder.getPrintPipelinePasses().has_value();
   // Reject load flags that were not handled before global initialization.
   if (!mlir::iree_compiler::verifyDynamicPluginFlags(llvm::errs())) {
     exit(EXIT_FAILURE);

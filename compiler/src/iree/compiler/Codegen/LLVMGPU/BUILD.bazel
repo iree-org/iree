@@ -218,6 +218,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:FuncTransforms",
         "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:GPUROCDLTransforms",
         "@llvm-project//mlir:GPUToNVVMTransforms",
         "@llvm-project//mlir:GPUToROCDLTransforms",
         "@llvm-project//mlir:GPUTransformOps",
