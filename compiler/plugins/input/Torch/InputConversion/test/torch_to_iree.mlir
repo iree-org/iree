@@ -1,4 +1,7 @@
-// RUN: iree-opt --split-input-file --torch-to-iree %s | FileCheck %s
+// RUN: iree-opt --split-input-file --torch-to-iree %s | FileCheck %s --check-prefixes=CHECK,NONFINITE
+// RUN: iree-opt --split-input-file --torch-to-iree="allow-non-finites=false" %s | FileCheck %s --check-prefixes=CHECK,FINITE
+// RUN: iree-compile --compile-to=input --split-input-file %s | FileCheck %s --check-prefixes=CHECK,NONFINITE
+// RUN: iree-compile --compile-to=input --split-input-file --iree-torch-allow-non-finites=false %s | FileCheck %s --check-prefixes=CHECK,FINITE
 // This is just a smoke test that the pipeline functions, and it also
 // validates any features different from upstream.
 
@@ -71,4 +74,30 @@ func.func @dequantize(
         !torch.int, !torch.int, !torch.int, !torch.int, !torch.optional<int>
         -> !torch.vtensor<[4,8],f32>
   return %result : !torch.vtensor<[4,8],f32>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @amax$async(
+// NONFINITE: arith.constant 0xFF800000 : f32
+// FINITE: arith.constant -3.40282347E+38 : f32
+func.func @amax(%input: !torch.vtensor<[4,8],f32>) -> !torch.vtensor<[4],f32> {
+  %dim = torch.constant.int 1
+  %dims = torch.prim.ListConstruct %dim : (!torch.int) -> !torch.list<int>
+  %false = torch.constant.bool false
+  %result = torch.aten.amax %input, %dims, %false : !torch.vtensor<[4,8],f32>, !torch.list<int>, !torch.bool -> !torch.vtensor<[4],f32>
+  return %result : !torch.vtensor<[4],f32>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @scatter_amin$async(
+// NONFINITE: arith.constant 0x7C00 : f16
+// FINITE: arith.constant 6.550400e+04 : f16
+func.func @scatter_amin(%input: !torch.vtensor<[8],f16>, %indices: !torch.vtensor<[4],si64>, %updates: !torch.vtensor<[4],f16>) -> !torch.vtensor<[8],f16> {
+  %dim = torch.constant.int 0
+  %reduce = torch.constant.str "amin"
+  %false = torch.constant.bool false
+  %result = torch.aten.scatter_reduce.two %input, %dim, %indices, %updates, %reduce, %false : !torch.vtensor<[8],f16>, !torch.int, !torch.vtensor<[4],si64>, !torch.vtensor<[4],f16>, !torch.str, !torch.bool -> !torch.vtensor<[8],f16>
+  return %result : !torch.vtensor<[8],f16>
 }
