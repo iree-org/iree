@@ -443,6 +443,40 @@ func.func @float_zero_point_zeros(
 
 // -----
 
+// Exports of asymmetric weights can store integer zero points as floats. They
+// become i32 constants.
+// CHECK: #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-LABEL: func.func @integral_float_zero_point(
+// CHECK: %[[ZERO_POINTS:.+]] = arith.constant
+// CHECK-SAME: dense<{{\[}}[1, 8], [15, 0], [2, 3], [4, 5]]> : tensor<4x2xi32>
+// CHECK: iree_linalg_ext.dequantize_affine
+// CHECK-SAME: indexing_maps = [#map, #map1, #map1, #map]
+// CHECK-SAME: ins(%{{.+}}, %{{.+}}, %[[ZERO_POINTS]] : tensor<4x2x4xi8>,
+// CHECK-SAME: tensor<4x2xf32>, tensor<4x2xi32>)
+func.func @integral_float_zero_point(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
+  %zero_points = torch.vtensor.literal(dense<[
+      [1.000000e+00, 8.000000e+00], [1.500000e+01, 0.000000e+00],
+      [2.000000e+00, 3.000000e+00], [4.000000e+00, 5.000000e+00]]>
+      : tensor<4x2xf32>) : !torch.vtensor<[4,2],f32>
+  %minimum = torch.constant.int 0
+  %maximum = torch.constant.int 15
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %out_dtype = torch.constant.int 6
+  %result = torch.quantized_decomposed.dequantize_per_channel_group
+      %input, %scales, %zero_points, %minimum, %maximum, %dtype, %group_size,
+      %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>,
+        !torch.vtensor<[4,2],f32>, !torch.int, !torch.int, !torch.int,
+        !torch.int, !torch.int -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
+
+// -----
+
 // LinalgExt zero points are integers, so other float zero points, such as the
 // fractional ones of HQQ, are left for the Torch-to-Linalg lowering.
 // CHECK-LABEL: func.func @nonzero_float_zero_point(

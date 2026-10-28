@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "torch-mlir/Conversion/TorchToLinalg/Utils.h"
@@ -43,6 +44,9 @@ struct PT2EQuantization {
   // Builtin zero point: an i64 scalar or an integer tensor shaped like the
   // scale; null for symmetric quantization.
   Value zeroPoint;
+  // Integer values of a constant float zero point. They become `zeroPoint`
+  // once the op is known to convert, so that matching creates no IR.
+  DenseElementsAttr integralZeroPoint;
   // Whether the zero-point elements are unsigned. Read from the Torch type
   // because builtin integer types are signless.
   bool zeroPointUnsigned = false;
@@ -137,10 +141,56 @@ static bool isUnsignedZeroPoint(Type zeroPointType) {
          cast<Torch::ValueTensorType>(zeroPointType).getDtype().isInteger(1);
 }
 
+// LinalgExt zero points are integers, whereas PT2E also accepts float ones. A
+// constant float zero point whose values are integers within the bounds, as
+// exports of asymmetric weights store them, converts exactly to i32 values in
+// `integralZeroPoint`. Other float zero points, such as the fractional ones of
+// HQQ, prevent conversion. Requires the bounds of `quantization` to be set.
+static LogicalResult
+matchIntegralFloatZeroPoint(Operation *op, Value torchZeroPoint,
+                            PT2EQuantization &quantization,
+                            ConversionPatternRewriter &rewriter) {
+  ElementsAttr zeroPointAttr;
+  if (!matchPattern(torchZeroPoint, m_Constant(&zeroPointAttr))) {
+    return rewriter.notifyMatchFailure(
+        op, "expected integer or constant float zero points");
+  }
+  // The FX importer stores tensors as resources, which only expose raw data.
+  auto values = dyn_cast<DenseFPElementsAttr>(zeroPointAttr);
+  if (auto resource = dyn_cast<DenseResourceElementsAttr>(zeroPointAttr)) {
+    if (DenseElementsAttr::isValidRawBuffer(resource.getType(),
+                                            resource.getData())) {
+      values = cast<DenseFPElementsAttr>(DenseElementsAttr::getFromRawBuffer(
+          resource.getType(), resource.getData()));
+    }
+  }
+  if (!values) {
+    return rewriter.notifyMatchFailure(
+        op, "expected float zero points with readable values");
+  }
+  bool isIntegral = true;
+  quantization.integralZeroPoint =
+      values.mapValues(rewriter.getI32Type(), [&](const APFloat &value) {
+        APSInt integer(/*BitWidth=*/32, /*isUnsigned=*/false);
+        bool isExact = false;
+        isIntegral &= value.convertToInteger(integer, APFloat::rmTowardZero,
+                                             &isExact) == APFloat::opOK &&
+                      integer >= quantization.quantMin &&
+                      integer <= quantization.quantMax;
+        return integer;
+      });
+  if (!isIntegral) {
+    return rewriter.notifyMatchFailure(
+        op, "expected float zero points with integer values within the "
+            "bounds");
+  }
+  return success();
+}
+
 // Sets the zero point of `quantization` from `torchZeroPoint` and its converted
 // value `zeroPoint`. A None zero point and a float one known to be zero leave
 // it unset, which denotes symmetric quantization. Other float zero points
-// prevent conversion, since LinalgExt zero points are integers.
+// convert only if they hold integers, see `matchIntegralFloatZeroPoint`.
 static LogicalResult matchZeroPoint(Operation *op, Value torchZeroPoint,
                                     Value zeroPoint,
                                     PT2EQuantization &quantization,
@@ -149,11 +199,11 @@ static LogicalResult matchZeroPoint(Operation *op, Value torchZeroPoint,
     return success();
   }
   if (isa<FloatType>(getElementTypeOrSelf(zeroPoint))) {
-    if (!IREE::LinalgExt::isKnownZero(torchZeroPoint)) {
-      return rewriter.notifyMatchFailure(
-          op, "expected integer or all-zero float zero points");
+    if (IREE::LinalgExt::isKnownZero(torchZeroPoint)) {
+      return success();
     }
-    return success();
+    return matchIntegralFloatZeroPoint(op, torchZeroPoint, quantization,
+                                       rewriter);
   }
   quantization.zeroPoint = zeroPoint;
   quantization.zeroPointUnsigned =
@@ -476,6 +526,16 @@ static Value collapseParameter(OpBuilder &builder, Location location,
   return tensor::dropGivenUnitDims(builder, location, parameter, unitDims);
 }
 
+// Sets the zero point of `quantization` to a constant holding its
+// `integralZeroPoint`, if any.
+static void materializeIntegralZeroPoint(OpBuilder &builder, Location location,
+                                         PT2EQuantization &quantization) {
+  if (quantization.integralZeroPoint) {
+    quantization.zeroPoint = arith::ConstantOp::create(
+        builder, location, quantization.integralZeroPoint);
+  }
+}
+
 static Value createQuantizeAffine(OpBuilder &builder, Location location,
                                   RankedTensorType resultType,
                                   const PT2EQuantization &quantization,
@@ -561,6 +621,7 @@ struct ConvertQuantize final : OpConversionPattern<OpTy> {
             rewriter))) {
       return failure();
     }
+    materializeIntegralZeroPoint(rewriter, op.getLoc(), *quantization);
 
     bool storageUnsigned =
         torch::torch_to_linalg::isUnsignedTorchType(op.getType());
@@ -606,6 +667,7 @@ struct ConvertDequantize final : OpConversionPattern<OpTy> {
             rewriter))) {
       return failure();
     }
+    materializeIntegralZeroPoint(rewriter, op.getLoc(), *quantization);
 
     bool inputUnsigned =
         torch::torch_to_linalg::isUnsignedTorchType(op.getInput().getType());
