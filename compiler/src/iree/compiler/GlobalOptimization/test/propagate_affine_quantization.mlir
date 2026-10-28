@@ -311,6 +311,31 @@ func.func @decline_pad_with_per_channel_zero_point(%aq: tensor<4x4xi8>, %sa: ten
 
 // -----
 
+#id2 = affine_map<(d0, d1) -> (d0, d1)>
+#scalar2 = affine_map<(d0, d1) -> ()>
+
+// A pad on sub-byte storage can move values off byte boundaries, so the pad
+// stays on the real-valued side.
+func.func @decline_pad_sub_byte_storage(%aq: tensor<4x4xi4>, %sa: f32)
+    -> tensor<4x6xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %init = tensor.empty() : tensor<4x4xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id2, #scalar2, #id2]>
+      ins(%aq, %sa : tensor<4x4xi4>, f32)
+      outs(%init : tensor<4x4xf32>) -> tensor<4x4xf32>
+  %padded = tensor.pad %a low[0, 1] high[0, 1] {
+  ^bb0(%i: index, %j: index):
+    tensor.yield %cst : f32
+  } : tensor<4x4xf32> to tensor<4x6xf32>
+  return %padded : tensor<4x6xf32>
+}
+// CHECK-LABEL: func.func @decline_pad_sub_byte_storage(
+//       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+//       CHECK:   tensor.pad %[[DEQ]] low[0, 1] high[0, 1]
+
+// -----
+
 // Output dimension zero corresponds to quantized input dimension one, so the
 // pad on output dimension zero becomes a pad on input dimension one. The
 // per-channel scale varies along the other dimension and stays unchanged.

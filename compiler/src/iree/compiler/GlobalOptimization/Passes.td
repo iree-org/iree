@@ -185,6 +185,34 @@ def PropagateAffineQuantizationPass :
   }];
 }
 
+def PackSubByteQuantizedConstantsPass :
+    Pass<"iree-global-opt-pack-sub-byte-quantized-constants", "mlir::ModuleOp"> {
+  let summary = "Packs constant quantized values with sub-byte ranges into i2 or i4 storage.";
+  let description = [{
+    Packs the constant `i8` input of an `iree_linalg_ext.dequantize_affine`
+    into `i2` or `i4` storage when its `quant_min`/`quant_max` range fits 2 or
+    4 bits, using the narrowest type that meets the conditions below.
+
+    Only constant expressions of inline data are packed, so runtime values and
+    parameters stay `i8`, as do inputs that other ops also read as `i8`. The
+    input must have a static shape whose innermost dimension is a multiple of
+    `k = 8 / w` for `w`-bit storage, and a zero point must be a constant that
+    fits the narrow type.
+
+    Element `k * i + j` of the innermost dimension goes to bits
+    `[j * w, (j + 1) * w)` of byte `i`, the layout narrow-type emulation
+    expects. The dequantize reads the packed bytes through a
+    `flow.tensor.bitcast`; constant evaluation folds the packing itself into a
+    smaller `i8` constant.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+    "IREE::Flow::FlowDialect",
+  ];
+}
+
 def ConvertQDQToIntegerMathPass :
     InterfacePass<"iree-global-opt-convert-qdq-to-integer-math", "mlir::FunctionOpInterface"> {
   let summary = "Rewrites contractions over dequantized operands into integer contractions.";
