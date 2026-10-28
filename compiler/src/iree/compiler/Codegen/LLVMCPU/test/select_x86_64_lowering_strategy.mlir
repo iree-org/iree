@@ -1887,3 +1887,112 @@ func.func @inner_tiled_avx512_1x16x1_f32(%lhs: tensor<2x4x2x1xf32>, %rhs: tensor
 //  CHECK-SAME:     translation_info = #[[INNER_TILED_TRANSLATION]]
 //       CHECK:   iree_codegen.inner_tiled
 //  CHECK-SAME:       lowering_config = #[[INNER_TILED_CONFIG]]
+
+// -----
+
+// The #24932 benchmark shape matrix (64x64x64, 256x256x256, 81x41x19,
+// 540x516x332) under the AVX512 1x16x1 f32 kind, whose 2x32 inner tile
+// (intrinsics_m = 2, intrinsics_n = 2) packs M into ceil(M/2) iterations:
+// the distribution tiles below are the cost model's picks at the default
+// 8 runtime threads. The RVV target's full 8/4/1-thread sweep of the same
+// matrix is pinned in select_riscv_inner_tiled_lowering_strategy.mlir.
+
+// 64x64x64: 32 x 2 iterations over K = 64.
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+func.func @inner_tiled_avx512_1x16x1_f32_64x64x64(%lhs: tensor<32x64x2x1xf32>, %rhs: tensor<2x64x2x16xf32>, %acc: tensor<32x2x2x2x16xf32>) -> tensor<32x2x2x2x16xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ],
+    iterator_types = [#linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 2, intrinsics_n = 2>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : tensor<32x64x2x1xf32>, tensor<2x64x2x16xf32> into tensor<32x2x2x2x16xf32>
+  return %0 : tensor<32x2x2x2x16xf32>
+}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [8, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//       CHECK: func.func @inner_tiled_avx512_1x16x1_f32_64x64x64(
+//       CHECK:   iree_codegen.inner_tiled
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+// 256x256x256: 128 x 8 iterations over K = 256.
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+func.func @inner_tiled_avx512_1x16x1_f32_256x256x256(%lhs: tensor<128x256x2x1xf32>, %rhs: tensor<8x256x2x16xf32>, %acc: tensor<128x8x2x2x16xf32>) -> tensor<128x8x2x2x16xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ],
+    iterator_types = [#linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 2, intrinsics_n = 2>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : tensor<128x256x2x1xf32>, tensor<8x256x2x16xf32> into tensor<128x8x2x2x16xf32>
+  return %0 : tensor<128x8x2x2x16xf32>
+}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [32, 4, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//       CHECK: func.func @inner_tiled_avx512_1x16x1_f32_256x256x256(
+//       CHECK:   iree_codegen.inner_tiled
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+// 81x41x19 (rect): 41 x 2 iterations over K = 19. The whole M fits one
+// workgroup tile within budget, so N (2 tiles) stays distributed.
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+func.func @inner_tiled_avx512_1x16x1_f32_81x41x19(%lhs: tensor<41x19x2x1xf32>, %rhs: tensor<2x19x2x16xf32>, %acc: tensor<41x2x2x2x16xf32>) -> tensor<41x2x2x2x16xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ],
+    iterator_types = [#linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 2, intrinsics_n = 2>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : tensor<41x19x2x1xf32>, tensor<2x19x2x16xf32> into tensor<41x2x2x2x16xf32>
+  return %0 : tensor<41x2x2x2x16xf32>
+}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [41, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//       CHECK: func.func @inner_tiled_avx512_1x16x1_f32_81x41x19(
+//       CHECK:   iree_codegen.inner_tiled
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+// 540x516x332 (large, the #25028 regression shape): 270 x 17 iterations over
+// K = 332. N has 17 tiles (prime), so tilesN stays 1 and the budget-bound
+// divisor search takes 54 M tiles: 5 x 17 = 85 workgroups instead of the
+// 4590 that one-tile-per-workgroup produced.
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>
+func.func @inner_tiled_avx512_1x16x1_f32_540x516x332(%lhs: tensor<270x332x2x1xf32>, %rhs: tensor<17x332x2x16xf32>, %acc: tensor<270x17x2x2x16xf32>) -> tensor<270x17x2x2x16xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ],
+    iterator_types = [#linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_X86_AVX512_1x16x1_F32_F32, intrinsics_m = 2, intrinsics_n = 2>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : tensor<270x332x2x1xf32>, tensor<17x332x2x16xf32> into tensor<270x17x2x2x16xf32>
+  return %0 : tensor<270x17x2x2x16xf32>
+}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [54, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Mmt4dTilingExpert>>
+//       CHECK: func.func @inner_tiled_avx512_1x16x1_f32_540x516x332(
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//       CHECK:   iree_codegen.inner_tiled
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]

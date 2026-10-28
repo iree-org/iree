@@ -3061,6 +3061,226 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       getCPUTranslationInfo(op.getContext(), CPUPipeline::Default));
 }
 
+/// Inner-tile extents in elements — the `inner_tiled` equivalent of mmt4d's
+/// fixed {M0, N0, K0}. For mmt4d these are baked into the microkernel and read
+/// back off the packed operand shapes; for `inner_tiled` they are a property of
+/// the `kind` attribute: the intrinsic's base shape, scaled by how many copies
+/// of it the tile packs (`intrinsics_{m,n,k}`, chosen at encoding
+/// materialization by `chooseUnrolling` in `CPUEncodingExternalModels.cpp`).
+///
+/// Returns nullopt when the shape does not resolve to positive static element
+/// counts. Scalable vectorization is one such case: `getVlenBitsForConfig`
+/// returns vlen = 0 there, which resolves an RVV intrinsic to a zero-sized
+/// tile. A scalable `inner_tiled` does not exist today, so nothing here should
+/// try to guess its extents.
+static std::optional<std::tuple<int64_t, int64_t, int64_t>>
+getInnerTiledTileSizes(IREE::Codegen::InnerTiledOp op) {
+  auto mma = dyn_cast_or_null<IREE::CPU::DataTiledMMAAttr>(op.getKind());
+  if (!mma) {
+    return std::nullopt;
+  }
+  auto mnk =
+      IREE::CPU::getIntrinsicMNKShape(mma.getIntrinsic(), mma.getVlen());
+  if (!mnk) {
+    return std::nullopt;
+  }
+  auto [baseM, baseN, baseK] = *mnk;
+  int64_t m0 = baseM * mma.getIntrinsicsM();
+  int64_t n0 = baseN * mma.getIntrinsicsN();
+  int64_t k0 = baseK * mma.getIntrinsicsK();
+  if (m0 <= 0 || n0 <= 0 || k0 <= 0) {
+    return std::nullopt;
+  }
+  return std::make_tuple(m0, n0, k0);
+}
+
+/// The M and N iteration dims of an `inner_tiled` matmul and the number of
+/// inner tiles one workgroup should cover along each.
+struct InnerTiledDistribution {
+  unsigned mDim;
+  unsigned nDim;
+  int64_t tilesM;
+  int64_t tilesN;
+};
+
+/// Picks how many inner tiles each workgroup covers along the M and N
+/// iteration dims of a data-tiled `inner_tiled` matmul.
+///
+/// This ports the `getMmt4dLoweringConfig` cost model to the `inner_tiled`
+/// path: the same byte budget (`iree-llvmcpu-matmul-tile-bytes`), the same
+/// divisor enumeration, and the same traversal-cost weighted by thread
+/// underutilization objective. The loop nests differ in shape but not in
+/// meaning — mmt4d's is (M1, N1, K1, M0, N0, K0) and it tiles M1/N1, while an
+/// `inner_tiled` iter domain consists of the outer iteration dims only, one
+/// iteration per inner tile — so in both cases the quantity chosen is a tile
+/// *count*, never an element count. Choosing in tile units also makes
+/// inner-tile alignment free: a workgroup tile can never split an inner tile.
+///
+/// K is not distributed, so a workgroup tile spans the whole reduction extent
+/// and both operand footprints grow with K. That is what bounds the tile for
+/// large-K matmuls rather than the accumulator footprint.
+///
+/// Returns nullopt to mean "keep exactly one inner tile per workgroup", which
+/// is the behavior this heuristic replaces. That fallback is taken whenever
+/// something the model needs is not statically known: no data-tiled MMA
+/// `kind`, a multi-input/output op, or dynamic M/N/K iteration bounds.
+/// Dynamic bounds must not be tiled here: `UnrollInnerTiledPattern` bails when
+/// it cannot divide a shape statically, pattern failures are swallowed by the
+/// greedy driver in `LLVMCPUVirtualVectorLowering`, and an unlowered
+/// `iree_codegen.inner_tiled` is a hard failure at `ConvertToLLVM` rather than
+/// a graceful degradation.
+static std::optional<InnerTiledDistribution>
+selectInnerTiledDistribution(IREE::Codegen::InnerTiledOp op,
+                             ArrayRef<utils::IteratorType> iteratorTypes,
+                             ArrayRef<int64_t> bounds) {
+  unsigned numInputs = op.getNumInputs();
+  if (numInputs != 2 || op.getNumOutputs() != 1) {
+    return std::nullopt;
+  }
+  auto tileSizes = getInnerTiledTileSizes(op);
+  if (!tileSizes) {
+    return std::nullopt;
+  }
+  auto [m0, n0, k0] = *tileSizes;
+
+  // Recover the contraction structure from the indexing maps. An
+  // `inner_tiled` matmul has LHS (M, K), RHS (N, K) and ACC (M, N) outer dims,
+  // so M, N and K are the pairwise intersections of the three maps' dims and
+  // anything appearing in all three is a batch dim. The maps are projected
+  // permutations of dims by the op verifier, so reading dim positions is safe.
+  SmallVector<AffineMap> maps = op.getIndexingMapsArray();
+  auto getOuterDims = [](AffineMap map) {
+    SmallVector<unsigned> dims;
+    for (AffineExpr expr : map.getResults()) {
+      auto dim = dyn_cast<AffineDimExpr>(expr);
+      if (!dim) {
+        return SmallVector<unsigned>();
+      }
+      dims.push_back(dim.getPosition());
+    }
+    return dims;
+  };
+  auto intersect = [](ArrayRef<unsigned> lhs, ArrayRef<unsigned> rhs) {
+    SmallVector<unsigned> result;
+    for (unsigned dim : lhs) {
+      if (llvm::is_contained(rhs, dim)) {
+        result.push_back(dim);
+      }
+    }
+    return result;
+  };
+  SmallVector<unsigned> lhsDims = getOuterDims(maps[0]);
+  SmallVector<unsigned> rhsDims = getOuterDims(maps[1]);
+  SmallVector<unsigned> accDims = getOuterDims(maps[numInputs]);
+  if (lhsDims.empty() || rhsDims.empty() || accDims.empty()) {
+    return std::nullopt;
+  }
+  SmallVector<unsigned> batchDims =
+      intersect(intersect(lhsDims, rhsDims), accDims);
+  auto withoutBatch = [&](SmallVector<unsigned> dims) {
+    llvm::erase_if(dims, [&](unsigned dim) {
+      return llvm::is_contained(batchDims, dim);
+    });
+    return dims;
+  };
+  SmallVector<unsigned> mDims = withoutBatch(intersect(accDims, lhsDims));
+  SmallVector<unsigned> nDims = withoutBatch(intersect(accDims, rhsDims));
+  SmallVector<unsigned> kDims = withoutBatch(intersect(lhsDims, rhsDims));
+  if (mDims.size() != 1 || nDims.size() != 1 || kDims.size() != 1) {
+    return std::nullopt;
+  }
+  unsigned mDim = mDims[0], nDim = nDims[0], kDim = kDims[0];
+  if (iteratorTypes[mDim] != utils::IteratorType::parallel ||
+      iteratorTypes[nDim] != utils::IteratorType::parallel ||
+      iteratorTypes[kDim] != utils::IteratorType::reduction) {
+    return std::nullopt;
+  }
+  if (llvm::any_of(SmallVector<unsigned, 3>{mDim, nDim, kDim},
+                   [&](unsigned dim) {
+                     return ShapedType::isDynamic(bounds[dim]);
+                   })) {
+    return std::nullopt;
+  }
+
+  // Element extents. K is never distributed, so a workgroup sees the whole
+  // reduction extent of both operands.
+  const int64_t numTilesM = bounds[mDim];
+  const int64_t numTilesN = bounds[nDim];
+  const int64_t M = numTilesM * m0;
+  const int64_t N = numTilesN * n0;
+  const int64_t K = bounds[kDim] * k0;
+
+  const int lhsTypeBits = cast<ShapedType>(op.getInputs()[0].getType())
+                              .getElementType()
+                              .getIntOrFloatBitWidth();
+  const int rhsTypeBits = cast<ShapedType>(op.getInputs()[1].getType())
+                              .getElementType()
+                              .getIntOrFloatBitWidth();
+  const int accTypeBits =
+      cast<ShapedType>(op.getOutputs()[0].getType())
+          .getElementType()
+          .getIntOrFloatBitWidth();
+
+  // Cost model, shared with `getMmt4dLoweringConfig`: each matrix is
+  // re-traversed once per tile of the opposite matrix, and a tile shape that
+  // leaves threads with no work is penalized.
+  auto evalCost = [&](int64_t tilesM, int64_t tilesN) -> int64_t {
+    int64_t numWorkgroupsM = llvm::divideCeil(numTilesM, tilesM);
+    int64_t numWorkgroupsN = llvm::divideCeil(numTilesN, tilesN);
+    int64_t traversalCost =
+        numWorkgroupsN * M * lhsTypeBits + numWorkgroupsM * N * rhsTypeBits;
+    int64_t underutilizationCost =
+        std::max<int64_t>(1, clNumberOfRuntimeThreads /
+                                (numWorkgroupsM * numWorkgroupsN));
+    return traversalCost * underutilizationCost;
+  };
+
+  // Baseline is one inner tile per workgroup, i.e. today's behavior. Note the
+  // arguments are tile sizes, not workgroup counts: mmt4d's `evalCost` takes
+  // workgroup counts directly, this one derives them.
+  int64_t selectedTilesM = 1;
+  int64_t selectedTilesN = 1;
+  int64_t selectedCost = evalCost(selectedTilesM, selectedTilesN);
+
+  // Candidates are the divisors of the iteration bounds, as in mmt4d: a tile
+  // that does not divide its extent needs peeling or masking, and a remainder
+  // tile of fewer than a full row of inner tiles is not the single-tile shape
+  // the vector lowering expects.
+  const SmallVector<std::pair<int64_t, int64_t>> divisorsOfM =
+      getDivisors(numTilesM);
+  const SmallVector<std::pair<int64_t, int64_t>> divisorsOfN =
+      getDivisors(numTilesN);
+  for (auto [tilesM, numWorkgroupsM] : divisorsOfM) {
+    for (auto [tilesN, numWorkgroupsN] : divisorsOfN) {
+      int64_t lhsBytes = tilesM * m0 * K * lhsTypeBits / 8;
+      int64_t rhsBytes = tilesN * n0 * K * rhsTypeBits / 8;
+      int64_t accBytes = tilesM * m0 * tilesN * n0 * accTypeBits / 8;
+      // Fitting a whole matrix in one workgroup tile is worth going a little
+      // over budget, since it removes re-traversals entirely.
+      if (numWorkgroupsM == 1) {
+        lhsBytes *= clMatmulTileUndercountWholeMatrix;
+      }
+      if (numWorkgroupsN == 1) {
+        rhsBytes *= clMatmulTileUndercountWholeMatrix;
+      }
+      if (numWorkgroupsM == 1 && numWorkgroupsN == 1) {
+        accBytes *= clMatmulTileUndercountWholeMatrix;
+      }
+      if (lhsBytes + rhsBytes + accBytes > clMatmulTileBytes) {
+        continue;
+      }
+      int64_t candidateCost = evalCost(tilesM, tilesN);
+      if (candidateCost < selectedCost) {
+        selectedCost = candidateCost;
+        selectedTilesM = tilesM;
+        selectedTilesN = tilesN;
+      }
+    }
+  }
+
+  return InnerTiledDistribution{mDim, nDim, selectedTilesM, selectedTilesN};
+}
+
 /// Sets the lowering configuration for a dispatch region rooted at an
 /// `iree_codegen.inner_tiled` op. The op already has the inner-tile shape
 /// baked into the operand layout (one inner tile per iteration of its
@@ -3072,7 +3292,9 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 /// With all iter bounds collapsed to 1, the unit-iter-dim drop and per-
 /// intrinsic lower patterns in `LLVMCPUVirtualVectorLoweringPass` fire on
 /// a single-tile op rather than getting fully unrolled over K. Distribution
-/// is parallel-only (M, N).
+/// is parallel-only (M, N), and works at the level above: it groups whole
+/// inner tiles into a workgroup, so it never changes the bounds these patterns
+/// see.
 ///
 /// We route through `Mmt4dTilingExpert` rather than `DataTiling` because
 /// the former has the modern lowerings (tile-and-fuse, vectorization via
@@ -3102,18 +3324,27 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
   assert(iteratorTypes.size() == numLoops);
 
-  // Distribution: one inner tile per workgroup along each parallel iter
-  // dim; reduction dims are not distributed. The same constant 1 works for
-  // static and dynamic outer extents — for static, it caps the workgroup
-  // tile at one inner tile (smaller than the matmul); for dynamic, it lets
-  // the workgroup count scale with the runtime extent. Larger workgroup
-  // tiles are a perf optimization; the mmt4d cost model is the template
-  // for porting that to inner_tiled in a follow-up.
+  // Distribution starts at one inner tile per workgroup along each parallel
+  // iter dim (reduction dims are not distributed at all). That constant 1
+  // works for static and dynamic outer extents alike — for dynamic it lets the
+  // workgroup count scale with the runtime extent — and it stays for any
+  // parallel dim that is neither M nor N, such as a batch dim. M and N then
+  // take as many inner tiles per workgroup as the cost model will pay for, so
+  // a large matmul does not become thousands of workgroups each covering one
+  // 6x32 f32 tile over the whole of K. See `selectInnerTiledDistribution` for
+  // the cases that fall back to 1, notably dynamic iteration bounds.
   SmallVector<int64_t> distTileSizes(numLoops, 0);
   for (auto [i, kind] : llvm::enumerate(iteratorTypes)) {
     if (kind == utils::IteratorType::parallel) {
       distTileSizes[i] = 1;
     }
+  }
+  if (std::optional<InnerTiledDistribution> distribution =
+          selectInnerTiledDistribution(op, iteratorTypes, bounds)) {
+    distTileSizes[distribution->mDim] = distribution->tilesM;
+    distTileSizes[distribution->nDim] = distribution->tilesN;
+    LDBG() << "inner_tiled workgroup tile: " << distribution->tilesM << " x "
+           << distribution->tilesN << " inner tiles along (M, N)";
   }
 
   // Vector tiling: every parallel iter dim down to a single inner tile.
