@@ -786,3 +786,30 @@ func.func @dynamic_batch_max_pool(%input: tensor<?x13x11x5xf32>) -> tensor<?x6x4
     : (tensor<?x13x11x5xf32>, tensor<f32>) -> tensor<?x6x4x5xf32>
   return %0 : tensor<?x6x4x5xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @dynamic_update_slice_dynamic
+// CHECK-SAME: (%[[TARGET:.+]]: tensor<?x5xf32>, %[[UPDATE:.+]]: tensor<2x?xf32>,
+// CHECK-DAG: %[[TARGET_ROWS:.+]] = tensor.dim %[[TARGET]], %c0
+// CHECK-DAG: %[[UPDATE_COLS:.+]] = tensor.dim %[[UPDATE]], %c1
+// CHECK: tensor.insert_slice %[[UPDATE]] into %[[TARGET]][%{{.+}}, %{{.+}}] [2, %[[UPDATE_COLS]]] [1, 1] : tensor<2x?xf32> into tensor<?x5xf32>
+func.func @dynamic_update_slice_dynamic(%target: tensor<?x5xf32>, %update: tensor<2x?xf32>, %i: tensor<i64>, %j: tensor<i64>) -> tensor<?x5xf32> {
+  %r = "stablehlo.dynamic_update_slice"(%target, %update, %i, %j) : (tensor<?x5xf32>, tensor<2x?xf32>, tensor<i64>, tensor<i64>) -> tensor<?x5xf32>
+  return %r : tensor<?x5xf32>
+}
+
+
+// -----
+
+// An unsigned start index clamps as unsigned in its own width, then narrows.
+// CHECK-LABEL: @dynamic_slice_unsigned_start
+// CHECK-SAME: (%[[OPERAND:[a-zA-Z0-9]+]]: tensor<5x3xi32>, %[[ROW:[a-zA-Z0-9]+]]: tensor<i64>
+// CHECK: %[[RAW:.+]] = tensor.extract %[[ROW]][] : tensor<i64>
+// CHECK: %[[CLAMPED:.+]] = arith.minui %[[RAW]], %c3_i64 : i64
+// CHECK: %[[START:.+]] = arith.index_castui %[[CLAMPED]] : i64 to index
+// CHECK: tensor.extract_slice %[[OPERAND]][%[[START]], 0] [2, 3] [1, 1]
+func.func @dynamic_slice_unsigned_start(%operand: tensor<5x3xi32>, %row: tensor<ui64>, %col: tensor<ui64>) -> tensor<2x3xi32> {
+  %r = stablehlo.dynamic_slice %operand, %row, %col, sizes = [2, 3] : (tensor<5x3xi32>, tensor<ui64>, tensor<ui64>) -> tensor<2x3xi32>
+  return %r : tensor<2x3xi32>
+}

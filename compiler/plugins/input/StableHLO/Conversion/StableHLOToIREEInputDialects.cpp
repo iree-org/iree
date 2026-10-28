@@ -59,9 +59,8 @@ struct ConcatenateOpConversion final
                   ConversionPatternRewriter &rewriter) const override {
     auto resultType =
         getTypeConverter()->convertType<RankedTensorType>(op.getType());
-    if (!resultType || !resultType.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(op,
-                                         "expected static shape for output");
+    if (!resultType) {
+      return rewriter.notifyMatchFailure(op, "expected ranked output");
     }
 
     Location loc = op.getLoc();
@@ -86,8 +85,15 @@ struct ConcatenateOpConversion final
     }
     sizes[dim] = resultDimSize;
 
-    Value result = tensor::EmptyOp::create(rewriter, loc, resultType.getShape(),
-                                           resultType.getElementType());
+    SmallVector<Value> dynamicSizes;
+    for (int64_t i = 0; i < rank; ++i) {
+      if (resultType.isDynamicDim(i)) {
+        dynamicSizes.push_back(sizes[i]);
+      }
+    }
+    Value result =
+        tensor::EmptyOp::create(rewriter, loc, resultType.getShape(),
+                                resultType.getElementType(), dynamicSizes);
 
     auto toOpFoldResult = [](Value v) -> OpFoldResult {
       auto op = v.getDefiningOp<arith::ConstantIndexOp>();
@@ -100,7 +106,10 @@ struct ConcatenateOpConversion final
     Value accBound = arith::ConstantIndexOp::create(rewriter, loc, 0);
     for (Value arg : adaptor.getOperands()) {
       offsets[dim] = accBound;
-      sizes[dim] = rewriter.createOrFold<tensor::DimOp>(loc, arg, dim);
+      // An operand may be static where another is dynamic.
+      for (int64_t i = 0; i < rank; ++i) {
+        sizes[i] = rewriter.createOrFold<tensor::DimOp>(loc, arg, i);
+      }
       result = tensor::InsertSliceOp::create(
           rewriter, loc, arg, result,
           llvm::map_to_vector(offsets, toOpFoldResult),

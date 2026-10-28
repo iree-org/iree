@@ -587,6 +587,32 @@ struct ConcatenateOpCanon final
   }
 };
 
+struct ConcatenateOpFlatten final
+    : OpRewritePattern<mlir::stablehlo::ConcatenateOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ConcatenateOp op,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Value> operands;
+    bool flattened = false;
+    for (Value input : op.getInputs()) {
+      auto inner = input.getDefiningOp<mlir::stablehlo::ConcatenateOp>();
+      if (inner && inner->hasOneUse() &&
+          inner.getDimension() == op.getDimension()) {
+        llvm::append_range(operands, inner.getInputs());
+        flattened = true;
+        continue;
+      }
+      operands.push_back(input);
+    }
+    if (!flattened) {
+      return rewriter.notifyMatchFailure(op, "no same-axis single-use input");
+    }
+    rewriter.modifyOpInPlace(op, [&] { op->setOperands(operands); });
+    return success();
+  }
+};
+
 struct ConvertOpCanon final : OpRewritePattern<mlir::stablehlo::ConvertOp> {
   using Base::Base;
 
@@ -1285,8 +1311,9 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       // Reduce op.
       NoopReduceOpCanon, EmptyReduceOpCanon,
       // Shape manipulation(-ish) ops.
-      ConcatenateOpCanon, ConvertOpCanon, DynamicReshapeOpCanon, GatherOpCanon,
-      ReshapeOpCanon, MergeConsecutiveReshapes, TransposeIsReshape,
+      ConcatenateOpCanon, ConcatenateOpFlatten, ConvertOpCanon,
+      DynamicReshapeOpCanon, GatherOpCanon, ReshapeOpCanon,
+      MergeConsecutiveReshapes, TransposeIsReshape,
       // Types.
       ZeroExtentTensorCanon>(context, benefit);
   patterns->add<ReorderElementwiseAndShapeOp>(context);

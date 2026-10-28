@@ -1742,6 +1742,116 @@ struct DynamicReduceWindowOpConversion final
   }
 };
 
+// The upstream slice lowerings cast start indices to index before clamping
+// them as signed values, which misreads unsigned and wider-than-index ones.
+bool needsOwnStartClamp(TypeRange startTypes) {
+  // Input conversion does not know the target's index width, which may be 32.
+  constexpr unsigned kNarrowestIndexWidth = 32;
+  return llvm::any_of(startTypes, [&](Type type) {
+    auto intType = dyn_cast<IntegerType>(getElementTypeOrSelf(type));
+    return intType &&
+           (intType.isUnsigned() || intType.getWidth() > kNarrowestIndexWidth);
+  });
+}
+
+unsigned getIndexWidth(Operation *op) {
+  return mlir::DataLayout::closest(op).getTypeSizeInBits(
+      IndexType::get(op->getContext()));
+}
+
+// Clamps each scalar start index to [0, operand extent - slice extent].
+SmallVector<OpFoldResult>
+clampStartIndices(OpBuilder &builder, Location loc, ValueRange starts,
+                  TypeRange originalTypes, Value operand,
+                  ArrayRef<OpFoldResult> sliceSizes, unsigned indexWidth) {
+  SmallVector<OpFoldResult> offsets;
+  for (auto [dim, start, originalType] :
+       llvm::enumerate(starts, originalTypes)) {
+    Value raw = tensor::ExtractOp::create(builder, loc, start, ValueRange{});
+    Value operandSize = getValueOrCreateConstantIndexOp(
+        builder, loc, tensor::getMixedSize(builder, loc, operand, dim));
+    Value sliceSize =
+        getValueOrCreateConstantIndexOp(builder, loc, sliceSizes[dim]);
+    Value upperBound =
+        builder.createOrFold<arith::SubIOp>(loc, operandSize, sliceSize);
+    offsets.push_back(clampGatherIndex(builder, loc, raw,
+                                       getElementTypeOrSelf(originalType),
+                                       upperBound, indexWidth));
+  }
+  return offsets;
+}
+
+struct DynamicSliceOpConversion final
+    : OpConversionPattern<mlir::stablehlo::DynamicSliceOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::DynamicSliceOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    unsigned indexWidth = getIndexWidth(op);
+    if (!needsOwnStartClamp(op.getStartIndices().getTypes())) {
+      return rewriter.notifyMatchFailure(op, "upstream clamps these indices");
+    }
+    auto resultType = dyn_cast_if_present<RankedTensorType>(
+        getTypeConverter()->convertType(op.getType()));
+    if (!resultType) {
+      return rewriter.notifyMatchFailure(op, "expected a ranked result");
+    }
+    Location loc = op.getLoc();
+    SmallVector<OpFoldResult> sizes =
+        getAsIndexOpFoldResult(rewriter.getContext(), op.getSliceSizes());
+    SmallVector<OpFoldResult> offsets =
+        clampStartIndices(rewriter, loc, adaptor.getStartIndices(),
+                          op.getStartIndices().getTypes(), adaptor.getOperand(),
+                          sizes, indexWidth);
+    SmallVector<OpFoldResult> strides(sizes.size(), rewriter.getIndexAttr(1));
+    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+        op, resultType, adaptor.getOperand(), offsets, sizes, strides);
+    return success();
+  }
+};
+
+// Also takes runtime operand and update extents, which the upstream lowering
+// rejects; insert_slice keeps the update in place for bufferization.
+struct DynamicUpdateSliceOpConversion final
+    : OpConversionPattern<mlir::stablehlo::DynamicUpdateSliceOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::DynamicUpdateSliceOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    unsigned indexWidth = getIndexWidth(op);
+    auto operandType = cast<RankedTensorType>(adaptor.getOperand().getType());
+    auto updateType = cast<RankedTensorType>(adaptor.getUpdate().getType());
+    if (operandType.hasStaticShape() && updateType.hasStaticShape() &&
+        !needsOwnStartClamp(op.getStartIndices().getTypes())) {
+      return rewriter.notifyMatchFailure(op, "upstream lowers this form");
+    }
+    auto resultType = dyn_cast_if_present<RankedTensorType>(
+        getTypeConverter()->convertType(op.getType()));
+    if (!resultType) {
+      return rewriter.notifyMatchFailure(op, "expected a ranked result");
+    }
+    Location loc = op.getLoc();
+    SmallVector<OpFoldResult> sizes =
+        tensor::getMixedSizes(rewriter, loc, adaptor.getUpdate());
+    SmallVector<OpFoldResult> offsets =
+        clampStartIndices(rewriter, loc, adaptor.getStartIndices(),
+                          op.getStartIndices().getTypes(), adaptor.getOperand(),
+                          sizes, indexWidth);
+    SmallVector<OpFoldResult> strides(sizes.size(), rewriter.getIndexAttr(1));
+    Value inserted = tensor::InsertSliceOp::create(
+        rewriter, loc, adaptor.getUpdate(), adaptor.getOperand(), offsets,
+        sizes, strides);
+    // The result type may be more static than the operand.
+    if (inserted.getType() != resultType) {
+      inserted = tensor::CastOp::create(rewriter, loc, resultType, inserted);
+    }
+    rewriter.replaceOp(op, inserted);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateDynamicShapeConversionPatterns(MLIRContext *context,
@@ -1751,8 +1861,9 @@ void populateDynamicShapeConversionPatterns(MLIRContext *context,
       ->add<DynamicReshapeOpConversion, PadOpConversion, DynamicPadOpConversion,
             DynamicConvolutionOpConversion, WideIndexGatherOpConversion,
             DynamicGatherOpConversion, DynamicBroadcastInDimOpConversion,
-            DynamicReduceWindowOpConversion>(typeConverter, context,
-                                             PatternBenefit{1000});
+            DynamicReduceWindowOpConversion, DynamicSliceOpConversion,
+            DynamicUpdateSliceOpConversion>(typeConverter, context,
+                                            PatternBenefit{1000});
 }
 
 } // namespace mlir::iree_compiler::stablehlo
