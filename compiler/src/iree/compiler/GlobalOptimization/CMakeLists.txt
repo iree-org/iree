@@ -88,6 +88,7 @@ iree_cc_library(
     "InferNumericNarrowing.cpp"
     "MaterializeHomogeneousEncodings.cpp"
     "OptimizeNumerics.cpp"
+    "PackSubByteQuantizedConstants.cpp"
     "Passes.cpp"
     "PropagateAffineQuantization.cpp"
     "PropagateLinalgTranspose.cpp"
@@ -141,6 +142,7 @@ iree_cc_library(
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
+    iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
