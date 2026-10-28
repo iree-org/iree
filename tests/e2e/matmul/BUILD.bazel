@@ -376,6 +376,26 @@ iree_generated_e2e_runner_test(
     test_type = "matmul",
 )
 
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_cpu_dt_inner_tiled_riscv_small_bf16_f32",
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+        "--iree-llvmcpu-enable-inner-tiled",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=bf16",
+        "--acc_type=f32",
+        "--shapes=small",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    target_cpu_features_variants = ["riscv_64:rvv:+m,+v,+zvl512b,+zvfbfwma"],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)
+
 # LLVMCPU, data-tiling lowering to iree_codegen.inner_tiled AND routing the
 # inner_tiled op through a built-in C-bitcode microkernel via
 # `--iree-llvmcpu-enable-llvm-ukernels=inner_tiled`. Restricted to the
