@@ -28,6 +28,11 @@ struct QuantMinMax {
 ///   Maximum: 127 -> magnitude 127
 int64_t getStorageMagnitude(unsigned bitWidth, bool isUnsigned);
 
+/// Inclusive range of the storage grid: [-8, 7] for signed and [0, 15] for
+/// unsigned 4-bit storage. Returns nullopt for zero-width storage or widths >=
+/// kAccumulatorWidth.
+std::optional<QuantMinMax> getStorageRange(unsigned bitWidth, bool isUnsigned);
+
 struct QuantizedOperandRanges {
   QuantMinMax input;
   QuantMinMax zeroPoint;

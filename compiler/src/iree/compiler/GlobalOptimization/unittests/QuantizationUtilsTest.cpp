@@ -34,6 +34,27 @@ TEST(QuantizationUtilsTest, getStorageMagnitude) {
   EXPECT_EQ(getStorageMagnitude(0, false), 0);
 }
 
+TEST(QuantizationUtilsTest, getStorageRange) {
+  struct TestCase {
+    unsigned bitWidth;
+    bool isUnsigned;
+    QuantMinMax storage;
+  };
+  for (const auto &test :
+       {TestCase{2, true, {0, 3}}, TestCase{2, false, {-2, 1}},
+        TestCase{4, true, {0, 15}}, TestCase{4, false, {-8, 7}}}) {
+    SCOPED_TRACE(test.bitWidth);
+    SCOPED_TRACE(test.isUnsigned);
+    std::optional<QuantMinMax> range =
+        getStorageRange(test.bitWidth, test.isUnsigned);
+    ASSERT_TRUE(range);
+    EXPECT_EQ(range->min, test.storage.min);
+    EXPECT_EQ(range->max, test.storage.max);
+  }
+  EXPECT_FALSE(getStorageRange(0, false));
+  EXPECT_FALSE(getStorageRange(32, true));
+}
+
 TEST(QuantizationUtilsTest, OperandRangesStorageGrid) {
   struct TestCase {
     unsigned bitWidth;
