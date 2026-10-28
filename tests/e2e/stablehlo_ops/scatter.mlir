@@ -177,3 +177,53 @@ func.func @scatter_2D_large() {
   check.expect_eq_const(%result, dense<2> : tensor<200x300xi32>) : tensor<200x300xi32>
   return
 }
+
+func.func @scatter_window_runtime_start_in_bounds() {
+  %operand = util.unfoldable_constant dense<0> : tensor<4x6xi32>
+  %indices = util.unfoldable_constant dense<[2]> : tensor<1xi32>
+  %updates = util.unfoldable_constant dense<[[1, 2, 3], [11, 12, 13], [21, 22, 23], [31, 32, 33]]> : tensor<4x3xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+    ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+      stablehlo.return %update : tensor<i32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      update_window_dims = [0, 1], scatter_dims_to_operand_dims = [1]>,
+    indices_are_sorted = true, unique_indices = true
+  } : (tensor<4x6xi32>, tensor<1xi32>, tensor<4x3xi32>) -> tensor<4x6xi32>
+  check.expect_eq_const(%result, dense<[[0, 0, 1, 2, 3, 0], [0, 0, 11, 12, 13, 0], [0, 0, 21, 22, 23, 0], [0, 0, 31, 32, 33, 0]]> : tensor<4x6xi32>) : tensor<4x6xi32>
+  return
+}
+
+// Elements past the operand are dropped.
+func.func @scatter_window_runtime_start_past_high_edge() {
+  %operand = util.unfoldable_constant dense<0> : tensor<4x6xi32>
+  %indices = util.unfoldable_constant dense<[5]> : tensor<1xi32>
+  %updates = util.unfoldable_constant dense<[[1, 2, 3], [11, 12, 13], [21, 22, 23], [31, 32, 33]]> : tensor<4x3xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+    ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+      stablehlo.return %update : tensor<i32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      update_window_dims = [0, 1], scatter_dims_to_operand_dims = [1]>,
+    indices_are_sorted = true, unique_indices = true
+  } : (tensor<4x6xi32>, tensor<1xi32>, tensor<4x3xi32>) -> tensor<4x6xi32>
+  check.expect_eq_const(%result, dense<[[0, 0, 0, 0, 0, 1], [0, 0, 0, 0, 0, 11], [0, 0, 0, 0, 0, 21], [0, 0, 0, 0, 0, 31]]> : tensor<4x6xi32>) : tensor<4x6xi32>
+  return
+}
+
+// Elements before the operand are dropped.
+func.func @scatter_window_runtime_start_below_zero() {
+  %operand = util.unfoldable_constant dense<0> : tensor<4x6xi32>
+  %indices = util.unfoldable_constant dense<[-2]> : tensor<1xi32>
+  %updates = util.unfoldable_constant dense<[[1, 2, 3], [11, 12, 13], [21, 22, 23], [31, 32, 33]]> : tensor<4x3xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+    ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+      stablehlo.return %update : tensor<i32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      update_window_dims = [0, 1], scatter_dims_to_operand_dims = [1]>,
+    indices_are_sorted = true, unique_indices = true
+  } : (tensor<4x6xi32>, tensor<1xi32>, tensor<4x3xi32>) -> tensor<4x6xi32>
+  check.expect_eq_const(%result, dense<[[3, 0, 0, 0, 0, 0], [13, 0, 0, 0, 0, 0], [23, 0, 0, 0, 0, 0], [33, 0, 0, 0, 0, 0]]> : tensor<4x6xi32>) : tensor<4x6xi32>
+  return
+}

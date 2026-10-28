@@ -73,12 +73,14 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRShapeDialect
     MLIRShapeOpsTransforms
+    MLIRSideEffectInterfaces
     MLIRSparseTensorDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
     MLIRTransformUtils
     MLIRTransforms
+    MLIRValueBoundsOpInterface
     MLIRVectorDialect
     StablehloBroadcastUtils
     StablehloLinalgTransforms

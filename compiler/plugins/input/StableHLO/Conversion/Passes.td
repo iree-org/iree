@@ -32,6 +32,12 @@ def ConvertStableHloToLinalgExt :
 // General passes
 //===----------------------------------------------------------------------===//
 
+def LegalizeDynamicReduceWindow :
+    Pass<"iree-stablehlo-legalize-dynamic-reduce-window", "ModuleOp"> {
+  let summary =
+      "Lowers stablehlo.dynamic_reduce_window custom calls that compute scans";
+}
+
 def LegalizeControlFlow :
     InterfacePass<"iree-stablehlo-legalize-control-flow", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes from StableHLO control flow to SCF control flow";
