@@ -2,7 +2,7 @@
 //
 // Compile:
 //   iree-compile \
-//     --iree-hal-target-backends=rocm \
+//     --iree-hal-target-device=hip \
 //     --iree-rocm-target=gfx950 \
 //     --iree-codegen-llvmgpu-use-igemm=true \
 //     --iree-llvmgpu-use-direct-load=true \
@@ -13,7 +13,7 @@
 //
 // Dump IR (for debugging):
 //   iree-compile \
-//     --iree-hal-target-backends=rocm \
+//     --iree-hal-target-device=hip \
 //     --iree-rocm-target=gfx950 \
 //     --iree-codegen-llvmgpu-use-igemm=true \
 //     --iree-llvmgpu-use-direct-load=true \
