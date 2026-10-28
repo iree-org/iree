@@ -109,6 +109,26 @@ util.func public @scfWhileExpansion(%arg0 : i32, %arg1 : tensor<1xf32>) {
 
 // -----
 
+// CHECK-LABEL: @scfWhileDifferentSignatures
+// CHECK-SAME: %[[INPUT:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[COND:.+]]: i1
+util.func public @scfWhileDifferentSignatures(%input: tensor<2xf32>, %condition: i1) -> (tensor<2xf32>, tensor<2xf32>) {
+  // CHECK: %[[RESULT:.+]]:4 = scf.while (%[[BEFORE:.+]] = %[[INPUT]], %[[BEFORE_SIZE:.+]] = %[[SIZE]])
+  // CHECK-SAME: (!stream.resource<*>, index) -> (!stream.resource<*>, index, !stream.resource<*>, index)
+  %result:2 = scf.while (%value = %input) : (tensor<2xf32>) -> (tensor<2xf32>, tensor<2xf32>) {
+    // CHECK: scf.condition(%[[COND]]) %[[BEFORE]], %[[BEFORE_SIZE]], %[[BEFORE]], %[[BEFORE_SIZE]]
+    scf.condition(%condition) %value, %value : tensor<2xf32>, tensor<2xf32>
+  } do {
+  // CHECK: ^bb0(%[[LEFT:.+]]: !stream.resource<*>, %[[LEFT_SIZE:.+]]: index, %{{.+}}: !stream.resource<*>, %{{.+}}: index):
+  ^bb0(%left: tensor<2xf32>, %right: tensor<2xf32>):
+    // CHECK: scf.yield %[[LEFT]], %[[LEFT_SIZE]] : !stream.resource<*>, index
+    scf.yield %left : tensor<2xf32>
+  }
+  // CHECK: util.return %[[RESULT]]#0, %[[RESULT]]#1, %[[RESULT]]#2, %[[RESULT]]#3
+  util.return %result#0, %result#1 : tensor<2xf32>, tensor<2xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @scfForExpansion
 // CHECK-SAME: %[[ARG0:.+]]: index,
 // CHECK-SAME: %[[ARG1:.+]]: !stream.resource<*>,

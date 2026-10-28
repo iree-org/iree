@@ -342,8 +342,8 @@ struct ScfWhileOpConversion
     whileOp.getAfter().getBlocks().clear();
     rewriter.inlineRegionBefore(op.getAfter(), whileOp.getAfter(),
                                 whileOp.getAfter().end());
-    if (failed(rewriter.convertRegionTypes(&whileOp.getAfter(), typeConverter,
-                                           &newSignature))) {
+    if (failed(
+            rewriter.convertRegionTypes(&whileOp.getAfter(), typeConverter))) {
       return failure();
     }
 
