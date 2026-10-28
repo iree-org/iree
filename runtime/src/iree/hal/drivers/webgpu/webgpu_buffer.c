@@ -275,6 +275,7 @@ iree_hal_webgpu_handle_t iree_hal_webgpu_buffer_handle(
 
 static void iree_hal_webgpu_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_webgpu_buffer_t* buffer = iree_hal_webgpu_buffer_cast(base_buffer);
+  IREE_ASSERT_EQ(buffer->mapping_count, 0);
   iree_allocator_t host_allocator = buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -338,6 +339,11 @@ static iree_status_t iree_hal_webgpu_buffer_map_range(
                             (uint64_t)buffer->shadow_buffer_size);
   }
 
+  if (buffer->mapping_count == IREE_HOST_SIZE_MAX) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "mapping count would overflow");
+  }
+
   // The mapped-at-creation shadow contains the latest host writes.
   if (!buffer->mapped_at_creation &&
       iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_READ)) {
@@ -366,6 +372,10 @@ static iree_status_t iree_hal_webgpu_buffer_unmap_range(
                             "buffer is not mapped");
   }
 
+  if (buffer->mapping_count == 0) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "buffer has no active mappings");
+  }
   --buffer->mapping_count;
   if (buffer->mapped_at_creation) {
     if (buffer->mapping_count != 0) return iree_ok_status();
