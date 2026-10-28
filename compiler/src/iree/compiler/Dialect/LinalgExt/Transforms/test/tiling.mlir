@@ -4524,3 +4524,25 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+func.func @group_matmul_partial_k(
+    %input: tensor<1x2xf32>, %weights: tensor<1x2x1xf32>,
+    %offsets: tensor<1xi64>, %output: tensor<1x1xf32>) -> tensor<1x1xf32> {
+  %c0 = arith.constant 0 : index
+  // expected-error @below {{partial reduction tiling is unsupported}}
+  // expected-error @below {{failed to tile operation}}
+  // expected-error @below {{failed to generate tiling loops}}
+  %result = iree_linalg_ext.group_matmul
+      ins(%input, %weights, %offsets, %c0 : tensor<1x2xf32>, tensor<1x2x1xf32>, tensor<1xi64>, index)
+      outs(%output : tensor<1x1xf32>) -> tensor<1x1xf32>
+  return %result : tensor<1x1xf32>
+}
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %op = transform.structured.match ops{["iree_linalg_ext.group_matmul"]} in %root : (!transform.any_op) -> !transform.any_op
+    %tiled, %loop = transform.structured.tile_using_for %op tile_sizes [0, 0, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
