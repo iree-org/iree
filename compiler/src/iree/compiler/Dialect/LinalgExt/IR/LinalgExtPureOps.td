@@ -38,6 +38,9 @@ def IREELinalgExt_IndexOp : IREELinalgExt_PureOp<"index", [Pure]>,
     `LinalgOp`, and the `iree_linalg_ext.index` operation enforces that the
     parent op is one of `IREE::LinalgExt::CustomOp`,
     `IREE::LinalgExt::AttentionOp`, or `IREE::LinalgExt::OnlineAttentionOp`.
+
+    In an attention region, `dim` indexes the score coordinates (batch...,
+    m..., k2...) in that order, not the iteration domain.
   }];
 
   let assemblyFormat = [{ $dim attr-dict `:` type($result) }];
