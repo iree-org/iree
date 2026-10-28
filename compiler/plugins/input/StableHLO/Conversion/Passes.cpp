@@ -62,6 +62,8 @@ void buildStableHLOInputConversionPassPipelineImpl(
       ::mlir::stablehlo::createStablehloLegalizeQuantToMathPass());
   passManager.addNestedPass<func::FuncOp>(
       ::mlir::stablehlo::createChloLegalizeToStablehloPass());
+  // Expose shape-helper arithmetic before deriving assertion facts.
+  passManager.addPass(createInlineShapeAssertionHelpers());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
   passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());

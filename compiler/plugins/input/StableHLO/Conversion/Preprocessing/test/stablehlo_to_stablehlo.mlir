@@ -1326,3 +1326,26 @@ func.func @scatter_sorted_axis_move(%operand: tensor<4x4xi32>, %indices: tensor<
   }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [1], inserted_window_dims = [1], scatter_dims_to_operand_dims = [1], index_vector_dim = 1>, indices_are_sorted = true, unique_indices = true} : (tensor<4x4xi32>, tensor<2x1xi64>, tensor<2x4xi32>) -> tensor<4x4xi32>
   return %result : tensor<4x4xi32>
 }
+
+// -----
+
+// The update returns its argument but also checks the previous value. Replacing
+// the scatter with dynamic_update_slice would discard that check.
+// CHECK-LABEL: @effectful_partial_scatter
+// CHECK-NOT: stablehlo.dynamic_update_slice
+// CHECK: "stablehlo.scatter"
+// CHECK: stablehlo.custom_call @shape_assertion
+// CHECK-SAME: has_side_effect = true
+// CHECK-NOT: stablehlo.dynamic_update_slice
+// CHECK: return
+func.func @effectful_partial_scatter(%operand: tensor<4xf32>, %updates: tensor<2xf32>) -> tensor<4xf32> {
+  %indices = stablehlo.constant dense<1> : tensor<1xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<f32>, %update: tensor<f32>):
+    %zero = stablehlo.constant dense<0.0> : tensor<f32>
+    %pred = stablehlo.compare GE, %current, %zero : (tensor<f32>, tensor<f32>) -> tensor<i1>
+    stablehlo.custom_call @shape_assertion(%pred) {has_side_effect = true, error_message = "negative current"} : (tensor<i1>) -> ()
+    stablehlo.return %update : tensor<f32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 0>, indices_are_sorted = false, unique_indices = false} : (tensor<4xf32>, tensor<1xi32>, tensor<2xf32>) -> tensor<4xf32>
+  return %result : tensor<4xf32>
+}

@@ -481,9 +481,16 @@ public:
           }
         }
       }
-      libraryBuilder.addExport(exportOp.getName(), std::move(sourceLocation),
-                               std::move(stageLocations), /*tag=*/"",
-                               dispatchAttrs, llvmFunc);
+      uint64_t dispatchFlags = 0;
+      if (llvmFunc->hasFnAttribute("iree-returns-status")) {
+        dispatchFlags |= static_cast<uint64_t>(
+            LibraryBuilder::DispatchFlags::RETURNS_STATUS);
+      }
+      libraryBuilder.addExport(
+          exportOp.getName(), std::move(sourceLocation),
+          std::move(stageLocations), /*tag=*/"", dispatchAttrs, llvmFunc,
+          /*params=*/{},
+          static_cast<LibraryBuilder::DispatchFlags>(dispatchFlags));
     }
 
     // Embed source files (if present).
