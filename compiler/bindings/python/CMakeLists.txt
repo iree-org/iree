@@ -18,9 +18,9 @@ include(AddLLVM)
 include(AddMLIR)
 include(AddMLIRPython)
 
-# Specifies that all MLIR packages are co-located under npcomp.
-# TODO: Add an upstream cmake param for this vs having a global here.
-add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=iree.compiler.")
+# Specifies that all MLIR packages are co-located under iree.compiler.
+set(MLIR_PYTHON_PACKAGE_PREFIX "iree.compiler")
+add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=${MLIR_PYTHON_PACKAGE_PREFIX}.")
 
 set(_PYTHON_BUILD_PREFIX "${IREE_BINARY_DIR}/compiler/bindings/python")
 set(_PYTHON_INSTALL_PREFIX "python_packages/iree_compiler")
@@ -265,6 +265,7 @@ set(_SOURCE_COMPONENTS
 add_mlir_python_modules(IREECompilerPythonModules
   ROOT_PREFIX "${_PYTHON_BUILD_PREFIX}/iree/compiler"
   INSTALL_PREFIX "${_PYTHON_INSTALL_PREFIX}/iree/compiler"
+  STUBGEN_DEPENDS_TARGETS IREECompilerPythonDylibFiles
   DECLARED_SOURCES ${_SOURCE_COMPONENTS}
   COMMON_CAPI_LINK_LIBS
     iree_compiler_API_SharedImpl
