@@ -76,6 +76,8 @@ function(iree_tablegen_library)
     endwhile()
 
     set(_OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/${_FILE})
+    get_filename_component(_OUTPUT_DIRECTORY "${_OUTPUT_FILE}" DIRECTORY)
+    file(MAKE_DIRECTORY "${_OUTPUT_DIRECTORY}")
 
     # Create add_custom_command with depfile support for Ninja.
     if(CMAKE_GENERATOR MATCHES "Ninja")
