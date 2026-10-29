@@ -12,7 +12,7 @@
 #   NAME: Name of the tablegen library target.
 #   TBLGEN: Tablegen executable to use (IREE or MLIR).
 #   TD_FILE: Main .td file to process.
-#   OUTS: List of output files and their generation flags.
+#   OUTS: List of output files and their generation flags. Supports nested paths and ensures that directories exist.
 function(iree_tablegen_library)
   cmake_parse_arguments(
     _RULE
