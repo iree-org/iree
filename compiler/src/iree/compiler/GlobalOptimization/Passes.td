@@ -97,6 +97,11 @@ def DemoteContractionInputsPass
                         "none",
                         "Demote no contraction ops.")
            )}]>,
+       Option<"minReductionSize", "min-reduction-size", "int64_t",
+              /*default=*/"2",
+              "Only demote contractions whose static reduction extent is "
+              "atleast this large. Tiny reductions gain nothing from narrower "
+              "inputs and lose precision.">,
   ];
 }
 
