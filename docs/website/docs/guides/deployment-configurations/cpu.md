@@ -93,16 +93,16 @@ compiled in by default on all platforms, though you should ensure that the
 You can check for CPU support by looking for the `local-sync` and `local-task`
 drivers and devices:
 
-```
-$ iree-run-module --list_drivers
+```shell
+iree-run-module --list_drivers
 ```
 
 ```console hl_lines="10-11"
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
 ```
 
-```
-$ iree-run-module --list_devices
+```shell
+iree-run-module --list_devices
 ```
 
 ```console hl_lines="4-5"
@@ -160,11 +160,11 @@ for a specific type of CPU. You can see the list of supported targets with
 "host" to let LLVM infer the triple from your host machine
 (e.g. `x86_64-linux-gnu`).
 
-```console
-$ iree-compile --iree-llvmcpu-list-targets
+```shell
+iree-compile --iree-llvmcpu-list-targets
 ```
 
-```
+```text
   Registered Targets:
     aarch64    - AArch64 (little endian)
     aarch64_32 - AArch64 (little endian ILP32)
