@@ -265,6 +265,8 @@ set(_SOURCE_COMPONENTS
 add_mlir_python_modules(IREECompilerPythonModules
   ROOT_PREFIX "${_PYTHON_BUILD_PREFIX}/iree/compiler"
   INSTALL_PREFIX "${_PYTHON_INSTALL_PREFIX}/iree/compiler"
+  MLIR_PYTHON_PACKAGE_PREFIX "iree.compiler"
+  STUBGEN_DEPENDS_TARGETS IREECompilerPythonDylibFiles
   DECLARED_SOURCES ${_SOURCE_COMPONENTS}
   COMMON_CAPI_LINK_LIBS
     iree_compiler_API_SharedImpl
