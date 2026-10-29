@@ -351,6 +351,14 @@ iree_cc_library(
   PUBLIC
 )
 
+target_link_libraries(iree_compiler_Codegen_Common_TransformDialectInterpreterPass PUBLIC
+    MLIRArithBufferizableOpInterfaceImpl
+    MLIRBufferizationBufferizableOpInterfaceImpl
+    MLIRSCFBufferizableOpInterfaceImpl
+    MLIRTensorBufferizableOpInterfaceImpl
+    MLIRVectorBufferizableOpInterfaceImpl
+)
+
 iree_tablegen_doc(
   NAME
     CodegenCommonPassesDocGen

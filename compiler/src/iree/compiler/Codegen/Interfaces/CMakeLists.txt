@@ -96,6 +96,14 @@ iree_cc_library(
   PUBLIC
 )
 
+target_link_libraries(iree_compiler_Codegen_Interfaces_BufferizationInterfaces PUBLIC
+    MLIRArithBufferizableOpInterfaceImpl
+    MLIRBufferizationBufferizableOpInterfaceImpl
+    MLIRSCFBufferizableOpInterfaceImpl
+    MLIRTensorBufferizableOpInterfaceImpl
+    MLIRVectorBufferizableOpInterfaceImpl
+)
+
 iree_cc_library(
   NAME
     HoistableRegionOpInterface
