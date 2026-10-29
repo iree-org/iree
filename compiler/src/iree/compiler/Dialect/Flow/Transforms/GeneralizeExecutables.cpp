@@ -114,14 +114,12 @@ static Signature buildSignature(func::FuncOp funcOp) {
     } else if (auto load =
                    dyn_cast<IREE::TensorExt::DispatchTensorLoadOp>(op)) {
       normalizeOffsets(
-          load,
-          cast<IREE::TensorExt::DispatchTensorLoadOp>(normalizedOp),
+          load, cast<IREE::TensorExt::DispatchTensorLoadOp>(normalizedOp),
           sig.slots);
     } else if (auto store =
                    dyn_cast<IREE::TensorExt::DispatchTensorStoreOp>(op)) {
       normalizeOffsets(
-          store,
-          cast<IREE::TensorExt::DispatchTensorStoreOp>(normalizedOp),
+          store, cast<IREE::TensorExt::DispatchTensorStoreOp>(normalizedOp),
           sig.slots);
     }
   }
@@ -129,11 +127,11 @@ static Signature buildSignature(func::FuncOp funcOp) {
   sig.hash =
       llvm::hash_value(normalizedFunc.getFunctionType().getAsOpaquePointer());
   normalizedFunc.getBody().walk([&](Operation *op) {
-    sig.hash = llvm::hash_combine(
-        sig.hash, OperationEquivalence::computeHash(
-                      op, OperationEquivalence::ignoreHashValue,
-                      OperationEquivalence::ignoreHashValue,
-                      OperationEquivalence::IgnoreLocations));
+    sig.hash = llvm::hash_combine(sig.hash,
+                                  OperationEquivalence::computeHash(
+                                      op, OperationEquivalence::ignoreHashValue,
+                                      OperationEquivalence::ignoreHashValue,
+                                      OperationEquivalence::IgnoreLocations));
   });
   return sig;
 }
@@ -233,7 +231,8 @@ class GeneralizeExecutablesPass
     // structural equivalence. Hash equality alone is never sufficient.
     llvm::MapVector<size_t, SmallVector<size_t>> groupsByHash;
     SmallVector<SmallVector<Member *>> groups;
-    for (auto &[name, m] : members) {
+    for (auto &entry : members) {
+      Member &m = entry.second;
       if (m.callers.empty()) {
         continue;
       }
