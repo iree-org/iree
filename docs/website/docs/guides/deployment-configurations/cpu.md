@@ -97,7 +97,7 @@ drivers and devices:
 iree-run-module --list_drivers
 ```
 
-```console hl_lines="10-11"
+```console hl_lines="9-10"
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
 ```
 
@@ -105,7 +105,7 @@ iree-run-module --list_drivers
 iree-run-module --list_devices
 ```
 
-```console hl_lines="4-5"
+```console hl_lines="3-4"
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-device-list-amd.md"
 ```
 
