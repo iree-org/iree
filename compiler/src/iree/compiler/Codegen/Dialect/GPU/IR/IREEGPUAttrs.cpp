@@ -1034,6 +1034,36 @@ MMAAttr MMAAttr::get(MLIRContext *context, MMAIntrinsic type) {
   return Base::get(context, type, /*colMajor=*/false);
 }
 
+LogicalResult
+SparseMMAAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                      SparseMMAIntrinsic intrinsic, int64_t sparsitySelector) {
+  if (intrinsic != SparseMMAIntrinsic::NV_MMA_SP_F32_16x8x32_F16) {
+    return emitError() << "unsupported sparse MMA intrinsic";
+  }
+  if (sparsitySelector < 0 || sparsitySelector > 1) {
+    return emitError() << "sparsity selector must be 0 or 1";
+  }
+  return success();
+}
+
+SmallVector<int64_t> SparseMMAAttr::getMmaShape() const { return {16, 8, 32}; }
+
+int64_t SparseMMAAttr::getSubgroupSize() const { return 32; }
+
+int64_t SparseMMAAttr::getCompressedAElements() const {
+  return getMmaShape()[0] * getMmaShape()[2] / 2;
+}
+
+int64_t SparseMMAAttr::getBElements() const {
+  return getMmaShape()[1] * getMmaShape()[2];
+}
+
+int64_t SparseMMAAttr::getAccumulatorElements() const {
+  return getMmaShape()[0] * getMmaShape()[1];
+}
+
+bool SparseMMAAttr::isCompressedA() const { return true; }
+
 int64_t MMAAttr::getExpectedNumInputs() const { return 2; }
 
 int64_t MMAAttr::getExpectedNumOutputs() const { return 1; }

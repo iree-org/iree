@@ -311,6 +311,38 @@ def IREEGPU_MMAAttr : AttrDef<IREEGPU_Dialect, "MMA", [
   }];
 }
 
+def IREEGPU_SparseMMAIntrinsicAttr
+  : IREEGPU_MmaEnumAttr<IREEGPU_SparseMMAIntrinsic, "sparse_mma_intrinsic">;
+
+def IREEGPU_SparseMMAAttr : AttrDef<IREEGPU_Dialect, "SparseMMA"> {
+  let mnemonic = "sparse_mma_layout";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let summary = [{Descriptor for a structured-sparse matrix multiply-accumulate instruction.}];
+  let description = [{
+    Describes an NVIDIA `mma.sp.sync` operation. The supported intrinsic is
+    the f16 x f16 -> f32 m16n8k32 operation with a compressed 2:4 A operand, a
+    dense B operand, an i32 metadata operand, and a sparsity selector.
+
+    The attribute only describes the operation. It does not imply lowering,
+    metadata materialization, or operand packing, and it does not check the
+    target architecture.
+  }];
+  let parameters = (ins
+    EnumParameter<IREEGPU_SparseMMAIntrinsic>:$intrinsic,
+    DefaultValuedParameter<"int64_t", "0">:$sparsity_selector
+  );
+  let assemblyFormat = "`<` $intrinsic (`,` `sparsity_selector` `=` $sparsity_selector^)? `>`";
+  let genVerifyDecl = 1;
+  let extraClassDeclaration = [{
+    SmallVector<int64_t> getMmaShape() const;
+    int64_t getSubgroupSize() const;
+    int64_t getCompressedAElements() const;
+    int64_t getBElements() const;
+    int64_t getAccumulatorElements() const;
+    bool isCompressedA() const;
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // DataTiled MMA Attributes
 //===----------------------------------------------------------------------===//
