@@ -93,8 +93,16 @@ compiled in by default on all platforms, though you should ensure that the
 You can check for CPU support by looking for the `local-sync` and `local-task`
 drivers and devices:
 
+```
+$ iree-run-module --list_drivers
+```
+
 ```console hl_lines="10-11"
 --8<-- "docs/website/docs/guides/deployment-configurations/snippets/_iree-run-module-driver-list.md:2"
+```
+
+```
+$ iree-run-module --list_devices
 ```
 
 ```console hl_lines="4-5"
@@ -154,7 +162,9 @@ for a specific type of CPU. You can see the list of supported targets with
 
 ```console
 $ iree-compile --iree-llvmcpu-list-targets
+```
 
+```
   Registered Targets:
     aarch64    - AArch64 (little endian)
     aarch64_32 - AArch64 (little endian ILP32)
