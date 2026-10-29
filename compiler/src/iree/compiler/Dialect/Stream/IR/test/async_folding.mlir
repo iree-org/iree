@@ -450,6 +450,59 @@ util.func private @IntermediateTransferElision(%source: !stream.resource<constan
 
 // -----
 
+// Both transfers have explicit storage policies that must survive canonicalization.
+// CHECK-LABEL: @PreserveExplicitTransferStorage
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
+util.func private @PreserveExplicitTransferStorage(%source: !stream.resource<constant>, %size: index) -> !stream.resource<external> {
+  // CHECK: %[[COPY:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<staging>{%[[SIZE]]} storage = copy
+  %copy = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size} storage = copy
+  // CHECK: %[[REUSE:.+]] = stream.async.transfer %[[COPY]] : !stream.resource<staging>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]} storage = reuse
+  %reuse = stream.async.transfer %copy : !stream.resource<staging>{%size} -> !stream.resource<external>{%size} storage = reuse
+  // CHECK: util.return %[[REUSE]]
+  util.return %reuse : !stream.resource<external>
+}
+
+// -----
+
+// CHECK-LABEL: @PreserveOuterReuseTransfer
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+util.func private @PreserveOuterReuseTransfer(%source: !stream.resource<transient>, %size: index) -> !stream.resource<transient> {
+  // CHECK: %[[INNER:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<staging>{%[[SIZE]]}{{$}}
+  %inner = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<staging>{%size}
+  // CHECK: %[[OUTER:.+]] = stream.async.transfer %[[INNER]] : !stream.resource<staging>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]} storage = reuse
+  %outer = stream.async.transfer %inner : !stream.resource<staging>{%size} -> !stream.resource<transient>{%size} storage = reuse
+  // CHECK: util.return %[[OUTER]]
+  util.return %outer : !stream.resource<transient>
+}
+
+// -----
+
+// CHECK-LABEL: @PreserveExplicitStorageInIntermediateTransfer
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
+util.func private @PreserveExplicitStorageInIntermediateTransfer(%source: !stream.resource<constant>, %size: index) -> !stream.resource<external> {
+  // CHECK: %[[COPY:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<staging>{%[[SIZE]]} storage = copy
+  %copy = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size} storage = copy
+  // CHECK: %[[RESULT:.+]] = stream.async.transfer %[[COPY]] : !stream.resource<staging>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+  %result = stream.async.transfer %copy : !stream.resource<staging>{%size} -> !stream.resource<external>{%size}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<external>
+}
+
+// -----
+
+// CHECK-LABEL: @PreserveExplicitStorageOnSameAffinity
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+util.func private @PreserveExplicitStorageOnSameAffinity(%source: !stream.resource<transient>, %size: index) -> !stream.resource<external> {
+  // CHECK-NOT: stream.async.clone
+  // CHECK: %[[COPY:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]} storage = copy
+  // CHECK-NOT: stream.async.clone
+  %copy = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<external>{%size} storage = copy
+  // CHECK: util.return %[[COPY]]
+  util.return %copy : !stream.resource<external>
+}
+
+// -----
+
 util.global private @device_a : !hal.device
 util.global private @device_b : !hal.device
 

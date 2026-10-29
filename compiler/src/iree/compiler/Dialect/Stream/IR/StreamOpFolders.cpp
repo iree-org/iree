@@ -1424,6 +1424,9 @@ struct FoldTensorCloneIntoLoad : OpRewritePattern<TensorLoadOp> {
     if (!transferOp) {
       return failure();
     }
+    if (transferOp.getStorageAttr()) {
+      return failure();
+    }
 
     if (!transferOp.getResult().hasOneUse()) {
       return failure();
@@ -2162,8 +2165,11 @@ void AsyncBarrierOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult AsyncTransferOp::fold(FoldAdaptor operands) {
+  if (getStorageAttr()) {
+    return {};
+  }
   if (auto sourceTransferOp = getSource().getDefiningOp<AsyncTransferOp>()) {
-    if (!getExecutionAffinityAttr() &&
+    if (!sourceTransferOp.getStorageAttr() && !getExecutionAffinityAttr() &&
         !sourceTransferOp.getExecutionAffinityAttr() &&
         sourceTransferOp.getSource().getType() == getResult().getType() &&
         sourceTransferOp.getSourceAffinity() == getTargetAffinity()) {
@@ -2184,6 +2190,9 @@ struct SameAffinityTransferToClone : OpRewritePattern<AsyncTransferOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(AsyncTransferOp transferOp,
                                 PatternRewriter &rewriter) const override {
+    if (transferOp.getStorageAttr()) {
+      return failure();
+    }
     // Check if source and result affinities are the same.
     // This includes the case where both are null (implicit same affinity).
     auto sourceAffinityAttr = transferOp.getSourceAffinityAttr();
@@ -2218,6 +2227,9 @@ struct IntermediateTransferElision : OpRewritePattern<AsyncTransferOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(AsyncTransferOp transferOp,
                                 PatternRewriter &rewriter) const override {
+    if (transferOp.getStorageAttr()) {
+      return failure();
+    }
     // Walk up the transfer chain to the first non-transfer op.
     AsyncTransferOp originTransferOp = transferOp;
     while (true) {
@@ -2226,6 +2238,9 @@ struct IntermediateTransferElision : OpRewritePattern<AsyncTransferOp> {
           dyn_cast_if_present<AsyncTransferOp>(source.getDefiningOp());
       if (!previousTransferOp) {
         break;
+      }
+      if (previousTransferOp.getStorageAttr()) {
+        return failure();
       }
       originTransferOp = previousTransferOp;
     }
@@ -2339,6 +2354,9 @@ struct FoldAsyncCloneIntoLoad : OpRewritePattern<AsyncLoadOp> {
     // Match: stream.async.load <- stream.async.transfer
     auto transferOp = loadOp.getSource().getDefiningOp<AsyncTransferOp>();
     if (!transferOp) {
+      return failure();
+    }
+    if (transferOp.getStorageAttr()) {
       return failure();
     }
     // Only fold if the transfer is not used by anything else: otherwise the
