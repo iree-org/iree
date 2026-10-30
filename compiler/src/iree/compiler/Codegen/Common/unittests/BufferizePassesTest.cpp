@@ -74,9 +74,10 @@ TEST_F(BufferizePassesTest, AllowsLoopAllocationsWithCustomCopy) {
     return success();
   };
   PassManager manager(&context);
-  addIREEComprehensiveBufferizePasses(manager.nest<func::FuncOp>(),
-                                      /*allocationFn=*/std::nullopt, copy,
-                                      /*allowReturnAllocsFromLoops=*/true);
+  addIREEComprehensiveBufferizePasses(
+      manager.nest<func::FuncOp>(),
+      /*allocationFn=*/std::nullopt, copy,
+      LoopAllocationMode::CallerManagesLifetime);
   ASSERT_TRUE(succeeded(manager.run(*module)));
   ASSERT_TRUE(succeeded(verify(*module)));
   scf::ForOp loop;

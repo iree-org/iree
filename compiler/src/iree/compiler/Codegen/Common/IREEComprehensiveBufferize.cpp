@@ -345,7 +345,7 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn,
-    bool allowReturnAllocsFromLoops) {
+    LoopAllocationMode loopAllocationMode) {
   if (!allocationFn) {
     allocationFn = defaultAllocationFn;
   }
@@ -353,7 +353,8 @@ createIREEComprehensiveBufferizePass(
     memCpyFn = defaultMemCpyFn;
   }
   return std::make_unique<IREEComprehensiveBufferizePass>(
-      allocationFn.value(), memCpyFn.value(), allowReturnAllocsFromLoops);
+      allocationFn.value(), memCpyFn.value(),
+      loopAllocationMode == LoopAllocationMode::CallerManagesLifetime);
 }
 
 void addIREEPostBufferizationPasses(OpPassManager &funcPassManager) {
@@ -372,13 +373,15 @@ void addIREEComprehensiveBufferizePasses(
     OpPassManager &funcPassManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn,
-    bool allowReturnAllocsFromLoops) {
+    LoopAllocationMode loopAllocationMode) {
+  const bool allowReturnAllocsFromLoops =
+      loopAllocationMode == LoopAllocationMode::CallerManagesLifetime;
   EliminateEmptyTensorsPassOptions eliminateOptions;
   eliminateOptions.allowReturnAllocsFromLoops = allowReturnAllocsFromLoops;
   funcPassManager.addPass(createEliminateEmptyTensorsPass(eliminateOptions));
   funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
   funcPassManager.addPass(createIREEComprehensiveBufferizePass(
-      allocationFn, memCpyFn, allowReturnAllocsFromLoops));
+      allocationFn, memCpyFn, loopAllocationMode));
   addIREEPostBufferizationPasses(funcPassManager);
 }
 
