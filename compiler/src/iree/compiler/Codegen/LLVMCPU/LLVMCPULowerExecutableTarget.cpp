@@ -158,7 +158,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     });
     return hasAttention;
   };
-  if (isAArch64(targetConfig) && hasAttentionOp(funcOp)) {
+  if ((isAArch64(targetConfig) || isMIPS(targetConfig)) &&
+      hasAttentionOp(funcOp)) {
     pipelineOpts.enableVectorMasking = true;
   }
 

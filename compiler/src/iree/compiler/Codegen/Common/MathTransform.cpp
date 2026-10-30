@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/FastMathPatterns.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/Transforms/Approximation.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
@@ -107,7 +108,6 @@ static bool predicateApprox(StringRef name,
     // cbrt has no WGSL builtin and its expansion uses only finite constants.
     return name == math::CbrtOp::getOperationName();
   }
-
   // Compute hasFastExp from target attribute.
   bool hasFastExp = isROCMBackend(target);
 
@@ -134,6 +134,20 @@ static bool predicateApprox(StringRef name,
   // If hasFastExp is enabled and the op is in our device-lib list,
   // don't apply the standard polynomial approximation.
   if (hasFastExp && llvm::is_contained(opsWithDeviceLibImpl, name)) {
+    return false;
+  }
+
+  // The LLVM MIPS backend miscompiles the vectorized polynomial approximation
+  // of certain transcendentals once MSA (128-bit SIMD) is enabled (e.g. exp(1)
+  // evaluates to 7.43 instead of 2.72); the same approximations are correct
+  // when scalar, so the fault is in MSA codegen of the vectorized approximation,
+  // not the approximation itself. Route only that confirmed-affected family to
+  // scalar libm on MIPS (correct; MSA still vectorizes the surrounding
+  // arith/matmul/conv). erf and cbrt are deliberately NOT included: they have
+  // no vector libm lowering and must stay approximated, else legalization
+  // fails. See <ISSUE>.
+  if (isMIPS(target.getConfiguration()) &&
+      llvm::is_contained({exp, expm1, log, log2, log1p, sin, cos, tanh}, name)) {
     return false;
   }
 
