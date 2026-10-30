@@ -459,3 +459,21 @@ module {
 }
 // CHECK-LABEL: func @test_data_tiled_scaled_mfma_F32_16x16x128_B32_unswizzled
 //  CHECK-SAME:   mma_types = #iree_gpu.data_tiled_scaled_mma_layout<intrinsic = MFMA_SCALE_F32_16x16x128_B32, lhs_elem_type = f4E2M1FN, rhs_elem_type = f4E2M1FN, acc_elem_type = f32, unswizzled_operands = [0, 1]>
+
+module {
+  func.func @test_sparse_mma_f16_16x8x32_f32() attributes {
+      mma_types = #iree_gpu.sparse_mma_layout<NV_MMA_SP_F32_16x8x32_F16>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_sparse_mma_f16_16x8x32_f32
+//  CHECK-SAME:   mma_types = #iree_gpu.sparse_mma_layout<NV_MMA_SP_F32_16x8x32_F16>
+
+module {
+  func.func @test_sparse_mma_selector_one() attributes {
+      mma_types = #iree_gpu.sparse_mma_layout<NV_MMA_SP_F32_16x8x32_F16, sparsity_selector = 1>} {
+    return
+  }
+}
+// CHECK-LABEL: func @test_sparse_mma_selector_one
+//  CHECK-SAME:   mma_types = #iree_gpu.sparse_mma_layout<NV_MMA_SP_F32_16x8x32_F16, sparsity_selector = 1>
