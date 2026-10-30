@@ -233,6 +233,10 @@ def IREECodegen_InnerTileDescAttrInterface :
         to `getDistributedTileShapes()`, construct, if possible, the operations
         that implement this kind and place the results (which will be used to
         replace the inner_tiled op) into the `results` vector.
+
+        `skipIntermediateRoundings` reflects the corresponding compilation
+        option: when false, lowered operations must preserve intermediate
+        rounding steps even if that prevents conversion hoisting/cancellation.
       }],
       /*retTy=*/"::mlir::LogicalResult",
       /*methodName=*/"buildUnderlyingOperations",
@@ -241,7 +245,8 @@ def IREECodegen_InnerTileDescAttrInterface :
         "::mlir::Location":$loc,
         "::mlir::ValueRange":$inputs,
         "::mlir::ValueRange":$outputs,
-        "::llvm::SmallVectorImpl<::mlir::Value>&":$results
+        "::llvm::SmallVectorImpl<::mlir::Value>&":$results,
+        "bool":$skipIntermediateRoundings
       ),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{

@@ -97,7 +97,10 @@ using DataTiledMMAValueXformer =
 /// needed.
 ///
 /// When `legalizeAcc` / `restoreAcc` are set they run inside the hoistable
-/// distribute / reassemble bodies and must be inverses of each other.
+/// distribute / reassemble bodies and must be inverses of each other. If the
+/// round-trip is numerically lossy (e.g. f32 -> f16 -> f32), set
+/// `markLossyRoundtrip` so the pair is tagged with
+/// `IREE::Util::kLossyRoundtripAttr` and cannot be cancelled or hoisted.
 LogicalResult buildDataTiledMMAUnderlyingOperations(
     OpBuilder &builder, Location loc, const TileSwizzle &lhsSwizzle,
     const TileSwizzle &rhsSwizzle, const TileSwizzle &accSwizzle,
@@ -105,7 +108,7 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
     ValueRange inputs, ValueRange outputs,
     DataTiledMMAIntrinsicEmitter emitIntrinsic, SmallVectorImpl<Value> &results,
     DataTiledMMAValueXformer legalizeAcc = {},
-    DataTiledMMAValueXformer restoreAcc = {});
+    DataTiledMMAValueXformer restoreAcc = {}, bool markLossyRoundtrip = false);
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 

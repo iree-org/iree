@@ -427,3 +427,32 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+// A pair marked `iree.lossy_roundtrip` is not a true inverse (e.g.
+// extf(truncf(x)) != x), so it must not be cancelled even when the tags match.
+// CHECK-LABEL: @lossy_pair_not_cancelled
+// CHECK: %[[EXT:.+]] = arith.extf
+// CHECK: %[[TRUNC:.+]] = arith.truncf
+// CHECK: return %[[TRUNC]]
+module attributes { transform.with_named_sequence } {
+  func.func @lossy_pair_not_cancelled(%arg0 : vector<32xf16>) -> vector<32xf16> {
+    %0 = util.hoistable_conversion "distribute" inverts("reassemble")
+        (%a = %arg0) : (vector<32xf16>) -> vector<32xf32> {
+      %e = arith.extf %a : vector<32xf16> to vector<32xf32>
+      util.return %e : vector<32xf32>
+    } {iree.lossy_roundtrip}
+    %1 = util.hoistable_conversion "reassemble" inverts("distribute")
+        (%b = %0) : (vector<32xf32>) -> vector<32xf16> {
+      %t = arith.truncf %b : vector<32xf32> to vector<32xf16>
+      util.return %t : vector<32xf16>
+    } {iree.lossy_roundtrip}
+    return %1 : vector<32xf16>
+  }
+  transform.named_sequence @__transform_main(%arg0: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %arg0 : (!transform.any_op) -> !transform.any_op
+    transform.util.eliminate_hoistable_conversions %func : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  }
+}

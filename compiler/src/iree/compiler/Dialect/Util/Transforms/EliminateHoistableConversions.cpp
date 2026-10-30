@@ -20,6 +20,12 @@ namespace {
 // Checks that F and G are marked as mutual inverses so that we can cancel or
 // hoist them.
 static bool areInversePairs(HoistableConversionOp f, HoistableConversionOp g) {
+  // A lossy round-trip (e.g. f32 -> f16 -> f32) is not a true inverse:
+  // extf(truncf(x)) != x. Cancelling or hoisting it would silently drop the
+  // per-iteration rounding step, so never treat such a pair as inverse.
+  if (f->hasAttr(kLossyRoundtripAttr) || g->hasAttr(kLossyRoundtripAttr)) {
+    return false;
+  }
   return f.getTag() == g.getInverseTag() && f.getInverseTag() == g.getTag();
 }
 

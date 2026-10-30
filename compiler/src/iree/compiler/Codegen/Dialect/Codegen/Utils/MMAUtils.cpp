@@ -99,7 +99,8 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
     int64_t intrinsicsM, int64_t intrinsicsN, int64_t intrinsicsK,
     ValueRange inputs, ValueRange outputs,
     DataTiledMMAIntrinsicEmitter emitIntrinsic, SmallVectorImpl<Value> &results,
-    DataTiledMMAValueXformer legalizeAcc, DataTiledMMAValueXformer restoreAcc) {
+    DataTiledMMAValueXformer legalizeAcc, DataTiledMMAValueXformer restoreAcc,
+    bool markLossyRoundtrip) {
   if (inputs.size() != 2 || outputs.size() != 1) {
     return failure();
   }
@@ -132,6 +133,10 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
         }
         return pieces;
       });
+  if (markLossyRoundtrip) {
+    distributeAccOp->setAttr(IREE::Util::kLossyRoundtripAttr,
+                             builder.getUnitAttr());
+  }
   SmallVector<Value> intrinsicsAcc(distributeAccOp.getResults());
 
   // Loop over the unroll_{m,n,k} dimensions to emit per-intrinsic ops.
@@ -190,6 +195,10 @@ LogicalResult buildDataTiledMMAUnderlyingOperations(
         }
         return {acc};
       });
+  if (markLossyRoundtrip) {
+    reassembleOp->setAttr(IREE::Util::kLossyRoundtripAttr,
+                          builder.getUnitAttr());
+  }
   results.push_back(reassembleOp.getResult(0));
   return success();
 }
