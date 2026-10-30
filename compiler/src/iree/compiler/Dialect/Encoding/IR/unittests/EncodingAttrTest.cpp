@@ -52,5 +52,36 @@ TEST_F(EncodingAttrsTest, PaddingAttr) {
   EXPECT_FALSE(cast<SerializableAttr>(nonZeroPaddingAttr).isIdentityLayout());
 }
 
+TEST_F(EncodingAttrsTest, PackedStorageCapabilities) {
+  auto packedStorage = PackedStorageAttr::get(getContext());
+  auto encoding = cast<SerializableAttr>(packedStorage);
+  EXPECT_TRUE(encoding.canDropWithoutTensorMaterialization());
+  EXPECT_TRUE(encoding.canSkipBufferViewAssertions());
+  EXPECT_TRUE(encoding.isInvariantUnderDimCollapse());
+  EXPECT_FALSE(encoding.isIdentityLayout());
+  EXPECT_EQ(encoding.getCollapsedEncoding({2, 4}, {8}), packedStorage);
+  EXPECT_EQ(encoding.getCollapsedEncoding({ShapedType::kDynamic, 4},
+                                          {ShapedType::kDynamic}),
+            packedStorage);
+}
+
+TEST_F(EncodingAttrsTest, ConservativeCapabilities) {
+  MLIRContext *ctx = getContext();
+  Builder builder(ctx);
+  SmallVector<Type> elemTypes(3, builder.getF32Type());
+  SmallVector<Attribute> encodings = {
+      TestingAttr::get(ctx, ArrayAttr{}, Type{}), IdentityAttr::get(ctx),
+      PaddingAttr::get(ctx, ArrayRef<int64_t>{4, 2}),
+      LayoutAttr::get(ctx, builder.getArrayAttr({PackedStorageAttr::get(ctx)})),
+      EncodingAttr::get(ctx, /*operandIndex=*/0, EncodingOpType::matmul,
+                        elemTypes)};
+  for (Attribute attr : encodings) {
+    auto encoding = cast<SerializableAttr>(attr);
+    EXPECT_FALSE(encoding.canDropWithoutTensorMaterialization());
+    EXPECT_FALSE(encoding.canSkipBufferViewAssertions());
+    EXPECT_FALSE(encoding.isInvariantUnderDimCollapse());
+  }
+}
+
 } // namespace
 } // namespace mlir::iree_compiler::IREE::Encoding
