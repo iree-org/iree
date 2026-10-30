@@ -201,3 +201,59 @@ func.func @clone_mask_chain_entry_block_constant_leaf(
   }
   func.return %0#0, %0#1 : vector<16x64xf16>, vector<16x64xf16>
 }
+
+// -----
+
+#layoutD = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [1, 1],
+  outer_tile = [1, 1],
+  thread_tile = [4, 16],
+  element_tile = [4, 4],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [16, 1]
+>
+
+#layoutE = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1],
+  batch_tile = [2, 2],
+  outer_tile = [1, 1],
+  thread_tile = [1, 1],
+  element_tile = [8, 32],
+
+  subgroup_strides = [0, 0],
+  thread_strides   = [0, 0]
+>
+
+// A mask built in a loop from a mask computed before it is cloned at each
+// use inside the loop, with no layout conversion of the i1 vector.
+// CHECK-LABEL: @clone_mask_chain_across_loop
+//       CHECK: scf.for
+//   CHECK-NOT: iree_vector_ext.to_layout {{.*}}xi1
+//       CHECK: arith.select
+//       CHECK: arith.select
+//       CHECK: scf.yield
+func.func @clone_mask_chain_across_loop(%a: vector<16x64xf16>, %b: vector<16x64xf16>, %n: index, %count: index) -> (vector<16x64xf16>, vector<16x64xf16>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant dense<0.0> : vector<16x64xf16>
+  %step = vector.step : vector<64xindex>
+  %limit = vector.broadcast %n : index to vector<64xindex>
+  %mask_1d = arith.cmpi slt, %step, %limit : vector<64xindex>
+  %r:2 = scf.for %i = %c0 to %count step %c1 iter_args(%ia = %a, %ib = %b) -> (vector<16x64xf16>, vector<16x64xf16>) {
+    %rows = vector.step : vector<16xindex>
+    %row_limit = vector.broadcast %i : index to vector<16xindex>
+    %row_mask_1d = arith.cmpi slt, %rows, %row_limit : vector<16xindex>
+    %row_mask_t = vector.broadcast %row_mask_1d : vector<16xi1> to vector<64x16xi1>
+    %row_mask = vector.transpose %row_mask_t, [1, 0] : vector<64x16xi1> to vector<16x64xi1>
+    %col_mask = vector.broadcast %mask_1d : vector<64xi1> to vector<16x64xi1>
+    %mask = arith.andi %row_mask, %col_mask : vector<16x64xi1>
+    %al = iree_vector_ext.to_layout %ia to layout(#layoutD) : vector<16x64xf16>
+    %bl = iree_vector_ext.to_layout %ib to layout(#layoutE) : vector<16x64xf16>
+    %sa = arith.select %mask, %al, %cst : vector<16x64xi1>, vector<16x64xf16>
+    %sb = arith.select %mask, %bl, %cst : vector<16x64xi1>, vector<16x64xf16>
+    scf.yield %sa, %sb : vector<16x64xf16>, vector<16x64xf16>
+  }
+  func.return %r#0, %r#1 : vector<16x64xf16>, vector<16x64xf16>
+}
