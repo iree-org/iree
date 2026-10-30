@@ -23,6 +23,22 @@ namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
+// Convolution interface matching checks indexing maps, but does not require a
+// multiply-accumulate body. Do not demote other computations with those maps.
+static bool hasFloatMultiplyAccumulateBody(linalg::GenericOp op) {
+  Block &body = op.getRegion().front();
+  if (op.getNumDpsInputs() != 2 || op.getNumDpsInits() != 1 ||
+      body.getOperations().size() != 3) {
+    return false;
+  }
+  // The shared matcher allows intervening unary ops; the three-operation
+  // guard above restricts this body to multiply, add, and yield.
+  return linalg::detail::isContractionBody(
+      body, [](Operation *elementwise, Operation *reduction) {
+        return isa<arith::MulFOp>(elementwise) && isa<arith::AddFOp>(reduction);
+      });
+}
+
 // Template pattern for demoting contraction inputs to a narrower floating-point
 // type.
 // SrcType: The source floating-point type (e.g., Float32Type)
@@ -42,7 +58,14 @@ struct DemoteContractionInputsPattern
     if (demoteOperation == DemoteOperation::None) {
       return failure();
     }
-    if (!isa<linalg::ContractionOpInterface, linalg::ConvolutionOpInterface>(
+    auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation());
+    bool genericMatmul =
+        genericOp && linalg::isaContractionOpInterface(linalgOp);
+    bool genericConv = genericOp &&
+                       linalg::isaConvolutionOpInterface(linalgOp) &&
+                       hasFloatMultiplyAccumulateBody(genericOp);
+    if (!genericMatmul && !genericConv &&
+        !isa<linalg::ContractionOpInterface, linalg::ConvolutionOpInterface>(
             linalgOp.getOperation())) {
       return failure();
     }
@@ -84,12 +107,33 @@ struct DemoteContractionInputsPattern
                 ->getResult(0));
       }
       using OpTy = std::remove_pointer_t<decltype(typePtr)>;
-      auto namedOp = cast<OpTy>(linalgOp.getOperation());
+      auto typedOp = cast<OpTy>(linalgOp.getOperation());
       llvm::append_range(demotedInputs, linalgOp.getDpsInits());
-      auto newOp = IREE::LinalgExt::cloneNamedLinalgOpWithNewTypes(
-          rewriter, cast<linalg::LinalgOp>(namedOp.getOperation()),
-          namedOp->getResultTypes(), demotedInputs);
-      rewriter.replaceOp(linalgOp, newOp->getResults());
+      if constexpr (std::is_same_v<OpTy, linalg::GenericOp>) {
+        auto newOp =
+            cast<linalg::GenericOp>(rewriter.clone(*typedOp.getOperation()));
+        newOp->setOperands(demotedInputs);
+        // Preserve the payload (including fast-math attributes) and accumulate
+        // in the original type, just as the named mixed-precision ops do.
+        {
+          OpBuilder::InsertionGuard guard(rewriter);
+          Block &body = newOp.getRegion().front();
+          rewriter.setInsertionPointToStart(&body);
+          for (BlockArgument arg :
+               body.getArguments().take_front(newOp.getNumDpsInputs())) {
+            arg.setType(destType);
+            Value extended = arith::ExtFOp::create(rewriter, loc, srcType, arg,
+                                                   arith::FastMathFlagsAttr{});
+            arg.replaceAllUsesExcept(extended, extended.getDefiningOp());
+          }
+        }
+        rewriter.replaceOp(linalgOp, newOp->getResults());
+      } else {
+        auto newOp = IREE::LinalgExt::cloneNamedLinalgOpWithNewTypes(
+            rewriter, cast<linalg::LinalgOp>(typedOp.getOperation()),
+            typedOp->getResultTypes(), demotedInputs);
+        rewriter.replaceOp(linalgOp, newOp->getResults());
+      }
     };
 
     bool demoteMatmul = (demoteOperation == DemoteOperation::All) ||
@@ -99,7 +143,9 @@ struct DemoteContractionInputsPattern
                       (demoteOperation == DemoteOperation::Conv);
 
     Operation *op = linalgOp.getOperation();
-    if (demoteMatmul && IREE::LinalgExt::isPureMatmul(op)) {
+    if ((demoteMatmul && genericMatmul) || (demoteConv && genericConv)) {
+      replaceOpInputs(static_cast<linalg::GenericOp *>(nullptr));
+    } else if (demoteMatmul && IREE::LinalgExt::isPureMatmul(op)) {
       replaceOpInputs(static_cast<linalg::MatmulOp *>(nullptr));
     } else if (demoteMatmul && isa<linalg::MatvecOp>(op)) {
       replaceOpInputs(static_cast<linalg::MatvecOp *>(nullptr));

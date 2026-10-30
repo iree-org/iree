@@ -130,15 +130,6 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
       .addPass(createLinalgQuantizedConvToConvPass)
       .addPass(createLinalgQuantizedMatmulToMatmulPass)
-      // Run propagation immediately before the QDQ rewrite so contractions
-      // consume dequantize results directly. This must happen before im2col
-      // inserts a packing operation between dequantize and its matmul.
-      .addPredicatedPass(clConvertQDQToIntegerMath,
-                         createPropagateAffineQuantizationPass)
-      .addPredicatedPass(clConvertQDQToIntegerMath,
-                         createConvertQDQToIntegerMathPass)
-      .addPredicatedPass(transformOptions.useIm2colForConvs,
-                         createConvertConvToIm2ColPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(createRemoveZeroExtentTensorsPass)
       .addPass(createDetachElementwiseFromNamedOpsPass)
@@ -179,10 +170,6 @@ void buildGlobalOptimizationPassPipeline(
   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   FunctionLikeNest(mainPassManager)
       .addPass(DispatchCreation::createFoldReshapesIntoTensorBarriersPass)
-      .addPass([&]() {
-        return createDemoteContractionInputsPass(
-            clDemoteContractionInputsType, clDemoteContractionInputsOperations);
-      })
       .addPredicatedPass(clEnableQuantizedMatmulReassociation,
                          createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createCanonicalizePass)
@@ -193,7 +180,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(GlobalOptimization::createConvertBatchMatmulToMatmulPass);
 
   FunctionLikeNest(mainPassManager)
-      // Propagate transposes immediately before set encoding/data tiling
+      // Propagate transposes before QDQ conversion and set encoding/data tiling
       // because transpose propagation cannot take an opinion on the preferred
       // layout of various operations. This simplifies local propagation
       // decisions as SetEncoding is expected to pick the ideal layout for
@@ -214,12 +201,19 @@ void buildGlobalOptimizationPassPipeline(
                                clEnableEdgeReshapePropagation;
                            return createPropagateLinalgTransposePass(options);
                          })
-      // Run propagation immediately before the QDQ rewrite again: earlier
-      // reshape/transpose passes can separate dequantize from its consumers.
+      // Normalize contractions and detach bias before converting QDQ. Restore
+      // direct dequantize producers after the preceding reshape/transpose
+      // transformations, before im2col or input demotion can hide them.
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createPropagateAffineQuantizationPass)
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createConvertQDQToIntegerMathPass)
+      .addPredicatedPass(transformOptions.useIm2colForConvs,
+                         createConvertConvToIm2ColPass)
+      .addPass([&]() {
+        return createDemoteContractionInputsPass(
+            clDemoteContractionInputsType, clDemoteContractionInputsOperations);
+      })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
   mainPassManager.addPass(
