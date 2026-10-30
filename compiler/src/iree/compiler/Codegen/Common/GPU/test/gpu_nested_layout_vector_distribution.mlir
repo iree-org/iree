@@ -1060,8 +1060,8 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @contraction_32x32_alldims
-// Local contraction
-// CHECK: vector.contract {{.*}} vector<2x2x1x1x1x4xf32>, vector<2x2x1x1x1x4xf32> into f32
+// Local contraction keeps original iterator types and indexing maps.
+// CHECK: vector.contract {indexing_maps = [#map, #map, #map1], iterator_types = ["reduction", "reduction"], kind = #vector.kind<maxnumf>} {{.*}} : vector<2x8xf32>, vector<2x8xf32> into f32
 // Global reduction
 // CHECK: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 16) : (f32) -> f32
 // CHECK-NEXT: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
@@ -1128,7 +1128,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: %[[C:.*]] = arith.extf %[[B]]
 // CHECK-NEXT: %[[D:.*]] = vector.extract %[[ARG0]][]
 // Local contraction
-// CHECK: vector.contract {{.*}} vector<2x2x1x1x1x4xf32>, vector<2x2x1x1x1x4xf32> into f32
+// CHECK: vector.contract {{.*}} vector<2x8xf32>, vector<2x8xf32> into f32
 // Global reduction
 // CHECK: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 16) : (f32) -> f32
 // CHECK-NEXT: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
@@ -1199,8 +1199,9 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // CHECK-LABEL: func @contraction_dim1
-// Local contraction
-// CHECK: vector.contract {{.*}} vector<2x2x1x1x1x4xf32>, vector<2x1x4xf32> into vector<2x1x1xf32>
+// Local contraction keeps parallel/reduction semantics from the maps.
+// CHECK: vector.contract {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "reduction"], kind = #vector.kind<maxnumf>} {{.*}} : vector<2x8xf32>, vector<8xf32> into vector<2xf32>
+// CHECK: vector.shape_cast %{{.*}} : vector<2xf32> to vector<2x1x1xf32>
 // Global reduction
 // CHECK: vector.extract %{{.*}}[0, 0, 0]
 // CHECK-NEXT: gpu.subgroup_reduce maxnumf %{{.*}} cluster(size = 4, stride = 16) : (f32) -> f32
