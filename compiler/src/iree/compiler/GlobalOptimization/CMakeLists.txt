@@ -30,6 +30,7 @@ iree_cc_library(
     MLIRPass
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::DispatchCreation::PassHeaders
   PUBLIC
 )
 
@@ -80,6 +81,7 @@ iree_cc_library(
     "DecomposeConcat.cpp"
     "DemoteContractionInputs.cpp"
     "DetachElementwiseFromNamedOps.cpp"
+    "EarlyDataTiling.cpp"
     "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"
     "FuseDequantizationMatmul.cpp"
@@ -109,6 +111,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
