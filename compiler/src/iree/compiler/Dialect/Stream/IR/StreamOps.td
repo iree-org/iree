@@ -2528,6 +2528,12 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
     The optional execution affinity specifies where the transfer must execute
     independently of the source and target storage affinities. When omitted an
     execution affinity is derived from the resource lifetimes and endpoints.
+
+    The optional storage policy records the intended lowering choice: `copy`
+    indicates separate destination storage, while `reuse` indicates using the
+    source storage for the result. This policy does not change transfer behavior
+    until lowering implements it. When omitted the transfer retains its current
+    behavior.
   }];
 
   let arguments = (ins
@@ -2539,7 +2545,8 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
     Stream_Size:$result_size,
     OptionalAttr<Stream_AffinityAttr>:$source_affinity,
     OptionalAttr<Stream_AffinityAttr>:$target_affinity,
-    OptionalAttr<Stream_AffinityAttr>:$execution_affinity
+    OptionalAttr<Stream_AffinityAttr>:$execution_affinity,
+    OptionalAttr<Stream_TransferStorageAttr>:$storage
   );
   let results = (outs
     AnyTypeOf<[
@@ -2556,6 +2563,7 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
     `->`
     (`to` `(` $target_affinity^ `)`)?
     type($result) `` `{` $result_size `}`
+    (`storage` `=` $storage^)?
     attr-dict-with-keyword
   }];
 
@@ -2564,10 +2572,20 @@ def Stream_AsyncTransferOp : Stream_PureOp<"async.transfer", [
                                   Type type, Value source, Value sourceSize,
                                   Value resultSize, AffinityAttr sourceAffinity,
                                   AffinityAttr targetAffinity);
+    static AsyncTransferOp create(OpBuilder &builder, Location location,
+                                  Type type, Value source, Value sourceSize,
+                                  Value resultSize, AffinityAttr sourceAffinity,
+                                  AffinityAttr targetAffinity,
+                                  AffinityAttr executionAffinity);
     static void build(OpBuilder &builder, OperationState &state, Type type,
                       Value source, Value sourceSize, Value resultSize,
                       AffinityAttr sourceAffinity,
                       AffinityAttr targetAffinity);
+    static void build(OpBuilder &builder, OperationState &state, Type type,
+                      Value source, Value sourceSize, Value resultSize,
+                      AffinityAttr sourceAffinity,
+                      AffinityAttr targetAffinity,
+                      AffinityAttr executionAffinity);
     AffinityAttr getDefaultExecutionAffinityAttr();
     Value getOperandSize(unsigned idx) { return getSourceSize(); }
     Value getResultSize(unsigned idx) { return getResultSize(); }

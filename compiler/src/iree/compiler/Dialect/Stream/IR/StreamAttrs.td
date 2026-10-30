@@ -165,6 +165,16 @@ def Stream_MemoryModelAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
 }
 
+def Stream_TransferStorage_Copy : I32EnumAttrCase<"Copy", 0, "copy">;
+def Stream_TransferStorage_Reuse : I32EnumAttrCase<"Reuse", 1, "reuse">;
+def Stream_TransferStorageAttr :
+    I32EnumAttr<"TransferStorage", "transfer storage policy", [
+      Stream_TransferStorage_Copy,
+      Stream_TransferStorage_Reuse,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
+}
+
 def Stream_ResourceConfigAttr :
     Stream_AttrDef<"ResourceConfig", []> {
   let mnemonic = "resource_config";
