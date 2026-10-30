@@ -33,6 +33,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -199,6 +200,35 @@ struct SortOpConversion final : OpConversionPattern<mlir::stablehlo::SortOp> {
                                 sortOp.getRegion().begin());
     Region &region = sortOp.getRegion();
     Block &block = region.front();
+    if (op.getIsStable()) {
+      // LinalgExt keeps adjacent elements when the comparator is true. For
+      // stable sorts, also keep pairs for which neither element precedes the
+      // other, including NaNs with an ordered floating-point comparator.
+      OpBuilder::InsertionGuard guard(rewriter);
+      Operation *terminator = block.getTerminator();
+      Value forwardResult = terminator->getOperand(0);
+      IRMapping reverseMap;
+      for (unsigned i = 0, e = block.getNumArguments(); i < e; i += 2) {
+        reverseMap.map(block.getArgument(i), block.getArgument(i + 1));
+        reverseMap.map(block.getArgument(i + 1), block.getArgument(i));
+      }
+      SmallVector<Operation *> comparatorOps;
+      for (Operation &nestedOp : block.without_terminator()) {
+        comparatorOps.push_back(&nestedOp);
+      }
+      rewriter.setInsertionPoint(terminator);
+      for (Operation *nestedOp : comparatorOps) {
+        rewriter.clone(*nestedOp, reverseMap);
+      }
+      Value reverseResult = reverseMap.lookupOrDefault(forwardResult);
+      Value cmpResultsEqual = mlir::stablehlo::CompareOp::create(
+          rewriter, loc, forwardResult, reverseResult,
+          mlir::stablehlo::ComparisonDirection::EQ);
+      Value keepOrder = mlir::stablehlo::OrOp::create(
+          rewriter, loc, forwardResult, cmpResultsEqual);
+      rewriter.modifyOpInPlace(terminator,
+                               [&] { terminator->setOperand(0, keepOrder); });
+    }
     TypeConverter::SignatureConversion signature_converter(
         block.getNumArguments());
     for (auto [idx, argument] : llvm::enumerate(block.getArguments())) {
