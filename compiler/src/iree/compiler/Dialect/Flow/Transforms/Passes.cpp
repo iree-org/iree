@@ -241,7 +241,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   // Cleanup executable contents.
   {
-    auto executablePassManager = passManager.nest<IREE::Flow::ExecutableOp>();
+    auto &executablePassManager = passManager.nest<IREE::Flow::ExecutableOp>();
     executablePassManager.addPass(IREE::Flow::createCanonicalizePass());
     executablePassManager.addPass(mlir::createCSEPass());
   }
