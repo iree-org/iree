@@ -31,6 +31,7 @@ iree_lit_test_suite(
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
+    "torch_onnx_to_iree.mlir"
     "torch_to_iree.mlir"
     "unstructured_linalg_ext.mlir"
   TOOLS
