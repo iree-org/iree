@@ -22,6 +22,9 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-generic-vectorization"
@@ -166,6 +169,37 @@ static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
   return success(maxFlatVecSize < maxVectorSize);
 }
 
+static void
+fillVectorizationOptions(IRRewriter &rewriter, MLIRContext *context,
+                         Operation *op, bool vectorizeToTransferGather,
+                         SmallVectorImpl<NamedAttribute> &linalgOptionsList) {
+  linalgOptionsList.push_back(
+      rewriter.getNamedAttr("vectorizeNDExtract", rewriter.getBoolAttr(true)));
+  if (vectorizeToTransferGather) {
+    linalgOptionsList.push_back(rewriter.getNamedAttr(
+        "vectorizeToTransferGather", rewriter.getBoolAttr(true)));
+  }
+  // Add operation-specific options.
+  // We can assume that the dynamic dims match vector sizes for
+  // operations in the data-tiled layout. Currently this is limited to
+  // mmt4d-like operations.
+  bool assumeDynamicDimsMatchVecSizes =
+      isa<linalg::Mmt4DOp, linalg::BatchMmt4DOp>(op);
+  linalgOptionsList.push_back(rewriter.getNamedAttr(
+      "assumeDynamicDimsMatchVecSizes",
+      rewriter.getBoolAttr(assumeDynamicDimsMatchVecSizes)));
+  // For mmt4d operations with equal input operand types, we can
+  // directly vectorize to contractions instead of multi_reduction.
+  bool createNamedContraction = false;
+  if (auto cOp = dyn_cast<linalg::ContractionOpInterface>(op)) {
+    createNamedContraction =
+        isa<linalg::Mmt4DOp, linalg::BatchMmt4DOp>(op) &&
+        (getElementTypeOrSelf(cOp.lhs()) == getElementTypeOrSelf(cOp.rhs()));
+  }
+  linalgOptionsList.push_back(rewriter.getNamedAttr(
+      "createNamedContraction", rewriter.getBoolAttr(createNamedContraction)));
+}
+
 class GenericVectorizationPass final
     : public impl::GenericVectorizationPassBase<GenericVectorizationPass> {
 public:
@@ -184,17 +218,6 @@ void GenericVectorizationPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
 
   IRRewriter rewriter(context);
-
-  // Build DictionaryAttr options from pass options. These are forwarded to
-  // upstream linalg::vectorize().
-  SmallVector<NamedAttribute, 2> linalgOptionsList;
-  linalgOptionsList.push_back(
-      rewriter.getNamedAttr("vectorizeNDExtract", rewriter.getBoolAttr(true)));
-  if (vectorizeToTransferGather) {
-    linalgOptionsList.push_back(rewriter.getNamedAttr(
-        "vectorizeToTransferGather", rewriter.getBoolAttr(true)));
-  }
-  auto linalgOptions = DictionaryAttr::get(context, linalgOptionsList);
 
   SmallVector<VectorizableOpInterface> candidates;
   funcOp.walk([&](VectorizableOpInterface op) {
@@ -247,7 +270,12 @@ void GenericVectorizationPass::runOnOperation() {
     }
     // Pad scalable dims with `false` to match the vector sizes.
     scalableVecDims.resize(vectorSizes.size());
-
+    // Build DictionaryAttr options from pass options. These are forwarded to
+    // upstream linalg::vectorize().
+    SmallVector<NamedAttribute, 4> linalgOptionsList;
+    fillVectorizationOptions(rewriter, context, op, vectorizeToTransferGather,
+                             linalgOptionsList);
+    auto linalgOptions = DictionaryAttr::get(context, linalgOptionsList);
     if (!vectorizableOp.isVectorizable(vectorSizes, scalableVecDims,
                                        linalgOptions)) {
       continue;
