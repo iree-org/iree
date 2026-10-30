@@ -128,9 +128,13 @@ func.func @dynamic_pad_after_inline(%arg0: tensor<2x5xf32>, %arg1: tensor<f32>) 
 
 // Start indices are clamped to operand_dim - slice_size: 5 - 1 and 8 - 3.
 // CHECK-LABEL: @dynamic_gather_constant
-// CHECK-DAG: arith.constant 4 : index
-// CHECK-DAG: arith.constant 5 : index
+// CHECK-DAG: %[[FOUR:.+]] = arith.constant 4 : i64
+// CHECK-DAG: %[[FIVE:.+]] = arith.constant 5 : i64
 // CHECK: linalg.generic
+// CHECK: %[[CLAMP0:.+]] = arith.minsi %{{.+}}, %[[FOUR]] : i64
+// CHECK: arith.index_cast %[[CLAMP0]] : i64 to index
+// CHECK: %[[CLAMP1:.+]] = arith.minsi %{{.+}}, %[[FIVE]] : i64
+// CHECK: arith.index_cast %[[CLAMP1]] : i64 to index
 // CHECK: return %{{.+}} : tensor<2x7x3x2xi32>
 func.func @dynamic_gather_constant(%arg0: tensor<5x8x2xi32>,
                                    %arg1: tensor<2x7x2xi64>) -> tensor<2x7x3x2xi32> {
