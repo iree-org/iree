@@ -311,6 +311,58 @@ func.func @decline_pad_with_per_channel_zero_point(%aq: tensor<4x4xi8>, %sa: ten
 
 // -----
 
+#id2 = affine_map<(d0, d1) -> (d0, d1)>
+#scalar2 = affine_map<(d0, d1) -> ()>
+
+// Sub-byte storage holds packed constants. A pad of packed values would run at
+// runtime with elements that need not start on a byte boundary, so the pad
+// stays on the real-valued side.
+func.func @decline_pad_sub_byte_storage(%aq: tensor<4x4xi4>, %sa: f32)
+    -> tensor<4x6xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %init = tensor.empty() : tensor<4x4xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id2, #scalar2, #id2], quant_min = -8, quant_max = 7>
+      ins(%aq, %sa : tensor<4x4xi4>, f32)
+      outs(%init : tensor<4x4xf32>) -> tensor<4x4xf32>
+  %padded = tensor.pad %a low[0, 1] high[0, 1] {
+  ^bb0(%i: index, %j: index):
+    tensor.yield %cst : f32
+  } : tensor<4x4xf32> to tensor<4x6xf32>
+  return %padded : tensor<4x6xf32>
+}
+// CHECK-LABEL: func.func @decline_pad_sub_byte_storage(
+//       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+//       CHECK:   tensor.pad %[[DEQ]] low[0, 1] high[0, 1]
+
+// -----
+
+#id2 = affine_map<(d0, d1) -> (d0, d1)>
+#scalar2 = affine_map<(d0, d1) -> ()>
+
+// Unlike a pad, a reshape keeps the row-major order in which sub-byte values
+// are packed, so an expand_shape still moves onto sub-byte storage.
+func.func @absorb_consumer_expand_sub_byte_storage(%aq: tensor<4x8xi4>, %sa: f32)
+    -> tensor<4x2x4xf32> {
+  %init = tensor.empty() : tensor<4x8xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id2, #scalar2, #id2], quant_min = -8, quant_max = 7>
+      ins(%aq, %sa : tensor<4x8xi4>, f32)
+      outs(%init : tensor<4x8xf32>) -> tensor<4x8xf32>
+  %expanded = tensor.expand_shape %a [[0], [1, 2]] output_shape [4, 2, 4]
+      : tensor<4x8xf32> into tensor<4x2x4xf32>
+  return %expanded : tensor<4x2x4xf32>
+}
+// CHECK-LABEL: func.func @absorb_consumer_expand_sub_byte_storage(
+//  CHECK-SAME:     %[[AQ:[a-zA-Z0-9_]+]]: tensor<4x8xi4>
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[AQ]]
+//  CHECK-SAME:     tensor<4x8xi4> into tensor<4x2x4xi4>
+//       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[EXPANDED]]
+//       CHECK:   return %[[DEQ]]
+
+// -----
+
 // Output dimension zero corresponds to quantized input dimension one, so the
 // pad on output dimension zero becomes a pad on input dimension one. The
 // per-channel scale varies along the other dimension and stays unchanged.

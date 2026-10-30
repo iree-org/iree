@@ -34,6 +34,8 @@ iree_lit_test_suite(
     "linalg_quantized_conv_to_conv.mlir"
     "linalg_quantized_matmul_to_matmul.mlir"
     "optimize_numerics.mlir"
+    "pack_sub_byte_quantized_constants.mlir"
+    "pack_sub_byte_quantized_constants_pipeline.mlir"
     "propagate_affine_quantization.mlir"
     "propagate_linalg_transpose.mlir"
     "raise_special_ops.mlir"

@@ -135,6 +135,57 @@ def PropagateAffineQuantizationPass :
   }];
 }
 
+def PackSubByteQuantizedConstantsPass :
+    Pass<"iree-global-opt-pack-sub-byte-quantized-constants", "mlir::ModuleOp"> {
+  let summary = "Packs constant quantized values with sub-byte ranges into i2 or i4 storage.";
+  let description = [{
+    Finds `iree_linalg_ext.dequantize_affine` ops whose quantized input is an
+    `i8` constant expression with a range that fits 2 or 4 bits, and makes
+    them read that input from `i2` or `i4` storage. The range is the op's
+    `quant_min`/`quant_max`, or else that of a producing
+    `iree_linalg_ext.quantize_affine` with the same signedness. A zero point
+    must be a constant that fits the narrow type. 2-bit ranges are packed into
+    `i4` unless `min-bit-width` is 2, since `i8 x i2` contractions have no
+    microkernels.
+
+    Packed storage is always signed. For an unsigned `w`-bit input, the pass
+    stores every value minus `2^(w - 1)` and shifts the zero point by the same
+    amount, which leaves `input - zero_point` unchanged, and clears
+    `input_unsigned` and `zp_unsigned`. A zero point that becomes 0 is dropped,
+    as for the MatMulNBits default zero point 8 with `i4`. Signed `i4` weights
+    can use the `i8 x i4` microkernels, and later passes never have to tell
+    signed from unsigned narrow storage. An unsigned input without a zero point
+    is not packed.
+
+    The pass trusts the range and does not read the quantized values. Only
+    constant expressions whose roots are inline constants or immutable globals
+    with an inline initial value are packed: a runtime value would need a
+    packing dispatch on every invocation, and a parameter would be packed at
+    program load while its archive still holds the unpacked bytes. An input
+    that other ops also read as `i8` is not packed, since it would be stored
+    twice.
+
+    The input must have a static shape. It is packed along its innermost
+    dimension, whose size must be a multiple of `k = 8 / w` for `w`-bit
+    storage: element `k * i + j` of a row is stored in bits
+    `[j * w, (j + 1) * w)` of byte `i`, the layout narrow-type emulation
+    expects. The packing is a strided `tensor.extract_slice` per lane, a
+    `linalg.generic` that combines the lanes into bytes, and a
+    `flow.tensor.bitcast` to the narrow type. Constant evaluation folds it into
+    a smaller `i8` constant.
+  }];
+  let options = [
+    Option<"minBitWidth", "min-bit-width", "unsigned", /*default=*/"4",
+           "Narrowest storage to pack into; 2 also packs 2-bit ranges into i2.">,
+  ];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+    "IREE::Flow::FlowDialect",
+  ];
+}
+
 def ConvertQDQToIntegerMathPass :
     InterfacePass<"iree-global-opt-convert-qdq-to-integer-math", "mlir::FunctionOpInterface"> {
   let summary = "Rewrites contractions over dequantized operands into integer contractions.";

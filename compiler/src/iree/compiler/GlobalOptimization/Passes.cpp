@@ -31,6 +31,11 @@ static llvm::cl::opt<bool> clConvertQDQToIntegerMath(
                    "changes floating-point rounding and exceptional-value "
                    "behavior)."),
     llvm::cl::init(true));
+static llvm::cl::opt<bool> clEnableSubByteQuantizedStorage(
+    "iree-global-opt-enable-sub-byte-quantized-storage",
+    llvm::cl::desc("Packs constant quantized values whose quantization range "
+                   "fits 4 bits into signed i4 storage."),
+    llvm::cl::init(false));
 static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",
     llvm::cl::desc(
@@ -134,7 +139,15 @@ void buildGlobalOptimizationPassPipeline(
       // consume dequantize results directly. This must happen before im2col
       // inserts a packing operation between dequantize and its matmul.
       .addPredicatedPass(clConvertQDQToIntegerMath,
-                         createPropagateAffineQuantizationPass)
+                         createPropagateAffineQuantizationPass);
+  // Pack after propagation has moved shape operations to the quantized side,
+  // so they run on i8 rather than on packed values, and before the QDQ rewrite
+  // so the integer contraction reads the packed storage. Without hoisting, the
+  // packing would run on every invocation.
+  if (clEnableSubByteQuantizedStorage && transformOptions.constExprHoisting) {
+    mainPassManager.addPass(createPackSubByteQuantizedConstantsPass());
+  }
+  FunctionLikeNest(mainPassManager)
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createConvertQDQToIntegerMathPass)
       .addPredicatedPass(transformOptions.useIm2colForConvs,

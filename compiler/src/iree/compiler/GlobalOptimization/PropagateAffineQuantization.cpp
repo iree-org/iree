@@ -45,6 +45,12 @@ struct BubblePadThroughDequantize : public OpRewritePattern<tensor::PadOp> {
     if (!dequantizeOp) {
       return rewriter.notifyMatchFailure(padOp, "source is not a dequantize");
     }
+    // Sub-byte storage holds packed constants, and a pad of packed values
+    // would run at runtime with elements that need not start on a byte
+    // boundary.
+    if (dequantizeOp.getInputType().getElementTypeBitWidth() % 8 != 0) {
+      return rewriter.notifyMatchFailure(padOp, "storage is sub-byte");
+    }
     // Only a pad with real zero can move to the quantized side, where the zero
     // point represents it.
     Value padValue = padOp.getConstantPaddingValue();
