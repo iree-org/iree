@@ -606,6 +606,17 @@ static iree_status_t iree_io_gguf_parse_metadata(void* user_data,
           IREE_STATUS_INVALID_ARGUMENT,
           "general.alignment metadata value must be uint32");
     }
+    // The alignment rounds the tensor data offset up; a zero or
+    // non-power-of-two value would otherwise let the offset arithmetic below
+    // produce a wrapped tensor data size and defeat the per-tensor bounds
+    // checks. The GGUF spec requires a power of two.
+    if (kv->value.uint32 == 0 ||
+        (kv->value.uint32 & (kv->value.uint32 - 1)) != 0) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "general.alignment must be a non-zero power of "
+                              "two (got %" PRIu32 ")",
+                              kv->value.uint32);
+    }
     parser->alignment = kv->value.uint32;
   }
   return iree_ok_status();
@@ -715,6 +726,13 @@ static iree_status_t iree_io_parse_gguf_index_from_memory(
   parser.tensor_data_offset = iree_align_uint64(
       (uint64_t)(tensor_info_contents.data - file_contents.data),
       parser.alignment);
+  if (parser.tensor_data_offset > file_contents.data_length) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "gguf tensor data offset (%" PRIu64
+        ") aligned to general.alignment exceeds the file size (%zu)",
+        parser.tensor_data_offset, file_contents.data_length);
+  }
   parser.tensor_data_size =
       file_contents.data_length - parser.tensor_data_offset;
 
