@@ -368,9 +368,12 @@ private:
   static SmallVector<int64_t> getReductionIndex(AffineMap map,
                                                 ArrayAttr iteratorTypes) {
     SmallVector<int64_t> dimsIdx;
-    for (unsigned i = 0, e = map.getNumResults(); i < e; i++) {
-      if (vector::isReductionIterator(iteratorTypes[map.getDimPosition(i)])) {
-        dimsIdx.push_back(i);
+    // Align both operands in logical reduction order before flattening them.
+    for (auto [dim, iteratorType] : llvm::enumerate(iteratorTypes)) {
+      if (vector::isReductionIterator(iteratorType)) {
+        if (auto operandDim = getDimPosition(map, dim)) {
+          dimsIdx.push_back(*operandDim);
+        }
       }
     }
     return dimsIdx;
