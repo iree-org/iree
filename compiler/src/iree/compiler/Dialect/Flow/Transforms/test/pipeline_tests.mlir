@@ -1,4 +1,7 @@
 // RUN: iree-opt --iree-flow-transformation-pipeline --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --iree-flow-transformation-pipeline --dump-pass-pipeline --mlir-print-local-scope %s 2>&1 | FileCheck %s --check-prefix=PIPELINE
+// RUN: iree-opt --pass-pipeline='builtin.module(flow.executable(iree-flow-canonicalize,cse))' --mlir-generate-reproducer=%t %s -o /dev/null
+// RUN: iree-opt --run-reproducer %t | FileCheck %s --check-prefix=REPLAY
 
 util.func public @scf_for_with_empty_tensor$dynamic_dim_resolution(
     %arg0: !hal.buffer_view) -> !hal.buffer_view {
@@ -32,3 +35,37 @@ util.func public @scf_for_with_empty_tensor$dynamic_dim_resolution(
 //       CHECK: %[[EXPORT:.*]] = hal.tensor.export %[[LOOP]]
 //  CHECK-SAME: tensor<?xi64>{%[[IN_DIM]]} -> !hal.buffer_view
 //       CHECK: util.return %[[EXPORT]] : !hal.buffer_view
+
+// -----
+
+// CSE in the nested executable pipeline must run and survive reproducer
+// serialization and replay.
+flow.executable public @nested_pipeline_reproducer {
+  flow.executable.export @nested_pipeline_entry
+  builtin.module {
+    func.func @nested_pipeline_entry(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+      %0 = arith.addf %arg0, %arg0 : tensor<4xf32>
+      %1 = arith.addf %arg0, %arg0 : tensor<4xf32>
+      %product = arith.mulf %0, %1 : tensor<4xf32>
+      return %product : tensor<4xf32>
+    }
+  }
+}
+// CHECK-LABEL: flow.executable public @nested_pipeline_reproducer
+//       CHECK: %[[ADD:.*]] = arith.addf %arg0, %arg0 : tensor<4xf32>
+//   CHECK-NOT: arith.addf
+//       CHECK: %[[PRODUCT:.*]] = arith.mulf %[[ADD]], %[[ADD]] : tensor<4xf32>
+//       CHECK: return %[[PRODUCT]] : tensor<4xf32>
+
+// PIPELINE: iree-util-fixed-point-iterator
+// PIPELINE: flow.executable(
+// PIPELINE-NEXT:   iree-flow-canonicalize
+// PIPELINE-NEXT: {{^ *cse$}}
+// PIPELINE-NEXT: )
+
+// REPLAY-LABEL: flow.executable public @nested_pipeline_reproducer
+// REPLAY: func.func @nested_pipeline_entry
+// REPLAY: %[[ADD:.+]] = arith.addf %arg0, %arg0 : tensor<4xf32>
+// REPLAY-NOT: arith.addf
+// REPLAY: %[[PRODUCT:.+]] = arith.mulf %[[ADD]], %[[ADD]] : tensor<4xf32>
+// REPLAY: return %[[PRODUCT]] : tensor<4xf32>

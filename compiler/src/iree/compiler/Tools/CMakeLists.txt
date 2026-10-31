@@ -86,6 +86,7 @@ iree_cc_library(
     MLIRArmNeon2dToIntr
     MLIRBufferizationDialect
     MLIRComplexDialect
+    MLIRControlFlowBufferizableOpInterfaceImpl
     MLIRControlFlowDialect
     MLIRControlFlowTransforms
     MLIRFuncInlinerExtension

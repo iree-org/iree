@@ -12,6 +12,8 @@
 
 namespace mlir::iree_compiler {
 
+llvm::ManagedStatic<llvm::cl::LibraryOptionsContext> commandLineOptions;
+
 llvm::ManagedStatic<llvm::DenseMap<llvm::StringRef, OptionsBinder::OptionInfo>>
     OptionsBinder::globalOptions;
 

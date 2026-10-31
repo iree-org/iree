@@ -59,6 +59,7 @@ iree_cc_library(
     "LLVMCPUAssignImportOrdinals.cpp"
     "LLVMCPUAssignWorkgroupLocalMemory.cpp"
     "LLVMCPUCheckIRBeforeLLVMConversion.cpp"
+    "LLVMCPUDecomposeGroupMmt4D.cpp"
     "LLVMCPUEmitVectorizationRemarks.cpp"
     "LLVMCPULinkExecutables.cpp"
     "LLVMCPULowerExecutableTarget.cpp"

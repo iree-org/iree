@@ -485,6 +485,105 @@ def IREELinalgExt_MapStoreOp : IREELinalgExt_Op<"map_store",
   }];
 }
 
+def IREELinalgExt_GroupMatmulOp : IREELinalgExt_Op<"group_matmul"> {
+  let summary = [{Performs a grouped matrix multiplication.}];
+  let description = [{
+    Multiplies each row of the [N, K] `input` matrix by one of the E
+    [K, M] matrices in `expert_weights`, producing an [N, M] result.
+
+    The [E] `expert_offsets` tensor specifies absolute, exclusive end
+    row indices for consecutive expert groups. Its values must be
+    nonnegative and nondecreasing. Expert 0 starts at row 0; each later
+    expert starts at the preceding expert's end. Equal consecutive
+    offsets represent an empty expert.
+
+    For local input row r, let g = row_base + r. Expert e applies when:
+
+    ```
+    start[e] <= g < expert_offsets[e]
+    ```
+
+    where start[0] = 0 and start[e] = expert_offsets[e - 1] for e > 0.
+    For example, offsets [2, 2, 5] assign global rows 0–1 to expert 0,
+    no rows to expert 1, and rows 2–4 to expert 2.
+
+    `row_base` identifies the global row corresponding to local row 0.
+    Tiling adjusts `row_base` while leaving `expert_offsets` unchanged.
+    The offsets need not end at the current input slice's boundary.
+
+    For each assigned row, the matrix product replaces the corresponding
+    destination row; it is not added to the existing destination values.
+    Rows outside all expert intervals retain their destination values.
+
+    The expert count E must be static. The row count N, reduction dimension K,
+    and column count M may be dynamic.
+  }];
+  let arguments = (ins
+    TensorRankOf<[AnyFloat], [2]>:$input,
+    TensorRankOf<[AnyFloat], [3]>:$expert_weights,
+    TensorRankOf<[AnySignlessIntegerOrIndex], [1]>:$expert_offsets,
+    Index:$row_base,
+    TensorRankOf<[AnyFloat], [2]>:$output);
+  let results = (outs TensorRankOf<[AnyFloat], [2]>:$result);
+  let hasVerifier = 1;
+  let assemblyFormat = [{
+    attr-dict `ins` `(` $input `,` $expert_weights `,` $expert_offsets `,`
+      $row_base `:` type($input) `,` type($expert_weights) `,`
+      type($expert_offsets) `,` type($row_base) `)`
+      `outs` `(` $output `:` type($output) `)` `->` type($result)
+  }];
+  let extraClassDeclaration = [{
+    MutableOperandRange getDpsInitsMutable() { return getOutputMutable(); }
+  }];
+}
+
+def IREELinalgExt_GroupMmt4DOp : IREELinalgExt_Op<"group_mmt4d"> {
+  let summary = [{Performs a grouped matrix-matrix-transpose multiplication of a packed 4D input by 5D weights.}];
+  let description = [{
+    Used for data tiling of `group_matmul`, largely analogous to `mmt4d`.
+
+    Expert offsets and destination values follow the same rules as
+    `group_matmul`: offsets are absolute, exclusive row ends; empty
+    experts are permitted; assigned rows are overwritten with their
+    matrix products; and uncovered rows retain their destination values.
+
+    For an input element at index [m, k, mi, ki], the global row used
+    to choose the expert is:
+
+    ```
+    g = row_base + m * row_stride + mi
+    ```
+
+    `row_stride` is the distance in logical rows between the starts
+    of consecutive outer row blocks. Tiling adjusts `row_base` while
+    preserving `row_stride` and `expert_offsets`.
+
+    If `transposed` is true, the output layout is [N, M, Ni, Mi]
+    instead of [M, N, Mi, Ni]. This does not change expert selection.
+  }];
+  let arguments = (ins
+    TensorRankOf<[AnyFloat], [4]>:$input,
+    TensorRankOf<[AnyFloat], [5]>:$expert_weights,
+    TensorRankOf<[AnySignlessIntegerOrIndex], [1]>:$expert_offsets,
+    Index:$row_base,
+    Index:$row_stride,
+    TensorRankOf<[AnyFloat], [4]>:$output,
+    DefaultValuedAttr<BoolAttr, "false">:$transposed);
+  let results = (outs TensorRankOf<[AnyFloat], [4]>:$result);
+  let hasVerifier = 1;
+  let assemblyFormat = [{
+    prop-dict attr-dict `ins` `(` $input `,` $expert_weights `,` $expert_offsets `,`
+      $row_base `,` $row_stride `:` type($input) `,` type($expert_weights) `,`
+      type($expert_offsets) `,` type($row_base) `,` type($row_stride) `)`
+      `outs` `(` $output `:` type($output) `)` `->` type($result)
+  }];
+  let extraClassDeclaration = [{
+    MutableOperandRange getDpsInitsMutable() { return getOutputMutable(); }
+    ArrayRef<int64_t> getOutputPermutation() const;
+    ArrayRef<int64_t> getLoopPermutation() const;
+  }];
+}
+
 def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     [AttrSizedOperandSegments,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,

@@ -79,6 +79,17 @@ def LLVMCPUCheckIRBeforeLLVMConversionPass :
   ];
 }
 
+def LLVMCPUDecomposeGroupMmt4DPass :
+    InterfacePass<"iree-llvmcpu-decompose-group-mmt4d", "mlir::FunctionOpInterface"> {
+  let summary = "Decomposes grouped mmt4d ops after workgroup tiling";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::linalg::LinalgDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::tensor::TensorDialect"
+  ];
+}
+
 def LLVMCPUEmitVectorizationRemarksPass :
     InterfacePass<"iree-llvmcpu-emit-vectorization-remarks", "mlir::FunctionOpInterface"> {
   let summary = "Emit vectorization remarks on Linalg ops";

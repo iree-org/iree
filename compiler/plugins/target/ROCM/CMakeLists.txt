@@ -81,16 +81,9 @@ iree_cc_library(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
-# We either use device bitcode files from a configurable path
-# or we download them from a fixed location and copy them from
-# there. We default to downloading as it is a better use experience
-# by default.
-# See: https://github.com/shark-infra/amdgpu-device-libs
+# Use local device bitcode when requested, otherwise extract it from the
+# official ROCm package pinned alongside the Bazel repository's build overlay.
 set(_amd_required_libs "ocml.bc" "ockl.bc")
-set(_amd_device_bc_url
-    "https://github.com/shark-infra/amdgpu-device-libs/releases/download/v20231101/amdgpu-device-libs-llvm-6086c272a3a59eb0b6b79dcbe00486bf4461856a.tgz")
-set(_amd_device_bc_sha256 "336362416c68fdd8bb80328f65ca7ebaa0c119ea19c95df6df30c832a4df39b9")
-set(_amd_device_bc_stamp "${_amd_device_bc_url} : ${_amd_device_bc_sha256}")
 set(IREE_TARGET_BACKEND_ROCM_DEVICE_BC_PATH "" CACHE PATH
     "Optional path to load device bitcode from (default to dynamic fetch)")
 set(_platform_lib_srcdir)
@@ -99,9 +92,21 @@ if(IREE_TARGET_BACKEND_ROCM_DEVICE_BC_PATH)
   # Don't fetch: Get from local directory.
   set(_platform_lib_srcdir "${IREE_TARGET_BACKEND_ROCM_DEVICE_BC_PATH}")
 else()
-  # Fetch from remote archive.
-  set(_platform_lib_archive "${CMAKE_CURRENT_BINARY_DIR}/_fetch_device_libs.tgz")
-  set(_platform_lib_srcdir "${CMAKE_CURRENT_BINARY_DIR}/_fetch_device_libs")
+  set(_amd_device_bc_package_file
+      "${IREE_ROOT_DIR}/build_tools/third_party/amdgpu_device_libs/rocm_package.json")
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+      "${_amd_device_bc_package_file}")
+  file(READ "${_amd_device_bc_package_file}" _amd_device_bc_package)
+  string(JSON _amd_device_bc_url GET "${_amd_device_bc_package}" url)
+  string(JSON _amd_device_bc_sha256 GET "${_amd_device_bc_package}" sha256)
+  string(JSON _amd_device_bc_payload GET "${_amd_device_bc_package}" payload)
+  string(JSON _amd_device_bc_bitcode_path GET "${_amd_device_bc_package}" bitcode_path)
+  # Include the archive layout in the cache key as well as the URL and hash.
+  set(_amd_device_bc_stamp "${_amd_device_bc_package}")
+
+  set(_platform_lib_archive "${CMAKE_CURRENT_BINARY_DIR}/_fetch_device_libs.deb")
+  set(_platform_lib_extractdir "${CMAKE_CURRENT_BINARY_DIR}/_fetch_device_libs")
+  set(_platform_lib_srcdir "${_platform_lib_extractdir}/${_amd_device_bc_bitcode_path}")
   set(_fetch_stamp_file "${CMAKE_CURRENT_BINARY_DIR}/_fetch_device_libs.stamp")
   set(_needs_fetch ON)
   if(EXISTS "${_fetch_stamp_file}" AND IS_DIRECTORY "${_platform_lib_srcdir}")
@@ -110,19 +115,42 @@ else()
       set(_needs_fetch OFF)
     endif()
   endif()
+  foreach(_amd_lib_name ${_amd_required_libs})
+    if(NOT EXISTS "${_platform_lib_srcdir}/${_amd_lib_name}")
+      set(_needs_fetch ON)
+    endif()
+  endforeach()
 
   # Download, extract, stamp.
   if(_needs_fetch)
     message(STATUS "Downloading AMD Device bitcode from ${_amd_device_bc_url} to ${_platform_lib_srcdir}")
     file(DOWNLOAD "${_amd_device_bc_url}" "${_platform_lib_archive}"
       EXPECTED_HASH SHA256=${_amd_device_bc_sha256})
-    file(MAKE_DIRECTORY "${_platform_lib_srcdir}")
-    execute_process(
-      COMMAND
-        ${CMAKE_COMMAND} -E tar xzf ${_platform_lib_archive}
-      WORKING_DIRECTORY "${_platform_lib_srcdir}"
-      COMMAND_ERROR_IS_FATAL ANY
+    # Extract the .deb container and then only the required bitcode from its
+    # data tarball.
+    file(REMOVE_RECURSE "${_platform_lib_extractdir}")
+    file(ARCHIVE_EXTRACT
+      INPUT "${_platform_lib_archive}"
+      DESTINATION "${_platform_lib_extractdir}"
+      PATTERNS "${_amd_device_bc_payload}"
     )
+    set(_platform_lib_patterns)
+    foreach(_amd_lib_name ${_amd_required_libs})
+      list(APPEND _platform_lib_patterns "./${_amd_device_bc_bitcode_path}/${_amd_lib_name}")
+    endforeach()
+    file(ARCHIVE_EXTRACT
+      INPUT "${_platform_lib_extractdir}/${_amd_device_bc_payload}"
+      DESTINATION "${_platform_lib_extractdir}"
+      PATTERNS ${_platform_lib_patterns}
+      # Rebuild the compiler bundle even if package timestamps predate it.
+      TOUCH
+    )
+    foreach(_amd_lib_name ${_amd_required_libs})
+      if(NOT EXISTS "${_platform_lib_srcdir}/${_amd_lib_name}")
+        message(FATAL_ERROR "ROCm package is missing required device bitcode: ${_amd_lib_name}")
+      endif()
+    endforeach()
+    file(REMOVE "${_platform_lib_extractdir}/${_amd_device_bc_payload}")
     file(WRITE "${_fetch_stamp_file}" "${_amd_device_bc_stamp}")
   else()
     message(STATUS "Already fetched AMD Device bitcode into ${_platform_lib_srcdir}")
@@ -135,12 +163,13 @@ set(_platform_lib_absdir "${IREE_COMPILER_DYLIB_DIR}/${_platform_lib_reldir}")
 file(MAKE_DIRECTORY "${_platform_lib_absdir}")
 set(_all_device_bc_copy_commands)
 set(_all_device_bc_files)
+set(_all_device_bc_deps)
 foreach(_amd_lib_name ${_amd_required_libs})
   # Copy to lib/ tree.
   set(_device_bc_srcpath "${_platform_lib_srcdir}/${_amd_lib_name}")
   set(_device_bc_relpath "${_platform_lib_reldir}/${_amd_lib_name}")
   list(APPEND _all_device_bc_files "${IREE_COMPILER_DYLIB_DIR}/${_device_bc_relpath}")
-  list(APPEND _all_device_bc_deps "${_device_bc_path}")
+  list(APPEND _all_device_bc_deps "${_device_bc_srcpath}")
   list(APPEND _all_device_bc_copy_commands
     COMMAND ${CMAKE_COMMAND} -E copy
       "${_device_bc_srcpath}"
