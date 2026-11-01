@@ -37,13 +37,15 @@ static std::optional<SmallVector<OpFoldResult>> getDefiningMixedSizes(Value v) {
 }
 
 
+// Only rewrite single-consumer versions: other consumers may still require
+// materialization, making the extra conditional reads unprofitable.
 struct ForwardStaticSliceExtract : OpRewritePattern<tensor::ExtractOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(tensor::ExtractOp read,
                                 PatternRewriter &rewriter) const override {
     auto insert = read.getTensor().getDefiningOp<tensor::InsertSliceOp>();
-    if (!insert || read.getIndices().size() != 1)
+    if (!insert || !insert->hasOneUse() || read.getIndices().size() != 1)
       return failure();
     RankedTensorType sourceType = insert.getSourceType();
     RankedTensorType destType = insert.getDestType();
