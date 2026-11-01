@@ -7,6 +7,8 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
@@ -33,6 +35,55 @@ static std::optional<SmallVector<OpFoldResult>> getDefiningMixedSizes(Value v) {
   }
   return {};
 }
+
+
+struct ForwardStaticSliceExtract : OpRewritePattern<tensor::ExtractOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(tensor::ExtractOp read,
+                                PatternRewriter &rewriter) const override {
+    auto insert = read.getTensor().getDefiningOp<tensor::InsertSliceOp>();
+    if (!insert || read.getIndices().size() != 1)
+      return failure();
+    RankedTensorType sourceType = insert.getSourceType();
+    RankedTensorType destType = insert.getDestType();
+    if (sourceType.getRank() != 1 || destType.getRank() != 1 ||
+        !sourceType.hasStaticShape() || !destType.hasStaticShape() ||
+        !insert.hasUnitStride())
+      return failure();
+    auto offset = getConstantIntValue(insert.getMixedOffsets()[0]);
+    auto size = getConstantIntValue(insert.getMixedSizes()[0]);
+    if (!offset || !size || *offset < 0 || *size <= 0 ||
+        *size != sourceType.getDimSize(0) ||
+        *offset > destType.getDimSize(0) ||
+        *size > destType.getDimSize(0) - *offset)
+      return failure();
+    Location loc = read.getLoc();
+    Value index = read.getIndices()[0];
+    Value start = rewriter.create<arith::ConstantIndexOp>(loc, *offset);
+    Value end = rewriter.create<arith::ConstantIndexOp>(loc, *offset + *size);
+    Value ge = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::sge, index, start);
+    Value lt = rewriter.create<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::slt, index, end);
+    Value inside = rewriter.create<arith::AndIOp>(loc, ge, lt);
+    auto conditional = rewriter.create<scf::IfOp>(
+        loc, read.getType(), inside,
+        [&](OpBuilder &b, Location l) {
+          Value local = b.create<arith::SubIOp>(l, index, start);
+          Value value = b.create<tensor::ExtractOp>(
+              l, insert.getSource(), ValueRange{local});
+          b.create<scf::YieldOp>(l, value);
+        },
+        [&](OpBuilder &b, Location l) {
+          Value value = b.create<tensor::ExtractOp>(
+              l, insert.getDest(), ValueRange{index});
+          b.create<scf::YieldOp>(l, value);
+        });
+    rewriter.replaceOp(read, conditional.getResults());
+    return success();
+  }
+};
 
 struct FoldFullInsertSlice : OpRewritePattern<tensor::InsertSliceOp> {
   using Base::Base;
@@ -125,6 +176,7 @@ struct CanonicalizePass : impl::CanonicalizePassBase<CanonicalizePass> {
     // compilation phase.
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(owningPatterns);
     owningPatterns.add<FoldFullInsertSlice>(context);
+    owningPatterns.add<ForwardStaticSliceExtract>(context);
     owningPatterns.add<AffineApplyLowering>(context);
 
     patterns =
