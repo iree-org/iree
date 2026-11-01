@@ -1393,9 +1393,8 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
       .def("__and__",
            [](uint64_t self, uint64_t other) { return self & other; })
-      .def("__int__", [](enum iree_hal_memory_type_bits_t self) {
-        return (uint64_t)self;
-      })
+      .def("__int__",
+           [](enum iree_hal_memory_type_bits_t self) { return (uint64_t)self; })
       .def("__index__", [](enum iree_hal_memory_type_bits_t self) {
         return (uint64_t)self;
       });
@@ -1411,9 +1410,10 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
       .def("__and__",
            [](uint64_t self, uint64_t other) { return self & other; })
-      .def("__int__", [](enum iree_hal_buffer_compatibility_bits_t self) {
-        return (uint64_t)self;
-      })
+      .def("__int__",
+           [](enum iree_hal_buffer_compatibility_bits_t self) {
+             return (uint64_t)self;
+           })
       .def("__index__", [](enum iree_hal_buffer_compatibility_bits_t self) {
         return (uint64_t)self;
       });
@@ -1453,9 +1453,9 @@ void SetupHalBindings(nanobind::module_ m) {
                         uint64_t other) { return self | other; })
       .def("__and__", [](enum iree_hal_buffer_usage_bits_t self,
                          uint64_t other) { return self & other; })
-      .def("__int__", [](enum iree_hal_buffer_usage_bits_t self) {
-        return (uint64_t)self;
-      })
+      .def(
+          "__int__",
+          [](enum iree_hal_buffer_usage_bits_t self) { return (uint64_t)self; })
       .def("__index__", [](enum iree_hal_buffer_usage_bits_t self) {
         return (uint64_t)self;
       });
@@ -1471,9 +1471,10 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
       .def("__and__",
            [](uint64_t self, uint64_t other) { return self & other; })
-      .def("__int__", [](enum iree_hal_memory_access_bits_t self) {
-        return (uint64_t)self;
-      })
+      .def("__int__",
+           [](enum iree_hal_memory_access_bits_t self) {
+             return (uint64_t)self;
+           })
       .def("__index__", [](enum iree_hal_memory_access_bits_t self) {
         return (uint64_t)self;
       });
