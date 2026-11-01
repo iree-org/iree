@@ -33,3 +33,19 @@ util.func public @do_not_forward_dynamic_offset(%base: tensor<16xf32>,
 // CHECK-LABEL: util.func public @do_not_forward_dynamic_offset
 // CHECK: tensor.insert_slice
 // CHECK: tensor.extract
+
+// -----
+
+// A materialized updated tensor with an additional consumer cannot safely
+// be assumed to disappear. Leave such reads unchanged in the first version.
+util.func public @do_not_forward_multiuse(%base: tensor<16xf32>,
+                                         %patch: tensor<2xf32>,
+                                         %index: index) -> (f32, tensor<16xf32>) {
+  %updated = tensor.insert_slice %patch into %base [5] [2] [1] : tensor<2xf32> into tensor<16xf32>
+  %value = tensor.extract %updated[%index] : tensor<16xf32>
+  util.return %value, %updated : f32, tensor<16xf32>
+}
+// CHECK-LABEL: util.func public @do_not_forward_multiuse
+// CHECK: tensor.insert_slice
+// CHECK: tensor.extract
+// CHECK: util.return
