@@ -194,3 +194,52 @@ util.func public @no_collapse_noncontiguous_m(%a: tensor<2x8x3xf32>, %b: tensor<
   } -> tensor<2x3x4xf32>
   util.return %result : tensor<2x3x4xf32>
 }
+
+// -----
+
+// A named batch_matmul whose RHS drops the batch dim has two M dims. It is
+// generalized and collapsed like the generic above, which lets the encoding
+// annotation accept it.
+// CHECK-LABEL: @broadcast_rhs_batch_matmul(
+// CHECK-SAME:    %[[A:[a-zA-Z0-9]+]]: tensor<2x3x8xf32>
+// CHECK-SAME:    %[[B:[a-zA-Z0-9]+]]: tensor<8x4xf32>
+// CHECK-SAME:    %[[INIT:[a-zA-Z0-9]+]]: tensor<2x3x4xf32>
+// CHECK-DAG:     %[[A_2D:.+]] = tensor.collapse_shape %[[A]] {{\[}}[0, 1], [2]] : tensor<2x3x8xf32> into tensor<6x8xf32>
+// CHECK-DAG:     %[[INIT_2D:.+]] = tensor.collapse_shape %[[INIT]] {{\[}}[0, 1], [2]] : tensor<2x3x4xf32> into tensor<6x4xf32>
+// CHECK-NOT:     linalg.batch_matmul
+// CHECK:         %[[MATMUL:.+]] = linalg.generic
+// CHECK-SAME:      iterator_types = ["parallel", "parallel", "reduction"]
+// CHECK-SAME:      ins(%[[A_2D]], %[[B]] : tensor<6x8xf32>, tensor<8x4xf32>)
+// CHECK-SAME:      outs(%[[INIT_2D]] : tensor<6x4xf32>)
+// CHECK:         %[[RESULT:.+]] = tensor.expand_shape %[[MATMUL]] {{\[}}[0, 1], [2]] output_shape [2, 3, 4] : tensor<6x4xf32> into tensor<2x3x4xf32>
+// CHECK:         util.return %[[RESULT]]
+// ENCODE-LABEL: @broadcast_rhs_batch_matmul(
+// ENCODE:         %[[A_2D:.+]] = tensor.collapse_shape
+// ENCODE:         %[[LHS:.+]] = iree_encoding.set_encoding %[[A_2D]] : tensor<6x8xf32> -> tensor<6x8xf32, #
+// ENCODE:         %[[MATMUL:.+]] = linalg.generic
+// ENCODE-SAME:      ins(%[[LHS]],
+// ENCODE:         %[[UNSET:.+]] = iree_encoding.unset_encoding %[[MATMUL]]
+// ENCODE:         tensor.expand_shape %[[UNSET]]
+util.func public @broadcast_rhs_batch_matmul(%a: tensor<2x3x8xf32>, %b: tensor<8x4xf32>, %init: tensor<2x3x4xf32>) -> tensor<2x3x4xf32> {
+  %result = linalg.batch_matmul
+      indexing_maps = [affine_map<(b, m, n, k) -> (b, m, k)>,
+                       affine_map<(b, m, n, k) -> (k, n)>,
+                       affine_map<(b, m, n, k) -> (b, m, n)>]
+      ins(%a, %b : tensor<2x3x8xf32>, tensor<8x4xf32>)
+      outs(%init : tensor<2x3x4xf32>) -> tensor<2x3x4xf32>
+  util.return %result : tensor<2x3x4xf32>
+}
+
+// -----
+
+// A named batch_matmul with its default maps has nothing to collapse.
+// CHECK-LABEL: @default_batch_matmul(
+// CHECK:         linalg.batch_matmul ins(
+// CHECK-NOT:     linalg.generic
+// ENCODE-LABEL: @default_batch_matmul(
+// ENCODE:         linalg.batch_matmul
+util.func public @default_batch_matmul(%a: tensor<2x3x8xf32>, %b: tensor<2x8x4xf32>, %init: tensor<2x3x4xf32>) -> tensor<2x3x4xf32> {
+  %result = linalg.batch_matmul ins(%a, %b : tensor<2x3x8xf32>, tensor<2x8x4xf32>)
+      outs(%init : tensor<2x3x4xf32>) -> tensor<2x3x4xf32>
+  util.return %result : tensor<2x3x4xf32>
+}

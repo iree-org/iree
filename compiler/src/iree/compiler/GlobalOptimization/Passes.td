@@ -124,9 +124,14 @@ def PropagateAffineQuantizationPass :
     or a zero `tensor.pad` whose padded dimensions do not index the scale and
     whose zero point is per-tensor, before `iree_linalg_ext.dequantize_affine`.
     These shape operations then run on quantized values. A consumer-side
-    `linalg.transpose` is fused into the dequantize's output map instead. When
-    a contraction consumes the result, the dequantize becomes its direct
-    producer so the integer contraction rewrite can match it.
+    `linalg.transpose` is fused into the dequantize's output map instead. A
+    `tensor.collapse_shape` of a dequantized value is absorbed by a consuming
+    `linalg.transpose`, or by a contraction whose inputs are all dequantized,
+    by expanding the consumer's iteration space; a blockwise matmul over
+    collapsed `[M, G, L]` and `[N, G, L]` operands thus iterates over
+    `(m, n, g, l)`. When a contraction consumes the result, the dequantize
+    becomes its direct producer so the integer contraction rewrite can match
+    it.
   }];
 }
 

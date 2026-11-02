@@ -617,6 +617,15 @@ static int64_t roundUpToPow2(int64_t size, bool predicate) {
   return llvm::PowerOf2Ceil(size);
 }
 
+/// Returns the maximum vscale recorded on the target, or 0 if no `vscale_range`
+/// is set.
+static int64_t getVscaleMax(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (auto range = getVscaleRange(targetAttr)) {
+    return static_cast<int64_t>(range->vscaleMax);
+  }
+  return 0;
+}
+
 /// Computes the maximum tile size that can be used to distribute a dimension
 /// based on its number of iterations and the native vector size used of the
 /// target. The resulting tile size will be a multiple of the provided vector
@@ -1817,11 +1826,10 @@ static SmallVector<std::pair<int64_t, int64_t>> getDivisors(int64_t n) {
 }
 
 static IREE::Codegen::LoweringConfigAttrInterface
-getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
-  Value lhs = op.getDpsInputs()[0];
-  Value rhs = op.getDpsInputs()[1];
-  Value acc = op.getDpsInits()[0];
-
+getMmt4dLoweringConfig(Operation *op, Value lhs, Value rhs, Value acc,
+                       int mmt4dDimBase, DictionaryAttr targetConfig,
+                       int64_t m0, int64_t n0, int64_t k0, int64_t m1,
+                       int64_t n1, int64_t k1) {
   const ShapedType lhsType = cast<ShapedType>(lhs.getType());
   const ShapedType rhsType = cast<ShapedType>(rhs.getType());
   const ShapedType accType = cast<ShapedType>(acc.getType());
@@ -1829,20 +1837,11 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   const int rhsTypeBits = rhsType.getElementTypeBitWidth();
   const int accTypeBits = accType.getElementTypeBitWidth();
 
-  SmallVector<int64_t> distTileSizes(op.getNumLoops(), 0);
-  const int mmt4dDimBase = isa<linalg::BatchMmt4DOp>(op) ? 1 : 0;
+  auto tilingOp = cast<TilingInterface>(op);
+  SmallVector<int64_t> distTileSizes(tilingOp.getLoopIteratorTypes().size(), 0);
   if (mmt4dDimBase == 1) {
     distTileSizes[0] = 1;
   }
-  const auto lhsShape = lhsType.getShape();
-  const auto rhsShape = rhsType.getShape();
-  int64_t M0 = lhsShape[mmt4dDimBase + 2];
-  int64_t N0 = rhsShape[mmt4dDimBase + 2];
-  int64_t K0 = lhsShape[mmt4dDimBase + 3];
-  int64_t M1 = lhsShape[mmt4dDimBase + 0];
-  int64_t N1 = rhsShape[mmt4dDimBase + 0];
-  int64_t K1 = lhsShape[mmt4dDimBase + 1];
-
   //
   // Part 1: set the vectorization tile sizes, vecTileSizes.
   // Normally these are just the M0, N0, K0 dimension sizes, as long as these
@@ -1853,34 +1852,37 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   // tile sizes.
   //
 
-  unsigned numLoops = op.getNumLoops();
+  unsigned numLoops = tilingOp.getLoopIteratorTypes().size();
   SmallVector<int64_t> vecTileSizes(numLoops, 1);
   assert(vecTileSizes.size() == mmt4dDimBase + 6);
-  vecTileSizes[mmt4dDimBase + 3] = M0;
-  vecTileSizes[mmt4dDimBase + 4] = N0;
-  vecTileSizes[mmt4dDimBase + 5] = K0;
+  vecTileSizes[mmt4dDimBase + 3] = m0;
+  vecTileSizes[mmt4dDimBase + 4] = n0;
+  vecTileSizes[mmt4dDimBase + 5] = k0;
   IREE::Codegen::ScalableTileFlags vecScalableTileFlags(mmt4dDimBase + 6,
                                                         false);
   bool scalableTilesFound = false;
   // If scalable vectorization is enabled, adjust the vector tile sizes and the
   // corresponding scalable flags.
-  if (targetConfig && isScalableVectorizationEnabled()) {
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+      linalgOp && targetConfig && isScalableVectorizationEnabled()) {
     scalableTilesFound = adjustVectorSizesForScalableVectorization(
-        op, targetConfig, M0, N0, vecTileSizes, vecScalableTileFlags);
+        linalgOp, targetConfig, m0, n0, vecTileSizes, vecScalableTileFlags);
   }
   // In the existence of scalable tiles, we do not yet support limiting vector
   // sizes as this assumes static tile sizes.
   // TODO: extend this mechanism to handle _scalable_ tile sizes as well.
   if (!scalableTilesFound) {
-    limitVectorTileSizes(op, vecTileSizes);
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+      limitVectorTileSizes(linalgOp, vecTileSizes);
+    }
   }
   // Query back the final M0, N0, K0 values.
-  M0 = vecTileSizes[mmt4dDimBase + 3];
-  N0 = vecTileSizes[mmt4dDimBase + 4];
-  K0 = vecTileSizes[mmt4dDimBase + 5];
+  m0 = vecTileSizes[mmt4dDimBase + 3];
+  n0 = vecTileSizes[mmt4dDimBase + 4];
+  k0 = vecTileSizes[mmt4dDimBase + 5];
   // By now, if any of these is still dynamic, that's an internal bug.
-  assert(!ShapedType::isDynamic(M0) && !ShapedType::isDynamic(N0) &&
-         !ShapedType::isDynamic(K0));
+  assert(!ShapedType::isDynamic(m0) && !ShapedType::isDynamic(n0) &&
+         !ShapedType::isDynamic(k0));
 
   //
   // Part 2: set the distribution tile sizes, distTileSizes.
@@ -1891,24 +1893,24 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   //
 
   const int64_t kTypicalDynamicSize = 1024;
-  if (ShapedType::isDynamic(M1)) {
-    M1 = kTypicalDynamicSize / M0;
+  if (ShapedType::isDynamic(m1)) {
+    m1 = kTypicalDynamicSize / m0;
   }
-  if (ShapedType::isDynamic(N1)) {
-    N1 = kTypicalDynamicSize / N0;
+  if (ShapedType::isDynamic(n1)) {
+    n1 = kTypicalDynamicSize / n0;
   }
-  if (ShapedType::isDynamic(K1)) {
-    K1 = kTypicalDynamicSize / K0;
+  if (ShapedType::isDynamic(k1)) {
+    k1 = kTypicalDynamicSize / k0;
   }
   // By now, all 6 size parameters {M,N,K}{0,1} are static.
-  assert(!ShapedType::isDynamic(M1) && !ShapedType::isDynamic(N1) &&
-         !ShapedType::isDynamic(K1));
+  assert(!ShapedType::isDynamic(m1) && !ShapedType::isDynamic(n1) &&
+         !ShapedType::isDynamic(k1));
 
-  const int64_t M = M0 * M1;
-  const int64_t N = N0 * N1;
+  const int64_t M = m0 * m1;
+  const int64_t N = n0 * n1;
 
-  const SmallVector<std::pair<int64_t, int64_t>> divisorsOfM1 = getDivisors(M1);
-  const SmallVector<std::pair<int64_t, int64_t>> divisorsOfN1 = getDivisors(N1);
+  const SmallVector<std::pair<int64_t, int64_t>> divisorsOfM1 = getDivisors(m1);
+  const SmallVector<std::pair<int64_t, int64_t>> divisorsOfN1 = getDivisors(n1);
 
   // Cost model.
   auto evalCost = [=](int64_t numTilesM, int64_t numTilesN) -> int64_t {
@@ -1924,15 +1926,15 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
 
   int64_t selectedTileM = 1;
   int64_t selectedTileN = 1;
-  int64_t selectedCost = evalCost(M1, N1);
+  int64_t selectedCost = evalCost(m1, n1);
 
   // Iterate over all candidate tile shapes, which are the divisors of (M1, N1).
   for (auto [tileM, numTilesM] : divisorsOfM1) {
     for (auto [tileN, numTilesN] : divisorsOfN1) {
       // Compute candidate tile size in bytes.
-      int64_t lhsBytes = tileM * M0 * K1 * K0 * lhsTypeBits / 8;
-      int64_t rhsBytes = tileN * N0 * K1 * K0 * rhsTypeBits / 8;
-      int64_t accBytes = tileM * N0 * tileN * M0 * accTypeBits / 8;
+      int64_t lhsBytes = tileM * m0 * k1 * k0 * lhsTypeBits / 8;
+      int64_t rhsBytes = tileN * n0 * k1 * k0 * rhsTypeBits / 8;
+      int64_t accBytes = tileM * n0 * tileN * m0 * accTypeBits / 8;
       // Adjust the tile size to favor fitting whole matrices in one tile.
       if (numTilesM == 1) {
         lhsBytes *= clMatmulTileUndercountWholeMatrix;
@@ -1964,6 +1966,21 @@ getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
   generator.setDistributionTileSizes(distTileSizes);
   generator.setVectorTileSizes(vecTileSizes, vecScalableTileFlags);
   return generator.generateCPULoweringConfig();
+}
+
+static IREE::Codegen::LoweringConfigAttrInterface
+getMmt4dLoweringConfig(linalg::LinalgOp op, DictionaryAttr targetConfig) {
+  Value lhs = op.getDpsInputs()[0];
+  Value rhs = op.getDpsInputs()[1];
+  Value acc = op.getDpsInits()[0];
+  const auto lhsShape = cast<ShapedType>(lhs.getType()).getShape();
+  const auto rhsShape = cast<ShapedType>(rhs.getType()).getShape();
+  const int mmt4dDimBase = isa<linalg::BatchMmt4DOp>(op) ? 1 : 0;
+  return getMmt4dLoweringConfig(
+      op, lhs, rhs, acc, mmt4dDimBase, targetConfig, lhsShape[mmt4dDimBase + 2],
+      rhsShape[mmt4dDimBase + 2], lhsShape[mmt4dDimBase + 3],
+      lhsShape[mmt4dDimBase + 0], rhsShape[mmt4dDimBase + 0],
+      lhsShape[mmt4dDimBase + 1]);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d
@@ -2039,12 +2056,14 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   int srcRank = op.getSourceRank();
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
+  IREE::Codegen::ScalableTileFlags scalableFlags(innerTiles.size(), false);
   // Try to infer scalable tile sizes. This is a no-op in case of static inner
   // tiles or if dynamic tile sizes are found, but scalable tile sizes cannot be
   // inferred.
   if (auto sizesAndScalableFlags =
           getScalableTileSizesAndFlags(op.getMixedTiles())) {
     innerTiles = sizesAndScalableFlags->first;
+    scalableFlags = sizesAndScalableFlags->second;
   }
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
@@ -2077,6 +2096,17 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     pipelineConfig = getPipelineConfWithDecompositionAttr(op.getContext());
   }
 
+  // For scalable inner tiles, the distribution tile on the packed dim must be a
+  // multiple of the largest possible inner tile (base * vscaleMax).
+  int64_t vscaleMax = getVscaleMax(target);
+  for (auto [pos, size, scalable] :
+       llvm::zip_equal(dimPos, innerTiles, scalableFlags)) {
+    if (!scalable || distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) {
+      continue;
+    }
+    distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size * vscaleMax);
+  }
+
   SmallVector<int64_t> vecTileSizes = getPackVectorTileSizes(entryPointFn, op);
   LoweringConfigGenerator generator(op);
   generator.setDistributionTileSizes(distTileSizes);
@@ -2107,20 +2137,20 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     innerTiles = sizesAndScalableFlags->first;
     scalableFlags = sizesAndScalableFlags->second;
   }
-  // Fixup for making distTileSizes be multiple of inner_tile_sizes.
-  // In case of scalable tile sizes, we align the distribution tile size with
-  // the static constant of the scalable tile size and round up to the next
-  // power of 2. Since vscale is a power of 2, this makes sure
-  // that the selected distribution size is divisible by or less than the
-  // effective scalable inner tile size.
+  // Align distribution tile sizes to inner tile sizes. For
+  // scalable inner tiles, align to the largest possible inner tile
+  // (base * vscaleMax) so the distribution tile stays a whole multiple of the
+  // runtime inner tile for any vscale.
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
+  int64_t vscaleMax =
+      getVscaleMax(IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn));
   for (auto [pos, size, scalable] :
        llvm::zip_equal(dimPos, innerTiles, scalableFlags)) {
     if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size)) {
       continue;
     }
-    int64_t alignedTileSize = llvm::alignTo(distTileSizes[pos], size);
-    distTileSizes[pos] = roundUpToPow2(alignedTileSize, scalable);
+    int64_t multiplier = scalable ? vscaleMax : 1;
+    distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size * multiplier);
   }
 
   SmallVector<int64_t> vecTileSizes(op.getDestRank(), 1);
@@ -3013,6 +3043,33 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                             CPUPipeline::DoubleTilingExpert));
 }
 
+static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                   IREE::LinalgExt::GroupMmt4DOp op) {
+  assert(!getLoweringConfig(op) && "expected lowering_config is not set");
+
+  auto inputType = cast<ShapedType>(op.getInput().getType());
+  auto outputType = cast<ShapedType>(op.getOutput().getType());
+
+  ArrayRef<int64_t> outputPermutation = op.getOutputPermutation();
+
+  int64_t M0 = inputType.getDimSize(2);
+  int64_t N0 = outputType.getDimSize(outputPermutation[3]);
+  int64_t K0 = inputType.getDimSize(3);
+  if (!ShapedType::isStatic(M0) || !ShapedType::isStatic(N0) ||
+      !ShapedType::isStatic(K0)) {
+    return op.emitOpError(
+        "CPU lowering does not support dynamic or scalable inner tiles");
+  }
+
+  auto loweringConfig = getMmt4dLoweringConfig(
+      op, op.getInput(), op.getExpertWeights(), op.getOutput(), 0,
+      /*targetConfig=*/nullptr, M0, N0, K0, inputType.getDimSize(0),
+      outputType.getDimSize(outputPermutation[1]), inputType.getDimSize(1));
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, loweringConfig,
+      getCPUTranslationInfo(op.getContext(), CPUPipeline::Mmt4dTilingExpert));
+}
+
 /// Set the default configuration for operations that implement the
 /// `TiledOpInterface`.
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -3211,8 +3268,9 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                                                     initCPULaunchConfig);
           })
           .Case<IREE::LinalgExt::OnlineAttentionOp, IREE::LinalgExt::FftOp,
-                IREE::LinalgExt::GatherOp, linalg::PackOp, tensor::PadOp,
-                linalg::UnPackOp, linalg::Mmt4DOp, linalg::BatchMmt4DOp,
+                IREE::LinalgExt::GatherOp, IREE::LinalgExt::GroupMmt4DOp,
+                linalg::PackOp, tensor::PadOp, linalg::UnPackOp,
+                linalg::Mmt4DOp, linalg::BatchMmt4DOp,
                 IREE::Codegen::InnerTiledOp>(
               [&](auto op) { return setRootConfig(entryPointFn, op); })
           .Case<IREE::LinalgExt::WinogradFilterTransformOp,
@@ -3605,6 +3663,8 @@ void MultiLoweringConfigGenerator::getVecTileSizesForNonRootOps(
 void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
   ArrayRef<int64_t> rootOpGlobalDims =
       dimTracker.getAllGlobalDimIdx(rootOperation);
+  int64_t vscaleMax =
+      getVscaleMax(IREE::HAL::ExecutableTargetAttr::lookup(rootOperation));
   auto adjust = [&](Operation *op, ArrayRef<int64_t> vecTileSize,
                     IREE::CPU::TilingLevel level,
                     llvm::function_ref<int64_t(int64_t, int64_t)> updater) {
@@ -3643,11 +3703,22 @@ void MultiLoweringConfigGenerator::adjustTileSizesForRootOp() {
         continue;
       }
       // For pack op, align the distribution tile size and overwrite the
-      // vector parallel tile size and scalable flag.
-      adjust(op, vecTileSize, IREE::CPU::TilingLevel::DistributionTiles, align);
+      // vector parallel tile size and scalable flag. Distribution tiles for
+      // scalable inner tiles are aligned to their largest runtime size (base *
+      // vscaleMax).
+      SmallVector<bool> packScalableFlags = nonRootOpScalableFlags.lookup(op);
+      SmallVector<int64_t> distAlignTiles(vecTileSize.begin(),
+                                          vecTileSize.end());
+      for (auto [i, scalable] : llvm::enumerate(packScalableFlags)) {
+        if (scalable && i < distAlignTiles.size() && distAlignTiles[i] > 0) {
+          distAlignTiles[i] *= vscaleMax;
+        }
+      }
+      adjust(op, distAlignTiles, IREE::CPU::TilingLevel::DistributionTiles,
+             align);
       adjust(op, vecTileSize, IREE::CPU::TilingLevel::VectorCommonParallelTiles,
              overwrite);
-      adjustScalableFlags(op, nonRootOpScalableFlags.lookup(op),
+      adjustScalableFlags(op, packScalableFlags,
                           IREE::CPU::TilingLevel::VectorCommonParallelTiles,
                           overwrite);
     } else if (auto unpackOp = dyn_cast<linalg::UnPackOp>(op)) {
@@ -4066,10 +4137,11 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
   LDBG() << "The tile sizes for each dimension should be aligned to "
          << alignedSizes;
 
-  // Fixup for making tileSizes be multiple of inner_tile_sizes. In case of
-  // scalable inner tiles, we align the distribution tile sizes with the static
-  // constant of the scalable inner tile size and round up to the next power of
-  // 2 to ensure alignment.
+  // Fixup for making tileSizes be multiple of inner_tile_sizes. Scalable
+  // distribution tiles are aligned to the largest possible inner tile
+  // (base * vscaleMax).
+  int64_t vscaleMax =
+      getVscaleMax(IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn));
   SmallVector<IREE::CPU::LoweringConfigLevelInfo> tilingInfo =
       loweringConfig.getAvailableTilingInfo();
   for (IREE::CPU::LoweringConfigLevelInfo &info : tilingInfo) {
@@ -4078,12 +4150,12 @@ adjustTileSizesForRootUnPackOp(mlir::FunctionOpInterface entryPointFn,
       if (tileSizes[idx] == 0) {
         continue;
       }
-      int64_t alignedTileSize =
-          llvm::alignTo(tileSizes[idx], alignedSizes[idx]);
-      tileSizes[idx] = roundUpToPow2(
-          alignedTileSize,
-          vecParallelScalableTileFlags[idx] &&
-              info.level == IREE::CPU::TilingLevel::DistributionTiles);
+      int multiplier = (vecParallelScalableTileFlags[idx] &&
+                        info.level == IREE::CPU::TilingLevel::DistributionTiles)
+                           ? vscaleMax
+                           : 1;
+      tileSizes[idx] =
+          llvm::alignTo(tileSizes[idx], alignedSizes[idx] * multiplier);
     }
     // Fixup for the scalable tile flags.
     if (info.level == IREE::CPU::TilingLevel::VectorCommonParallelTiles) {

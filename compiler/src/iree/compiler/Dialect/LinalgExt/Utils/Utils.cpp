@@ -22,8 +22,11 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/RegionUtils.h"
 
@@ -1645,6 +1648,37 @@ bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
     return false;
   }
   return llvm::hasSingleElement(linalgOp.getBlock()->getOperations());
+}
+
+/// True when every byte of `data` is zero.
+static bool isAllZeroBytes(ArrayRef<char> data) {
+  return llvm::all_of(data, [](char byte) { return byte == 0; });
+}
+
+bool isKnownZero(Value value) {
+  Attribute constant;
+  if (!matchPattern(value, m_Constant(&constant))) {
+    return false;
+  }
+  if (auto intAttr = dyn_cast<IntegerAttr>(constant)) {
+    return intAttr.getValue().isZero();
+  }
+  // A splat answers from its one stored element rather than scanning a
+  // blockwise operand that has an entry per block.
+  auto elements = dyn_cast<ElementsAttr>(constant);
+  if (elements && elements.isSplat()) {
+    Attribute splat = elements.getSplatValue<Attribute>();
+    return matchPattern(splat, m_Zero()) ||
+           matchPattern(splat, m_PosZeroFloat());
+  }
+  if (auto dense = dyn_cast<DenseElementsAttr>(constant)) {
+    return isAllZeroBytes(dense.getRawData());
+  }
+  if (auto resource = dyn_cast<DenseResourceElementsAttr>(constant)) {
+    const AsmResourceBlob *blob = resource.getRawHandle().getBlob();
+    return blob && isAllZeroBytes(blob->getData());
+  }
+  return false;
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

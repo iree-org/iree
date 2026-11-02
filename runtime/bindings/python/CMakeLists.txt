@@ -120,7 +120,9 @@ target_compile_options(iree_runtime_bindings_python_PyExtRt
 
 set_target_properties(
   iree_runtime_bindings_python_PyExtRt
-  PROPERTIES OUTPUT_NAME "iree/_runtime_libs/_runtime"
+  PROPERTIES
+    OUTPUT_NAME "_runtime"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/iree/_runtime_libs"
 )
 
 iree_py_library(

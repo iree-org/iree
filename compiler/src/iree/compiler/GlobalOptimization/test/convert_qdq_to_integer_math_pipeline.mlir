@@ -168,3 +168,55 @@ util.func public @transposed_dequantized_rhs(
 // DISABLED: iree_linalg_ext.dequantize_affine
 // DISABLED: linalg.matmul
 // DISABLED-SAME: outs(%{{.+}} : tensor<4x3xf32>)
+
+// -----
+
+// Blockwise linear layer as produced by the Torch frontend: both operands are
+// dequantized per block and collapsed back into K, and the weight is
+// transposed. Propagation expands the matmul over the blocks so the rewrite
+// reduces each block in integer arithmetic and the blocks in floating point.
+util.func public @blockwise_collapsed_linear(
+    %aq: tensor<4x2x32xi8>, %sa: tensor<4x2xf32>, %za: tensor<4x2xi64>,
+    %bq: tensor<8x2x32xi8>, %sb: tensor<8x2xf32>, %zb: tensor<8x2xi8>)
+    -> tensor<4x8xf32> {
+  %ai = tensor.empty() : tensor<4x2x32xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(m, g, l) -> (m, g, l)>,
+                        affine_map<(m, g, l) -> (m, g)>,
+                        affine_map<(m, g, l) -> (m, g)>,
+                        affine_map<(m, g, l) -> (m, g, l)>],
+       quant_min = -128, quant_max = 127>
+      ins(%aq, %sa, %za : tensor<4x2x32xi8>, tensor<4x2xf32>, tensor<4x2xi64>)
+      outs(%ai : tensor<4x2x32xf32>) -> tensor<4x2x32xf32>
+  %ac = tensor.collapse_shape %a [[0], [1, 2]]
+      : tensor<4x2x32xf32> into tensor<4x64xf32>
+  %bi = tensor.empty() : tensor<8x2x32xf32>
+  %b = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(n, g, l) -> (n, g, l)>,
+                        affine_map<(n, g, l) -> (n, g)>,
+                        affine_map<(n, g, l) -> (n, g)>,
+                        affine_map<(n, g, l) -> (n, g, l)>],
+       quant_min = 0, quant_max = 255, input_unsigned, zp_unsigned>
+      ins(%bq, %sb, %zb : tensor<8x2x32xi8>, tensor<8x2xf32>, tensor<8x2xi8>)
+      outs(%bi : tensor<8x2x32xf32>) -> tensor<8x2x32xf32>
+  %bc = tensor.collapse_shape %b [[0], [1, 2]]
+      : tensor<8x2x32xf32> into tensor<8x64xf32>
+  %ti = tensor.empty() : tensor<64x8xf32>
+  %bt = linalg.transpose ins(%bc : tensor<8x64xf32>)
+      outs(%ti : tensor<64x8xf32>) permutation = [1, 0]
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<4x8xf32>
+  %init = linalg.fill ins(%zero : f32) outs(%empty : tensor<4x8xf32>) -> tensor<4x8xf32>
+  %result = linalg.matmul ins(%ac, %bt : tensor<4x64xf32>, tensor<64x8xf32>)
+      outs(%init : tensor<4x8xf32>) -> tensor<4x8xf32>
+  util.return %result : tensor<4x8xf32>
+}
+// CHECK-LABEL: util.func public @blockwise_collapsed_linear(
+// CHECK: linalg.generic
+// CHECK-SAME: iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+// CHECK-SAME: ins(%{{.+}}, %{{.+}} : tensor<4x2x32xi8>, tensor<8x2x32xi8>)
+// CHECK: arith.muli %{{.+}}, %{{.+}} : i32
+// CHECK: arith.sitofp
+// DISABLED-LABEL: util.func public @blockwise_collapsed_linear(
+// DISABLED: iree_linalg_ext.dequantize_affine
+// DISABLED: linalg.matmul

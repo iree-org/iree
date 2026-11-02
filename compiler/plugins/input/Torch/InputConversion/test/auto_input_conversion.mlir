@@ -1,4 +1,5 @@
-// RUN: iree-compile --compile-to=input --split-input-file %s | FileCheck %s
+// RUN: iree-compile --compile-to=input --split-input-file %s | FileCheck %s --check-prefixes=CHECK,NONFINITE
+// RUN: iree-compile --compile-to=input --split-input-file --iree-torch-allow-non-finites=false %s | FileCheck %s --check-prefixes=CHECK,FINITE
 
 // Check that the auto input conversion pipeline uses this plugin.
 
@@ -18,4 +19,14 @@ func.func @simple_add_onnx(%arg0: !torch.vtensor<[],si64>, %arg1: !torch.vtensor
 // CHECK: util.func public @nop(%{{.+}}: !hal.buffer_view) -> !hal.buffer_view
 func.func @nop(%arg0: !torch.vtensor<[5],f32>) -> !torch.vtensor<[5],f32> attributes {torch.assume_strict_symbolic_shapes} {
   return %arg0 : !torch.vtensor<[5],f32>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @empty_reduce_max$async(
+// NONFINITE: arith.constant dense<0xFF800000> : tensor<1xf32>
+// FINITE: arith.constant dense<-3.40282347E+38> : tensor<1xf32>
+func.func @empty_reduce_max(%input: !torch.vtensor<[0],f32>) -> !torch.vtensor<[1],f32> attributes {torch.onnx_meta.opset_version = 13 : si64} {
+  %result = torch.operator "onnx.ReduceMax"(%input) : (!torch.vtensor<[0],f32>) -> !torch.vtensor<[1],f32>
+  return %result : !torch.vtensor<[1],f32>
 }

@@ -1,5 +1,7 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
 // RUN:   --iree-codegen-llvmgpu-rocdl-lowering-pipeline='include-llvm-lowering=false' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 \
+// RUN:   --iree-codegen-llvmgpu-rocdl-lowering-pipeline='include-llvm-lowering=true' %s | FileCheck %s --check-prefix=LLVM
 
 // Small 3-D reduction over dim 0 (non-last-dim). Reduction size 2 is smaller
 // than subgroup size, so setReductionConfig rejects and falls through to
@@ -37,10 +39,17 @@ func.func @argcompare_small_3d_dim0()
 }
 
 // Non-last-dim reduction over dim 0: the 3-D input is read as vector<2x1x1xf32>
-// and shape_cast to vector<2xf32> before the scf.for reduction loop.
+// and shape_cast to vector<1x1x2xf32> before the scf.for reduction loop.
+// The dynamic innermost extraction must also survive full LLVM lowering.
+// LLVM-LABEL: llvm.func @argcompare_small_3d_dim0
+//       LLVM: llvm.extractelement {{.*}} : vector<2xf32>
+//       LLVM: llvm.fcmp "ogt"
+//       LLVM: llvm.select
+//       LLVM: llvm.return
 // CHECK-LABEL: func.func @argcompare_small_3d_dim0
-//     CHECK:     vector.shape_cast %{{.*}} : vector<2x1x1xf32> to vector<2xf32>
-//     CHECK:     scf.for
+//     CHECK:     %[[INPUT:.+]] = vector.shape_cast %{{.*}} : vector<2x1x1xf32> to vector<1x1x2xf32>
+//     CHECK:     scf.for %[[I:[a-zA-Z0-9_]+]] =
+//     CHECK:       vector.extract %[[INPUT]][0, 0, %[[I]]] : f32 from vector<1x1x2xf32>
 //     CHECK:       arith.cmpf ogt
 //     CHECK:       arith.select
 //     CHECK:     vector.transfer_write
@@ -82,6 +91,8 @@ func.func @argcompare_last_dim_reduction()
 
 // Last-dim reduction: no transpose/shape_cast needed; input read directly as
 // vector<128xf32> and reduced via scf.for.
+// LLVM-LABEL: llvm.func @argcompare_last_dim_reduction
+//       LLVM: llvm.return
 // CHECK-LABEL: func.func @argcompare_last_dim_reduction
 // CHECK-NOT:     vector.transpose
 //     CHECK:     vector.transfer_read {{.*}} vector<128xf32>
@@ -126,6 +137,8 @@ func.func @argcompare_unaligned_reduction()
 }
 
 // Unaligned reduction: input read as vector<100xf32>, reduced via scf.for.
+// LLVM-LABEL: llvm.func @argcompare_unaligned_reduction
+//       LLVM: llvm.return
 // CHECK-LABEL: func.func @argcompare_unaligned_reduction
 //     CHECK:     vector.transfer_read {{.*}} vector<100xf32>
 //     CHECK:     scf.for
@@ -168,6 +181,8 @@ func.func @argcompare_f64_fallback()
 }
 
 // f64 fallback: input read as vector<256xf64>, reduced via scf.for with f64 compare.
+// LLVM-LABEL: llvm.func @argcompare_f64_fallback
+//       LLVM: llvm.return
 // CHECK-LABEL: func.func @argcompare_f64_fallback
 //     CHECK:     vector.transfer_read {{.*}} vector<256xf64>
 //     CHECK:     scf.for

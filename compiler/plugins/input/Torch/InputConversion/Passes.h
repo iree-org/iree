@@ -42,6 +42,10 @@ struct TorchToIREELoweringPipelineOptions
   Option<bool> decompose{*this, "decompose",
                          llvm::cl::desc("Decompose complex torch operations."),
                          llvm::cl::init(true)};
+  Option<bool> allowNonFinites{
+      *this, "allow-non-finites",
+      llvm::cl::desc("Allow non-finite values in Torch lowering initializers."),
+      llvm::cl::init(true)};
   Option<bool> externalizeTransients{
       *this, "externalize-transients",
       llvm::cl::desc(

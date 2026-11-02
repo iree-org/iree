@@ -289,5 +289,8 @@ bool isPureBatchMatmul(Operation *op);
 /// Returns true if the given linalg op represents a transpose.
 bool isaTransposeOpInterface(linalg::LinalgOp linalgOp);
 
+/// True when `value` is a constant that is zero in every element.
+bool isKnownZero(Value value);
+
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
