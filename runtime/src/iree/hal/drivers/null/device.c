@@ -316,6 +316,9 @@ static iree_status_t iree_hal_null_device_assign_topology_info(
     iree_hal_null_device_clear_topology_info(device);
     return iree_ok_status();
   }
+  // A device may be regrouped (e.g. from a standalone single-device group
+  // into a multi-device group); retire the prior frontier assignment first.
+  iree_hal_null_device_clear_topology_info(device);
   iree_async_frontier_tracker_t* frontier_tracker =
       topology_info->frontier.tracker;
   iree_async_axis_t axis = topology_info->frontier.base_axis;
