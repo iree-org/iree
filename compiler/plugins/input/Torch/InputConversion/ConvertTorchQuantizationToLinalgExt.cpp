@@ -9,9 +9,11 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "llvm/ADT/Sequence.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "torch-mlir/Conversion/TorchToLinalg/Utils.h"
@@ -22,6 +24,8 @@
 #include "torch-mlir/Dialect/TorchConversion/Transforms/BackendTypeConversion.h"
 
 #include <cmath>
+#include <cstring>
+#include <optional>
 
 namespace mlir::iree_compiler::TorchInput {
 
@@ -45,6 +49,9 @@ struct PT2EQuantization {
   // Builtin zero point: an i64 scalar or an integer tensor shaped like the
   // scale; null for symmetric quantization.
   Value zeroPoint;
+  // i32 values of an integral float zero point, which becomes `zeroPoint` once
+  // the op is known to convert.
+  DenseElementsAttr integralZeroPoint;
   // Whether the zero-point elements are unsigned. Read from the Torch type
   // because builtin integer types are signless.
   bool zeroPointUnsigned = false;
@@ -164,10 +171,108 @@ static bool isUnsignedZeroPoint(Type zeroPointType) {
          cast<Torch::ValueTensorType>(zeroPointType).getDtype().isInteger(1);
 }
 
+// Returns the raw data of a dense or resource constant of f16, bf16, f32 or f64
+// values, or nothing for other constants and for unavailable values, such as
+// those of an elided resource. The data of a splat holds one element.
+static std::optional<ArrayRef<char>> getFloatData(ElementsAttr attr) {
+  Type type = attr.getElementType();
+  if (!type.isF16() && !type.isBF16() && !type.isF32() && !type.isF64()) {
+    return std::nullopt;
+  }
+  if (auto dense = dyn_cast<DenseFPElementsAttr>(attr)) {
+    return dense.getRawData();
+  }
+  auto resource = dyn_cast<DenseResourceElementsAttr>(attr);
+  if (!resource) {
+    return std::nullopt;
+  }
+  ArrayRef<char> data = resource.getData();
+  if (static_cast<int64_t>(data.size()) * 8 !=
+      attr.getNumElements() * type.getIntOrFloatBitWidth()) {
+    return std::nullopt;
+  }
+  return data;
+}
+
+// Returns element `index` of `data`, which holds f16, bf16, f32 or f64 values
+// of `type`. Each of them converts to double exactly.
+static double readFloat(FloatType type, ArrayRef<char> data, int64_t index) {
+  const char *element = data.data() + index * type.getWidth() / 8;
+  if (type.isF64()) {
+    double value;
+    std::memcpy(&value, element, sizeof(value));
+    return value;
+  }
+  if (type.isF32()) {
+    float value;
+    std::memcpy(&value, element, sizeof(value));
+    return value;
+  }
+  assert((type.isF16() || type.isBF16()) && "expected a 16-bit float type");
+  uint16_t bits;
+  std::memcpy(&bits, element, sizeof(bits));
+  return APFloat(type.getFloatSemantics(), APInt(16, bits)).convertToDouble();
+}
+
+// Sets `integralZeroPoint` to the values of a constant float zero point that
+// holds integers within the bounds. Other float zero points prevent conversion.
+// Requires the scale and bounds of `quantization` to be set.
+static LogicalResult
+matchIntegralFloatZeroPoint(Operation *op, Value torchZeroPoint,
+                            PT2EQuantization &quantization,
+                            ConversionPatternRewriter &rewriter) {
+  ElementsAttr zeroPointAttr;
+  if (!matchPattern(torchZeroPoint, m_Constant(&zeroPointAttr))) {
+    return rewriter.notifyMatchFailure(
+        op, "expected integer or constant float zero points");
+  }
+  std::optional<ArrayRef<char>> data = getFloatData(zeroPointAttr);
+  if (!data) {
+    return rewriter.notifyMatchFailure(
+        op, "expected float zero points with readable values");
+  }
+  // PT2E dequantizes in the promoted type of a float zero point and the scale,
+  // so the zero point must not widen the scale.
+  auto floatType = cast<FloatType>(zeroPointAttr.getElementType());
+  auto scaleType =
+      dyn_cast<FloatType>(getElementTypeOrSelf(quantization.scale.getType()));
+  if (isa<Torch::QuantizedDecomposedDequantizePerChannelOp,
+          Torch::QuantizedDecomposedDequantizePerChannelGroupOp,
+          Torch::QuantizedDecomposedDequantizePerTokenOp>(op) &&
+      (!scaleType || (floatType != scaleType &&
+                      floatType.getWidth() >= scaleType.getWidth()))) {
+    return rewriter.notifyMatchFailure(
+        op, "expected float zero points that do not widen the scales");
+  }
+  // The values become i32 zero points.
+  int64_t lowerBound = std::max(quantization.quantMin, llvm::minIntN(32));
+  int64_t upperBound = std::min(quantization.quantMax, llvm::maxIntN(32));
+  int64_t numValues =
+      zeroPointAttr.isSplat() ? 1 : zeroPointAttr.getNumElements();
+  SmallVector<int32_t> values;
+  values.reserve(numValues);
+  for (int64_t index : llvm::seq<int64_t>(0, numValues)) {
+    double value = readFloat(floatType, *data, index);
+    // NaN fails the first comparison, and infinities the bounds.
+    if (value != std::trunc(value) || value < lowerBound ||
+        value > upperBound) {
+      return rewriter.notifyMatchFailure(
+          op, "expected float zero points with integer values within the "
+              "bounds");
+    }
+    values.push_back(static_cast<int32_t>(value));
+  }
+  quantization.integralZeroPoint = DenseElementsAttr::get(
+      zeroPointAttr.getShapedType().clone(rewriter.getI32Type()),
+      ArrayRef(values));
+  return success();
+}
+
 // Sets the zero point of `quantization` from `torchZeroPoint` and its converted
 // value `zeroPoint`. A None zero point and a float one known to be zero leave
 // it unset, which denotes symmetric quantization. Other float zero points
-// prevent conversion, since LinalgExt zero points are integers.
+// convert only if they hold integers, which are kept in `integralZeroPoint`.
+// Requires the scale and bounds of `quantization` to be set.
 static LogicalResult matchZeroPoint(Operation *op, Value torchZeroPoint,
                                     Value zeroPoint,
                                     PT2EQuantization &quantization,
@@ -176,11 +281,11 @@ static LogicalResult matchZeroPoint(Operation *op, Value torchZeroPoint,
     return success();
   }
   if (isa<FloatType>(getElementTypeOrSelf(zeroPoint))) {
-    if (!IREE::LinalgExt::isKnownZero(torchZeroPoint)) {
-      return rewriter.notifyMatchFailure(
-          op, "expected integer or all-zero float zero points");
+    if (IREE::LinalgExt::isKnownZero(torchZeroPoint)) {
+      return success();
     }
-    return success();
+    return matchIntegralFloatZeroPoint(op, torchZeroPoint, quantization,
+                                       rewriter);
   }
   quantization.zeroPoint = zeroPoint;
   quantization.zeroPointUnsigned =
@@ -439,6 +544,15 @@ getParameterDims(const PT2EQuantization &quantization) {
   return parameterDims;
 }
 
+// Returns the type of the builtin zero point, which an integral float zero
+// point has before it is created, or null for symmetric quantization.
+static Type getZeroPointType(const PT2EQuantization &quantization) {
+  if (quantization.integralZeroPoint) {
+    return quantization.integralZeroPoint.getType();
+  }
+  return quantization.zeroPoint ? quantization.zeroPoint.getType() : Type();
+}
+
 // Checks whether LinalgExt can use the scale and zero point, reporting why
 // unsupported parameters prevent conversion. Per-tensor scalars need no
 // additional checks. `realType` is the element type of the floating-point
@@ -454,9 +568,8 @@ checkScaleAndZeroPointSupport(Operation *op, Type realType,
     return success();
   }
   auto scaleType = dyn_cast<RankedTensorType>(quantization.scale.getType());
-  if (!scaleType ||
-      (quantization.zeroPoint &&
-       !isa<RankedTensorType>(quantization.zeroPoint.getType()))) {
+  Type zeroPointType = getZeroPointType(quantization);
+  if (!scaleType || (zeroPointType && !isa<RankedTensorType>(zeroPointType))) {
     return rewriter.notifyMatchFailure(
         op, "expected per-channel parameters with known dtypes");
   }
@@ -467,14 +580,14 @@ checkScaleAndZeroPointSupport(Operation *op, Type realType,
   SmallVector<int64_t> blockCounts =
       llvm::map_to_vector(getParameterDims(quantization),
                           [&](unsigned dim) { return blockedShape[dim]; });
-  auto isShapedLikeBlocks = [&](Value parameter) {
+  auto isShapedLikeBlocks = [&](Type parameterType) {
     auto nonUnitSizes = llvm::make_filter_range(
-        cast<RankedTensorType>(parameter.getType()).getShape(),
+        cast<RankedTensorType>(parameterType).getShape(),
         [](int64_t size) { return size != 1; });
     return llvm::equal(nonUnitSizes, blockCounts);
   };
-  if (!isShapedLikeBlocks(quantization.scale) ||
-      (quantization.zeroPoint && !isShapedLikeBlocks(quantization.zeroPoint))) {
+  if (!isShapedLikeBlocks(scaleType) ||
+      (zeroPointType && !isShapedLikeBlocks(zeroPointType))) {
     return rewriter.notifyMatchFailure(
         op, "expected parameters shaped like blocks");
   }
@@ -515,7 +628,7 @@ static ArrayAttr getIndexingMaps(Builder &builder,
       rank, getParameterDims(quantization), builder.getContext());
   AffineMap identity = builder.getMultiDimIdentityMap(rank);
   SmallVector<AffineMap> maps = {identity, parameterMap};
-  if (quantization.zeroPoint) {
+  if (getZeroPointType(quantization)) {
     maps.push_back(parameterMap);
   }
   maps.push_back(identity);
@@ -573,6 +686,17 @@ static Value collapseParameter(OpBuilder &builder, Location location,
   return tensor::dropGivenUnitDims(builder, location, parameter, unitDims);
 }
 
+// Returns the builtin zero point, creating the constant of an integral float
+// zero point.
+static Value createZeroPoint(OpBuilder &builder, Location location,
+                             const PT2EQuantization &quantization) {
+  if (!quantization.integralZeroPoint) {
+    return quantization.zeroPoint;
+  }
+  return arith::ConstantOp::create(builder, location,
+                                   quantization.integralZeroPoint);
+}
+
 static Value createQuantizeAffine(OpBuilder &builder, Location location,
                                   RankedTensorType resultType,
                                   const PT2EQuantization &quantization,
@@ -588,8 +712,8 @@ static Value createQuantizeAffine(OpBuilder &builder, Location location,
   Value input = createBlockedInput(builder, location, quantization);
   Value scale = truncateScalarScaleToF32(builder, location, quantization.scale);
   scale = collapseParameter(builder, location, scale);
-  Value zeroPoint =
-      collapseParameter(builder, location, quantization.zeroPoint);
+  Value zeroPoint = collapseParameter(
+      builder, location, createZeroPoint(builder, location, quantization));
   Value init = createInit(builder, location, input, resultType);
   auto quantize = IREE::LinalgExt::QuantizeAffineOp::create(
       builder, location, init.getType(), input, scale, zeroPoint, init,
@@ -613,8 +737,8 @@ static Value createDequantizeAffine(OpBuilder &builder, Location location,
   Value input = createBlockedInput(builder, location, quantization);
   Value scale = truncateScalarScaleToF32(builder, location, quantization.scale);
   scale = collapseParameter(builder, location, scale);
-  Value zeroPoint =
-      collapseParameter(builder, location, quantization.zeroPoint);
+  Value zeroPoint = collapseParameter(
+      builder, location, createZeroPoint(builder, location, quantization));
   Value init = createInit(builder, location, input, resultType);
   auto dequantize = IREE::LinalgExt::DequantizeAffineOp::create(
       builder, location, init.getType(), input, scale, zeroPoint, init,

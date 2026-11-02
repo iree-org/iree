@@ -443,12 +443,163 @@ func.func @float_zero_point_zeros(
 
 // -----
 
-// LinalgExt zero points are integers, so other float zero points, such as the
-// fractional ones of HQQ, are left for the Torch-to-Linalg lowering.
-// CHECK-LABEL: func.func @nonzero_float_zero_point(
+// Asymmetric weights can have integral float zero points, which the FX importer
+// gives as resources. They become i32 constants.
+// CHECK-LABEL: func.func @integral_float_zero_point(
+// CHECK: %[[ZERO_POINTS:.+]] = arith.constant
+// CHECK-SAME: dense<{{\[}}[1, 8], [15, 0], [2, 3], [4, 5]]> : tensor<4x2xi32>
+// CHECK: iree_linalg_ext.dequantize_affine
+// CHECK-SAME: ins(%{{.+}}, %{{.+}}, %[[ZERO_POINTS]] :
+func.func @integral_float_zero_point(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
+  %zero_points = torch.vtensor.literal(dense_resource<float_zero_points>
+      : tensor<4x2xf32>) : !torch.vtensor<[4,2],f32>
+  %minimum = torch.constant.int 0
+  %maximum = torch.constant.int 15
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %out_dtype = torch.constant.int 6
+  %result = torch.quantized_decomposed.dequantize_per_channel_group
+      %input, %scales, %zero_points, %minimum, %maximum, %dtype, %group_size,
+      %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>,
+        !torch.vtensor<[4,2],f32>, !torch.int, !torch.int, !torch.int,
+        !torch.int, !torch.int -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
+
+{-#
+  dialect_resources: {
+    builtin: {
+      float_zero_points: "0x040000000000803F0000004100007041000000000000004000004040000080400000A040"
+    }
+  }
+#-}
+
+// -----
+
+// torchao zero points can also be integral floats, bounded by the storage dtype
+// when the bounds are None.
+// CHECK-LABEL: func.func @torchao_integral_float_zero_point(
+// CHECK: %[[ZERO_POINT:.+]] = arith.constant
+// CHECK-SAME: dense<{{\[}}[-128, 127], [0, 3], [-1, 1], [64, -64]]>
+// CHECK-SAME: : tensor<4x2xi32>
+// CHECK: iree_linalg_ext.quantize_affine
+// CHECK-SAME: ins(%{{.+}}, %{{.+}}, %[[ZERO_POINT]] :
+func.func @torchao_integral_float_zero_point(
+    %input: !torch.vtensor<[4,8],bf16>,
+    %scale: !torch.vtensor<[4,2],bf16>) -> !torch.vtensor<[4,8],si8> {
+  %zero_point = torch.vtensor.literal(dense<[
+      [-1.280000e+02, 1.270000e+02], [0.000000e+00, 3.000000e+00],
+      [-1.000000e+00, 1.000000e+00], [6.400000e+01, -6.400000e+01]]>
+      : tensor<4x2xbf16>) : !torch.vtensor<[4,2],bf16>
+  %one = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %dtype = torch.constant.int 1
+  %none = torch.constant.none
+  %block_size = torch.prim.ListConstruct %one, %group_size
+      : (!torch.int, !torch.int) -> !torch.list<int>
+  %result = torch.torchao.quantize_affine
+      %input, %block_size, %scale, %zero_point, %dtype, %none, %none
+      : !torch.vtensor<[4,8],bf16>, !torch.list<int>,
+        !torch.vtensor<[4,2],bf16>, !torch.vtensor<[4,2],bf16>, !torch.int,
+        !torch.none, !torch.none -> !torch.vtensor<[4,8],si8>
+  return %result : !torch.vtensor<[4,8],si8>
+}
+
+// -----
+
+// A flattened integral float zero point cannot be indexed per group, so the op
+// is left for the Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @flattened_integral_float_zero_point(
 // CHECK: torch.quantized_decomposed.dequantize_per_channel_group
 // CHECK-NOT: iree_linalg_ext.dequantize_affine
-func.func @nonzero_float_zero_point(
+func.func @flattened_integral_float_zero_point(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
+  %zero_points = torch.vtensor.literal(dense<[
+      1.000000e+00, 8.000000e+00, 1.500000e+01, 0.000000e+00,
+      2.000000e+00, 3.000000e+00, 4.000000e+00, 5.000000e+00]>
+      : tensor<8xf32>) : !torch.vtensor<[8],f32>
+  %minimum = torch.constant.int 0
+  %maximum = torch.constant.int 15
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %out_dtype = torch.constant.int 6
+  %result = torch.quantized_decomposed.dequantize_per_channel_group
+      %input, %scales, %zero_points, %minimum, %maximum, %dtype, %group_size,
+      %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>,
+        !torch.vtensor<[8],f32>, !torch.int, !torch.int, !torch.int,
+        !torch.int, !torch.int -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
+
+// -----
+
+// Integral float zero points outside the bounds are left for the
+// Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @out_of_bounds_float_zero_point(
+// CHECK: torch.quantized_decomposed.dequantize_per_channel_group
+// CHECK-NOT: iree_linalg_ext.dequantize_affine
+func.func @out_of_bounds_float_zero_point(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
+  %zero_points = torch.vtensor.literal(dense<[
+      [1.000000e+00, 8.000000e+00], [1.600000e+01, 0.000000e+00],
+      [2.000000e+00, 3.000000e+00], [4.000000e+00, 5.000000e+00]]>
+      : tensor<4x2xf32>) : !torch.vtensor<[4,2],f32>
+  %minimum = torch.constant.int 0
+  %maximum = torch.constant.int 15
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %out_dtype = torch.constant.int 6
+  %result = torch.quantized_decomposed.dequantize_per_channel_group
+      %input, %scales, %zero_points, %minimum, %maximum, %dtype, %group_size,
+      %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>,
+        !torch.vtensor<[4,2],f32>, !torch.int, !torch.int, !torch.int,
+        !torch.int, !torch.int -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
+
+// -----
+
+// PT2E dequantizes in the promoted type of a float zero point and the scales,
+// so wider zero points are left for the Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @widening_float_zero_point(
+// CHECK: torch.quantized_decomposed.dequantize_per_channel_group
+// CHECK-NOT: iree_linalg_ext.dequantize_affine
+func.func @widening_float_zero_point(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4,2],f16>) -> !torch.vtensor<[4,8],f32> {
+  %zero_points = torch.vtensor.literal(dense<[
+      [1.000000e+00, 8.000000e+00], [1.500000e+01, 0.000000e+00],
+      [2.000000e+00, 3.000000e+00], [4.000000e+00, 5.000000e+00]]>
+      : tensor<4x2xf32>) : !torch.vtensor<[4,2],f32>
+  %minimum = torch.constant.int 0
+  %maximum = torch.constant.int 15
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %out_dtype = torch.constant.int 6
+  %result = torch.quantized_decomposed.dequantize_per_channel_group
+      %input, %scales, %zero_points, %minimum, %maximum, %dtype, %group_size,
+      %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f16>,
+        !torch.vtensor<[4,2],f32>, !torch.int, !torch.int, !torch.int,
+        !torch.int, !torch.int -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
+
+// -----
+
+// LinalgExt zero points are integers, so fractional float zero points, such as
+// those of HQQ, are left for the Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @fractional_float_zero_point(
+// CHECK: torch.quantized_decomposed.dequantize_per_channel_group
+// CHECK-NOT: iree_linalg_ext.dequantize_affine
+func.func @fractional_float_zero_point(
     %input: !torch.vtensor<[4,8],si8>,
     %scales: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
   %zero_points = torch.vtensor.literal(dense<5.000000e-01> : tensor<4x2xf32>)
