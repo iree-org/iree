@@ -350,12 +350,14 @@ readTorchaoQuantization(OpTy op, typename OpTy::Adaptor adaptor,
     return rewriter.notifyMatchFailure(
         op, "expected constant quantization bounds and dtype");
   }
-  // LinalgExt takes integer bounds, so float bounds must be integral. The
-  // verifier keeps them within the storage dtype.
+  // LinalgExt takes integer bounds within the storage dtype. The verifier
+  // bounds quant_min from below and quant_max from above, so ordered bounds
+  // lie within it.
   auto [quantMin, quantMax] = *bounds;
-  if (quantMin != std::trunc(quantMin) || quantMax != std::trunc(quantMax)) {
-    return rewriter.notifyMatchFailure(op,
-                                       "expected integral quantization bounds");
+  if (quantMin > quantMax || quantMin != std::trunc(quantMin) ||
+      quantMax != std::trunc(quantMax)) {
+    return rewriter.notifyMatchFailure(
+        op, "expected integral bounds with quant_min <= quant_max");
   }
   quantization.quantMin = static_cast<int64_t>(quantMin);
   quantization.quantMax = static_cast<int64_t>(quantMax);
