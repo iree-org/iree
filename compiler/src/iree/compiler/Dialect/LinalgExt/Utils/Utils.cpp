@@ -15,10 +15,12 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -1127,11 +1129,7 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
 // Copied over from implementation of `isaContractionInterfaceImpl` in Linalg
 //===---------------------------------------------------------------------===//
 
-/// If the value is defined by a chain of unary side effect-free, go up the
-/// use-def chain until the first value that isn't defined by such an op.
-// TODO: relax to multi-operands with constants, which are technically unary ops
-// as needed (e.g. add5).
-static Value getSourceSkipUnary(Value value) {
+Value getSourceSkipUnary(Value value) {
   Operation *op = value.getDefiningOp();
   while (op && op->getNumOperands() == 1) {
     auto iface = dyn_cast<MemoryEffectOpInterface>(op);
@@ -1679,6 +1677,31 @@ bool isKnownZero(Value value) {
     return blob && isAllZeroBytes(blob->getData());
   }
   return false;
+}
+
+Value computeSubAndExp(OpBuilder &builder, Location loc, AffineMap inputMap,
+                       AffineMap outputMap, Value input, Value output,
+                       bool useExp2) {
+  SmallVector<AffineMap> compressedMaps =
+      compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
+  inputMap = compressedMaps[0];
+  outputMap = compressedMaps[1];
+
+  SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
+                                                 utils::IteratorType::parallel);
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, output.getType(), input, output,
+      SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        // Convert input to the same datatype as output.
+        Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
+                                        /*isUnsignedCast=*/false);
+        Value diff = arith::SubFOp::create(b, loc, args[1], in);
+        Value weight = useExp2 ? math::Exp2Op::create(b, loc, diff).getResult()
+                               : math::ExpOp::create(b, loc, diff).getResult();
+        linalg::YieldOp::create(b, loc, weight);
+      });
+  return genericOp.getResult(0);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
