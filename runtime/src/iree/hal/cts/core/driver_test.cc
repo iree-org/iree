@@ -146,6 +146,47 @@ TEST_P(DriverTest, QueryAndCreateAvailableDevicesByPath) {
   iree_allocator_free(iree_allocator_system(), device_infos);
 }
 
+// A device first wrapped in its own single-device group may later be placed in
+// another group with a different frontier tracker. The second assignment must
+// replace the first and leave the device's queues usable.
+TEST_P(DriverTest, RegroupDevice) {
+  DeviceCreateContext first_context;
+  DeviceCreateContext second_context;
+  IREE_ASSERT_OK(first_context.Initialize(iree_allocator_system()));
+  IREE_ASSERT_OK(second_context.Initialize(iree_allocator_system()));
+
+  iree_hal_device_t* device = NULL;
+  IREE_ASSERT_OK(iree_hal_driver_create_default_device(
+      driver_, first_context.params(), iree_allocator_system(), &device));
+
+  iree_hal_device_group_t* first_group = NULL;
+  IREE_ASSERT_OK(iree_hal_device_group_create_from_device(
+      device, first_context.frontier_tracker(), iree_allocator_system(),
+      &first_group));
+  iree_hal_device_group_t* second_group = NULL;
+  IREE_ASSERT_OK(iree_hal_device_group_create_from_device(
+      device, second_context.frontier_tracker(), iree_allocator_system(),
+      &second_group));
+  iree_hal_device_group_release(first_group);
+
+  iree_hal_semaphore_t* semaphore = NULL;
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_create(device, IREE_HAL_QUEUE_AFFINITY_ANY, 0ull,
+                                IREE_HAL_SEMAPHORE_FLAG_DEFAULT, &semaphore));
+  uint64_t signal_value = 1;
+  iree_hal_semaphore_list_t signal_list = {1, &semaphore, &signal_value};
+  IREE_ASSERT_OK(iree_hal_device_queue_barrier(
+      device, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+      signal_list, IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(semaphore, signal_value,
+                                         iree_infinite_timeout(),
+                                         IREE_ASYNC_WAIT_FLAG_NONE));
+
+  iree_hal_semaphore_release(semaphore);
+  iree_hal_device_group_release(second_group);
+  iree_hal_device_release(device);
+}
+
 CTS_REGISTER_TEST_SUITE(DriverTest);
 
 }  // namespace iree::hal::cts
