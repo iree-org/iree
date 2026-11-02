@@ -2272,13 +2272,11 @@ static iree_status_t iree_hal_amdgpu_logical_device_assign_topology_info(
     const iree_hal_device_topology_info_t* topology_info) {
   iree_hal_amdgpu_logical_device_t* logical_device =
       iree_hal_amdgpu_logical_device_cast(base_device);
-  if (!topology_info) {
-    iree_hal_amdgpu_logical_device_deassign_frontier(logical_device);
-    return iree_ok_status();
-  }
-  // A device may be regrouped (e.g. from a standalone single-device group
-  // into a multi-device group); retire the prior frontier assignment first.
+  // Retire any prior assignment: NULL only unwinds it, and a device may be
+  // regrouped (e.g. from a standalone single-device group into a multi-device
+  // group).
   iree_hal_amdgpu_logical_device_deassign_frontier(logical_device);
+  if (!topology_info) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_amdgpu_system_t* system = logical_device->system;
 
