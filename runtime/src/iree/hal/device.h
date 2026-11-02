@@ -567,11 +567,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_refine_topology_edge(
 // topology pointer within |topology_info| must remain valid for the lifetime of
 // the device (ensured by the device group retaining all its devices).
 //
-// A device may be assigned again when it is placed into another group (e.g. a
-// device first wrapped in a standalone single-device group and later grouped
-// with peers). The prior assignment, including its frontier axes, is retired
-// before the new one is applied.
-//
 // If |topology_info| is NULL, aborts a prior assignment on a device whose
 // containing device group was never returned to the caller. NULL is only valid
 // during construction failure unwinding and must not be used once a device
