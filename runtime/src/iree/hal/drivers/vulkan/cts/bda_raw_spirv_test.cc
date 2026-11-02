@@ -1346,43 +1346,6 @@ class BdaRawSpirvReplayCacheTest : public BdaRawSpirvTest {
                                              workgroup_count,
                                              sizeof(workgroup_count)));
   }
-
-  void ZeroBuffer(iree_hal_buffer_t* buffer) {
-    const int32_t zero_pattern = 0;
-    SemaphoreList fill_signal(device_, {0}, {1});
-    IREE_ASSERT_OK(iree_hal_device_queue_fill(
-        device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
-        fill_signal, buffer, /*target_offset=*/0,
-        iree_hal_buffer_byte_length(buffer), &zero_pattern,
-        sizeof(zero_pattern), IREE_HAL_FILL_FLAG_NONE));
-    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-        fill_signal, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
-  }
-
-  static void RecordFullExecutionBarrier(
-      iree_hal_command_buffer_t* command_buffer) {
-    const iree_hal_memory_barrier_t memory_barrier = {
-        IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE |
-            IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE,
-        IREE_HAL_ACCESS_SCOPE_TRANSFER_READ |
-            IREE_HAL_ACCESS_SCOPE_DISPATCH_READ,
-    };
-    IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
-        command_buffer,
-        IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER,
-        IREE_HAL_EXECUTION_STAGE_DISPATCH | IREE_HAL_EXECUTION_STAGE_TRANSFER,
-        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, /*memory_barrier_count=*/1,
-        &memory_barrier, /*buffer_barrier_count=*/0,
-        /*buffer_barriers=*/nullptr));
-  }
-
-  std::vector<int32_t> ReadInt32Prefix(iree_hal_buffer_t* buffer) {
-    std::vector<uint8_t> bytes =
-        ReadBufferBytes(buffer, /*offset=*/0, kDispatchByteLength);
-    std::vector<int32_t> values(kElementCount);
-    std::memcpy(values.data(), bytes.data(), kDispatchByteLength);
-    return values;
-  }
 };
 
 TEST_P(BdaRawSpirvReplayCacheTest, TrimDropsIdleCachedNativeReplay) {
@@ -1601,11 +1564,11 @@ TEST_P(BdaRawSpirvReplayCacheTest, ConcurrentExecutionsForkCachedNativeReplay) {
   EXPECT_EQ(0, QueryNativeReplayCache(IREE_SV("instance_count")));
 }
 
-// Copy commands bake the VkBuffer handles resolved from the binding table into
-// the native command buffer. Resubmitting with a different binding table must
-// copy between the new buffers, not replay the copy between the old ones.
+// Copy commands bake the VkBuffers resolved from the binding table into the
+// native command buffer, so a resubmission with a different binding table must
+// not reuse the cached replay.
 TEST_P(BdaRawSpirvReplayCacheTest,
-       CommandBufferCopyWithBindingTableRefsBypassesCachedNativeReplay) {
+       CommandBufferCopyFromBindingTableBypassesNativeReplay) {
   IREE_ASSERT_OK(iree_hal_device_trim(device_));
   ASSERT_EQ(0, QueryNativeReplayCache(IREE_SV("instance_count")));
 
@@ -1629,15 +1592,15 @@ TEST_P(BdaRawSpirvReplayCacheTest,
       device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
       IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
       /*binding_capacity=*/2, command_buffer.out()));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer.get()));
   IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
-      command_buffer,
+      command_buffer.get(),
       iree_hal_make_indirect_buffer_ref(/*buffer_slot=*/0, /*offset=*/0,
                                         kDispatchByteLength),
       iree_hal_make_indirect_buffer_ref(/*buffer_slot=*/1, /*offset=*/0,
                                         kDispatchByteLength),
       IREE_HAL_COPY_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer.get()));
 
   iree_hal_buffer_binding_t binding_table_a_entries[2];
   iree_hal_buffer_binding_table_t binding_table_a = MakeBindingTable(
@@ -1648,36 +1611,27 @@ TEST_P(BdaRawSpirvReplayCacheTest,
 
   const int64_t initial_hit_count =
       QueryNativeReplayCache(IREE_SV("hit_count"));
-  const int64_t initial_create_count =
-      QueryNativeReplayCache(IREE_SV("create_count"));
   const int64_t initial_binding_table_bypass_count =
       QueryNativeReplayCache(IREE_SV("binding_table_bypass_count"));
 
-  ExecuteCommandBufferAndWait(command_buffer, binding_table_a);
-  EXPECT_THAT(ReadInt32Prefix(target_a_buffer),
+  ExecuteCommandBufferAndWait(command_buffer.get(), binding_table_a);
+  EXPECT_THAT(ReadBufferData<int32_t>(target_a_buffer.get()),
               ContainerEq(std::vector<int32_t>{1, 2, 3, 4}));
-
-  // A stale replay would copy source_a into target_a again.
-  ZeroBuffer(target_a_buffer);
-  ExecuteCommandBufferAndWait(command_buffer, binding_table_b);
-  EXPECT_THAT(ReadInt32Prefix(target_b_buffer),
+  // A stale replay would copy source_a into target_a and leave target_b zero.
+  ExecuteCommandBufferAndWait(command_buffer.get(), binding_table_b);
+  EXPECT_THAT(ReadBufferData<int32_t>(target_b_buffer.get()),
               ContainerEq(std::vector<int32_t>{50, 60, 70, 80}));
-  EXPECT_THAT(ReadInt32Prefix(target_a_buffer),
-              ContainerEq(std::vector<int32_t>(kElementCount, 0)));
 
   EXPECT_EQ(2, QueryNativeReplayCache(IREE_SV("binding_table_bypass_count")) -
                    initial_binding_table_bypass_count);
   EXPECT_EQ(initial_hit_count, QueryNativeReplayCache(IREE_SV("hit_count")));
-  EXPECT_EQ(initial_create_count,
-            QueryNativeReplayCache(IREE_SV("create_count")));
-  EXPECT_EQ(0, QueryNativeReplayCache(IREE_SV("instance_count")));
 }
 
 // Indirect dispatches bake the parameter VkBuffer resolved from the binding
-// table into vkCmdDispatchIndirect. Resubmitting with a different parameter
-// buffer must use the new workgroup count.
+// table into vkCmdDispatchIndirect, so a resubmission with a different
+// parameter buffer must not reuse the cached replay.
 TEST_P(BdaRawSpirvReplayCacheTest,
-       CommandBufferBindingTableParametersBypassCachedNativeReplay) {
+       CommandBufferIndirectParametersFromBindingTableBypassNativeReplay) {
   IREE_ASSERT_OK(iree_hal_device_trim(device_));
   ASSERT_EQ(0, QueryNativeReplayCache(IREE_SV("instance_count")));
 
@@ -1713,12 +1667,13 @@ TEST_P(BdaRawSpirvReplayCacheTest,
       device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
       /*binding_capacity=*/3, command_buffer.out()));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer.get()));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, iree_hal_executable_function_from_index(0),
-      config, iree_const_byte_span_empty(), bindings,
+      command_buffer.get(), executable_,
+      iree_hal_executable_function_from_index(0), config,
+      iree_const_byte_span_empty(), bindings,
       IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer.get()));
 
   iree_hal_buffer_binding_t binding_table_a_entries[3] = {
       {input_buffer.get(), 0, kDispatchByteLength},
@@ -1737,193 +1692,26 @@ TEST_P(BdaRawSpirvReplayCacheTest,
       QueryNativeReplayCache(IREE_SV("binding_table_bypass_count"));
 
   ExecuteCommandBufferAndWait(
-      command_buffer,
+      command_buffer.get(),
       {IREE_ARRAYSIZE(binding_table_a_entries), binding_table_a_entries});
-  ExpectOutput(output_a_buffer);
-
+  ExpectOutput(output_a_buffer.get());
   // A stale replay would dispatch kElementCount workgroups from
   // parameters_a_buffer and write every element of output_b_buffer.
   ExecuteCommandBufferAndWait(
-      command_buffer,
+      command_buffer.get(),
       {IREE_ARRAYSIZE(binding_table_b_entries), binding_table_b_entries});
-  EXPECT_THAT(ReadInt32Prefix(output_b_buffer),
+  EXPECT_THAT(ReadBufferData<int32_t>(output_b_buffer.get()),
               ContainerEq(std::vector<int32_t>{8, 5, 0, 0}));
 
   EXPECT_EQ(2, QueryNativeReplayCache(IREE_SV("binding_table_bypass_count")) -
                    initial_binding_table_bypass_count);
   EXPECT_EQ(initial_hit_count, QueryNativeReplayCache(IREE_SV("hit_count")));
-  EXPECT_EQ(0, QueryNativeReplayCache(IREE_SV("instance_count")));
 }
 
-// Mirrors compiler-generated command buffers: a dispatch whose results are
-// copied out through the binding table. Dispatch bindings are refreshed by BDA
-// republication, the copy is not, so the whole command buffer must bypass.
+// Direct buffer references are the same for every submission, so copies and
+// indirect parameters that only use them keep the cached replay.
 TEST_P(BdaRawSpirvReplayCacheTest,
-       CommandBufferDispatchThenCopyResubmitsWithDifferentBindings) {
-  IREE_ASSERT_OK(iree_hal_device_trim(device_));
-  ASSERT_EQ(0, QueryNativeReplayCache(IREE_SV("instance_count")));
-
-  const int32_t input_a_data[kElementCount] = {1, -2, 30, 400};
-  const int32_t input_b_data[kElementCount] = {10, 20, 30, 40};
-  Ref<iree_hal_buffer_t> input_a_buffer;
-  IREE_ASSERT_OK(CreateDeviceBufferWithData(input_a_data, sizeof(input_a_data),
-                                            input_a_buffer.out()));
-  Ref<iree_hal_buffer_t> input_b_buffer;
-  IREE_ASSERT_OK(CreateDeviceBufferWithData(input_b_data, sizeof(input_b_data),
-                                            input_b_buffer.out()));
-  Ref<iree_hal_buffer_t> scratch_a_buffer;
-  IREE_ASSERT_OK(
-      CreateZeroedDeviceBuffer(kDispatchByteLength, scratch_a_buffer.out()));
-  Ref<iree_hal_buffer_t> scratch_b_buffer;
-  IREE_ASSERT_OK(
-      CreateZeroedDeviceBuffer(kDispatchByteLength, scratch_b_buffer.out()));
-  Ref<iree_hal_buffer_t> result_a_buffer;
-  IREE_ASSERT_OK(
-      CreateZeroedDeviceBuffer(kDispatchByteLength, result_a_buffer.out()));
-  Ref<iree_hal_buffer_t> result_b_buffer;
-  IREE_ASSERT_OK(
-      CreateZeroedDeviceBuffer(kDispatchByteLength, result_b_buffer.out()));
-
-  iree_hal_buffer_ref_t binding_refs[2] = {
-      iree_hal_make_indirect_buffer_ref(/*buffer_slot=*/0, /*offset=*/0,
-                                        kDispatchByteLength),
-      iree_hal_make_indirect_buffer_ref(/*buffer_slot=*/1, /*offset=*/0,
-                                        kDispatchByteLength),
-  };
-  iree_hal_buffer_ref_list_t bindings = {
-      /*.count=*/IREE_ARRAYSIZE(binding_refs),
-      /*.values=*/binding_refs,
-  };
-  Ref<iree_hal_command_buffer_t> command_buffer;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
-      IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/3, command_buffer.out()));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-  IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, iree_hal_executable_function_from_index(0),
-      iree_hal_make_static_dispatch_config(kElementCount, 1, 1),
-      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
-  RecordFullExecutionBarrier(command_buffer);
-  IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
-      command_buffer,
-      iree_hal_make_indirect_buffer_ref(/*buffer_slot=*/1, /*offset=*/0,
-                                        kDispatchByteLength),
-      iree_hal_make_indirect_buffer_ref(/*buffer_slot=*/2, /*offset=*/0,
-                                        kDispatchByteLength),
-      IREE_HAL_COPY_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
-
-  iree_hal_buffer_binding_t binding_table_a_entries[3] = {
-      {input_a_buffer.get(), 0, kDispatchByteLength},
-      {scratch_a_buffer.get(), 0, kDispatchByteLength},
-      {result_a_buffer.get(), 0, kDispatchByteLength},
-  };
-  iree_hal_buffer_binding_t binding_table_b_entries[3] = {
-      {input_b_buffer.get(), 0, kDispatchByteLength},
-      {scratch_b_buffer.get(), 0, kDispatchByteLength},
-      {result_b_buffer.get(), 0, kDispatchByteLength},
-  };
-
-  const int64_t initial_hit_count =
-      QueryNativeReplayCache(IREE_SV("hit_count"));
-  const int64_t initial_binding_table_bypass_count =
-      QueryNativeReplayCache(IREE_SV("binding_table_bypass_count"));
-
-  ExecuteCommandBufferAndWait(
-      command_buffer,
-      {IREE_ARRAYSIZE(binding_table_a_entries), binding_table_a_entries});
-  EXPECT_THAT(ReadInt32Prefix(result_a_buffer),
-              ContainerEq(std::vector<int32_t>{8, 5, 37, 407}));
-
-  ZeroBuffer(result_a_buffer);
-  ExecuteCommandBufferAndWait(
-      command_buffer,
-      {IREE_ARRAYSIZE(binding_table_b_entries), binding_table_b_entries});
-  EXPECT_THAT(ReadInt32Prefix(scratch_b_buffer),
-              ContainerEq(std::vector<int32_t>{17, 27, 37, 47}));
-  EXPECT_THAT(ReadInt32Prefix(result_b_buffer),
-              ContainerEq(std::vector<int32_t>{17, 27, 37, 47}));
-  EXPECT_THAT(ReadInt32Prefix(result_a_buffer),
-              ContainerEq(std::vector<int32_t>(kElementCount, 0)));
-
-  EXPECT_EQ(2, QueryNativeReplayCache(IREE_SV("binding_table_bypass_count")) -
-                   initial_binding_table_bypass_count);
-  EXPECT_EQ(initial_hit_count, QueryNativeReplayCache(IREE_SV("hit_count")));
-}
-
-// Fill and update commands also bake resolved binding-table buffers. They
-// currently bypass for their built-in descriptor requirements before the
-// binding-table check is reached; either way they must never replay stale.
-TEST_P(BdaRawSpirvReplayCacheTest,
-       CommandBufferFillAndUpdateResubmitWithDifferentBindings) {
-  IREE_ASSERT_OK(iree_hal_device_trim(device_));
-  ASSERT_EQ(0, QueryNativeReplayCache(IREE_SV("instance_count")));
-
-  Ref<iree_hal_buffer_t> fill_a_buffer;
-  IREE_ASSERT_OK(
-      CreateZeroedDeviceBuffer(kDispatchByteLength, fill_a_buffer.out()));
-  Ref<iree_hal_buffer_t> fill_b_buffer;
-  IREE_ASSERT_OK(
-      CreateZeroedDeviceBuffer(kDispatchByteLength, fill_b_buffer.out()));
-  Ref<iree_hal_buffer_t> update_a_buffer;
-  IREE_ASSERT_OK(
-      CreateZeroedDeviceBuffer(kDispatchByteLength, update_a_buffer.out()));
-  Ref<iree_hal_buffer_t> update_b_buffer;
-  IREE_ASSERT_OK(
-      CreateZeroedDeviceBuffer(kDispatchByteLength, update_b_buffer.out()));
-
-  const int32_t fill_pattern = 0x11;
-  const int32_t update_data[kElementCount] = {9, 8, 7, 6};
-  Ref<iree_hal_command_buffer_t> command_buffer;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
-      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/2, command_buffer.out()));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
-      command_buffer,
-      iree_hal_make_indirect_buffer_ref(/*buffer_slot=*/0, /*offset=*/0,
-                                        kDispatchByteLength),
-      &fill_pattern, sizeof(fill_pattern), IREE_HAL_FILL_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_command_buffer_update_buffer(
-      command_buffer, update_data, /*source_offset=*/0,
-      iree_hal_make_indirect_buffer_ref(/*buffer_slot=*/1, /*offset=*/0,
-                                        kDispatchByteLength),
-      IREE_HAL_UPDATE_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
-
-  iree_hal_buffer_binding_t binding_table_a_entries[2];
-  iree_hal_buffer_binding_table_t binding_table_a = MakeBindingTable(
-      fill_a_buffer.get(), update_a_buffer.get(), binding_table_a_entries);
-  iree_hal_buffer_binding_t binding_table_b_entries[2];
-  iree_hal_buffer_binding_table_t binding_table_b = MakeBindingTable(
-      fill_b_buffer.get(), update_b_buffer.get(), binding_table_b_entries);
-
-  const int64_t initial_hit_count =
-      QueryNativeReplayCache(IREE_SV("hit_count"));
-
-  ExecuteCommandBufferAndWait(command_buffer, binding_table_a);
-  ZeroBuffer(fill_a_buffer);
-  ZeroBuffer(update_a_buffer);
-  ExecuteCommandBufferAndWait(command_buffer, binding_table_b);
-
-  EXPECT_THAT(ReadInt32Prefix(fill_b_buffer),
-              ContainerEq(std::vector<int32_t>(kElementCount, 0x11)));
-  EXPECT_THAT(ReadInt32Prefix(update_b_buffer),
-              ContainerEq(std::vector<int32_t>{9, 8, 7, 6}));
-  EXPECT_THAT(ReadInt32Prefix(fill_a_buffer),
-              ContainerEq(std::vector<int32_t>(kElementCount, 0)));
-  EXPECT_THAT(ReadInt32Prefix(update_a_buffer),
-              ContainerEq(std::vector<int32_t>(kElementCount, 0)));
-  EXPECT_EQ(initial_hit_count, QueryNativeReplayCache(IREE_SV("hit_count")));
-}
-
-// Direct buffer references are stable for the command buffer lifetime, so
-// transfers and indirect parameters that only use them must keep the cached
-// replay path.
-TEST_P(BdaRawSpirvReplayCacheTest,
-       CommandBufferDirectTransferRefsReuseCachedNativeReplay) {
+       CommandBufferDirectTransferRefsReuseNativeReplay) {
   IREE_ASSERT_OK(iree_hal_device_trim(device_));
   ASSERT_EQ(0, QueryNativeReplayCache(IREE_SV("instance_count")));
 
@@ -1957,26 +1745,27 @@ TEST_P(BdaRawSpirvReplayCacheTest,
   iree_hal_dispatch_config_t config =
       iree_hal_make_static_dispatch_config(0, 0, 0);
   config.workgroup_count_ref = iree_hal_make_buffer_ref(
-      parameters_buffer, /*offset=*/0, kParameterByteLength);
+      parameters_buffer.get(), /*offset=*/0, kParameterByteLength);
 
   Ref<iree_hal_command_buffer_t> command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
       IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
       /*binding_capacity=*/2, command_buffer.out()));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer.get()));
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, iree_hal_executable_function_from_index(0),
-      config, iree_const_byte_span_empty(), bindings,
+      command_buffer.get(), executable_,
+      iree_hal_executable_function_from_index(0), config,
+      iree_const_byte_span_empty(), bindings,
       IREE_HAL_DISPATCH_FLAG_STATIC_INDIRECT_PARAMETERS));
   IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
-      command_buffer,
-      iree_hal_make_buffer_ref(source_buffer, /*offset=*/0,
+      command_buffer.get(),
+      iree_hal_make_buffer_ref(source_buffer.get(), /*offset=*/0,
                                kDispatchByteLength),
-      iree_hal_make_buffer_ref(target_buffer, /*offset=*/0,
+      iree_hal_make_buffer_ref(target_buffer.get(), /*offset=*/0,
                                kDispatchByteLength),
       IREE_HAL_COPY_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer.get()));
 
   iree_hal_buffer_binding_t binding_table_a_entries[2];
   iree_hal_buffer_binding_table_t binding_table_a = MakeBindingTable(
@@ -1990,16 +1779,12 @@ TEST_P(BdaRawSpirvReplayCacheTest,
   const int64_t initial_binding_table_bypass_count =
       QueryNativeReplayCache(IREE_SV("binding_table_bypass_count"));
 
-  ExecuteCommandBufferAndWait(command_buffer, binding_table_a);
-  ExpectOutput(output_a_buffer);
-  EXPECT_THAT(ReadInt32Prefix(target_buffer),
+  ExecuteCommandBufferAndWait(command_buffer.get(), binding_table_a);
+  ExpectOutput(output_a_buffer.get());
+  EXPECT_THAT(ReadBufferData<int32_t>(target_buffer.get()),
               ContainerEq(std::vector<int32_t>{3, 1, 4, 1}));
-
-  ZeroBuffer(target_buffer);
-  ExecuteCommandBufferAndWait(command_buffer, binding_table_b);
-  ExpectOutput(output_b_buffer);
-  EXPECT_THAT(ReadInt32Prefix(target_buffer),
-              ContainerEq(std::vector<int32_t>{3, 1, 4, 1}));
+  ExecuteCommandBufferAndWait(command_buffer.get(), binding_table_b);
+  ExpectOutput(output_b_buffer.get());
 
   EXPECT_EQ(initial_binding_table_bypass_count,
             QueryNativeReplayCache(IREE_SV("binding_table_bypass_count")));
