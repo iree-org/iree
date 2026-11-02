@@ -54,7 +54,7 @@ static Value elementwiseValueInPlace(OpBuilder &builder, Location loc,
         // Convert scale to the same datatype as input.
         Value scale = convertScalarToDtype(b, loc, args[0], args[1].getType(),
                                            /*isUnsignedCast=*/false);
-        Value result = T::create(b, loc, scale, args[1]);
+        Value result = T::create(b, loc, args[1], scale);
         linalg::YieldOp::create(b, loc, result);
       });
   return genericOp.getResult(0);
