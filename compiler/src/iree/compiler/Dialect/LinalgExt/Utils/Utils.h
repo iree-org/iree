@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
 #define IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
 
+#include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -291,6 +293,48 @@ bool isaTransposeOpInterface(linalg::LinalgOp linalgOp);
 
 /// True when `value` is a constant that is zero in every element.
 bool isKnownZero(Value value);
+
+/// If the value is defined by a chain of unary side effect-free ops, go up the
+/// use-def chain until the first value that isn't defined by such an op.
+// TODO: relax to multi-operands with constants, which are technically unary ops
+// as needed (e.g. add5).
+Value getSourceSkipUnary(Value value);
+
+/// Computes `value = T(value, scale)` elementwise with a linalg.generic that
+/// updates `value` in place, e.g. `elementwiseValueInPlace<arith::DivFOp>`
+/// computes `value = value / scale`. `scale` is broadcast according to
+/// `scaleMap` and converted to the element type of `value`.
+template <typename T>
+Value elementwiseValueInPlace(OpBuilder &builder, Location loc,
+                              AffineMap inputMap, AffineMap scaleMap,
+                              Value value, Value scale) {
+  SmallVector<AffineMap> compressedMaps =
+      compressUnusedDims(SmallVector<AffineMap>{inputMap, scaleMap});
+  inputMap = compressedMaps[0];
+  scaleMap = compressedMaps[1];
+
+  SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
+                                                 utils::IteratorType::parallel);
+
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, value.getType(), scale, value,
+      SmallVector<AffineMap>{scaleMap, inputMap}, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        // Convert scale to the same datatype as input.
+        Value scale = convertScalarToDtype(b, loc, args[0], args[1].getType(),
+                                           /*isUnsignedCast=*/false);
+        Value result = T::create(b, loc, args[1], scale);
+        linalg::YieldOp::create(b, loc, result);
+      });
+  return genericOp.getResult(0);
+}
+
+/// Computes `output = exp2(output - input)`, or `exp(output - input)` if
+/// `useExp2` is false, elementwise with a linalg.generic. `input` is broadcast
+/// according to `inputMap` and converted to the element type of `output`.
+Value computeSubAndExp(OpBuilder &builder, Location loc, AffineMap inputMap,
+                       AffineMap outputMap, Value input, Value output,
+                       bool useExp2);
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_

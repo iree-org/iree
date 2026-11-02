@@ -3605,56 +3605,6 @@ static linalg::ReduceOp reduceOnK2(OnlineAttentionOp attn, AffineMap partialMap,
       });
 };
 
-template <typename T>
-static Value elementwiseValueInPlace(OpBuilder &builder, Location loc,
-                                     AffineMap inputMap, AffineMap scaleMap,
-                                     Value value, Value scale) {
-  SmallVector<AffineMap> compressedMaps =
-      compressUnusedDims(SmallVector<AffineMap>{inputMap, scaleMap});
-  inputMap = compressedMaps[0];
-  scaleMap = compressedMaps[1];
-
-  SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
-                                                 utils::IteratorType::parallel);
-
-  auto genericOp = linalg::GenericOp::create(
-      builder, loc, value.getType(), scale, value,
-      SmallVector<AffineMap>{scaleMap, inputMap}, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        // Convert scale to the same datatype as input.
-        Value scale = convertScalarToDtype(b, loc, args[0], args[1].getType(),
-                                           /*isUnsignedCast=*/false);
-        Value result = T::create(b, loc, args[1], scale);
-        linalg::YieldOp::create(b, loc, result);
-      });
-  return genericOp.getResult(0);
-}
-
-// Compute output = exp2(output - input)
-static Value computeSubAndExp2(OpBuilder &builder, Location loc,
-                               AffineMap inputMap, AffineMap outputMap,
-                               Value input, Value output) {
-  SmallVector<AffineMap> compressedMaps =
-      compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
-  inputMap = compressedMaps[0];
-  outputMap = compressedMaps[1];
-
-  SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
-                                                 utils::IteratorType::parallel);
-  auto genericOp = linalg::GenericOp::create(
-      builder, loc, output.getType(), input, output,
-      SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        // Convert input to the same datatype as output.
-        Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
-                                        /*isUnsignedCast=*/false);
-        Value diff = arith::SubFOp::create(b, loc, args[1], in);
-        Value weight = math::Exp2Op::create(b, loc, diff);
-        linalg::YieldOp::create(b, loc, weight);
-      });
-  return genericOp.getResult(0);
-}
-
 FailureOr<MergeResult> OnlineAttentionOp::mergeReductions(
     OpBuilder &b, Location loc, ValueRange partialReduce,
     const llvm::SetVector<unsigned> &reductionDims) {
@@ -3674,8 +3624,9 @@ FailureOr<MergeResult> OnlineAttentionOp::mergeReductions(
       *this, partialMaxMap, opInfo, b, loc, partialReduce[1], getMax());
 
   // norm = exp2(partialMax - newMax)
-  Value norm = computeSubAndExp2(b, loc, getMaxMap(), partialMaxMap,
-                                 reducedMax.getResult(0), partialReduce[1]);
+  Value norm = computeSubAndExp(b, loc, getMaxMap(), partialMaxMap,
+                                reducedMax.getResult(0), partialReduce[1],
+                                /*useExp2=*/true);
 
   // normSum = norm * partialSum
   Value normSum = elementwiseValueInPlace<arith::MulFOp>(

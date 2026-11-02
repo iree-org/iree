@@ -35,31 +35,6 @@ static llvm::cl::opt<float> clAttentionSoftmaxMax(
     llvm::cl::desc("maximum expected value from attention softmax"),
     llvm::cl::init(1.0));
 
-template <typename T>
-static Value elementwiseValueInPlace(OpBuilder &builder, Location loc,
-                                     AffineMap inputMap, AffineMap scaleMap,
-                                     Value value, Value scale) {
-  SmallVector<AffineMap> compressedMaps =
-      compressUnusedDims(SmallVector<AffineMap>{inputMap, scaleMap});
-  inputMap = compressedMaps[0];
-  scaleMap = compressedMaps[1];
-
-  SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
-                                                 utils::IteratorType::parallel);
-
-  auto genericOp = linalg::GenericOp::create(
-      builder, loc, value.getType(), scale, value,
-      SmallVector<AffineMap>{scaleMap, inputMap}, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        // Convert scale to the same datatype as input.
-        Value scale = convertScalarToDtype(b, loc, args[0], args[1].getType(),
-                                           /*isUnsignedCast=*/false);
-        Value result = T::create(b, loc, args[1], scale);
-        linalg::YieldOp::create(b, loc, result);
-      });
-  return genericOp.getResult(0);
-}
-
 static Value reciprocalValue(OpBuilder &b, Location loc, Value input,
                              Value output) {
   int64_t rank = cast<ShapedType>(input.getType()).getRank();
@@ -287,32 +262,6 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
         linalg::YieldOp::create(b, loc, add);
       });
 
-  return genericOp.getResult(0);
-}
-
-// Compute output = exp2/exp(output - input) depending on useExp2 flag.
-static Value computeSubAndExp(OpBuilder &builder, Location loc,
-                              AffineMap inputMap, AffineMap outputMap,
-                              Value input, Value output, bool useExp2) {
-  SmallVector<AffineMap> compressedMaps =
-      compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
-  inputMap = compressedMaps[0];
-  outputMap = compressedMaps[1];
-
-  SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
-                                                 utils::IteratorType::parallel);
-  auto genericOp = linalg::GenericOp::create(
-      builder, loc, output.getType(), input, output,
-      SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        // Convert input to the same datatype as output.
-        Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
-                                        /*isUnsignedCast=*/false);
-        Value diff = arith::SubFOp::create(b, loc, args[1], in);
-        Value weight = useExp2 ? math::Exp2Op::create(b, loc, diff).getResult()
-                               : math::ExpOp::create(b, loc, diff).getResult();
-        linalg::YieldOp::create(b, loc, weight);
-      });
   return genericOp.getResult(0);
 }
 
