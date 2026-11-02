@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "invalid.mlir"
     "materialize_encoding_invalid.mlir"
+    "materialize_encoding_scalar.mlir"
     "roundtrip.mlir"
   TOOLS
     FileCheck
