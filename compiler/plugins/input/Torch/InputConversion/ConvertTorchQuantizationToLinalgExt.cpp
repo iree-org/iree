@@ -339,9 +339,7 @@ readTorchaoQuantization(OpTy op, typename OpTy::Adaptor adaptor,
   PT2EQuantization quantization;
   quantization.input = adaptor.getInput();
   quantization.scale = adaptor.getScale();
-  if (failed(matchBlockSize(op, op.getBlockSize(), quantization, rewriter)) ||
-      failed(matchZeroPoint(op, op.getZeroPoint(), adaptor.getZeroPoint(),
-                            quantization, rewriter))) {
+  if (failed(matchBlockSize(op, op.getBlockSize(), quantization, rewriter))) {
     return failure();
   }
   FailureOr<std::pair<double, double>> bounds = Torch::getTorchaoQuantBounds(
@@ -361,12 +359,13 @@ readTorchaoQuantization(OpTy op, typename OpTy::Adaptor adaptor,
   }
   quantization.quantMin = static_cast<int64_t>(quantMin);
   quantization.quantMax = static_cast<int64_t>(quantMax);
+  if (failed(matchZeroPoint(op, op.getZeroPoint(), adaptor.getZeroPoint(),
+                            quantization, rewriter))) {
+    return failure();
+  }
   return quantization;
 }
 
-// torchao multiplies by `1.0 / scale`, whereas LinalgExt divides by the scale
-// like Torch-to-Linalg, so the two can round differently at ties. LinalgExt
-// computes in the scale type, torchao in the wider of the scale and real types.
 static FailureOr<PT2EQuantization>
 readPT2EQuantization(Torch::TorchaoQuantizeAffineOp op,
                      Torch::TorchaoQuantizeAffineOp::Adaptor adaptor,
@@ -374,10 +373,6 @@ readPT2EQuantization(Torch::TorchaoQuantizeAffineOp op,
   return readTorchaoQuantization(op, adaptor, op.getOutputDtype(), rewriter);
 }
 
-// torchao subtracts the zero point in the real type, whereas LinalgExt
-// subtracts integers, so results can differ for 16-bit real values with
-// storage wider than 8 bits. LinalgExt multiplies in the scale type, torchao in
-// the wider of the scale and real types.
 static FailureOr<PT2EQuantization>
 readPT2EQuantization(Torch::TorchaoDequantizeAffineOp op,
                      Torch::TorchaoDequantizeAffineOp::Adaptor adaptor,
@@ -465,10 +460,9 @@ checkScaleAndZeroPointSupport(Operation *op, Type realType,
     return rewriter.notifyMatchFailure(
         op, "expected per-channel parameters with known dtypes");
   }
-  // torchao reshapes the scale and zero point to the blocks, so its verifier
-  // checks only their element counts. LinalgExt indexes them by the dimensions
-  // that select a block, so their non-unit dimensions must be those block
-  // counts.
+  // LinalgExt indexes the scale and zero point by the dimensions that select a
+  // block, so their non-unit sizes must be the block counts along those
+  // dimensions.
   ArrayRef<int64_t> blockedShape = getBlockedType(quantization).getShape();
   SmallVector<int64_t> blockCounts =
       llvm::map_to_vector(getParameterDims(quantization),
@@ -588,7 +582,9 @@ static Value createQuantizeAffine(OpBuilder &builder, Location location,
   // the scale, so results can differ by one ulp before rounding. The
   // per-channel-group and per-token references also add the zero point before
   // rounding, so ties with odd zero points differ. Torch-to-Linalg follows only
-  // the per-token one.
+  // the per-token one. torchao also multiplies by `1.0 / scale`, and computes
+  // in the wider of the scale and real types, whereas LinalgExt computes in the
+  // scale type.
   Value input = createBlockedInput(builder, location, quantization);
   Value scale = truncateScalarScaleToF32(builder, location, quantization.scale);
   scale = collapseParameter(builder, location, scale);
@@ -610,6 +606,10 @@ static Value createDequantizeAffine(OpBuilder &builder, Location location,
                                     RankedTensorType resultType,
                                     const PT2EQuantization &quantization,
                                     bool inputUnsigned) {
+  // torchao subtracts the zero point in the real type, whereas LinalgExt
+  // subtracts integers, so results can differ for 16-bit real values with
+  // storage wider than 8 bits. torchao also multiplies in the wider of the
+  // scale and real types, whereas LinalgExt multiplies in the scale type.
   Value input = createBlockedInput(builder, location, quantization);
   Value scale = truncateScalarScaleToF32(builder, location, quantization.scale);
   scale = collapseParameter(builder, location, scale);
@@ -649,7 +649,8 @@ struct ConvertQuantize final : OpConversionPattern<OpTy> {
       return rewriter.notifyMatchFailure(op,
                                          "expected tensors with known dtypes");
     }
-    // PT2E also quantizes to fp8, which LinalgExt storage cannot express.
+    // PT2E and torchao also quantize to fp8, which LinalgExt storage cannot
+    // express.
     if (!isa<IntegerType>(resultType.getElementType())) {
       return rewriter.notifyMatchFailure(op, "expected integer storage");
     }
@@ -695,7 +696,8 @@ struct ConvertDequantize final : OpConversionPattern<OpTy> {
       return rewriter.notifyMatchFailure(op,
                                          "expected tensors with known dtypes");
     }
-    // PT2E also quantizes to fp8, which LinalgExt storage cannot express.
+    // PT2E and torchao also quantize to fp8, which LinalgExt storage cannot
+    // express.
     if (!isa<IntegerType>(inputType.getElementType())) {
       return rewriter.notifyMatchFailure(op, "expected integer storage");
     }

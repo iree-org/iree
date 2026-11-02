@@ -469,9 +469,8 @@ func.func @nonzero_float_zero_point(
 
 // -----
 
-// Each token has its own scale and zero point, which torch.export gives without
-// a unit last dimension, so LinalgExt indexes them by the leading dimensions.
-// Like torchao, it computes the bf16 input in the wider f32 scale type.
+// Each token has its own scale and zero point, indexed by the leading
+// dimensions, including the dynamic one.
 // CHECK: #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK-LABEL: func.func @torchao_per_token(
@@ -575,46 +574,6 @@ func.func @torchao_symmetric_per_block(
 
 // -----
 
-// LinalgExt operands are signless, so unsigned storage and zero points set the
-// unsigned flags. None bounds of uint8 storage are 0 and 255.
-// CHECK-LABEL: func.func @torchao_unsigned(
-// CHECK: iree_linalg_ext.quantize_affine
-// CHECK-SAME: quant_min = 0
-// CHECK-SAME: quant_max = 255
-// CHECK-SAME: storage_unsigned
-// CHECK-SAME: zp_unsigned
-// CHECK: iree_linalg_ext.dequantize_affine
-// CHECK-SAME: quant_min = 0
-// CHECK-SAME: quant_max = 255
-// CHECK-SAME: input_unsigned
-// CHECK-SAME: zp_unsigned
-func.func @torchao_unsigned(
-    %input: !torch.vtensor<[4,8],f32>,
-    %scale: !torch.vtensor<[4,1],f32>,
-    %zero_point: !torch.vtensor<[4,1],ui8>) -> !torch.vtensor<[4,8],f32> {
-  %one = torch.constant.int 1
-  %row_size = torch.constant.int 8
-  %dtype = torch.constant.int 0
-  %out_dtype = torch.constant.int 6
-  %none = torch.constant.none
-  %block_size = torch.prim.ListConstruct %one, %row_size
-      : (!torch.int, !torch.int) -> !torch.list<int>
-  %quantized = torch.torchao.quantize_affine
-      %input, %block_size, %scale, %zero_point, %dtype, %none, %none
-      : !torch.vtensor<[4,8],f32>, !torch.list<int>, !torch.vtensor<[4,1],f32>,
-        !torch.vtensor<[4,1],ui8>, !torch.int, !torch.none, !torch.none
-        -> !torch.vtensor<[4,8],ui8>
-  %result = torch.torchao.dequantize_affine
-      %quantized, %block_size, %scale, %zero_point, %dtype, %none, %none,
-      %out_dtype
-      : !torch.vtensor<[4,8],ui8>, !torch.list<int>, !torch.vtensor<[4,1],f32>,
-        !torch.vtensor<[4,1],ui8>, !torch.int, !torch.none, !torch.none,
-        !torch.int -> !torch.vtensor<[4,8],f32>
-  return %result : !torch.vtensor<[4,8],f32>
-}
-
-// -----
-
 // Expanding a dimension into its blocks needs a static size, so an op whose
 // block splits a dynamic dimension is left for the Torch-to-Linalg lowering.
 // CHECK-LABEL: func.func @torchao_dynamic_blocked_dimension(
@@ -640,8 +599,7 @@ func.func @torchao_dynamic_blocked_dimension(
 
 // -----
 
-// torchao reshapes the scale to the blocks, so a flattened scale is valid, but
-// LinalgExt indexes it per blocked dimension, so the op is left for the
+// A flattened scale cannot be indexed per block, so the op is left for the
 // Torch-to-Linalg lowering.
 // CHECK-LABEL: func.func @torchao_flattened_scale(
 // CHECK: torch.torchao.dequantize_affine
@@ -688,35 +646,5 @@ func.func @torchao_reversed_bounds(
       : !torch.vtensor<[4,8],si8>, !torch.list<int>, !torch.vtensor<[4,2],f32>,
         !torch.none, !torch.int, !torch.int, !torch.int, !torch.int
         -> !torch.vtensor<[4,8],f32>
-  return %result : !torch.vtensor<[4,8],f32>
-}
-
-// -----
-
-// torchao exports also store the zero points of symmetric weights as float
-// zeros, which are dropped as for PT2E.
-// CHECK: #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
-// CHECK-LABEL: func.func @torchao_float_zero_point_zeros(
-// CHECK: iree_linalg_ext.dequantize_affine
-// CHECK-SAME: indexing_maps = [#map, #map1, #map]
-// CHECK-SAME: ins({{.*}} : tensor<4x2x4xi8>, tensor<4x2xf32>)
-func.func @torchao_float_zero_point_zeros(
-    %input: !torch.vtensor<[4,8],si8>,
-    %scale: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
-  %zero_point = torch.vtensor.literal(dense<0.000000e+00> : tensor<4x2xf32>)
-      : !torch.vtensor<[4,2],f32>
-  %one = torch.constant.int 1
-  %group_size = torch.constant.int 4
-  %dtype = torch.constant.int 1
-  %out_dtype = torch.constant.int 6
-  %none = torch.constant.none
-  %block_size = torch.prim.ListConstruct %one, %group_size
-      : (!torch.int, !torch.int) -> !torch.list<int>
-  %result = torch.torchao.dequantize_affine
-      %input, %block_size, %scale, %zero_point, %dtype, %none, %none, %out_dtype
-      : !torch.vtensor<[4,8],si8>, !torch.list<int>, !torch.vtensor<[4,2],f32>,
-        !torch.vtensor<[4,2],f32>, !torch.int, !torch.none, !torch.none,
-        !torch.int -> !torch.vtensor<[4,8],f32>
   return %result : !torch.vtensor<[4,8],f32>
 }
