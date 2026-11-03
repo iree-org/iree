@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --canonicalize -cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vm-conversion --cse %s | FileCheck %s --check-prefix=VM
 
 // CHECK-LABEL: @FoldBufferLengthOp
 // CHECK-SAME: (%[[LENGTH:.+]]: index)
@@ -65,4 +66,35 @@ util.func public @SkipBufferViewBufferOp(%buffer: !hal.buffer) -> !hal.buffer {
   %view_buffer = hal_inline.buffer_view.buffer<%view : !hal.buffer_view> : !hal.buffer
   // CHECK: return %[[BUFFER]]
   util.return %view_buffer : !hal.buffer
+}
+
+// -----
+
+// CHECK-LABEL: @AllocateDistinctBuffers
+// CHECK-COUNT-2: hal_inline.buffer.allocate alignment
+// VM-LABEL: vm.func private @AllocateDistinctBuffers
+// VM: %[[FIRST:[^: ]+]]:2 = vm.call @hal_inline.buffer.allocate(
+// VM: %[[SECOND:[^: ]+]]:2 = vm.call @hal_inline.buffer.allocate(
+// VM: vm.return %[[FIRST]]#0, %[[SECOND]]#0
+util.func public @AllocateDistinctBuffers(%length: index) -> (!hal.buffer, !hal.buffer) {
+  %c64 = arith.constant 64 : index
+  %a, %sa = hal_inline.buffer.allocate alignment(%c64) : !hal.buffer{%length} in !util.buffer
+  %b, %sb = hal_inline.buffer.allocate alignment(%c64) : !hal.buffer{%length} in !util.buffer
+  util.return %a, %b : !hal.buffer, !hal.buffer
+}
+
+// -----
+
+// CHECK-LABEL: @AllocateDistinctInitializedBuffers
+// CHECK-COUNT-2: hal_inline.buffer.allocate.initialized
+// VM-LABEL: vm.func private @AllocateDistinctInitializedBuffers
+// VM: %[[FIRST:[^: ]+]]:2 = vm.call @hal_inline.buffer.allocate.initialized(
+// VM: %[[SECOND:[^: ]+]]:2 = vm.call @hal_inline.buffer.allocate.initialized(
+// VM: vm.return %[[FIRST]]#0, %[[SECOND]]#0
+util.func public @AllocateDistinctInitializedBuffers(%source: !util.buffer, %length: index) -> (!hal.buffer, !hal.buffer) {
+  %c64 = arith.constant 64 : index
+  %c0 = arith.constant 0 : index
+  %a, %sa = hal_inline.buffer.allocate.initialized source(%source : !util.buffer)[%c0, %length] alignment(%c64) : !hal.buffer{%length} in !util.buffer
+  %b, %sb = hal_inline.buffer.allocate.initialized source(%source : !util.buffer)[%c0, %length] alignment(%c64) : !hal.buffer{%length} in !util.buffer
+  util.return %a, %b : !hal.buffer, !hal.buffer
 }
