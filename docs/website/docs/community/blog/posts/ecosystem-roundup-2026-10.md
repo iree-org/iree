@@ -92,7 +92,7 @@ outlined how the release cycle will work in the future. There was also a
 presentation from Sebastian Fischer from Ludwig-Maximilians-University in
 Munich on their project "anvl", which implements the R language and is
 investigating the use of IREE to compile for different targets. Watch the
-recording [on YouTube](https://www.youtube.com/@iree-org).
+recording [on YouTube](https://www.youtube.com/watch?v=Y82MWrbhe54).
 
 ## The IREE community built backends, products, and tutorials
 
