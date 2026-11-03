@@ -62,7 +62,7 @@ Hexagon NPU work with Qualcomm.
 on the Roofline website, and the presentation recordings will be shared once
 they're available.
 
-## Toradex, hiPEAC, and PyTorch Conference
+## Toradex, HiPEAC, and PyTorch Conference
 
 * Roofline is now listed in the
   [Toradex partner network](https://www.toradex.com/support/partner-network/services/100081/roofline),
