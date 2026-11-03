@@ -30,6 +30,7 @@ iree_lit_test_suite(
             "inline_memoize_regions.mlir",
             "materialize_dispatch_instrumentation.mlir",
             "materialize_interfaces.mlir",
+            "materialize_interfaces_indirect_constants.mlir",
             "materialize_resource_caches.mlir",
             "materialize_target_devices.mlir",
             "memoize_device_queries.mlir",

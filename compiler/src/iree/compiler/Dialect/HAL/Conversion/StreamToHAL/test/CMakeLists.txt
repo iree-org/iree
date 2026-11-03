@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "context_ops.mlir"
     "debug_ops.mlir"
     "file_ops.mlir"
+    "indirect_constant_bindings.mlir"
     "resource_ops.mlir"
     "timepoint_ops.mlir"
     "transfer_ops.mlir"
