@@ -140,20 +140,26 @@ def PackSubByteQuantizedConstantsPass :
   let summary = "Packs constant quantized values with sub-byte ranges into i2 or i4 storage.";
   let description = [{
     Packs the constant `i8` input of an `iree_linalg_ext.dequantize_affine`
-    into `i2` or `i4` storage when its `quant_min`/`quant_max` range fits 2 or
-    4 bits, using the narrowest type that meets the conditions below.
+    into `i2` or `i4` storage, which the dequantize then reads through a
+    `flow.tensor.bitcast`. With `w`-bit storage, element `k * i + j` of the
+    innermost dimension goes to bits `[j * w, (j + 1) * w)` of byte `i`, where
+    `k = 8 / w`.
 
-    Only constant expressions of inline data are packed, so runtime values and
-    parameters stay `i8`, as do inputs that other ops also read as `i8`. The
-    input must have a static shape whose innermost dimension is a multiple of
-    `k = 8 / w` for `w`-bit storage, and a zero point must be a constant that
-    fits the narrow type.
+    A dequantize can use `w`-bit storage if its `quant_min`/`quant_max` range
+    and its zero point fit `w` bits. The zero point must be a constant, and the
+    input must have a static, non-empty shape whose innermost dimension is a
+    multiple of `k`. Each dequantize needs the narrowest such type. An input
+    that several dequantizes read is packed once, into the widest type they
+    need.
 
-    Element `k * i + j` of the innermost dimension goes to bits
-    `[j * w, (j + 1) * w)` of byte `i`, the layout narrow-type emulation
-    expects. The dequantize reads the packed bytes through a
-    `flow.tensor.bitcast`; constant evaluation folds the packing itself into a
-    smaller `i8` constant.
+    An input is packed only when constant evaluation folds the packing and no
+    `i8` reader remains. The input must be computed from inline constants or
+    immutable globals with an inline initial value. The packing must take no
+    more bytes than this data, which hoisting accepts at any size threshold.
+    Every read of the data must be the input of a packed dequantize, in the
+    same shape. This includes reads through reshapes and through other loads
+    of the same global. Other inputs, such as runtime values and parameters,
+    stay `i8`.
   }];
   let dependentDialects = [
     "mlir::arith::ArithDialect",
