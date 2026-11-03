@@ -20,6 +20,23 @@
 namespace mlir::iree_compiler::IREE::HAL {
 
 //===----------------------------------------------------------------------===//
+// Device target resolution
+//===----------------------------------------------------------------------===//
+
+// Resolves |rootAttr| (a device global reference or device attribute) into the
+// device targets it may refer to without running DeviceAnalysis. Unresolvable
+// devices fall back to the legacy `hal.device.targets` attribute.
+void resolveDeviceTargets(Attribute rootAttr, Operation *fromOp,
+                          SymbolTableCollection &symbolTables,
+                          SetVector<IREE::HAL::DeviceTargetAttr> &resultSet);
+
+// As resolveDeviceTargets but for the device referenced by |affinityAttr|.
+void resolveDeviceAffinityTargets(
+    IREE::Stream::AffinityAttr affinityAttr, Operation *fromOp,
+    SymbolTableCollection &symbolTables,
+    SetVector<IREE::HAL::DeviceTargetAttr> &resultSet);
+
+//===----------------------------------------------------------------------===//
 // DeviceAnalysis
 //===----------------------------------------------------------------------===//
 
@@ -97,10 +114,6 @@ public:
       SetVector<IREE::HAL::ExecutableTargetAttr> &resultSet);
 
 private:
-  // Recursively resolves the referenced device into targets.
-  void gatherDeviceTargets(Attribute rootAttr, Operation *fromOp,
-                           SetVector<IREE::HAL::DeviceTargetAttr> &resultSet);
-
   Explorer explorer;
   llvm::BumpPtrAllocator allocator;
   DFX::Solver solver;

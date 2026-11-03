@@ -115,7 +115,8 @@ std::optional<DeviceSet> DeviceAnalysis::lookupDeviceTargets(
 std::optional<DeviceSet>
 DeviceAnalysis::lookupDeviceTargets(SymbolRefAttr deviceGlobalAttr) {
   SetVector<IREE::HAL::DeviceTargetAttr> resultSet;
-  gatherDeviceTargets(deviceGlobalAttr, explorer.getRootOp(), resultSet);
+  resolveDeviceTargets(deviceGlobalAttr, explorer.getRootOp(),
+                       explorer.getSymbolTables(), resultSet);
   return DeviceSet(resultSet.getArrayRef());
 }
 
@@ -160,10 +161,9 @@ static void gatherLegacyDeviceTargetAttrs(
   // No devices found; let caller decide what to do.
 }
 
-// Recursively resolves the referenced device into targets.
-void DeviceAnalysis::gatherDeviceTargets(
-    Attribute rootAttr, Operation *fromOp,
-    SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
+void resolveDeviceTargets(Attribute rootAttr, Operation *fromOp,
+                          SymbolTableCollection &symbolTables,
+                          SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
   SetVector<Attribute> worklist;
   worklist.insert(rootAttr);
   do {
@@ -171,7 +171,7 @@ void DeviceAnalysis::gatherDeviceTargets(
     if (!TypeSwitch<Attribute, bool>(attr)
              .Case([&](SymbolRefAttr symRefAttr) {
                auto globalOp =
-                   explorer.getSymbolTables()
+                   symbolTables
                        .lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
                            fromOp, symRefAttr);
                assert(globalOp && "global reference must be valid");
@@ -205,16 +205,9 @@ void DeviceAnalysis::gatherDeviceTargets(
   } while (!worklist.empty());
 }
 
-void DeviceAnalysis::gatherAllDeviceTargets(
-    SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
-  for (auto globalOp : deviceGlobals) {
-    gatherDeviceTargets(FlatSymbolRefAttr::get(globalOp), explorer.getRootOp(),
-                        resultSet);
-  }
-}
-
-void DeviceAnalysis::gatherDeviceAffinityTargets(
+void resolveDeviceAffinityTargets(
     IREE::Stream::AffinityAttr affinityAttr, Operation *fromOp,
+    SymbolTableCollection &symbolTables,
     SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
   // We currently only know how to handle HAL device affinities.
   // We could support other ones via an interface but instead we just fall back
@@ -227,7 +220,23 @@ void DeviceAnalysis::gatherDeviceAffinityTargets(
   }
 
   // Recursively resolve the referenced device into targets.
-  gatherDeviceTargets(deviceAffinityAttr.getDevice(), fromOp, resultSet);
+  resolveDeviceTargets(deviceAffinityAttr.getDevice(), fromOp, symbolTables,
+                       resultSet);
+}
+
+void DeviceAnalysis::gatherAllDeviceTargets(
+    SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
+  for (auto globalOp : deviceGlobals) {
+    resolveDeviceTargets(FlatSymbolRefAttr::get(globalOp), explorer.getRootOp(),
+                         explorer.getSymbolTables(), resultSet);
+  }
+}
+
+void DeviceAnalysis::gatherDeviceAffinityTargets(
+    IREE::Stream::AffinityAttr affinityAttr, Operation *fromOp,
+    SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
+  resolveDeviceAffinityTargets(affinityAttr, fromOp, explorer.getSymbolTables(),
+                               resultSet);
 }
 
 void DeviceAnalysis::gatherAllExecutableTargets(
