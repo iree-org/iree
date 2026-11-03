@@ -5761,6 +5761,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#iree-ecosystem-roundup-october-2026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IREE ecosystem roundup: October 2026
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running-models-on-risc-v-with-iree" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5904,6 +5915,8 @@
       
         
       
+        
+      
     
     
     
@@ -5950,6 +5963,36 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    
+  
+  
+    <li class="md-nav__item">
+      <a href="../../category/community/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Community
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -6121,6 +6164,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#iree-ecosystem-roundup-october-2026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IREE ecosystem roundup: October 2026
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#running-models-on-risc-v-with-iree" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6156,6 +6210,135 @@
       <header class="md-typeset">
         <h1 id="2026">2026<a class="headerlink" href="#2026" title="Permanent link">link</a></h1>
       </header>
+      
+        <article class="md-post md-post--excerpt">
+  <header class="md-post__header">
+    
+      <nav class="md-post__authors md-typeset">
+        
+          <span class="md-author">
+            <img src="https://github.com/rodburns.png" alt="Rod Burns">
+          </span>
+        
+      </nav>
+    
+    <div class="md-post__meta md-meta">
+      <ul class="md-meta__list">
+        <li class="md-meta__item">
+          <time datetime="2026-11-03 00:00:00+00:00">November 3, 2026</time></li>
+        
+          <li class="md-meta__item">
+            in
+            
+              <a href="../../category/community/" class="md-meta__link">Community</a></li>
+        
+        
+          
+          <li class="md-meta__item">
+            
+              3 min read
+            
+          </li>
+        
+        
+      </ul>
+      
+    </div>
+  </header>
+  <div class="md-post__content md-typeset">
+    <h2 id="iree-ecosystem-roundup-october-2026"><a class="toclink" href="../../2026-11-03-iree-ecosystem-roundup-october-2026/">IREE ecosystem roundup: October 2026</a></h2>
+<p><img alt="IREE newsletter, October 2026" src="../../ecosystem-roundup-2026-10-banner.png" /></p>
+<p>Welcome to the October roundup of news from across the IREE ecosystem.</p>
+<p>Two IREE-based hardware launches led October: Google released Coral NPU
+compiler v1.0, and Synaptics launched its Astra SR200 processors, which use the
+IREE compiler and runtime. Maximilian Bartel also became chair of the IREE
+Technical Steering Committee (TSC).</p>
+<p>Below, you'll find these stories alongside LLVM Developers' Meeting and PyTorch
+Conference talks, the IREE 3.12 release, and highlights from the community.</p>
+<h3 id="google-and-synaptics-ship-edge-ai-hardware-built-on-iree"><a class="toclink" href="../../2026-11-03-iree-ecosystem-roundup-october-2026/#google-and-synaptics-ship-edge-ai-hardware-built-on-iree">Google and Synaptics ship edge AI hardware built on IREE</a></h3>
+<p>On 21 October, Google released
+<a href="https://developers.googleblog.com/unifying-edge-ai-how-coral-npus-open-standard-brings-portable-energy-viable-intelligence-from-model-to-silicon/">Coral NPU compiler v1.0</a>,
+which is based on IREE, and Synaptics launched the Astra SR200 series on top of
+Coral NPU, describing the chips as a new class of multimodal edge AI
+microcontrollers that also use the IREE compiler and runtime. Together, the two
+launches put IREE underneath commercial edge AI silicon from Synaptics and
+Google Research.</p>
+<p>You can
+<a href="https://www.digikey.com/en/products/detail/synaptics-coralboard/720-KDVSL2619-11/29784108">buy the Coralboard SL development board at DigiKey</a>;
+SR200 chips are still sampling.</p>
+<p>Synaptics partner Enerzai has also published hands-on work with the IREE-based
+Torq compiler:
+<a href="https://medium.com/@enerzai/optimizing-the-mlir-based-torq-npu-compiler-f5ea6628c95d">optimizing the Torq NPU compiler</a>,
+<a href="https://medium.com/@enerzai/porting-a-ternary-stt-model-to-the-synaptics-torq-npu-bf9f55a6910e">porting a ternary speech-to-text model to the Torq NPU</a>,
+and building a
+<a href="https://www.youtube.com/watch?v=YZ5QPGJJpDA">low-memory smart-home agent demo</a>.</p>
+<h3 id="maximilian-bartel-now-chairs-the-iree-technical-steering-committee"><a class="toclink" href="../../2026-11-03-iree-ecosystem-roundup-october-2026/#maximilian-bartel-now-chairs-the-iree-technical-steering-committee">Maximilian Bartel now chairs the IREE Technical Steering Committee</a></h3>
+<p>Maximilian Bartel, Roofline's CTO, is now Chair of the IREE TSC. In the role,
+he coordinates the TSC's work and presides over its meetings, while technical
+oversight for IREE stays with the TSC as a whole. Read the
+<a href="https://www.roofline.ai/news/news-maximilian-bartel-iree-tsc-chair">TSC chair announcement</a>
+on the Roofline blog. (The Edge AI Foundation also
+<a href="https://lnkd.in/p/gVF-_wep">shared the news on LinkedIn</a>.)</p>
+<h3 id="mips-globalfoundries-and-qualcomm-back-iree-in-llvm-talks"><a class="toclink" href="../../2026-11-03-iree-ecosystem-roundup-october-2026/#mips-globalfoundries-and-qualcomm-back-iree-in-llvm-talks">MIPS, GlobalFoundries, and Qualcomm back IREE in LLVM talks</a></h3>
+<p>At the <a href="https://llvm.swoogo.com/2026devmtg">LLVM Developers' Meeting</a>, Roofline
+engineers presented joint work: RISC-V work with MIPS by GlobalFoundries, and
+Hexagon NPU work with Qualcomm.
+<a href="https://www.roofline.ai/news/news-roofline-llvm-developers-meeting-2026">You can see an overview of the LLVM Developers' Meeting speakers</a>
+on the Roofline website, and the presentation recordings will be shared once
+they're available.</p>
+<h3 id="toradex-hipeac-and-pytorch-conference"><a class="toclink" href="../../2026-11-03-iree-ecosystem-roundup-october-2026/#toradex-hipeac-and-pytorch-conference">Toradex, HiPEAC, and PyTorch Conference</a></h3>
+<ul>
+<li>Roofline is now listed in the
+  <a href="https://www.toradex.com/support/partner-network/services/100081/roofline">Toradex partner network</a>,
+  enabling AI workloads on NXP i.MX 95 hardware using IREE. Toradex
+  <a href="https://lnkd.in/p/gETQRgGP">announced the partnership on LinkedIn</a>.</li>
+<li>HiPEAC magazine published
+  <a href="https://www.hipeac.net/files/public/33/7175/hipeacinfo79_web-8HHhWYGG.pdf">an article written by Roofline CEO Dr. Jan Moritz Joseph</a>
+  about how the team brought the latest mixture of experts (MoE) models to
+  hardware using IREE.</li>
+<li>Rod Burns presented the IREE project at PyTorch Conference and met attendees
+  at the
+  <a href="https://www.linkedin.com/feed/update/urn:li:activity:7518696528446922753">LF AI &amp; Data booth</a>.
+  <a href="https://lnkd.in/p/g-T_V2b5">Read the slides and recap</a>.</li>
+</ul>
+<h3 id="iree-312-brings-a-rewritten-vulkan-driver"><a class="toclink" href="../../2026-11-03-iree-ecosystem-roundup-october-2026/#iree-312-brings-a-rewritten-vulkan-driver">IREE 3.12 brings a rewritten Vulkan driver</a></h3>
+<p><a href="https://github.com/iree-org/iree/releases/tag/v3.12.0">IREE 3.12</a> shipped with
+a rewritten Vulkan driver and an experimental hardware abstraction layer (HAL)
+for AMD's Heterogeneous System Architecture (HSA), alongside an updated
+<a href="https://pypi.org/project/iree-base-compiler/">PyPI package</a>. Read
+<a href="https://phoronix.com/news/IREE-3.12-Released">Phoronix's coverage of the release</a>.</p>
+<h3 id="iree-community-meeting"><a class="toclink" href="../../2026-11-03-iree-ecosystem-roundup-october-2026/#iree-community-meeting">IREE community meeting</a></h3>
+<p>Tobias Fuchs talked about the new features in the IREE 3.12 release and
+outlined how the release cycle will work in the future. There was also a
+presentation from Sebastian Fischer from Ludwig-Maximilians-University in
+Munich on their project "anvl", which implements the R language and is
+investigating the use of IREE to compile for different targets. Watch the
+recording <a href="https://www.youtube.com/watch?v=Y82MWrbhe54">on YouTube</a>.</p>
+<h3 id="the-iree-community-built-backends-products-and-tutorials"><a class="toclink" href="../../2026-11-03-iree-ecosystem-roundup-october-2026/#the-iree-community-built-backends-products-and-tutorials">The IREE community built backends, products, and tutorials</a></h3>
+<p>Community work this month ranged from a new POWER backend to automotive and
+chip-design products. A few highlights:</p>
+<ul>
+<li><strong>IBM Research:</strong> <a href="https://drive.google.com/file/d/1q30e2pP7IULbbbbT7g6VPaYR7YPC8dZm/view">library-free ML inference using IREE on POWER</a></li>
+<li><strong>Embecosm:</strong> <a href="https://embecosm.com/2026/09/22/howto-bringing-up-iree-up-on-a-bare-metal-microcontroller-full-series/">bringing up IREE on a bare-metal microcontroller</a></li>
+<li><strong>Silicore AI:</strong> <a href="https://lnkd.in/p/giuVuxjM">developing an IREE-based stack for automotive</a></li>
+<li><strong>Zenedgex:</strong> <a href="https://lnkd.in/p/gvksZ5MU">AI-powered chip-design exploration tools that use IREE</a></li>
+<li><strong>Tobias Grosser, University of Cambridge:</strong> <a href="https://www.youtube.com/watch?v=KEMSeN-rGJY">Quidditch, an end-to-end deep
+  learning compiler for Occamy using IREE and xDSL</a></li>
+<li><strong>Waiz Khan:</strong> <a href="https://www.linkedin.com/pulse/benchmarking-dynamic-moe-execution-iree-when-faster-result-waiz-khan-guusf/">benchmarking dynamic mixture-of-experts (MoE) execution with
+  IREE</a></li>
+<li><strong>Jonathan Song, Ghent University:</strong> <a href="https://lnkd.in/p/gAqGt-Aw">building an LLM compiler for an AI
+  accelerator</a>, <a href="https://lnkd.in/p/ggWmhFSn">plus a follow-up post</a></li>
+<li><strong>Alex Denisov:</strong> <a href="https://lowlevelbits.com/p/beginners-guide-to-mlirs-linalg-dialect">a beginner's guide to MLIR's linalg dialect</a></li>
+</ul>
+<!-- TODO: link each community highlight -->
+
+<p>Building something with IREE? We'd like to hear about it. Share it on the
+<a href="https://discord.gg/wEWh6Z9nMU">IREE Discord server</a> or the
+<a href="https://lists.lfaidata.foundation/g/iree-technical-discussion">iree-technical-discussion email list</a>.</p>
+    
+    
+  </div>
+</article>
       
         <article class="md-post md-post--excerpt">
   <header class="md-post__header">
