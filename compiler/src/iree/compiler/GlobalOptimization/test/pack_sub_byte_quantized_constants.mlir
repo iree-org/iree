@@ -406,8 +406,8 @@ util.func public @decline_zero_size(%scale: f32) -> tensor<4x0xf32> {
 //
 // Each input is packed once, right after its definition, at the widest width
 // its dequantizes need. An input that another op still reads as i8, also
-// through another load of the same global, is not packed, since it would be
-// stored twice.
+// through a reshape or another load of the same global, or that dequantizes
+// read in different shapes, is not packed, since it would be stored twice.
 //===----------------------------------------------------------------------===//
 
 // -----
@@ -479,39 +479,43 @@ util.func public @pack_once_at_widest_width(%scale: tensor<4xf32>) -> (tensor<4x
 #id2 = affine_map<(d0, d1) -> (d0, d1)>
 #row2 = affine_map<(d0, d1) -> (d0)>
 
-// The second dequantize reads the weight with an 8-bit range and keeps reading
-// it as i8. Packing it for the first one would store the weight twice.
+// The second dequantize reads the weight as its zero point, which stays i8.
+// Packing the weight for the first one would store it twice. The second
+// dequantize's own input is packed.
 util.global private @weight = dense<1> : tensor<4x8xi8>
-util.func public @decline_input_read_unpacked(%scale: tensor<4xf32>) -> (tensor<4x8xf32>, tensor<4x8xf32>) {
+util.global private @other_weight = dense<2> : tensor<4x8xi8>
+util.func public @decline_input_read_as_zero_point(%scale: tensor<4xf32>) -> (tensor<4x8xf32>, tensor<4x8xf32>) {
   %weight = util.global.load @weight : tensor<4x8xi8>
+  %other_weight = util.global.load @other_weight : tensor<4x8xi8>
   %init = tensor.empty() : tensor<4x8xf32>
-  %dequantized0 = iree_linalg_ext.dequantize_affine
+  %dequantized = iree_linalg_ext.dequantize_affine
       <indexing_maps = [#id2, #row2, #id2], quant_min = -8, quant_max = 7>
       ins(%weight, %scale : tensor<4x8xi8>, tensor<4xf32>)
       outs(%init : tensor<4x8xf32>) -> tensor<4x8xf32>
-  %dequantized1 = iree_linalg_ext.dequantize_affine
-      <indexing_maps = [#id2, #row2, #id2], quant_min = -128, quant_max = 127>
-      ins(%weight, %scale : tensor<4x8xi8>, tensor<4xf32>)
+  %other = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id2, #row2, #id2, #id2], quant_min = -8, quant_max = 7>
+      ins(%other_weight, %scale, %weight : tensor<4x8xi8>, tensor<4xf32>, tensor<4x8xi8>)
       outs(%init : tensor<4x8xf32>) -> tensor<4x8xf32>
-  util.return %dequantized0, %dequantized1 : tensor<4x8xf32>, tensor<4x8xf32>
+  util.return %dequantized, %other : tensor<4x8xf32>, tensor<4x8xf32>
 }
-// CHECK-LABEL: util.func public @decline_input_read_unpacked(
+// CHECK-LABEL: util.func public @decline_input_read_as_zero_point(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x8xi8>
+//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
 //   CHECK-NOT:   flow.tensor.bitcast
-//       CHECK:   %[[DEQ0:.+]] = iree_linalg_ext.dequantize_affine
-//  CHECK-SAME:     quant_min = -8, quant_max = 7>
+//       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<4x8xi8>, tensor<4xf32>)
-//       CHECK:   %[[DEQ1:.+]] = iree_linalg_ext.dequantize_affine
-//  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<4x8xi8>, tensor<4xf32>)
-//       CHECK:   util.return %[[DEQ0]], %[[DEQ1]]
+//       CHECK:   %[[OTHER:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[NARROW]], %[[SCALE]], %[[WEIGHT]] : tensor<4x8xi4>, tensor<4xf32>, tensor<4x8xi8>)
+//       CHECK:   util.return %[[DEQ]], %[[OTHER]]
 
 // -----
 
 #id2 = affine_map<(d0, d1) -> (d0, d1)>
 #row2 = affine_map<(d0, d1) -> (d0)>
 
-// Both functions dequantize the weight, so both loads are packed.
+// Both functions dequantize the weight in the same shape, so both loads are
+// packed.
 util.global private @weight = dense<1> : tensor<4x8xi8>
 util.func public @pack_global_dequantized_twice(%scale: tensor<4xf32>) -> tensor<4x8xf32> {
   %weight = util.global.load @weight : tensor<4x8xi8>
@@ -548,11 +552,13 @@ util.func public @dequantize_weight_again(%scale: tensor<4xf32>) -> tensor<4x8xf
 
 #id2 = affine_map<(d0, d1) -> (d0, d1)>
 #row2 = affine_map<(d0, d1) -> (d0)>
+#id3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#row3 = affine_map<(d0, d1, d2) -> (d0)>
 
-// Another function loads the weight and returns it as i8. Packing it for the
-// dequantize would store the weight twice.
+// The second function dequantizes the weight through a reshape. Packing it in
+// both shapes would store it twice.
 util.global private @weight = dense<1> : tensor<4x8xi8>
-util.func public @decline_global_read_unpacked(%scale: tensor<4xf32>) -> tensor<4x8xf32> {
+util.func public @decline_global_read_in_two_shapes(%scale: tensor<4xf32>) -> tensor<4x8xf32> {
   %weight = util.global.load @weight : tensor<4x8xi8>
   %init = tensor.empty() : tensor<4x8xf32>
   %dequantized = iree_linalg_ext.dequantize_affine
@@ -561,17 +567,64 @@ util.func public @decline_global_read_unpacked(%scale: tensor<4xf32>) -> tensor<
       outs(%init : tensor<4x8xf32>) -> tensor<4x8xf32>
   util.return %dequantized : tensor<4x8xf32>
 }
-util.func public @read_weight() -> tensor<4x8xi8> {
+util.func public @dequantize_reshaped_weight(%scale: tensor<4xf32>) -> tensor<4x2x4xf32> {
   %weight = util.global.load @weight : tensor<4x8xi8>
-  util.return %weight : tensor<4x8xi8>
+  %expanded = tensor.expand_shape %weight [[0], [1, 2]] output_shape [4, 2, 4]
+      : tensor<4x8xi8> into tensor<4x2x4xi8>
+  %init = tensor.empty() : tensor<4x2x4xf32>
+  %dequantized = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id3, #row3, #id3], quant_min = -8, quant_max = 7>
+      ins(%expanded, %scale : tensor<4x2x4xi8>, tensor<4xf32>)
+      outs(%init : tensor<4x2x4xf32>) -> tensor<4x2x4xf32>
+  util.return %dequantized : tensor<4x2x4xf32>
 }
-// CHECK-LABEL: util.func public @decline_global_read_unpacked(
+// CHECK-LABEL: util.func public @decline_global_read_in_two_shapes(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x8xi8>
 //   CHECK-NOT:   flow.tensor.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
-//  CHECK-SAME:     quant_min = -8, quant_max = 7>
 //  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<4x8xi8>, tensor<4xf32>)
+//       CHECK:   util.return %[[DEQ]]
+// CHECK-LABEL: util.func public @dequantize_reshaped_weight(
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape
+//   CHECK-NOT:   flow.tensor.bitcast
+//       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[EXPANDED]], %[[SCALE]] : tensor<4x2x4xi8>, tensor<4xf32>)
+//       CHECK:   util.return %[[DEQ]]
+
+// -----
+
+#id2 = affine_map<(d0, d1) -> (d0, d1)>
+#row2 = affine_map<(d0, d1) -> (d0)>
+
+// Another function loads the weight and returns it as i8, while the dequantize
+// reads it through a reshape. Packing it for the dequantize would store the
+// weight twice.
+util.global private @weight = dense<1> : tensor<4x2x4xi8>
+util.func public @decline_global_read_unpacked(%scale: tensor<4xf32>) -> tensor<4x8xf32> {
+  %weight = util.global.load @weight : tensor<4x2x4xi8>
+  %collapsed = tensor.collapse_shape %weight [[0], [1, 2]]
+      : tensor<4x2x4xi8> into tensor<4x8xi8>
+  %init = tensor.empty() : tensor<4x8xf32>
+  %dequantized = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id2, #row2, #id2], quant_min = -8, quant_max = 7>
+      ins(%collapsed, %scale : tensor<4x8xi8>, tensor<4xf32>)
+      outs(%init : tensor<4x8xf32>) -> tensor<4x8xf32>
+  util.return %dequantized : tensor<4x8xf32>
+}
+util.func public @read_weight() -> tensor<4x2x4xi8> {
+  %weight = util.global.load @weight : tensor<4x2x4xi8>
+  util.return %weight : tensor<4x2x4xi8>
+}
+// CHECK-LABEL: util.func public @decline_global_read_unpacked(
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
+//       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x2x4xi8>
+//       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[WEIGHT]]
+//   CHECK-NOT:   flow.tensor.bitcast
+//       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     quant_min = -8, quant_max = 7>
+//  CHECK-SAME:     ins(%[[COLLAPSED]], %[[SCALE]] : tensor<4x8xi8>, tensor<4xf32>)
 //       CHECK:   util.return %[[DEQ]]
 
 //===----------------------------------------------------------------------===//
@@ -580,7 +633,9 @@ util.func public @read_weight() -> tensor<4x8xi8> {
 // Only constant expressions of inline constants or immutable globals with
 // inline data are packed, so that constant evaluation folds the packing. A
 // runtime value would be packed on every call, and a parameter at every load
-// while its archive keeps the unpacked bytes.
+// while its archive keeps the unpacked bytes. Hoisting rejects an expression
+// that grows too much, so the packing must not take more bytes than the data
+// it is computed from.
 //===----------------------------------------------------------------------===//
 
 // -----
@@ -603,6 +658,79 @@ util.func public @decline_runtime_value(%input: tensor<4x8xi8>, %scale: tensor<4
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = -8, quant_max = 7>
 //  CHECK-SAME:     ins(%[[INPUT]], %[[SCALE]] : tensor<4x8xi8>, tensor<4xf32>)
+//       CHECK:   util.return %[[DEQ]]
+
+// -----
+
+#id2 = affine_map<(d0, d1) -> (d0, d1)>
+#row2 = affine_map<(d0, d1) -> (d0)>
+#id3 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#byte3 = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+// MatMulNBits stores two 4-bit values per byte, and its lowering unpacks them
+// into i8. Packing them again takes exactly the bytes of the stored data.
+util.global private @packed_weight = dense<33> : tensor<4x4xi8>
+util.func public @pack_unpacked_nibbles(%scale: tensor<4xf32>) -> tensor<4x8xf32> {
+  %packed_weight = util.global.load @packed_weight : tensor<4x4xi8>
+  %empty = tensor.empty() : tensor<4x4x2xi8>
+  %nibbles = linalg.generic
+      {indexing_maps = [#byte3, #id3],
+       iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%packed_weight : tensor<4x4xi8>) outs(%empty : tensor<4x4x2xi8>) {
+  ^bb0(%byte: i8, %out: i8):
+    %c4 = arith.constant 4 : i8
+    %c15 = arith.constant 15 : i8
+    %lane = linalg.index 2 : index
+    %lane_i8 = arith.index_cast %lane : index to i8
+    %shift = arith.muli %lane_i8, %c4 : i8
+    %shifted = arith.shrui %byte, %shift : i8
+    %nibble = arith.andi %shifted, %c15 : i8
+    linalg.yield %nibble : i8
+  } -> tensor<4x4x2xi8>
+  %weight = tensor.collapse_shape %nibbles [[0], [1, 2]]
+      : tensor<4x4x2xi8> into tensor<4x8xi8>
+  %init = tensor.empty() : tensor<4x8xf32>
+  %dequantized = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id2, #row2, #id2], quant_min = 0, quant_max = 15,
+       input_unsigned>
+      ins(%weight, %scale : tensor<4x8xi8>, tensor<4xf32>)
+      outs(%init : tensor<4x8xf32>) -> tensor<4x8xf32>
+  util.return %dequantized : tensor<4x8xf32>
+}
+// CHECK-LABEL: util.func public @pack_unpacked_nibbles(
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
+//       CHECK:   %[[WEIGHT:.+]] = tensor.collapse_shape
+//       CHECK:   tensor.extract_slice %[[WEIGHT]]
+//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
+//       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[NARROW]], %[[SCALE]] : tensor<4x8xi4>, tensor<4xf32>)
+//       CHECK:   util.return %[[DEQ]]
+
+// -----
+
+#id2 = affine_map<(d0, d1) -> (d0, d1)>
+#scalar2 = affine_map<(d0, d1) -> ()>
+
+// The broadcast of two bytes packs into eight, which hoisting may leave in the
+// program to run on every call.
+util.func public @decline_packing_larger_than_data(%scale: f32) -> tensor<2x8xf32> {
+  %values = arith.constant dense<[1, -1]> : tensor<2xi8>
+  %empty = tensor.empty() : tensor<2x8xi8>
+  %broadcast = linalg.broadcast ins(%values : tensor<2xi8>)
+      outs(%empty : tensor<2x8xi8>) dimensions = [1]
+  %init = tensor.empty() : tensor<2x8xf32>
+  %dequantized = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id2, #scalar2, #id2], quant_min = -8, quant_max = 7>
+      ins(%broadcast, %scale : tensor<2x8xi8>, f32)
+      outs(%init : tensor<2x8xf32>) -> tensor<2x8xf32>
+  util.return %dequantized : tensor<2x8xf32>
+}
+// CHECK-LABEL: util.func public @decline_packing_larger_than_data(
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: f32
+//       CHECK:   %[[BROADCAST:.+]] = linalg.broadcast
+//   CHECK-NOT:   flow.tensor.bitcast
+//       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[BROADCAST]], %[[SCALE]] : tensor<2x8xi8>, f32)
 //       CHECK:   util.return %[[DEQ]]
 
 // -----
