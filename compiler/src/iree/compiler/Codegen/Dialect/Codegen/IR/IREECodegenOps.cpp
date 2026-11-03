@@ -441,7 +441,8 @@ void InnerTiledOp::getIterationBounds(
   iterationBounds.append(inverseMap.compose(combinedOuterShapes));
 }
 
-std::optional<SmallVector<int64_t, 4>> InnerTiledOp::getShapeForUnroll() {
+std::optional<SmallVector<int64_t, 4>>
+InnerTiledOp::getIterationShapeToUnroll() {
   SmallVector<int64_t, 4> shape;
   getIterationBounds(shape);
   return shape;

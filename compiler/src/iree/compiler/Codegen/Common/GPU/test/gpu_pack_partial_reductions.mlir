@@ -110,8 +110,10 @@ func.func @pack_with_linalg_index(%a: tensor<4x128xf32>) -> tensor<4xi32> {
   return %result : tensor<4xi32>
 }
 
+// CHECK: #[[$INDEX_MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 4 + s1)>
 // CHECK-LABEL: func.func @pack_with_linalg_index
 // CHECK:         linalg.generic
 //       CHECK:     %[[OUTER:.+]] = linalg.index 1 : index
 //       CHECK:     %[[INNER:.+]] = linalg.index 2 : index
-//       CHECK:     affine.apply #[[$INDEX_MAP:.+]]()[%[[OUTER]], %[[INNER]]]
+//  CHECK-NEXT:     %[[INDEX:.+]] = affine.apply #[[$INDEX_MAP]]()[%[[OUTER]], %[[INNER]]]
+//  CHECK-NEXT:     %{{.+}} = arith.index_cast %[[INDEX]] : index to i32

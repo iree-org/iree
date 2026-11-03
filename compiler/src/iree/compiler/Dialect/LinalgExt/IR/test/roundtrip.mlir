@@ -2,9 +2,10 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
+  %empty = tensor.empty() : tensor<128xi32>
   %0 = iree_linalg_ext.sort
     dimension(0)
-    outs(%arg0 : tensor<128xi32>) {
+    ins(%arg0 : tensor<128xi32>) outs(%empty : tensor<128xi32>) {
   ^bb0(%arg1: i32, %arg2: i32):
     %1 = arith.cmpi sgt, %arg1, %arg2 : i32
     iree_linalg_ext.yield %1 : i1
@@ -12,16 +13,17 @@ func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
   return %0 : tensor<128xi32>
 }
 // CHECK-LABEL: func.func @sort_tensor(
-// CHECK:         iree_linalg_ext.sort
-// CHECK-SAME:      dimension(0)
-// CHECK-SAME:      outs({{.*}})
+// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<128xi32>
+// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
+// CHECK:           dimension(0)
+// CHECK:           ins(%{{.+}} : tensor<128xi32>) outs(%[[EMPTY]] : tensor<128xi32>)
 // CHECK:           iree_linalg_ext.yield
 
 // -----
 
 func.func @sort_memref(%arg0: memref<128xi32>) {
   iree_linalg_ext.sort dimension(0)
-    outs(%arg0 : memref<128xi32>) {
+    ins(%arg0 : memref<128xi32>) outs(%arg0 : memref<128xi32>) {
   ^bb0(%arg1: i32, %arg2: i32):
     %0 = arith.cmpi sgt, %arg1, %arg2 : i32
     iree_linalg_ext.yield %0 : i1
@@ -39,8 +41,16 @@ func.func @sort_memref(%arg0: memref<128xi32>) {
 func.func @sort_multi_result_tensor(
     %arg0: tensor<?x?xi32>, %arg1: tensor<?x?xf32>)
     -> (tensor<?x?xi32>, tensor<?x?xf32>) {
+  %c0 = arith.constant 0 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?xi32>
+  %c1 = arith.constant 1 : index
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?xi32>
+  %d2 = tensor.dim %arg1, %c0 : tensor<?x?xf32>
+  %d3 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
+  %empty0 = tensor.empty(%d0, %d1) : tensor<?x?xi32>
+  %empty1 = tensor.empty(%d2, %d3) : tensor<?x?xf32>
   %0:2 = iree_linalg_ext.sort dimension(0)
-      outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) {
+      ins(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) outs(%empty0, %empty1 : tensor<?x?xi32>, tensor<?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
         %1 = arith.cmpf ogt, %arg4, %arg5 : f32
         iree_linalg_ext.yield %1 : i1
@@ -50,8 +60,18 @@ func.func @sort_multi_result_tensor(
 // CHECK-LABEL: func.func @sort_multi_result_tensor(
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<?x?xi32>
 //  CHECK-SAME:   %[[ARG1:.+]]: tensor<?x?xf32>
-//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.sort dimension(0)
-//  CHECK-SAME:      outs(%[[ARG0]], %[[ARG1]]
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x?xi32>
+//   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]] : tensor<?x?xi32>
+//   CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG1]], %[[C0]] : tensor<?x?xf32>
+//   CHECK-DAG:   %[[D3:.+]] = tensor.dim %[[ARG1]], %[[C1]] : tensor<?x?xf32>
+//   CHECK-DAG:   %[[EMPTY0:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xi32>
+//   CHECK-DAG:   %[[EMPTY1:.+]] = tensor.empty(%[[D2]], %[[D3]]) : tensor<?x?xf32>
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.sort
+//       CHECK:       dimension(0)
+//       CHECK:       ins(%[[ARG0]], %[[ARG1]] : tensor<?x?xi32>,
+//       CHECK:           tensor<?x?xf32>) outs(%[[EMPTY0]], %[[EMPTY1]] : tensor<?x?xi32>, tensor<?x?xf32>)
 //       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
 
 // -----
@@ -59,7 +79,7 @@ func.func @sort_multi_result_tensor(
 func.func @sort_multi_result_memref(
     %arg0: memref<?x?xi32>, %arg1: memref<?x?xf32>) {
   iree_linalg_ext.sort dimension(0)
-     outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
+     ins(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
        %1 = arith.cmpf ogt, %arg4, %arg5 : f32
        iree_linalg_ext.yield %1 : i1
@@ -3013,3 +3033,68 @@ func.func @dequantize_affine_wider_scale(%input: tensor<128x64xi8>,
 //       CHECK:   iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%{{.+}}, %{{.+}} : tensor<128x64xi8>, tensor<128xf32>)
 //  CHECK-SAME:     outs(%{{.+}} : tensor<128x64xf16>)
+
+// -----
+
+func.func @group_matmul(%input: tensor<?x16xf32>,
+                        %weights: tensor<4x16x32xf32>,
+                        %counts: tensor<4xi32>,
+                        %row_base: index,
+                        %output: tensor<?x32xf32>) -> tensor<?x32xf32> {
+  %result = iree_linalg_ext.group_matmul ins(
+      %input, %weights, %counts, %row_base : tensor<?x16xf32>, tensor<4x16x32xf32>, tensor<4xi32>, index)
+    outs(%output : tensor<?x32xf32>) -> tensor<?x32xf32>
+  return %result : tensor<?x32xf32>
+}
+// CHECK-LABEL: func.func @group_matmul(
+// CHECK-SAME: %[[INPUT:.+]]: tensor<?x16xf32>
+// CHECK-SAME: %[[WEIGHTS:.+]]: tensor<4x16x32xf32>
+// CHECK-SAME: %[[COUNTS:.+]]: tensor<4xi32>
+// CHECK-SAME: %[[ROW_BASE:.+]]: index
+// CHECK-SAME: %[[OUTPUT:.+]]: tensor<?x32xf32>
+// CHECK: %[[RESULT:.+]] = iree_linalg_ext.group_matmul ins(%[[INPUT]], %[[WEIGHTS]], %[[COUNTS]], %[[ROW_BASE]] : tensor<?x16xf32>, tensor<4x16x32xf32>, tensor<4xi32>, index) outs(%[[OUTPUT]] : tensor<?x32xf32>) -> tensor<?x32xf32>
+// CHECK: return %[[RESULT]] : tensor<?x32xf32>
+
+func.func @group_mmt4d(%input: tensor<2x3x4x5xf32>,
+                       %weights: tensor<4x6x3x7x5xf32>,
+                       %offsets: tensor<4xi64>, %row_base: index,
+                       %output: tensor<2x6x4x7xf32>) -> tensor<2x6x4x7xf32> {
+  %row_stride_dim = arith.constant 2 : index
+  %row_stride = tensor.dim %input, %row_stride_dim : tensor<2x3x4x5xf32>
+  %result = iree_linalg_ext.group_mmt4d ins(%input, %weights, %offsets, %row_base, %row_stride : tensor<2x3x4x5xf32>,
+      tensor<4x6x3x7x5xf32>, tensor<4xi64>, index, index)
+    outs(%output : tensor<2x6x4x7xf32>) -> tensor<2x6x4x7xf32>
+  return %result : tensor<2x6x4x7xf32>
+}
+// CHECK-LABEL: func.func @group_mmt4d(
+// CHECK-SAME: %[[INPUT:.+]]: tensor<2x3x4x5xf32>
+// CHECK-SAME: %[[WEIGHTS:.+]]: tensor<4x6x3x7x5xf32>
+// CHECK-SAME: %[[OFFSETS:.+]]: tensor<4xi64>
+// CHECK-SAME: %[[ROW_BASE:.+]]: index
+// CHECK-SAME: %[[OUTPUT:.+]]: tensor<2x6x4x7xf32>
+// CHECK: %[[ROW_STRIDE_DIM:.+]] = arith.constant 2 : index
+// CHECK: %[[ROW_STRIDE:.+]] = tensor.dim %[[INPUT]], %[[ROW_STRIDE_DIM]] : tensor<2x3x4x5xf32>
+// CHECK: %[[RESULT:.+]] = iree_linalg_ext.group_mmt4d ins(%[[INPUT]], %[[WEIGHTS]], %[[OFFSETS]], %[[ROW_BASE]], %[[ROW_STRIDE]] : tensor<2x3x4x5xf32>, tensor<4x6x3x7x5xf32>, tensor<4xi64>, index, index) outs(%[[OUTPUT]] : tensor<2x6x4x7xf32>) -> tensor<2x6x4x7xf32>
+// CHECK: return %[[RESULT]] : tensor<2x6x4x7xf32>
+
+func.func @group_mmt4d_transposed(%input: tensor<2x3x4x5xf32>,
+                                  %weights: tensor<4x6x3x7x5xf32>,
+                                  %offsets: tensor<4xi64>, %row_base: index,
+                                  %output: tensor<6x2x7x4xf32>) -> tensor<6x2x7x4xf32> {
+  %row_stride_dim = arith.constant 2 : index
+  %row_stride = tensor.dim %input, %row_stride_dim : tensor<2x3x4x5xf32>
+  %result = iree_linalg_ext.group_mmt4d <transposed = true> ins(%input, %weights, %offsets, %row_base, %row_stride : tensor<2x3x4x5xf32>,
+      tensor<4x6x3x7x5xf32>, tensor<4xi64>, index, index)
+    outs(%output : tensor<6x2x7x4xf32>) -> tensor<6x2x7x4xf32>
+  return %result : tensor<6x2x7x4xf32>
+}
+// CHECK-LABEL: func.func @group_mmt4d_transposed(
+// CHECK-SAME: %[[INPUT:.+]]: tensor<2x3x4x5xf32>
+// CHECK-SAME: %[[WEIGHTS:.+]]: tensor<4x6x3x7x5xf32>
+// CHECK-SAME: %[[OFFSETS:.+]]: tensor<4xi64>
+// CHECK-SAME: %[[ROW_BASE:.+]]: index
+// CHECK-SAME: %[[OUTPUT:.+]]: tensor<6x2x7x4xf32>
+// CHECK: %[[ROW_STRIDE_DIM:.+]] = arith.constant 2 : index
+// CHECK: %[[ROW_STRIDE:.+]] = tensor.dim %[[INPUT]], %[[ROW_STRIDE_DIM]] : tensor<2x3x4x5xf32>
+// CHECK: %[[RESULT:.+]] = iree_linalg_ext.group_mmt4d <transposed = true> ins(%[[INPUT]], %[[WEIGHTS]], %[[OFFSETS]], %[[ROW_BASE]], %[[ROW_STRIDE]] : tensor<2x3x4x5xf32>, tensor<4x6x3x7x5xf32>, tensor<4xi64>, index, index) outs(%[[OUTPUT]] : tensor<6x2x7x4xf32>) -> tensor<6x2x7x4xf32>
+// CHECK: return %[[RESULT]] : tensor<6x2x7x4xf32>

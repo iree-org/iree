@@ -14,6 +14,7 @@
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_llvmir_translations.h"
 #include "iree/compiler/Tools/init_passes.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/compiler/tool_entry_points_api.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Process.h"
@@ -92,7 +93,8 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   }
 
   // Parse pass names in main to ensure static initialization completed.
-  cl::ParseCommandLineOptions(argc, argv, helpHeader);
+  cl::parseCommandLineOptions(*mlir::iree_compiler::commandLineOptions,
+                              ArrayRef<const char *>(argv, argc), helpHeader);
   MlirOptMainConfig config = MlirOptMainConfig::createFromCLOptions();
 
   // The local binder is meant for overriding session-level options, but for

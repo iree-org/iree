@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/cuda_executable_def_builder.h"
@@ -347,7 +348,7 @@ static void optimizeModule(llvm::Module &module,
 
   fam.registerPass([&] { return targetMachine.getTargetIRAnalysis(); });
 
-  llvm::PipelineTuningOptions pto;
+  llvm::PipelineTuningOptions pto(&module.getContext().getLibraryOptions());
   pto.SLPVectorization = false;
 
   llvm::PassInstrumentationCallbacks pic;
@@ -355,7 +356,8 @@ static void optimizeModule(llvm::Module &module,
   llvm::StandardInstrumentations si(module.getContext(), false);
   si.registerCallbacks(pic, &mam);
 
-  llvm::PassBuilder pb(&targetMachine, pto, std::nullopt, &pic);
+  llvm::PassBuilder pb(module.getContext(), &targetMachine, pto, std::nullopt,
+                       &pic);
   llvm::ModulePassManager mpm;
   StringRef nnvmReflectPassName = "nvvm-reflect";
   if (pb.parsePassPipeline(mpm, nnvmReflectPassName)) {
@@ -536,6 +538,7 @@ public:
       // Perform the translation in a separate context to avoid any
       // multi-threading issues.
       llvm::LLVMContext context;
+      context.getLibraryOptions().assign(*commandLineOptions);
 
       std::unique_ptr<llvm::Module> llvmModule =
           mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
@@ -587,8 +590,10 @@ public:
         if (target == nullptr) {
           return variantOp.emitError() << "cannot initialize target triple";
         }
+        llvm::TargetOptions llvmOptions;
+        llvmOptions.MCOptions.LibraryOptions = &context.getLibraryOptions();
         targetMachine.reset(target->createTargetMachine(
-            triple, targetArch, targetFeatures, {}, {}));
+            triple, targetArch, targetFeatures, llvmOptions, {}));
         if (targetMachine == nullptr) {
           return variantOp.emitError() << "cannot initialize target machine";
         }

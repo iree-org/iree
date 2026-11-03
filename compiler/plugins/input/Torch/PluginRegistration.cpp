@@ -29,6 +29,7 @@ namespace {
 struct TorchOptions {
   bool strictSymbolicShapes = true;
   bool decompose = true;
+  bool allowNonFinites = true;
   bool externalizeTransients = false;
   bool enableShapeRefinement = false;
   bool emitAsyncEntryPoints = true;
@@ -41,6 +42,12 @@ struct TorchOptions {
     binder.opt<bool>("iree-torch-decompose-complex-ops", decompose,
                      llvm::cl::cat(category),
                      llvm::cl::desc("Decompose complex torch operations."));
+    binder.opt<bool>(
+        "iree-torch-allow-non-finites", allowNonFinites,
+        llvm::cl::cat(category),
+        llvm::cl::desc(
+            "Allow non-finite values in Torch lowering initializers. "
+            "When disabled, use the nearest finite values."));
     binder.opt<bool>(
         "iree-torch-externalize-transients", externalizeTransients,
         llvm::cl::cat(category),
@@ -105,6 +112,7 @@ struct TorchSession : PluginSession<TorchSession, TorchOptions,
       // ONNX input is a pre-processing step to torch.
       mlir::torch::Torch::TorchLoweringPipelineOptions torchOnnxPipelineOptions;
       torchOnnxPipelineOptions.decompose = options.decompose;
+      torchOnnxPipelineOptions.allowNonFinites = options.allowNonFinites;
       torchOnnxPipelineOptions.backendLegalOps =
           TorchInput::BackendLegalOps::get();
       mlir::torch::Torch::createTorchOnnxToTorchBackendPipeline(
@@ -115,6 +123,7 @@ struct TorchSession : PluginSession<TorchSession, TorchOptions,
       TorchInput::TorchToIREELoweringPipelineOptions torchOptions;
       torchOptions.strictSymbolicShapes = options.strictSymbolicShapes;
       torchOptions.decompose = options.decompose;
+      torchOptions.allowNonFinites = options.allowNonFinites;
       torchOptions.externalizeTransients = options.externalizeTransients;
       torchOptions.enableShapeRefinement = options.enableShapeRefinement;
       torchOptions.emitAsyncEntryPoints = options.emitAsyncEntryPoints;

@@ -4,9 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# AMDGPU device library bitcode files (ocml, ockl, opencl) fetched from
-# https://github.com/shark-infra/amdgpu-device-libs. These are linked into
-# ROCM/HIP executables by iree-compile at hal-executable compilation time.
+# AMDGPU device library bitcode files fetched from the official ROCm package
+# pinned in rocm_package.json. These are linked into ROCM/HIP executables by
+# iree-compile at hal-executable compilation time.
 #
 # Bundled as an iree_directory (TreeArtifact) because iree-compile expects
 # --iree-rocm-bc-dir to point at a directory, not individual files.
@@ -17,5 +17,8 @@ package(default_visibility = ["//visibility:public"])
 
 iree_directory(
     name = "bitcode",
-    srcs = glob(["*.bc"]),
+    srcs = [
+        "ockl.bc",
+        "ocml.bc",
+    ],
 )

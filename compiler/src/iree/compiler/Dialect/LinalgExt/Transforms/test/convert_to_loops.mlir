@@ -2,7 +2,7 @@
 
 func.func @sort_1d(%arg0: memref<128xi32>) {
   iree_linalg_ext.sort dimension(0)
-    outs(%arg0 : memref<128xi32>) {
+    ins(%arg0 : memref<128xi32>) outs(%arg0 : memref<128xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):
     %0 = arith.cmpi sgt, %arg2, %arg3 : i32
     iree_linalg_ext.yield %0 : i1
@@ -30,7 +30,7 @@ func.func @sort_1d(%arg0: memref<128xi32>) {
 
 func.func @sort_2d(%arg0: memref<16x32xi32>) {
   iree_linalg_ext.sort dimension(0)
-    outs(%arg0 : memref<16x32xi32>) {
+    ins(%arg0 : memref<16x32xi32>) outs(%arg0 : memref<16x32xi32>) {
   ^bb0(%arg2: i32, %arg3: i32):
     %0 = arith.cmpi sgt, %arg2, %arg3 : i32
     iree_linalg_ext.yield %0 : i1
@@ -61,7 +61,7 @@ func.func @sort_2d(%arg0: memref<16x32xi32>) {
 func.func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
   iree_linalg_ext.sort
     dimension(0)
-    outs(%arg0, %arg1 : memref<128xf32>, memref<128xi32>) {
+    ins(%arg0, %arg1 : memref<128xf32>, memref<128xi32>) outs(%arg0, %arg1 : memref<128xf32>, memref<128xi32>) {
   ^bb0(%arg2: f32, %arg3: f32, %arg4: i32, %arg5: i32):
     %0 = arith.cmpf ogt, %arg2, %arg3 : f32
     iree_linalg_ext.yield %0 : i1

@@ -9,6 +9,7 @@
 #include "compiler/plugins/target/LLVMCPU/ResolveCPUAndCPUFeatures.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -433,6 +434,7 @@ void LLVMTarget::populateDefaultsFromTargetMachine() {
     // If anyone comes across this: it'd be great if getTargetTransformInfo
     // could be called without requiring a function.
     llvm::LLVMContext llvmContext;
+    llvmContext.getLibraryOptions().assign(*commandLineOptions);
     auto llvmModule =
         std::make_unique<llvm::Module>("dummy_module", llvmContext);
     llvmModule->setDataLayout(dataLayout);
@@ -468,11 +470,12 @@ createTargetMachine(const LLVMTarget &target) {
     return nullptr;
   }
   llvm::Triple triple(target.getTriple());
+  auto llvmTargetOptions = target.llvmTargetOptions;
+  llvmTargetOptions.MCOptions.LibraryOptions = &*commandLineOptions;
   std::unique_ptr<llvm::TargetMachine> machine(llvmTarget->createTargetMachine(
       triple, target.getCpu() /* cpu e.g k8 */,
-      target.getCpuFeatures() /* cpu features e.g avx512f */,
-      target.llvmTargetOptions, llvm::Reloc::Model::PIC_, {},
-      target.codeGenOptLevel,
+      target.getCpuFeatures() /* cpu features e.g avx512f */, llvmTargetOptions,
+      llvm::Reloc::Model::PIC_, {}, target.codeGenOptLevel,
       /*JIT=*/false));
   return machine;
 }

@@ -32,6 +32,7 @@
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/EmbeddedDataDirectory.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/amdgpu_executable_def_builder.h"
 #include "iree/schemas/hip_executable_def_builder.h"
@@ -612,25 +613,6 @@ public:
                              llvm::TargetMachine &targetMachine,
                              bool slpVectorization,
                              std::string &outPassesString) {
-    // Workaround for upstream LLVM PR llvm/llvm-project#194924 (commit
-    // b09174b41e7e, "[AMDGPU] Enable runtime loop unrolling") which set
-    //   UP.PartialThreshold = UP.Threshold / 4   (75 for AMDGPU)
-    // in AMDGPUTTIImpl::getUnrollingPreferences, regressing partial unrolling
-    // of small constant-trip-count reduction loops. Restore the prior
-    // un-overridden LLVM default (150) by bumping the cl::opt occurrence
-    // count, which makes LoopUnrollPass apply the override (see
-    // LoopUnrollPass.cpp gatherUnrollingPreferences). Skipped when the user
-    // already set --unroll-partial-threshold so an explicit override still
-    // wins. Safe to remove once the upstream regression is fixed.
-    auto &registeredCLOpts = llvm::cl::getRegisteredOptions();
-    auto unrollOptIt = registeredCLOpts.find("unroll-partial-threshold");
-    if (unrollOptIt != registeredCLOpts.end() &&
-        unrollOptIt->second->getNumOccurrences() == 0) {
-      unrollOptIt->second->addOccurrence(/*pos=*/0,
-                                         /*ArgName=*/"unroll-partial-threshold",
-                                         /*Value=*/"150");
-    }
-
     llvm::LoopAnalysisManager lam;
     llvm::FunctionAnalysisManager fam;
     llvm::CGSCCAnalysisManager cgam;
@@ -638,7 +620,7 @@ public:
 
     fam.registerPass([&] { return targetMachine.getTargetIRAnalysis(); });
 
-    llvm::PipelineTuningOptions pto;
+    llvm::PipelineTuningOptions pto(&module.getContext().getLibraryOptions());
     pto.SLPVectorization = slpVectorization;
 
     llvm::PassInstrumentationCallbacks pic;
@@ -646,7 +628,8 @@ public:
     llvm::StandardInstrumentations si(module.getContext(), false);
     si.registerCallbacks(pic, &mam);
 
-    llvm::PassBuilder pb(&targetMachine, pto, std::nullopt, &pic);
+    llvm::PassBuilder pb(module.getContext(), &targetMachine, pto, std::nullopt,
+                         &pic);
     llvm::ModulePassManager mpm;
     pb.registerModuleAnalyses(mam);
     pb.registerCGSCCAnalyses(cgam);
@@ -794,6 +777,7 @@ public:
       // Perform the translation in a separate context to avoid any
       // multi-threading issues.
       llvm::LLVMContext context;
+      context.getLibraryOptions().assign(*commandLineOptions);
       std::unique_ptr<llvm::Module> llvmModule =
           mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
       if (!llvmModule) {
@@ -834,6 +818,7 @@ public:
           return variantOp.emitError() << "cannot initialize target triple";
         }
         llvm::TargetOptions opt;
+        opt.MCOptions.LibraryOptions = &context.getLibraryOptions();
         // Be extra cautious while this is less tested, and prevent unknown
         // fallbacks from global isel.
         //
@@ -1029,11 +1014,13 @@ public:
           return variantOp.emitError()
                  << "cannot find SPIR-V target: " << spirvError;
         }
+        llvm::TargetOptions spirvOptions;
+        spirvOptions.MCOptions.LibraryOptions = &context.getLibraryOptions();
         auto spirvTM = std::unique_ptr<llvm::TargetMachine>(
-            spirvTarget->createTargetMachine(
-                spirvTriple, /*CPU=*/"", /*Features=*/"", llvm::TargetOptions{},
-                llvm::Reloc::PIC_, std::nullopt,
-                llvm::CodeGenOptLevel::Default));
+            spirvTarget->createTargetMachine(spirvTriple, /*CPU=*/"",
+                                             /*Features=*/"", spirvOptions,
+                                             llvm::Reloc::PIC_, std::nullopt,
+                                             llvm::CodeGenOptLevel::Default));
 
         if (!spirvTM) {
           return variantOp.emitError() << "cannot create SPIR-V target machine";

@@ -232,6 +232,16 @@ else()
     ${_EXPORT_OBJECT_DEPS}
   )
 
+  # The embedded MLIRCAPIGPU objects expose target-specific pass constructors.
+  # Collecting object-library dependencies would not bring in all dependencies
+  # of the owning C API library.
+  target_link_libraries(iree_compiler_API_SharedImpl PRIVATE
+    MLIRGPUNVVMTransforms
+    MLIRGPUROCDLTransforms
+    MLIRGPUSPIRVTransforms
+    MLIRGPUXeVMTransforms
+  )
+
   # Link MLIRTargetLLVMIRImport and MLIRExportSMTLIB directly since they are
   # not exported as object libraries.
   target_link_libraries(iree_compiler_API_SharedImpl PRIVATE

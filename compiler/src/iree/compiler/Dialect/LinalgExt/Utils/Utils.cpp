@@ -15,15 +15,20 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/RegionUtils.h"
 
@@ -1124,11 +1129,7 @@ getIGEMMGenericConvDetails(linalg::LinalgOp linalgOp) {
 // Copied over from implementation of `isaContractionInterfaceImpl` in Linalg
 //===---------------------------------------------------------------------===//
 
-/// If the value is defined by a chain of unary side effect-free, go up the
-/// use-def chain until the first value that isn't defined by such an op.
-// TODO: relax to multi-operands with constants, which are technically unary ops
-// as needed (e.g. add5).
-static Value getSourceSkipUnary(Value value) {
+Value getSourceSkipUnary(Value value) {
   Operation *op = value.getDefiningOp();
   while (op && op->getNumOperands() == 1) {
     auto iface = dyn_cast<MemoryEffectOpInterface>(op);
@@ -1645,6 +1646,62 @@ bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
     return false;
   }
   return llvm::hasSingleElement(linalgOp.getBlock()->getOperations());
+}
+
+/// True when every byte of `data` is zero.
+static bool isAllZeroBytes(ArrayRef<char> data) {
+  return llvm::all_of(data, [](char byte) { return byte == 0; });
+}
+
+bool isKnownZero(Value value) {
+  Attribute constant;
+  if (!matchPattern(value, m_Constant(&constant))) {
+    return false;
+  }
+  if (auto intAttr = dyn_cast<IntegerAttr>(constant)) {
+    return intAttr.getValue().isZero();
+  }
+  // A splat answers from its one stored element rather than scanning a
+  // blockwise operand that has an entry per block.
+  auto elements = dyn_cast<ElementsAttr>(constant);
+  if (elements && elements.isSplat()) {
+    Attribute splat = elements.getSplatValue<Attribute>();
+    return matchPattern(splat, m_Zero()) ||
+           matchPattern(splat, m_PosZeroFloat());
+  }
+  if (auto dense = dyn_cast<DenseElementsAttr>(constant)) {
+    return isAllZeroBytes(dense.getRawData());
+  }
+  if (auto resource = dyn_cast<DenseResourceElementsAttr>(constant)) {
+    const AsmResourceBlob *blob = resource.getRawHandle().getBlob();
+    return blob && isAllZeroBytes(blob->getData());
+  }
+  return false;
+}
+
+Value computeSubAndExp(OpBuilder &builder, Location loc, AffineMap inputMap,
+                       AffineMap outputMap, Value input, Value output,
+                       bool useExp2) {
+  SmallVector<AffineMap> compressedMaps =
+      compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
+  inputMap = compressedMaps[0];
+  outputMap = compressedMaps[1];
+
+  SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
+                                                 utils::IteratorType::parallel);
+  auto genericOp = linalg::GenericOp::create(
+      builder, loc, output.getType(), input, output,
+      SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        // Convert input to the same datatype as output.
+        Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
+                                        /*isUnsignedCast=*/false);
+        Value diff = arith::SubFOp::create(b, loc, args[1], in);
+        Value weight = useExp2 ? math::Exp2Op::create(b, loc, diff).getResult()
+                               : math::ExpOp::create(b, loc, diff).getResult();
+        linalg::YieldOp::create(b, loc, weight);
+      });
+  return genericOp.getResult(0);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
