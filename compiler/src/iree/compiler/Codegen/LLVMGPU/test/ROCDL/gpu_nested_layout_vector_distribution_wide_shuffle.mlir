@@ -210,3 +210,128 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK: vector.scan
 // CHECK-NOT: iree_gpu.subgroup_scan
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1], batch_tile = [2, 2],
+  outer_tile = [1, 1], thread_tile = [16, 4],
+  element_tile = [1, 4], subgroup_strides = [1, 1],
+  thread_strides = [1, 16]>
+
+// CHECK-LABEL: func @maxsi_i64
+// CHECK: [[IDENTITY:%.*]] = arith.constant dense<-9223372036854775808> : vector<2x1x1xi64>
+// CHECK: vector.multi_reduction <maxsi>, {{.*}}, [[IDENTITY]]
+func.func @maxsi_i64(%arg0: vector<32x32xi64>, %arg1: vector<32xi64>) -> vector<32xi64> {
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested) : vector<32x32xi64>
+  %0 = vector.multi_reduction <maxsi>, %arg0l, %arg1 [1] : vector<32x32xi64> to vector<32xi64>
+  return %0 : vector<32xi64>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1], batch_tile = [2, 2],
+  outer_tile = [1, 1], thread_tile = [16, 4],
+  element_tile = [1, 4], subgroup_strides = [1, 1],
+  thread_strides = [1, 16]>
+
+// CHECK-LABEL: func @minsi_i64
+// CHECK: [[IDENTITY:%.*]] = arith.constant dense<9223372036854775807> : vector<2x1x1xi64>
+// CHECK: vector.multi_reduction <minsi>, {{.*}}, [[IDENTITY]]
+func.func @minsi_i64(%arg0: vector<32x32xi64>, %arg1: vector<32xi64>) -> vector<32xi64> {
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested) : vector<32x32xi64>
+  %0 = vector.multi_reduction <minsi>, %arg0l, %arg1 [1] : vector<32x32xi64> to vector<32xi64>
+  return %0 : vector<32xi64>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1], batch_tile = [2, 2],
+  outer_tile = [1, 1], thread_tile = [16, 4],
+  element_tile = [1, 4], subgroup_strides = [1, 1],
+  thread_strides = [1, 16]>
+
+// CHECK-LABEL: func @maxui_i64
+// CHECK: [[IDENTITY:%.*]] = arith.constant dense<0> : vector<2x1x1xi64>
+// CHECK: vector.multi_reduction <maxui>, {{.*}}, [[IDENTITY]]
+func.func @maxui_i64(%arg0: vector<32x32xi64>, %arg1: vector<32xi64>) -> vector<32xi64> {
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested) : vector<32x32xi64>
+  %0 = vector.multi_reduction <maxui>, %arg0l, %arg1 [1] : vector<32x32xi64> to vector<32xi64>
+  return %0 : vector<32xi64>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1], batch_tile = [2, 2],
+  outer_tile = [1, 1], thread_tile = [16, 4],
+  element_tile = [1, 4], subgroup_strides = [1, 1],
+  thread_strides = [1, 16]>
+
+// CHECK-LABEL: func @minui_i64
+// CHECK: [[IDENTITY:%.*]] = arith.constant dense<-1> : vector<2x1x1xi64>
+// CHECK: vector.multi_reduction <minui>, {{.*}}, [[IDENTITY]]
+func.func @minui_i64(%arg0: vector<32x32xi64>, %arg1: vector<32xi64>) -> vector<32xi64> {
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested) : vector<32x32xi64>
+  %0 = vector.multi_reduction <minui>, %arg0l, %arg1 [1] : vector<32x32xi64> to vector<32xi64>
+  return %0 : vector<32xi64>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroup_tile = [1, 1], batch_tile = [2, 2],
+  outer_tile = [1, 1], thread_tile = [16, 4],
+  element_tile = [1, 4], subgroup_strides = [1, 1],
+  thread_strides = [1, 16]>
+
+// CHECK-LABEL: func @and_i64
+// CHECK: [[IDENTITY:%.*]] = arith.constant dense<-1> : vector<2x1x1xi64>
+// CHECK: vector.multi_reduction <and>, {{.*}}, [[IDENTITY]]
+func.func @and_i64(%arg0: vector<32x32xi64>, %arg1: vector<32xi64>) -> vector<32xi64> {
+  %arg0l = iree_vector_ext.to_layout %arg0 to layout(#nested) : vector<32x32xi64>
+  %0 = vector.multi_reduction <and>, %arg0l, %arg1 [1] : vector<32x32xi64> to vector<32xi64>
+  return %0 : vector<32xi64>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %func : !transform.any_op
+    transform.yield
+  }
+}
