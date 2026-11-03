@@ -1,20 +1,25 @@
 // RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-conversion --cse --iree-hal-indirect-command-buffers=true --verify-diagnostics %s | FileCheck %s
 
-// Today all memory control operations are ignored and we're just left with
-// the normal sequential execution barriers.
+// Flush and invalidate lower to HAL command buffer operations with sequential
+// execution barriers; discard is ignored.
 
 util.global private @device : !hal.device
 
 // CHECK-LABEL: @cmdMemoryControl
+// CHECK-SAME: (%[[TARGET:.+]]: !hal.buffer, %{{.+}}: index)
 util.func public @cmdMemoryControl(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
   %0 = stream.cmd.execute on(#hal.device.affinity<@device>) with(%arg0 as %arg2: !stream.resource<transient>{%arg1}) {
-    // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
+    // CHECK-NEXT: hal.command_buffer.flush_buffer<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: target(%[[TARGET]] : !hal.buffer)[%c0, %c128]
     stream.cmd.flush %arg2[%c0 for %c128] : !stream.resource<transient>{%arg1}
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
+    // CHECK-NEXT: hal.command_buffer.invalidate_buffer<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: target(%[[TARGET]] : !hal.buffer)[%c0, %c128]
     stream.cmd.invalidate %arg2[%c0 for %c128] : !stream.resource<transient>{%arg1}
+    // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
     stream.cmd.discard %arg2[%c0 for %c128] : !stream.resource<transient>{%arg1}
   } => !stream.timepoint
