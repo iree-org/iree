@@ -127,8 +127,7 @@ struct DropUnitDimsFromCollapseOfExpand
         expandOp.getStaticOutputShape(), expandOp.getOutputShape(), rewriter);
     for (auto [idx, ofr] : llvm::enumerate(origInterSizes)) {
       if (!toDrop.contains(idx)) {
-        std::optional<int64_t> staticDim = getConstantIntValue(ofr);
-        newInterShape.push_back(staticDim.value_or(ShapedType::kDynamic));
+        newInterShape.push_back(interShape[idx]);
         newInterSizes.push_back(ofr);
       }
     }
