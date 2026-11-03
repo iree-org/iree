@@ -479,8 +479,35 @@ func.func @integral_float_zero_point(
 
 // -----
 
-// torchao zero points can also be integral floats, bounded by the storage dtype
-// when the bounds are None.
+// A splat f16 zero point, narrower than the f32 scales, becomes a splat i32
+// constant.
+// CHECK-LABEL: func.func @splat_integral_float_zero_point(
+// CHECK: %[[ZERO_POINTS:.+]] = arith.constant dense<8> : tensor<4x2xi32>
+// CHECK: iree_linalg_ext.dequantize_affine
+// CHECK-SAME: ins(%{{.+}}, %{{.+}}, %[[ZERO_POINTS]] :
+func.func @splat_integral_float_zero_point(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
+  %zero_points = torch.vtensor.literal(dense<8.000000e+00> : tensor<4x2xf16>)
+      : !torch.vtensor<[4,2],f16>
+  %minimum = torch.constant.int 0
+  %maximum = torch.constant.int 15
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %out_dtype = torch.constant.int 6
+  %result = torch.quantized_decomposed.dequantize_per_channel_group
+      %input, %scales, %zero_points, %minimum, %maximum, %dtype, %group_size,
+      %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>,
+        !torch.vtensor<[4,2],f16>, !torch.int, !torch.int, !torch.int,
+        !torch.int, !torch.int -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
+
+// -----
+
+// torchao zero points can also be integral floats, such as bf16 ones on a
+// quantize op.
 // CHECK-LABEL: func.func @torchao_integral_float_zero_point(
 // CHECK: %[[ZERO_POINT:.+]] = arith.constant
 // CHECK-SAME: dense<{{\[}}[-128, 127], [0, 3], [-1, 1], [64, -64]]>
@@ -614,6 +641,58 @@ func.func @fractional_float_zero_point(
       %out_dtype
       : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>,
         !torch.vtensor<[4,2],f32>, !torch.int, !torch.int, !torch.int,
+        !torch.int, !torch.int -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
+
+// -----
+
+// Constant zero points within the bounds convert. ui8 values are read as
+// unsigned, so 255 lies within [0, 255].
+// CHECK-LABEL: func.func @constant_unsigned_zero_point(
+// CHECK: iree_linalg_ext.dequantize_affine
+func.func @constant_unsigned_zero_point(
+    %input: !torch.vtensor<[4,8],ui8>,
+    %scales: !torch.vtensor<[4],f32>) -> !torch.vtensor<[4,8],f32> {
+  %zero_points = torch.vtensor.literal(dense<[0, 128, 255, 7]> : tensor<4xui8>)
+      : !torch.vtensor<[4],ui8>
+  %axis = torch.constant.int 0
+  %minimum = torch.constant.int 0
+  %maximum = torch.constant.int 255
+  %dtype = torch.constant.int 0
+  %none = torch.constant.none
+  %out_dtype = torch.derefine %none : !torch.none to !torch.optional<int>
+  %result = torch.quantized_decomposed.dequantize_per_channel
+      %input, %scales, %zero_points, %axis, %minimum, %maximum, %dtype,
+      %out_dtype
+      : !torch.vtensor<[4,8],ui8>, !torch.vtensor<[4],f32>,
+        !torch.vtensor<[4],ui8>, !torch.int, !torch.int, !torch.int, !torch.int,
+        !torch.optional<int> -> !torch.vtensor<[4,8],f32>
+  return %result : !torch.vtensor<[4,8],f32>
+}
+
+// -----
+
+// LinalgExt narrows zero points to the storage type, so constant ones outside
+// the bounds are left for the Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @out_of_bounds_integer_zero_point(
+// CHECK: torch.quantized_decomposed.dequantize_per_channel_group
+// CHECK-NOT: iree_linalg_ext.dequantize_affine
+func.func @out_of_bounds_integer_zero_point(
+    %input: !torch.vtensor<[4,8],si8>,
+    %scales: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
+  %zero_points = torch.vtensor.literal(dense<[[1, 8], [300, 0], [2, 3], [4, 5]]>
+      : tensor<4x2xsi32>) : !torch.vtensor<[4,2],si32>
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %dtype = torch.constant.int 1
+  %group_size = torch.constant.int 4
+  %out_dtype = torch.constant.int 6
+  %result = torch.quantized_decomposed.dequantize_per_channel_group
+      %input, %scales, %zero_points, %minimum, %maximum, %dtype, %group_size,
+      %out_dtype
+      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>,
+        !torch.vtensor<[4,2],si32>, !torch.int, !torch.int, !torch.int,
         !torch.int, !torch.int -> !torch.vtensor<[4,8],f32>
   return %result : !torch.vtensor<[4,8],f32>
 }

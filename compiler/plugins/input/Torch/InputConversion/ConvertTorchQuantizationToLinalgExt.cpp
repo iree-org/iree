@@ -9,7 +9,9 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/Sequence.h"
+#include "llvm/ADT/bit.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -47,10 +49,11 @@ struct PT2EQuantization {
   // with one value per block.
   Value scale;
   // Builtin zero point: an i64 scalar or an integer tensor shaped like the
-  // scale; null for symmetric quantization.
+  // scale; null for symmetric quantization and for an integral float zero
+  // point.
   Value zeroPoint;
-  // i32 values of an integral float zero point, which becomes `zeroPoint` once
-  // the op is known to convert.
+  // i32 values of an integral float zero point. Once the op is known to
+  // convert, a constant of them takes the place of `zeroPoint`.
   DenseElementsAttr integralZeroPoint;
   // Whether the zero-point elements are unsigned. Read from the Torch type
   // because builtin integer types are signless.
@@ -211,16 +214,20 @@ static double readFloat(FloatType type, ArrayRef<char> data, int64_t index) {
   assert((type.isF16() || type.isBF16()) && "expected a 16-bit float type");
   uint16_t bits;
   std::memcpy(&bits, element, sizeof(bits));
+  // A bf16 value is the upper half of an f32 one.
+  if (type.isBF16()) {
+    return llvm::bit_cast<float>(static_cast<uint32_t>(bits) << 16U);
+  }
   return APFloat(type.getFloatSemantics(), APInt(16, bits)).convertToDouble();
 }
 
-// Sets `integralZeroPoint` to the values of a constant float zero point that
-// holds integers within the bounds. Other float zero points prevent conversion.
-// Requires the scale and bounds of `quantization` to be set.
-static LogicalResult
-matchIntegralFloatZeroPoint(Operation *op, Value torchZeroPoint,
-                            PT2EQuantization &quantization,
-                            ConversionPatternRewriter &rewriter) {
+// Returns the i32 values of a constant float zero point that holds integers
+// within the bounds, and fails for other float zero points. Requires the scale
+// and bounds of `quantization` to be set.
+static FailureOr<DenseElementsAttr>
+readIntegralFloatZeroPoint(Operation *op, Value torchZeroPoint,
+                           const PT2EQuantization &quantization,
+                           ConversionPatternRewriter &rewriter) {
   ElementsAttr zeroPointAttr;
   if (!matchPattern(torchZeroPoint, m_Constant(&zeroPointAttr))) {
     return rewriter.notifyMatchFailure(
@@ -262,16 +269,33 @@ matchIntegralFloatZeroPoint(Operation *op, Value torchZeroPoint,
     }
     values.push_back(static_cast<int32_t>(value));
   }
-  quantization.integralZeroPoint = DenseElementsAttr::get(
+  return DenseElementsAttr::get(
       zeroPointAttr.getShapedType().clone(rewriter.getI32Type()),
       ArrayRef(values));
-  return success();
+}
+
+// Returns whether a dense integer zero point holds a value outside the bounds
+// of `quantization`, reading its values as unsigned if `isUnsigned`.
+static bool hasOutOfBoundsZeroPoint(Value torchZeroPoint, bool isUnsigned,
+                                    const PT2EQuantization &quantization) {
+  DenseIntElementsAttr zeroPointAttr;
+  if (!matchPattern(torchZeroPoint, m_Constant(&zeroPointAttr))) {
+    return false;
+  }
+  APSInt lowerBound = APSInt::get(quantization.quantMin);
+  APSInt upperBound = APSInt::get(quantization.quantMax);
+  return llvm::any_of(zeroPointAttr.getValues<APInt>(), [&](const APInt &bits) {
+    APSInt value(bits, isUnsigned);
+    return APSInt::compareValues(value, lowerBound) < 0 ||
+           APSInt::compareValues(value, upperBound) > 0;
+  });
 }
 
 // Sets the zero point of `quantization` from `torchZeroPoint` and its converted
 // value `zeroPoint`. A None zero point and a float one known to be zero leave
 // it unset, which denotes symmetric quantization. Other float zero points
 // convert only if they hold integers, which are kept in `integralZeroPoint`.
+// Float zero points and dense integer zero points must lie within the bounds.
 // Requires the scale and bounds of `quantization` to be set.
 static LogicalResult matchZeroPoint(Operation *op, Value torchZeroPoint,
                                     Value zeroPoint,
@@ -284,12 +308,22 @@ static LogicalResult matchZeroPoint(Operation *op, Value torchZeroPoint,
     if (IREE::LinalgExt::isKnownZero(torchZeroPoint)) {
       return success();
     }
-    return matchIntegralFloatZeroPoint(op, torchZeroPoint, quantization,
-                                       rewriter);
+    FailureOr<DenseElementsAttr> integralZeroPoint =
+        readIntegralFloatZeroPoint(op, torchZeroPoint, quantization, rewriter);
+    if (failed(integralZeroPoint)) {
+      return failure();
+    }
+    quantization.integralZeroPoint = *integralZeroPoint;
+    return success();
+  }
+  bool zeroPointUnsigned = isUnsignedZeroPoint(torchZeroPoint.getType());
+  if (hasOutOfBoundsZeroPoint(torchZeroPoint, zeroPointUnsigned,
+                              quantization)) {
+    return rewriter.notifyMatchFailure(
+        op, "expected constant zero points within the bounds");
   }
   quantization.zeroPoint = zeroPoint;
-  quantization.zeroPointUnsigned =
-      isUnsignedZeroPoint(torchZeroPoint.getType());
+  quantization.zeroPointUnsigned = zeroPointUnsigned;
   return success();
 }
 
