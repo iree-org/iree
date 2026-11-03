@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_H_
 #define IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_H_
 
+#include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
@@ -15,6 +16,26 @@
 #include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
+
+// Decides which resources used by reusable command buffers are referenced
+// through the binding table instead of being recorded as direct references.
+// Dynamic resources always are; constants and immutable globals only when
+// --iree-hal-indirect-constant-bindings is set or a device the op may run on
+// sets `indirect_constant_bindings = true` in its configuration.
+// Device lookups are cached per affinity.
+class IndirectBindingPolicy {
+public:
+  // Returns true if |resource| used from |op| should be referenced indirectly
+  // through the binding table.
+  bool isIndirectResource(Value resource, Operation *op);
+
+private:
+  // Returns true if constant resources used by |op| should be referenced
+  // indirectly.
+  bool shouldBindConstantsIndirectly(Operation *op);
+
+  DenseMap<Attribute, bool> affinityResults;
+};
 
 struct PipelineLayoutBinding {
   // Ordinal of the descriptor within its parent set layout.

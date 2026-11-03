@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/Conversion/StreamToHAL/Utils.h"
-#include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 
@@ -245,9 +244,11 @@ deriveRequiredResourceBufferBits(Location loc, IREE::HAL::Lifetime lifetime,
   return success();
 }
 
-BindingTable::BindingTable(IREE::Stream::CmdExecuteOp executeOp,
-                           ValueRange bufferValues, ValueRange bufferSizes,
-                           IndexSet &indexSet) {
+BindingTable::BindingTable(
+    IREE::Stream::CmdExecuteOp executeOp, ValueRange bufferValues,
+    ValueRange bufferSizes,
+    IREE::HAL::IndirectBindingPolicy &indirectBindingPolicy,
+    IndexSet &indexSet) {
   auto resourceValues = executeOp.getResourceOperands();
   auto capturedValues = executeOp.getBody().getArguments();
 
@@ -255,30 +256,22 @@ BindingTable::BindingTable(IREE::Stream::CmdExecuteOp executeOp,
   for (auto [resourceValue, capturedValue, bufferValue, bufferSize] :
        llvm::zip_equal(resourceValues, capturedValues, bufferValues,
                        bufferSizes)) {
-    switch (IREE::HAL::categorizeValue(resourceValue)) {
-    default:
-    case IREE::HAL::ValueOrigin::Unknown:
-    case IREE::HAL::ValueOrigin::MutableGlobal: {
-      // Indirect reference. Add to the table unless it already exists.
-      Value slot = indexSet.get(indirectBuffers.size());
-      if (indirectSlots.try_emplace(capturedValue, slot).second) {
-        // TODO(benvanik): subset the range bound by the min/max used within the
-        // consumer region. This would require emitting ops that track that
-        // information (probably via util.range.min/max). For now we bind the
-        // entire buffer range and let the individual commands subrange them.
-        IREE::HAL::BindingValue bindingValue;
-        bindingValue.buffer = bufferValue;
-        bindingValue.byteOffset = indexSet.get(0);
-        bindingValue.byteLength = bufferSize;
-        indirectBuffers.push_back(bindingValue);
-      }
-      break;
-    }
-    case IREE::HAL::ValueOrigin::LocalConstant:
-    case IREE::HAL::ValueOrigin::ImmutableGlobal: {
+    if (!indirectBindingPolicy.isIndirectResource(resourceValue, executeOp)) {
       // Direct reference; not in the table.
-      break;
+      continue;
     }
+    // Indirect reference. Add to the table unless it already exists.
+    Value slot = indexSet.get(indirectBuffers.size());
+    if (indirectSlots.try_emplace(capturedValue, slot).second) {
+      // TODO(benvanik): subset the range bound by the min/max used within the
+      // consumer region. This would require emitting ops that track that
+      // information (probably via util.range.min/max). For now we bind the
+      // entire buffer range and let the individual commands subrange them.
+      IREE::HAL::BindingValue bindingValue;
+      bindingValue.buffer = bufferValue;
+      bindingValue.byteOffset = indexSet.get(0);
+      bindingValue.byteLength = bufferSize;
+      indirectBuffers.push_back(bindingValue);
     }
   }
 }

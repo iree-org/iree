@@ -7,15 +7,71 @@
 #include "iree/compiler/Dialect/HAL/Analysis/BindingLayout.h"
 
 #include "iree/compiler/Dialect/HAL/Analysis/Captures.h"
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/SymbolTable.h"
 
 #define DEBUG_TYPE "iree-hal-binding-layout-analysis"
 
 namespace mlir::iree_compiler::IREE::HAL {
+
+static llvm::cl::opt<bool> clIndirectConstantBindings{
+    "iree-hal-indirect-constant-bindings",
+    llvm::cl::desc("Reference constant buffers through the binding table of "
+                   "reusable command buffers so they dont need to stay mapped "
+                   "between executions."),
+    llvm::cl::init(false),
+};
+
+bool IndirectBindingPolicy::shouldBindConstantsIndirectly(Operation *op) {
+  if (clIndirectConstantBindings) {
+    return true;
+  }
+  // cache lookup
+  auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(op);
+  auto it = affinityResults.find(affinityAttr);
+  if (it != affinityResults.end()) {
+    return it->second;
+  }
+  // cache miss: read from resolveDeviceAffinityTargets
+  // Symbol tables are only used for this resolution and not retained as the IR
+  // may change (e.g. during conversion) while the policy is alive.
+  SymbolTableCollection symbolTables;
+  SetVector<IREE::HAL::DeviceTargetAttr> targetAttrs;
+  resolveDeviceAffinityTargets(affinityAttr, op, symbolTables, targetAttrs);
+  bool result =
+      llvm::any_of(targetAttrs, [](IREE::HAL::DeviceTargetAttr targetAttr) {
+        auto configAttr = targetAttr.getConfiguration();
+        auto valueAttr =
+            configAttr
+                ? configAttr.getAs<BoolAttr>("indirect_constant_bindings")
+                : BoolAttr{};
+        return valueAttr && valueAttr.getValue();
+      });
+  affinityResults[affinityAttr] = result;
+  return result;
+}
+
+bool IndirectBindingPolicy::isIndirectResource(Value resource, Operation *op) {
+  // TODO: exports with explicit layouts (custom/external executables) lack
+  // DescriptorFlags::Indirect, so their dispatches still bind constants
+  // directly even though the constants get binding table slots.
+  switch (categorizeValue(resource)) {
+  default:
+  case ValueOrigin::Unknown:
+  case ValueOrigin::MutableGlobal:
+    return true;
+  case ValueOrigin::LocalConstant:
+  case ValueOrigin::ImmutableGlobal:
+    return shouldBindConstantsIndirectly(op);
+  }
+}
 
 void PipelineLayout::print(llvm::raw_ostream &os) const {
   os << "PipelineLayout:\n";
@@ -56,7 +112,8 @@ assumeExportLayout(IREE::HAL::PipelineLayoutAttr layoutAttr) {
 // Derives an pipeline layout from all of the dispatches to |exportOp|.
 static PipelineLayout
 deriveStreamExportLayout(IREE::Stream::ExecutableExportOp exportOp,
-                         ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps) {
+                         ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps,
+                         IndirectBindingPolicy &indirectBindingPolicy) {
   if (auto layoutAttr = exportOp->getAttrOfType<IREE::HAL::PipelineLayoutAttr>(
           "hal.interface.layout")) {
     auto assumedLayout = assumeExportLayout(layoutAttr);
@@ -117,8 +174,9 @@ deriveStreamExportLayout(IREE::Stream::ExecutableExportOp exportOp,
     for (unsigned i = 0; i < bindingCount; ++i) {
       auto &descriptorInfo = descriptorInfos[i];
 
-      // Opt into indirect descriptors when dynamic values are used from
-      // execution regions that may be executed more than once.
+      // Opt into indirect descriptors for resources referenced through the
+      // binding table from execution regions that may be executed more than
+      // once (see IndirectBindingPolicy).
       if (!isRegionExecutedOnce) {
         Value resource = dispatchOp.getResources()[i];
         if (auto blockArg = dyn_cast<BlockArgument>(resource)) {
@@ -126,16 +184,9 @@ deriveStreamExportLayout(IREE::Stream::ExecutableExportOp exportOp,
             resource = parentOp.getResourceOperands()[blockArg.getArgNumber()];
           }
         }
-        switch (categorizeValue(resource)) {
-        default:
-        case ValueOrigin::Unknown:
-        case ValueOrigin::MutableGlobal:
+        if (indirectBindingPolicy.isIndirectResource(resource, dispatchOp)) {
           descriptorInfo.flags =
               descriptorInfo.flags | IREE::HAL::DescriptorFlags::Indirect;
-          break;
-        case ValueOrigin::LocalConstant:
-        case ValueOrigin::ImmutableGlobal:
-          break;
         }
       }
 
@@ -218,11 +269,12 @@ BindingLayoutAnalysis::BindingLayoutAnalysis(Operation *rootOp,
   });
 
   // Derive the layouts for each export op.
+  IndirectBindingPolicy indirectBindingPolicy;
   for (auto &it : exportInfos) {
     TypeSwitch<Operation *>(it.first)
         .Case([&](IREE::Stream::ExecutableExportOp exportOp) {
-          it.second->pipelineLayout =
-              deriveStreamExportLayout(exportOp, it.second->dispatchOps);
+          it.second->pipelineLayout = deriveStreamExportLayout(
+              exportOp, it.second->dispatchOps, indirectBindingPolicy);
         })
         .Default([&](auto op) {});
   }

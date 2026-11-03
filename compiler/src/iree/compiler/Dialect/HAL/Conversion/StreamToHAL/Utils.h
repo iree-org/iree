@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_UTILS_H_
 #define IREE_COMPILER_DIALECT_HAL_CONVERSION_STREAMTOHAL_UTILS_H_
 
+#include "iree/compiler/Dialect/HAL/Analysis/BindingLayout.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "mlir/IR/Builders.h"
@@ -67,8 +68,12 @@ class BindingTable {
 public:
   BindingTable() = default;
   // TODO(benvanik): interface for execution regions so this can be reused.
+  // Resources are added to the table if |indirectBindingPolicy| decides they
+  // are referenced indirectly.
   BindingTable(IREE::Stream::CmdExecuteOp executeOp, ValueRange bufferValues,
-               ValueRange bufferSizes, IndexSet &indexSet);
+               ValueRange bufferSizes,
+               IREE::HAL::IndirectBindingPolicy &indirectBindingPolicy,
+               IndexSet &indexSet);
 
   // True if binding tables are supported for the consumer.
   bool isSupported() const { return true; }
@@ -127,7 +132,14 @@ public:
   CommandBufferConversionMapping &
   lookupCommandBufferFor(Operation *cmdOp) const;
 
+  // Returns the policy used to decide which resources are bound indirectly.
+  // Shared across all patterns so results are cached.
+  IREE::HAL::IndirectBindingPolicy &getIndirectBindingPolicy() {
+    return indirectBindingPolicy;
+  }
+
 private:
+  IREE::HAL::IndirectBindingPolicy indirectBindingPolicy;
   // All cached command buffer results.
   SmallVector<std::shared_ptr<CommandBufferConversionMapping>> commandBuffers;
   // Ops within stream.cmd.execute ops -> !hal.command_buffer.

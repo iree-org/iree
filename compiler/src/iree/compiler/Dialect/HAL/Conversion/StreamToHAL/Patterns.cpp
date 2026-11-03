@@ -1331,8 +1331,10 @@ struct CmdExecuteOpPattern
     BindingTable bindingTable;
     if (!executeOp.getOnce() && !capturesDynamicUniformValues &&
         clIndirectCommandBuffers) {
-      bindingTable = BindingTable(executeOp, adaptor.getResourceOperands(),
-                                  adaptor.getResourceOperandSizes(), indexSet);
+      bindingTable =
+          BindingTable(executeOp, adaptor.getResourceOperands(),
+                       adaptor.getResourceOperandSizes(),
+                       mapping->getIndirectBindingPolicy(), indexSet);
     }
 
     // If the execute op is one-shot or there's no indirect bindings then mark
