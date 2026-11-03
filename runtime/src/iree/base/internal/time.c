@@ -10,7 +10,7 @@
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_WASM) && !defined(IREE_PLATFORM_WASI) && \
-    !defined(IREE_PLATFORM_EMSCRIPTEN)
+    !defined(IREE_COMPILER_EMSCRIPTEN)
 
 // Freestanding wasm (browser/Node.js) uses a direct JS import that returns
 // nanoseconds as int64_t. This avoids the POSIX clock_gettime abstraction
@@ -47,7 +47,7 @@ int64_t iree_platform_time_now(void) {
          (remainder * 1000000000ll) / frequency.QuadPart;
 #elif defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
     defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_WASI) ||      \
-    defined(IREE_PLATFORM_EMSCRIPTEN)
+    defined(IREE_COMPILER_EMSCRIPTEN)
   // CLOCK_MONOTONIC is used across all POSIX-like platforms for consistency.
   // WASI libc provides clock_gettime backed by __wasi_clock_time_get.
   // CLOCK_MONOTONIC_RAW exists on Linux but can't be used with
@@ -63,4 +63,4 @@ int64_t iree_platform_time_now(void) {
 }
 
 #endif  // IREE_PLATFORM_WASM && !IREE_PLATFORM_WASI &&
-        // !IREE_PLATFORM_EMSCRIPTEN
+        // !IREE_COMPILER_EMSCRIPTEN

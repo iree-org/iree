@@ -31,6 +31,7 @@
 // IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_64 (0/1)
 //
 // IREE_COMPILER_CLANG
+// IREE_COMPILER_EMSCRIPTEN
 // IREE_COMPILER_GCC
 // IREE_COMPILER_GCC_COMPAT
 // IREE_COMPILER_MSVC
@@ -45,7 +46,6 @@
 // IREE_PLATFORM_APPLE (IOS | MACOS)
 // IREE_PLATFORM_BSD (FREEBSD | NETBSD | OPENBSD | DRAGONFLYBSD)
 // IREE_PLATFORM_DRAGONFLYBSD
-// IREE_PLATFORM_EMSCRIPTEN
 // IREE_PLATFORM_FREEBSD
 // IREE_PLATFORM_GENERIC
 // IREE_PLATFORM_IOS
@@ -54,7 +54,7 @@
 // IREE_PLATFORM_MACOS
 // IREE_PLATFORM_NETBSD
 // IREE_PLATFORM_OPENBSD
-// IREE_PLATFORM_WASM (EMSCRIPTEN | WEB | WASI)
+// IREE_PLATFORM_WASM (WEB | WASI)
 // IREE_PLATFORM_WASI
 // IREE_PLATFORM_WEB
 // IREE_PLATFORM_WINDOWS
@@ -201,6 +201,10 @@ enum iree_arch_enum_e {
 #error Unrecognized compiler.
 #endif  // compiler versions
 
+#if defined(__EMSCRIPTEN__)
+#define IREE_COMPILER_EMSCRIPTEN 1
+#endif  // __EMSCRIPTEN__
+
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)
 #define IREE_SANITIZER_ADDRESS 1
@@ -236,24 +240,20 @@ enum iree_arch_enum_e {
 #endif  // __ANDROID__
 
 //==============================================================================
-// IREE_PLATFORM_WASM (EMSCRIPTEN | WEB | WASI)
+// IREE_PLATFORM_WASM (WEB | WASI)
 //==============================================================================
-// Wasm platform markers:
+// Wasm targets have a three-tier hierarchy:
 //   IREE_PLATFORM_WASM — all Wasm VMs (no signals, no sysfs, memory.grow heap)
-//   IREE_PLATFORM_EMSCRIPTEN — Emscripten environments (libc, JS glue)
 //   IREE_PLATFORM_WEB  — browser/Node.js (JS bridge, WebGPU, Web Workers)
 //   IREE_PLATFORM_WASI — WASI hosted environments (WASI syscalls)
 //
-// IREE_PLATFORM_WASM, IREE_PLATFORM_EMSCRIPTEN, and IREE_PLATFORM_WASI are
-// auto-detected from __wasm__, __EMSCRIPTEN__, and __wasi__, respectively.
-// IREE_PLATFORM_WEB must be injected by the toolchain (-DIREE_PLATFORM_WEB=1)
-// since there is no compiler-provided define for "targeting a browser."
+// IREE_PLATFORM_WASM is auto-detected from __wasm__. IREE_PLATFORM_WASI is
+// auto-detected from __wasi__. IREE_PLATFORM_WEB must be injected by the
+// toolchain (-DIREE_PLATFORM_WEB=1) since there is no compiler-provided
+// define for "targeting a browser."
 
 #if defined(__wasm__)
 #define IREE_PLATFORM_WASM 1
-#if defined(__EMSCRIPTEN__)
-#define IREE_PLATFORM_EMSCRIPTEN 1
-#endif  // __EMSCRIPTEN__
 #if defined(__wasi__)
 #define IREE_PLATFORM_WASI 1
 #endif  // __wasi__
