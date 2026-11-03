@@ -68,7 +68,7 @@ they're available.
   [Toradex partner network](https://www.toradex.com/support/partner-network/services/100081/roofline),
   enabling AI workloads on NXP i.MX 95 hardware using IREE. Toradex
   [announced the partnership on LinkedIn](https://lnkd.in/p/gETQRgGP).
-* hiPEAC magazine published
+* HiPEAC magazine published
   [an article written by Roofline CEO Dr. Jan Moritz Joseph](https://www.hipeac.net/files/public/33/7175/hipeacinfo79_web-8HHhWYGG.pdf)
   about how the team brought the latest mixture of experts (MoE) models to
   hardware using IREE.
