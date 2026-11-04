@@ -1199,6 +1199,35 @@ util.func private @scf_if_consumer_yield(%cond: i1) -> tensor<1xi32> {
 
 // -----
 
+// Tests that an explicit affinity is preserved across a region boundary when
+// the enclosing default affinity differs.
+
+// CHECK-LABEL: @explicit_affinity_preserved_across_region
+util.func private @explicit_affinity_preserved_across_region()
+    -> tensor<1xi32>
+    attributes {
+      stream.affinity.default = #hal.device.promise<@dev_b>
+    } {
+  // CHECK: flow.tensor.constant
+  // CHECK-SAME{LITERAL}: stream.affinities = [#hal.device.promise<@dev_a>]
+  %cst = flow.tensor.constant {stream.affinity = #hal.device.promise<@dev_a>} dense<123> : tensor<1xi32>
+  // CHECK: scf.forall
+  %forall = scf.forall (%i) in (1) shared_outs(%arg0 = %cst) -> tensor<1xi32> {
+    // CHECK: util.optimization_barrier
+    // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+    %arg0_dno = util.optimization_barrier %arg0 : tensor<1xi32>
+    scf.forall.in_parallel {
+    }
+  // CHECK{LITERAL}: } {stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  // CHECK-SAME{LITERAL}: stream.affinities.results = [[#hal.device.promise<@dev_a>]]
+  }
+  // CHECK: util.return
+  // CHECK-SAME{LITERAL}: stream.affinities.operands = [[#hal.device.promise<@dev_a>]]
+  util.return %forall : tensor<1xi32>
+}
+
+// -----
+
 // Tests that consumer-placed ops get placed based on their use in the body.
 
 // CHECK-LABEL: @scf_for_consumer_body_transfer
