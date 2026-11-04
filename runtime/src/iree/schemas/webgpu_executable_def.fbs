@@ -56,6 +56,10 @@ table ExportDef {
 
   // Optional debug information related to the export.
   debug_info:iree.hal.debug.ExportDef;
+
+  // Canonical hal.executable.export name used by runtime function lookup.
+  // The WGSL entry point may have a different name (for example, "d0").
+  name:string;
 }
 
 table ExecutableDef {

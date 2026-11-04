@@ -63,14 +63,14 @@ static iree_status_t iree_hal_webgpu_executable_calculate_name_storage_size(
         iree_hal_webgpu_ExportDef_vec_at(exports_vec, i);
     flatbuffers_string_t entry_point =
         iree_hal_webgpu_ExportDef_entry_point_get(export_def);
-    iree_host_size_t entry_point_length =
-        entry_point ? flatbuffers_string_len(entry_point) : 0;
-    if (entry_point_length == 0) {
+    flatbuffers_string_t name = iree_hal_webgpu_ExportDef_name_get(export_def);
+    if (!name || flatbuffers_string_len(name) == 0) name = entry_point;
+    iree_host_size_t name_length = name ? flatbuffers_string_len(name) : 0;
+    if (name_length == 0) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "exports[%" PRIhsz "] has no entry point name",
-                              i);
+                              "exports[%" PRIhsz "] has no export name", i);
     }
-    if (!iree_host_size_checked_add(name_storage_size, entry_point_length + 1,
+    if (!iree_host_size_checked_add(name_storage_size, name_length + 1,
                                     &name_storage_size)) {
       return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                               "WebGPU executable export name storage exceeds "
@@ -119,11 +119,13 @@ static iree_status_t iree_hal_webgpu_executable_initialize_export(
                             "exports[%" PRIhsz "] has no entry point name",
                             export_ordinal);
   }
-  memcpy(*inout_name_storage, entry_point, entry_point_length);
-  (*inout_name_storage)[entry_point_length] = '\0';
-  out_entry->name =
-      iree_make_string_view(*inout_name_storage, entry_point_length);
-  *inout_name_storage += entry_point_length + 1;
+  flatbuffers_string_t name = iree_hal_webgpu_ExportDef_name_get(export_def);
+  if (!name || flatbuffers_string_len(name) == 0) name = entry_point;
+  iree_host_size_t name_length = flatbuffers_string_len(name);
+  memcpy(*inout_name_storage, name, name_length);
+  (*inout_name_storage)[name_length] = '\0';
+  out_entry->name = iree_make_string_view(*inout_name_storage, name_length);
+  *inout_name_storage += name_length + 1;
 
   uint32_t constant_count =
       iree_hal_webgpu_ExportDef_constant_count_get(export_def);
@@ -163,8 +165,8 @@ static iree_status_t iree_hal_webgpu_executable_initialize_export(
   out_entry->pipeline_handle =
       iree_hal_webgpu_import_device_create_compute_pipeline(
           device_handle, /*layout_handle=*/0, (uintptr_t)wgsl_source,
-          (uint32_t)wgsl_source_length, (uintptr_t)out_entry->name.data,
-          (uint32_t)out_entry->name.size);
+          (uint32_t)wgsl_source_length, (uintptr_t)entry_point,
+          (uint32_t)entry_point_length);
   if (out_entry->pipeline_handle == 0) {
     return iree_make_status(
         IREE_STATUS_INTERNAL,
