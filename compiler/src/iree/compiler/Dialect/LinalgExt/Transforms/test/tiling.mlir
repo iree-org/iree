@@ -2923,14 +2923,13 @@ module attributes { transform.with_named_sequence } {
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
-// Buffer tiling writes to destination subviews and must not create SSA results.
 func.func @online_attention_tiling_memref(
     %query: memref<192x1024x64xf32>, %key: memref<192x1024x64xf32>,
     %value: memref<192x1024x64xf32>, %output: memref<192x1024x64xf32>,
     %max: memref<192x1024xf32>, %sum: memref<192x1024xf32>) {
   %scale = arith.constant 1.0 : f32
   iree_linalg_ext.online_attention
-      { indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR] }
+      < indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR] >
       ins(%query, %key, %value, %scale : memref<192x1024x64xf32>, memref<192x1024x64xf32>, memref<192x1024x64xf32>, f32)
       outs(%output, %max, %sum : memref<192x1024x64xf32>, memref<192x1024xf32>, memref<192x1024xf32>) {
     ^bb0(%score: f32):
