@@ -2995,28 +2995,6 @@ func.func @dequantize_affine_transposed(%input: tensor<128x64xi8>,
 
 // -----
 
-// A constant i64 zero point whose values are on the storage type's grid, which
-// is what PT2E emits. The verifier checks constant zero points against the grid
-// because the lowering narrows them, so this guards against a false positive.
-func.func @dequantize_affine_constant_wide_zp(%input: tensor<128x64xi8>,
-    %scale: tensor<128xf32>, %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
-  %zp = arith.constant dense<-128> : tensor<128xi64>
-  %0 = iree_linalg_ext.dequantize_affine
-      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
-                        affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d0, d1)>]>
-      ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<128xi64>)
-      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
-  return %0 : tensor<128x64xf32>
-}
-// CHECK-LABEL: func.func @dequantize_affine_constant_wide_zp(
-//       CHECK:   %[[ZP:.+]] = arith.constant dense<-128> : tensor<128xi64>
-//       CHECK:   iree_linalg_ext.dequantize_affine
-//  CHECK-SAME:     ins(%{{.+}}, %{{.+}}, %[[ZP]] :
-
-// -----
-
 // The scale need not match the output: the multiply happens in f32 and the
 // product is narrowed to f16 afterwards.
 func.func @dequantize_affine_wider_scale(%input: tensor<128x64xi8>,

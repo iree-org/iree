@@ -34,7 +34,6 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -2729,33 +2728,9 @@ LogicalResult DequantizeAffineOp::verify() {
                        "got ")
            << realType;
   }
-  if (getZeroPoint()) {
-    if (!getZeroPointDifferenceType()) {
-      return emitOpError("cannot subtract a zero point from a ")
-             << storageType << " value without exceeding 64 bits";
-    }
-    // The zero point is narrowed to the width the storage grid needs, so a
-    // constant that is off the grid would be silently truncated. Reject it
-    // here rather than miscompile it.
-    DenseIntElementsAttr zeroPointAttr;
-    if (matchPattern(getZeroPoint(), m_Constant(&zeroPointAttr))) {
-      unsigned storageWidth = cast<IntegerType>(storageType).getWidth();
-      bool isUnsigned = getInputUnsigned();
-      int64_t lowerBound = isUnsigned ? 0 : llvm::minIntN(storageWidth);
-      int64_t upperBound =
-          isUnsigned ? static_cast<int64_t>(llvm::maxUIntN(storageWidth))
-                     : llvm::maxIntN(storageWidth);
-      for (const APInt &value : zeroPointAttr.getValues<APInt>()) {
-        int64_t zeroPoint =
-            getZpUnsigned() ? value.getZExtValue() : value.getSExtValue();
-        if (zeroPoint < lowerBound || zeroPoint > upperBound) {
-          return emitOpError("zero point ")
-                 << zeroPoint << " is not representable in the storage type "
-                 << storageType << ", whose range is [" << lowerBound << ", "
-                 << upperBound << "]";
-        }
-      }
-    }
+  if (getZeroPoint() && !getZeroPointDifferenceType()) {
+    return emitOpError("cannot subtract a zero point from a ")
+           << storageType << " value without exceeding 64 bits";
   }
   std::optional<int64_t> quantMin = getQuantMin();
   std::optional<int64_t> quantMax = getQuantMax();
