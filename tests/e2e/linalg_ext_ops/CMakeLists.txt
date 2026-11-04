@@ -12,6 +12,20 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
+    check_llvm-cpu_grouped_matmul_local-task
+  SRCS
+    "grouped_matmul.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-dispatch-creation-data-tiling=true"
+    "--iree-llvmcpu-target-cpu=generic"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_llvm-cpu_local-task
   SRCS
     "arg_compare.mlir"

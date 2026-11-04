@@ -16,7 +16,6 @@ vm.import private @buffer.allocate(
   %minimum_alignment : i32,
   %allocation_size : i64
 ) -> (!vm.ref<!hal.buffer>, !vm.buffer)
-attributes {nosideeffects}
 
 // Allocates a buffer with an initial value provided by a VM byte buffer.
 vm.import private @buffer.allocate.initialized(
@@ -25,7 +24,6 @@ vm.import private @buffer.allocate.initialized(
   %offset : i64,
   %length : i64
 ) -> (!vm.ref<!hal.buffer>, !vm.buffer)
-attributes {nosideeffects}
 
 // Wraps a VM byte buffer in a HAL buffer.
 vm.import private @buffer.wrap(

@@ -260,7 +260,7 @@ def IREECodegen_InnerTiledOp : Op<IREECodegen_Dialect, "inner_tiled", [
     DestinationStyleOpInterface,
     DeclareOpInterfaceMethods<ValueBoundsOpInterface,
        ["populateBoundsForShapedValueDim"]>,
-    DeclareOpInterfaceMethods<VectorUnrollOpInterface, ["getShapeForUnroll"]>,
+    DeclareOpInterfaceMethods<VectorUnrollOpInterface, ["getIterationShapeToUnroll"]>,
     DeclareOpInterfaceMethods<TilingInterface,
        ["getIterationDomain",
         "getLoopIteratorTypes",

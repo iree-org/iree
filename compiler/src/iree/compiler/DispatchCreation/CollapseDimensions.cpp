@@ -215,6 +215,32 @@ SmallVector<ReassociationIndices> getCollapsibleLoops(Operation *op) {
   return contiguousLoops;
 }
 
+/// Collapses the loops of `linalgOp` along `reassociation`. Upstream collapses
+/// a named op by cloning it with collapsed operands, which is only valid when
+/// the collapse keeps the op's structure (e.g. linalg.fill). A named
+/// contraction whose loops merge (e.g. batch into M) is generalized first. On
+/// return `linalgOp` is the op that was collapsed, which the caller replaces.
+static FailureOr<linalg::CollapseResult>
+collapseLinalgOpIterationDims(linalg::LinalgOp &linalgOp,
+                              ArrayRef<ReassociationIndices> reassociation,
+                              RewriterBase &rewriter) {
+  bool isNamedContraction = !isa<linalg::GenericOp>(linalgOp.getOperation()) &&
+                            linalg::isaContractionOpInterface(linalgOp);
+  bool hasCollapse =
+      llvm::any_of(reassociation, [](ReassociationIndicesRef group) {
+        return group.size() > 1;
+      });
+  if (isNamedContraction && hasCollapse) {
+    FailureOr<linalg::LinalgOp> generalized =
+        linalg::generalizeNamedOp(rewriter, linalgOp);
+    if (failed(generalized)) {
+      return failure();
+    }
+    linalgOp = *generalized;
+  }
+  return linalg::collapseOpIterationDims(linalgOp, reassociation, rewriter);
+}
+
 /// Returns true if the given op is collapsible.
 static bool isEligibleForCollapse(Operation *op) {
   if (isa<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::OnlineAttentionOp,
@@ -222,8 +248,22 @@ static bool isEligibleForCollapse(Operation *op) {
     return true;
   }
 
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp || !linalgOp.hasPureTensorSemantics()) {
+    return false;
+  }
   auto genericOp = dyn_cast<linalg::GenericOp>(op);
-  if (!genericOp) {
+  // Named ops are only collapsible when they are contractions: user indexing
+  // maps can leave loops collapsible (e.g. a `linalg.batch_matmul` whose RHS
+  // drops the batch dim merges batch and M), and such ops are generalized
+  // before being collapsed. Named contractions with their default maps have
+  // no collapsible loops and pass through the analysis unchanged.
+  if (!genericOp && !linalg::isaContractionOpInterface(linalgOp)) {
+    return false;
+  }
+  // A preset compilation info or lowering config refers to the original loops,
+  // so a named contraction carrying one must keep its loop space.
+  if (!genericOp && (getCompilationInfo(op) || getLoweringConfig(op))) {
     return false;
   }
 
@@ -241,7 +281,7 @@ static bool isEligibleForCollapse(Operation *op) {
   // chains) on the extract indices that dominates execution; keeping the
   // multi-dimensional iteration space allows direct workgroup tiling without
   // delinearization.
-  if (genericOp.getNumDpsInputs() == 0) {
+  if (genericOp && genericOp.getNumDpsInputs() == 0) {
     bool hasLinalgIndex = false;
     bool extractFeedsSelect = false;
     genericOp.getBlock()->walk([&](Operation *inner) {
@@ -278,7 +318,7 @@ static bool isEligibleForCollapse(Operation *op) {
   // affine_map<d0, d1+d2> with affine_map<d0, d1+d2>, however, this is not
   // supported in collapsing mechanism in MLIR. Once we have this support,
   // we can remove this if statement.
-  if (llvm::any_of(genericOp.getIndexingMapsArray(), [](AffineMap map) {
+  if (llvm::any_of(linalgOp.getIndexingMapsArray(), [](AffineMap map) {
         return !map.isProjectedPermutation();
       })) {
     return false;
@@ -1153,17 +1193,23 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
   for (auto &[opToCollapse, info] : opMap) {
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(opToCollapse);
+    // The op whose results get replaced. Generalizing a named contraction
+    // below already replaces the original op, so this then points at the
+    // generic.
+    Operation *opToReplace = opToCollapse;
 
     using ResultsType = FailureOr<SmallVector<Value>>;
     auto maybeReplacements =
         llvm::TypeSwitch<Operation *, ResultsType>(opToCollapse)
-            .Case([&, &info = info](linalg::LinalgOp genericOp) -> ResultsType {
+            .Case([&, &info = info](linalg::LinalgOp linalgOp) -> ResultsType {
               FailureOr<linalg::CollapseResult> maybeReplacements =
-                  mlir::linalg::collapseOpIterationDims(
-                      genericOp, info.getReassociation(), rewriter);
+                  collapseLinalgOpIterationDims(
+                      linalgOp, info.getReassociation(), rewriter);
               if (failed(maybeReplacements)) {
                 return failure();
               }
+              // A generalized named contraction already replaced the original.
+              opToReplace = linalgOp;
               return maybeReplacements->results;
             })
             .Case<IREE::LinalgExt::AttentionOp,
@@ -1198,7 +1244,7 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
       continue;
     }
     didCollapse = true;
-    rewriter.replaceOp(opToCollapse, maybeReplacements.value());
+    rewriter.replaceOp(opToReplace, maybeReplacements.value());
   }
   return didCollapse;
 }
@@ -1208,8 +1254,8 @@ collapseDimensionsForDispatch(IRRewriter &rewriter,
 //===---------------------------------------------------------------------===//
 
 void CollapseContractionDimensionsPass::runOnOperation() {
-  SmallVector<linalg::GenericOp> contractions;
-  getOperation()->walk([&](linalg::GenericOp op) {
+  SmallVector<linalg::LinalgOp> contractions;
+  getOperation()->walk([&](linalg::LinalgOp op) {
     // Dispatch bodies already have their own normalization and shape-hoisting
     // policy. Do not revisit explicitly scheduled workgroups either. A preset
     // compilation info or lowering config refers to the original loops, so
@@ -1225,14 +1271,14 @@ void CollapseContractionDimensionsPass::runOnOperation() {
   });
 
   IRRewriter rewriter(&getContext());
-  for (linalg::GenericOp op : contractions) {
+  for (linalg::LinalgOp op : contractions) {
     SmallVector<ReassociationIndices> reassociation = getCollapsibleLoops(op);
     if (reassociation.empty()) {
       continue;
     }
     rewriter.setInsertionPoint(op);
     FailureOr<linalg::CollapseResult> result =
-        linalg::collapseOpIterationDims(op, reassociation, rewriter);
+        collapseLinalgOpIterationDims(op, reassociation, rewriter);
     if (succeeded(result)) {
       rewriter.replaceOp(op, result->results);
     }

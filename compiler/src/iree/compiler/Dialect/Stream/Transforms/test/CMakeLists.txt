@@ -74,6 +74,7 @@ iree_lit_test_suite(
     "specialize_dispatches.mlir"
     "specialize_encodings.mlir"
     "split_parameter_encoder.mlir"
+    "split_parameter_encoder_shared_load.mlir"
     "sync_initializers.mlir"
     "unify_encoding_for_globals.mlir"
     "verify_affinities.mlir"

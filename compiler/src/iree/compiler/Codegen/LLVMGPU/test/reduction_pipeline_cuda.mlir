@@ -155,13 +155,16 @@ func.func @softmax_singlesubgroup() attributes {hal.executable.target = #executa
 }
 
 //   CHECK-LABEL:  func.func @softmax_singlesubgroup()
+//         CHECK:    %[[MAX_INIT:.+]] = arith.constant dense<-3.40282347E+38> : vector<1x1x1x1x1x1xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x1x1x1x1x1x1x1xf32>) {
 //         CHECK:      vector.transfer_read {{.*}} : memref<12x256x40960xf32, {{.*}}>, vector<1x1x4xf32>
 //         CHECK:      vector.multi_reduction <maxnumf>, {{.*}} {{.*}} : vector<1x1x1x1x1x1x1x1x1x1x1x4xf32> to vector<1x1x1x1x1x1x1x1x1xf32>
 //         CHECK:      arith.maxnumf {{.*}} : vector<1x1x1x1x1x1x1x1x1xf32>
 //         CHECK:      scf.yield
-//         CHECK:    gpu.subgroup_reduce maxnumf
-//         CHECK:    vector.broadcast %{{.*}} : f32 to vector<1x1x1x1x1x1x1x1x1x1x1x4xf32>
+//         CHECK:    %[[SUBGROUP_MAX:.+]] = gpu.subgroup_reduce maxnumf
+//         CHECK:    %[[MAX_BCAST:.+]] = vector.broadcast %[[SUBGROUP_MAX]] : f32 to vector<1x1x1x1x1x1xf32>
+//         CHECK:    %[[MAX:.+]] = arith.maxnumf %[[MAX_BCAST]], %[[MAX_INIT]] : vector<1x1x1x1x1x1xf32>
+//         CHECK:    vector.broadcast %[[MAX]] : vector<1x1x1x1x1x1xf32> to vector<1x1x1x1x1x1x1x1x1x1x1x4xf32>
 //         CHECK:    scf.for {{.*}} -> (vector<1x1x1x1x1x1x1x1x1xf32>) {
 //         CHECK:      vector.transfer_read
 //         CHECK:      arith.subf

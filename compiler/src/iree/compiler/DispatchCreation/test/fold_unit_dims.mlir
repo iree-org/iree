@@ -802,3 +802,34 @@ util.func public @dequantize_conv_unit_batch(%q: tensor<1x4x4x2xi8>, %s: tensor<
 // between.
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       ins(%[[DQ]],
+
+// -----
+
+// A constant value may supply a dimension whose tensor type is still dynamic.
+// Folding unit dimensions must preserve that type while shortening the reshape.
+util.func public @fold_constant_dynamic_size(%arg0: tensor<?xf32>) -> tensor<?x784xf32> {
+  %c1 = arith.constant 1 : index
+  %expanded = tensor.expand_shape %arg0 [[0, 1, 2, 3]] output_shape [%c1, 1, 1, 784] : tensor<?xf32> into tensor<?x1x1x784xf32>
+  %collapsed = tensor.collapse_shape %expanded [[0, 1, 2], [3]] : tensor<?x1x1x784xf32> into tensor<?x784xf32>
+  util.return %collapsed : tensor<?x784xf32>
+}
+// CHECK-LABEL: util.func public @fold_constant_dynamic_size
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?xf32>
+//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1]] output_shape [%[[C1]], 784] : tensor<?xf32> into tensor<?x784xf32>
+//   CHECK-NOT:   tensor.collapse_shape
+//       CHECK:   util.return %[[EXPANDED]] : tensor<?x784xf32>
+
+// -----
+
+// non constant size stays dynamic
+util.func public @preserve_unknown_dynamic_size(%arg0: tensor<?xf32>, %size: index) -> tensor<?x784xf32> {
+  %expanded = tensor.expand_shape %arg0 [[0, 1, 2, 3]] output_shape [%size, 1, 1, 784] : tensor<?xf32> into tensor<?x1x1x784xf32>
+  %collapsed = tensor.collapse_shape %expanded [[0, 1, 2], [3]] : tensor<?x1x1x784xf32> into tensor<?x784xf32>
+  util.return %collapsed : tensor<?x784xf32>
+}
+// CHECK-LABEL: util.func public @preserve_unknown_dynamic_size
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?xf32>, %[[SIZE:[a-zA-Z0-9]+]]: index
+//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1]] output_shape [%[[SIZE]], 784] : tensor<?xf32> into tensor<?x784xf32>
+//   CHECK-NOT:   tensor.collapse_shape
+//       CHECK:   util.return %[[EXPANDED]] : tensor<?x784xf32>

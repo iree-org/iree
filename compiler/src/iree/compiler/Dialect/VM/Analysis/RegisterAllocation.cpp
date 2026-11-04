@@ -52,50 +52,21 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
         SmallVector<std::string, 8> operandRegStrs;
         operandRegStrs.reserve(op.getNumOperands());
 
-        // For branch operations, use remapSuccessorRegisters to get the
-        // correct MOVE bits for branch arguments.
-        // Build a map from operand index to the correct register with MOVE bit.
+        // Use the same per-successor MOVE bits as branch register remapping,
+        // including operands coalesced with their destination registers.
         llvm::DenseMap<unsigned, Register> branchOperandRegs;
         if (auto branchOp = dyn_cast<BranchOpInterface>(&op)) {
           for (unsigned i = 0; i < op.getNumSuccessors(); ++i) {
-            auto srcDstRegs =
-                registerAllocation.remapSuccessorRegisters(&op, i);
             auto succOperands =
                 branchOp.getSuccessorOperands(i).getForwardedOperands();
             if (succOperands.empty()) {
               continue;
             }
             unsigned baseIdx = succOperands.getBeginOperandIndex();
-            // remapSuccessorRegisters only returns pairs where src != dst.
-            // For display, we need ALL operands with correct MOVE bits.
-            // Re-compute with the same logic as remapSuccessorRegisters.
-            (void)srcDstRegs; // Unused - we recompute for display.
-
-            // Build lastOccurrence map: only the last occurrence of a ref value
-            // in this successor's operand list can get MOVE (matches
-            // remapSuccessorRegisters logic).
-            llvm::DenseMap<Value, unsigned> lastOccurrence;
-            for (auto [idx, operand] : llvm::enumerate(succOperands)) {
-              if (isa<IREE::VM::RefType>(operand.getType())) {
-                lastOccurrence[operand] = idx;
-              }
-            }
-
-            for (auto [localIdx, operand] : llvm::enumerate(succOperands)) {
-              unsigned globalIdx = baseIdx + localIdx;
-              auto srcReg = registerAllocation.mapToRegister(operand);
-              // Apply same MOVE logic as remapSuccessorRegisters.
-              if (srcReg.isRef()) {
-                bool isLastOccurrence =
-                    (lastOccurrence.lookup(operand) == localIdx);
-                bool isLastUse =
-                    registerAllocation.liveness_.isLastRealValueUse(
-                        operand, &op, globalIdx);
-                if (isLastOccurrence && isLastUse) {
-                  srcReg.setMove(true);
-                }
-              }
-              branchOperandRegs[globalIdx] = srcReg;
+            auto operandRegs =
+                registerAllocation.getSuccessorOperandRegisters(&op, i);
+            for (auto [localIdx, reg] : llvm::enumerate(operandRegs)) {
+              branchOperandRegs[baseIdx + localIdx] = reg;
             }
           }
         }
@@ -759,106 +730,119 @@ struct FeedbackArcSet {
   }
 };
 
+// Computes registers and MOVE bits for all forwarded successor operands,
+// including operands coalesced with their destination registers.
+//
+// For a remap between distinct registers, MOVE transfers ownership and clears
+// the source register. Without MOVE, the runtime retains a reference for the
+// destination.
+//
+// A ref operand receives MOVE only when all four conditions hold:
+// 1. It is the last occurrence of this value in the successor's operand list.
+// 2. It is the last real use across all successors, or the remap is
+//    non-coalesced and the original value is not live-in to this target block.
+// 3. The branch op supports MOVE on this operand via RefMoveInterface.
+// 4. No duplicate occurrence is coalesced with its destination block argument;
+//    moving another occurrence would clear that coalesced register.
+//
+// These conditions also apply to back-edges. When they hold for a remap to a
+// loop header, MOVE transfers ownership to the next iteration's block argument.
+// The edge being a back-edge does not itself require retaining the source ref.
+SmallVector<Register, 8>
+RegisterAllocation::getSuccessorOperandRegisters(Operation *branchOp,
+                                                 unsigned successorIndex) {
+  auto targetOperands = cast<BranchOpInterface>(branchOp)
+                            .getSuccessorOperands(successorIndex)
+                            .getForwardedOperands();
+  if (targetOperands.empty()) {
+    return {};
+  }
+  Block *targetBlock = branchOp->getSuccessor(successorIndex);
+  unsigned baseOperandIndex = targetOperands.getBeginOperandIndex();
+
+  struct RefOperandInfo {
+    unsigned lastIndex = 0;
+    unsigned count = 0;
+    bool coalesced = false;
+  };
+  llvm::DenseMap<Value, RefOperandInfo> refOperands;
+  SmallVector<Register, 8> operandRegisters;
+  operandRegisters.reserve(targetOperands.size());
+  for (auto [idx, operand] : llvm::enumerate(targetOperands)) {
+    auto srcReg = mapToRegister(operand);
+    operandRegisters.push_back(srcReg);
+    if (!srcReg.isRef()) {
+      continue;
+    }
+    auto &info = refOperands[operand];
+    info.lastIndex = idx;
+    ++info.count;
+    info.coalesced |= srcReg == mapToRegister(targetBlock->getArgument(idx));
+  }
+
+  auto moveOp = dyn_cast<IREE::VM::RefMoveInterface>(branchOp);
+  for (auto [idx, operand] : llvm::enumerate(targetOperands)) {
+    auto &srcReg = operandRegisters[idx];
+    if (!srcReg.isRef()) {
+      continue;
+    }
+    auto info = refOperands.lookup(operand);
+    bool isLastOccurrence = info.lastIndex == idx;
+    unsigned globalOperandIndex = baseOperandIndex + idx;
+    bool isLastUseAcrossSuccessors =
+        liveness_.isLastRealValueUse(operand, branchOp, globalOperandIndex);
+
+    // A ref may remain live on one successor while ownership transfers on
+    // another. A non-coalesced remap can MOVE when this target does not use
+    // the original value directly, even if another successor does.
+    auto dstReg = mapToRegister(targetBlock->getArgument(idx));
+    bool transfersOnTargetEdge =
+        srcReg != dstReg &&
+        !llvm::is_contained(liveness_.getBlockLiveIns(targetBlock), operand);
+    bool canTransferOwnership =
+        isLastUseAcrossSuccessors || transfersOnTargetEdge;
+    bool isMovable = moveOp && moveOp.isRefOperandMovable(globalOperandIndex);
+
+    // Moving another occurrence would clear the coalesced destination register.
+    // A single coalesced operand emits no remap pair, so its MOVE bit only
+    // affects IR annotation.
+    bool hasCoalescedDuplicate = info.count > 1 && info.coalesced;
+    if (isLastOccurrence && canTransferOwnership && isMovable &&
+        !hasCoalescedDuplicate) {
+      srcReg.setMove(true);
+    }
+  }
+  return operandRegisters;
+}
+
 SmallVector<std::pair<Register, Register>, 8>
 RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
-  auto branchOp = cast<BranchOpInterface>(op);
-  auto *targetBlock = op->getSuccessor(successorIndex);
-  auto targetOperands =
-      branchOp.getSuccessorOperands(successorIndex).getForwardedOperands();
-
-  // Get the base operand index for this successor's operands in the branch op.
-  // This is needed to query isLastRealValueUse with the correct global index.
-  // Note: getBeginOperandIndex() asserts on empty ranges, so we handle that.
-  unsigned baseOperandIndex =
-      targetOperands.empty() ? 0 : targetOperands.getBeginOperandIndex();
-
-  return remapSuccessorRegisters(op, targetBlock, targetOperands,
-                                 baseOperandIndex);
+  auto operandRegisters = getSuccessorOperandRegisters(op, successorIndex);
+  return remapSuccessorRegisters(op, op->getSuccessor(successorIndex),
+                                 operandRegisters);
 }
 
 SmallVector<std::pair<Register, Register>, 8>
 RegisterAllocation::remapSuccessorRegisters(Location loc, Block *targetBlock,
                                             OperandRange targetOperands) {
-  // Legacy overload - called without branch op context, so no MOVE bits.
-  // This path is only used for testing/annotation where we don't have the op.
+  // Without branch op context, leave MOVE bits unset.
+  auto operandRegisters = llvm::map_to_vector<8>(
+      targetOperands, [&](Value operand) { return mapToRegister(operand); });
   return remapSuccessorRegisters(/*branchOp=*/nullptr, targetBlock,
-                                 targetOperands, /*baseOperandIndex=*/0);
+                                 operandRegisters);
 }
 
-// Computes register remapping for branch operands from source block to target.
-//
-// This function handles the MOVE bit logic for ref operands:
-// - MOVE transfers ownership (runtime nulls source after copy)
-// - No MOVE retains (runtime increments refcount of destination)
-//
-// MOVE is set when all three conditions are true:
-// 1. This is the last occurrence of the ref value in this successor's list
-//    (handles same ref appearing multiple times like `^bb(%ref, %ref)`)
-// 2. The ref is not live after this branch (checked via isLastRealValueUse)
-// 3. The branch op supports MOVE on this operand (RefMoveInterface)
-//
-// MOVE on back-edges (loops) is CORRECT:
-// - Ownership transfers to the next iteration's block argument
-// - NOT MOVE would leak: source retains AND destination retains = refcount++
-// - At loop exit, source register would be non-null causing spurious release
-//
-// Returns a list of (src, dst) register pairs that need to be remapped.
-// Pairs where src == dst (coalesced) are omitted.
 SmallVector<std::pair<Register, Register>, 8>
-RegisterAllocation::remapSuccessorRegisters(Operation *branchOp,
-                                            Block *targetBlock,
-                                            OperandRange targetOperands,
-                                            unsigned baseOperandIndex) {
+RegisterAllocation::remapSuccessorRegisters(
+    Operation *branchOp, Block *targetBlock,
+    ArrayRef<Register> operandRegisters) {
   // Compute the initial directed graph of register movements.
   // This may contain cycles ([reg 0->1], [reg 1->0], ...) that would not be
-  // possible to evaluate as a direct remapping.
+  // possible to evaluate as a direct remapping. Coalesced operands need no
+  // remap.
   SmallVector<std::pair<Register, Register>, 8> srcDstRegs;
-
-  // Build last-occurrence map for ref operands in this successor's list.
-  // Only the last occurrence of a value can get MOVE (for multi-use cases like
-  // passing same ref to both branches of cond_br).
-  llvm::DenseMap<Value, unsigned> lastOccurrence;
-  for (auto [idx, operand] : llvm::enumerate(targetOperands)) {
-    if (isa<IREE::VM::RefType>(operand.getType())) {
-      lastOccurrence[operand] = idx;
-    }
-  }
-
-  for (auto [idx, operand] : llvm::enumerate(targetOperands)) {
-    auto srcReg = mapToRegister(operand);
-    BlockArgument targetArg = targetBlock->getArgument(idx);
-    auto dstReg = mapToRegister(targetArg);
-
-    // Apply MOVE bit logic for ref registers.
-    if (branchOp && srcReg.isRef()) {
-      // Check if this is the last occurrence of this value in the operand list.
-      bool isLastOccurrence = (lastOccurrence.lookup(operand) == idx);
-
-      // Compute global operand index for liveness query.
-      unsigned globalOperandIndex = baseOperandIndex + idx;
-
-      // Check if this is the last real use of the value (not live after branch,
-      // not used elsewhere in the function after this point).
-      bool isLastUse =
-          liveness_.isLastRealValueUse(operand, branchOp, globalOperandIndex);
-
-      // Check if the branch op supports MOVE on this operand.
-      bool isMovable = false;
-      if (auto moveOp = dyn_cast<IREE::VM::RefMoveInterface>(branchOp)) {
-        isMovable = moveOp.isRefOperandMovable(globalOperandIndex);
-      }
-
-      // Set MOVE if:
-      // 1. This is the last occurrence in this successor's operand list
-      // 2. This is the last real use of the value (not live after branch)
-      // 3. The branch op supports MOVE on this operand
-      // Note: MOVE is correct even on back-edges. The ref ownership transfers
-      // to the destination block arg, which is correct for loop-carried values.
-      if (isLastOccurrence && isLastUse && isMovable) {
-        srcReg.setMove(true);
-      }
-    }
-
+  for (auto [idx, srcReg] : llvm::enumerate(operandRegisters)) {
+    auto dstReg = mapToRegister(targetBlock->getArgument(idx));
     if (srcReg != dstReg) {
       srcDstRegs.push_back({srcReg, dstReg});
     }

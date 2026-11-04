@@ -3023,7 +3023,17 @@ AsyncTransferOp AsyncTransferOp::create(OpBuilder &builder, Location location,
                                         AffinityAttr sourceAffinity,
                                         AffinityAttr targetAffinity) {
   return create(builder, location, type, source, sourceSize, resultSize,
-                sourceAffinity, targetAffinity, nullptr);
+                sourceAffinity, targetAffinity, nullptr, nullptr);
+}
+
+AsyncTransferOp AsyncTransferOp::create(OpBuilder &builder, Location location,
+                                        Type type, Value source,
+                                        Value sourceSize, Value resultSize,
+                                        AffinityAttr sourceAffinity,
+                                        AffinityAttr targetAffinity,
+                                        AffinityAttr executionAffinity) {
+  return create(builder, location, type, source, sourceSize, resultSize,
+                sourceAffinity, targetAffinity, executionAffinity, nullptr);
 }
 
 void AsyncTransferOp::build(OpBuilder &builder, OperationState &state,
@@ -3031,7 +3041,16 @@ void AsyncTransferOp::build(OpBuilder &builder, OperationState &state,
                             Value resultSize, AffinityAttr sourceAffinity,
                             AffinityAttr targetAffinity) {
   build(builder, state, type, source, sourceSize, resultSize, sourceAffinity,
-        targetAffinity, nullptr);
+        targetAffinity, nullptr, nullptr);
+}
+
+void AsyncTransferOp::build(OpBuilder &builder, OperationState &state,
+                            Type type, Value source, Value sourceSize,
+                            Value resultSize, AffinityAttr sourceAffinity,
+                            AffinityAttr targetAffinity,
+                            AffinityAttr executionAffinity) {
+  build(builder, state, type, source, sourceSize, resultSize, sourceAffinity,
+        targetAffinity, executionAffinity, nullptr);
 }
 
 void AsyncTransferOp::getAsyncAccessRanges(
