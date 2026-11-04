@@ -112,8 +112,8 @@ util.func public @non_contraction(%a: tensor<1x8x2xf32>, %b: tensor<3x2x4xf32>, 
 
 // -----
 
-// The shared contraction-body matcher accepts intervening unary operations,
-// but convolution input demotion requires a plain multiply-accumulate body.
+// The multiply-accumulate matcher accepts intervening unary operations, as it
+// does for generic matmuls. Demotion keeps them in the payload.
 util.func public @conv_with_unary_op(%a: tensor<1x8x2xf32>, %b: tensor<3x2x4xf32>, %init: tensor<1x6x4xf32>) -> tensor<1x6x4xf32> {
   %result = linalg.generic {
       indexing_maps = [affine_map<(n, w, f, kw, c) -> (n, w + kw, c)>,
@@ -130,12 +130,20 @@ util.func public @conv_with_unary_op(%a: tensor<1x8x2xf32>, %b: tensor<3x2x4xf32
   } -> tensor<1x6x4xf32>
   util.return %result : tensor<1x6x4xf32>
 }
-// NEGATIVE-LABEL: @conv_with_unary_op(
-// NEGATIVE-NOT: arith.truncf
-// NEGATIVE: arith.negf
-// NEGATIVE: arith.mulf
-// NEGATIVE: arith.addf
-// NEGATIVE: util.return
+// CONV-LABEL: @conv_with_unary_op(
+// CONV: arith.truncf {{.*}} : f32 to [[$TYPE]]
+// CONV: arith.truncf {{.*}} : f32 to [[$TYPE]]
+// CONV: linalg.generic
+// CONV-SAME: ins(%{{.*}}, %{{.*}} : tensor<1x8x2x[[$TYPE]]>, tensor<3x2x4x[[$TYPE]]>)
+// CONV: %[[LHS:.+]] = arith.extf
+// CONV: arith.extf
+// CONV: arith.negf %[[LHS]] : f32
+// CONV: arith.mulf {{.*}} : f32
+// CONV: arith.addf {{.*}} : f32
+// CONV: util.return
+// NOCONV-LABEL: @conv_with_unary_op(
+// NOCONV-NOT: arith.truncf
+// NOCONV: util.return
 // NONE-LABEL: @conv_with_unary_op(
 // NONE: util.return
 
