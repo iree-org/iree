@@ -1531,12 +1531,12 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
     return failure();
   }
 
-  auto setMatmulConfig = [&entryPoint, &op](int64_t tileX, int64_t tileY,
-                                            int64_t tileK,
-                                            ArrayRef<int64_t> workgroupSize,
-                                            ArrayRef<int32_t> subgroupSizes,
-                                            unsigned softwarePipelineDepth,
-                                            GPUPipeline pipeline) {
+  auto setMatmulConfig = [&entryPoint, &op, &contractionDims](
+                             int64_t tileX, int64_t tileY, int64_t tileK,
+                             ArrayRef<int64_t> workgroupSize,
+                             ArrayRef<int32_t> subgroupSizes,
+                             unsigned softwarePipelineDepth,
+                             GPUPipeline pipeline) {
     TileSizesListType tileSizes;
     unsigned numParallelLoops = op.getNumParallelLoops();
     unsigned numReductionLoops = op.getNumReductionLoops();
@@ -1580,7 +1580,11 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
 
       SmallVector<int64_t> reductionTileSizes(
           numParallelLoops + numReductionLoops, 0);
-      reductionTileSizes[numParallelLoops + numReductionLoops - 1] = tileK;
+      // Tile outer K dimensions to avoid expanding them during vector lowering.
+      for (int64_t k : llvm::drop_end(contractionDims->k)) {
+        reductionTileSizes[k] = 1;
+      }
+      reductionTileSizes[contractionDims->k.back()] = tileK;
 
       SmallVector<NamedAttribute, 3> attrs = {
           NamedAttribute("workgroup", b.getI64ArrayAttr(workgroupTileSizes)),
