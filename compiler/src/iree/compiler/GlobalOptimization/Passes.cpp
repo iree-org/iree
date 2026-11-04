@@ -181,10 +181,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPredicatedPass(clEnableQuantizedMatmulReassociation,
                          createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createCanonicalizePass)
-      .addPass(mlir::createCSEPass)
-      // Fold broadcasts into batch_matmul indexing maps before transpose
-      // propagation so the contraction consumes its producers directly.
-      .addPass(createFoldBroadcastIntoBatchMatmulPass);
+      .addPass(mlir::createCSEPass);
 
   FunctionLikeNest(mainPassManager)
       // Propagate transposes before QDQ conversion and set encoding/data tiling
@@ -212,7 +209,13 @@ void buildGlobalOptimizationPassPipeline(
       // direct dequantize producers after the preceding reshape/transpose
       // transformations, before im2col or input demotion can hide them.
       .addPredicatedPass(clConvertQDQToIntegerMath,
-                         createPropagateAffineQuantizationPass);
+                         createPropagateAffineQuantizationPass)
+      // Fold broadcasts into batch_matmul indexing maps once transposes have
+      // been propagated and folded into dequantizes and broadcasts, so a
+      // transposed and broadcast operand reaches the fold as a single
+      // producer. The contraction then reads its operands at their native
+      // rank and consumes its dequantize producers directly.
+      .addPass(createFoldBroadcastIntoBatchMatmulPass);
   // Pack sub-byte constants between propagation, which moves reshapes onto the
   // i8 values, and the QDQ rewrite, so the integer contraction reads the packed
   // storage. Without hoisting and const-eval, the packing would run at runtime.
