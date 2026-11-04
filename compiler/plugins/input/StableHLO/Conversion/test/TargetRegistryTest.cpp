@@ -53,7 +53,8 @@ protected:
 
   bool runRewritePass(ModuleOp module, const TargetRegistry &registry) {
     PassManager manager(&context);
-    manager.addPass(createRewriteRegisteredTargetsPass(registry));
+    manager.addPass(
+        createRewriteRegisteredCustomCallsAndCompositesPass(registry));
     return succeeded(manager.run(module));
   }
 
@@ -191,7 +192,8 @@ TEST_F(TargetRegistryTest, OwnsTemporaryStringKeys) {
 TEST_F(TargetRegistryTest, PassSnapshotsRegistryBeforeLaterRegistration) {
   TargetRegistry registry;
   PassManager manager(&context);
-  manager.addPass(createRewriteRegisteredTargetsPass(registry));
+  manager.addPass(
+      createRewriteRegisteredCustomCallsAndCompositesPass(registry));
   ASSERT_TRUE(
       succeeded(registry.addCustomCall("late_target", replaceWithI32(5))));
 
@@ -217,7 +219,8 @@ TEST_F(TargetRegistryTest, ClonedPassOutlivesRegistry) {
       return nullptr;
     }
     OpPassManager original(ModuleOp::getOperationName());
-    original.addPass(createRewriteRegisteredTargetsPass(registry));
+    original.addPass(
+        createRewriteRegisteredCustomCallsAndCompositesPass(registry));
     return std::make_unique<OpPassManager>(original);
   }();
   ASSERT_NE(clonedPipeline, nullptr);
@@ -268,7 +271,8 @@ TEST_F(TargetRegistryTest, HandlerCanUseDependentDialect) {
                                             &context);
   ASSERT_TRUE(module);
   PassManager manager(&context);
-  manager.addPass(createRewriteRegisteredTargetsPass(registry));
+  manager.addPass(
+      createRewriteRegisteredCustomCallsAndCompositesPass(registry));
   ASSERT_TRUE(succeeded(manager.run(*module)));
   EXPECT_NE(context.getLoadedDialect<arith::ArithDialect>(), nullptr);
   std::string printed;
@@ -277,7 +281,11 @@ TEST_F(TargetRegistryTest, HandlerCanUseDependentDialect) {
   EXPECT_NE(printed.find("arith.constant dense<9>"), std::string::npos);
 }
 
-TEST_F(TargetRegistryTest, CompositeDispatchFallsBackByVersionAndAttributes) {
+// The handler rewrites only the supported version with mode "identity".
+// An unknown version skips the handler; an unsupported mode is declined by it.
+// Both remain as composites until they are replaced by decomposition calls.
+TEST_F(TargetRegistryTest,
+       UnsupportedCompositeVersionsAndModesRemainForDecomposition) {
   TargetRegistry registry;
   int handlerCalls = 0;
   auto handler = [&handlerCalls](mlir::stablehlo::CompositeOp op,
@@ -346,7 +354,11 @@ TEST_F(TargetRegistryTest, CompositeDispatchFallsBackByVersionAndAttributes) {
   EXPECT_EQ(referenceCalls, 2);
 }
 
-TEST_F(TargetRegistryTest, CompositeDispatchPreservesGlobalConstantOperands) {
+// Handlers receive the JAX dimension and platform operands along with the data.
+// The handler returns the data operand for accepted composites. If it declines,
+// all operands remain available for decomposition.
+TEST_F(TargetRegistryTest,
+       HandlersReceiveDimensionAndPlatformOperandsAndDeclinesPreserveThem) {
   TargetRegistry registry;
   std::vector<size_t> inputCounts;
   auto handler = [&inputCounts](mlir::stablehlo::CompositeOp op,

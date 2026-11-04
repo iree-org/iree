@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "compiler/plugins/input/StableHLO/Conversion/TargetPreprocessing.h"
+#include "compiler/plugins/input/StableHLO/Conversion/CustomCallAndCompositePreprocessing.h"
 #include "compiler/plugins/input/StableHLO/Conversion/StableHLOCustomCallMetadata.h"
 #include "compiler/plugins/input/StableHLO/Conversion/TargetRegistry.h"
 
@@ -34,9 +34,9 @@ module {
 }
 )mlir";
 
-class TargetPreprocessingTest : public ::testing::Test {
+class CustomCallAndCompositePreprocessingTest : public ::testing::Test {
 protected:
-  TargetPreprocessingTest() {
+  CustomCallAndCompositePreprocessingTest() {
     context.loadDialect<func::FuncDialect, mlir::stablehlo::StablehloDialect>();
   }
 
@@ -80,7 +80,8 @@ protected:
         })));
 
     PassManager preprocessing(&context);
-    buildTargetPreprocessingPassPipeline(preprocessing, registry);
+    buildCustomCallAndCompositePreprocessingPassPipeline(preprocessing,
+                                                         registry);
     ASSERT_TRUE(succeeded(preprocessing.run(*module)));
     EXPECT_EQ(calls->load(), 1u);
     EXPECT_TRUE(succeeded(verify(*module)));
@@ -102,15 +103,18 @@ protected:
   MLIRContext context;
 };
 
-TEST_F(TargetPreprocessingTest, HandlesStablehloBeforeInputConversion) {
+TEST_F(CustomCallAndCompositePreprocessingTest,
+       HandlesStablehloBeforeInputConversion) {
   checkCustomCall(false);
 }
 
-TEST_F(TargetPreprocessingTest, NormalizesVhloBeforeTargetLookup) {
+TEST_F(CustomCallAndCompositePreprocessingTest,
+       NormalizesVhloBeforeTargetLookup) {
   checkCustomCall(true);
 }
 
-TEST_F(TargetPreprocessingTest, LeavesOtherInputDialectsUnchanged) {
+TEST_F(CustomCallAndCompositePreprocessingTest,
+       LeavesOtherInputDialectsUnchanged) {
   context.loadDialect<arith::ArithDialect>();
   auto module = parseSourceString<ModuleOp>(R"mlir(
     module {
@@ -126,7 +130,7 @@ TEST_F(TargetPreprocessingTest, LeavesOtherInputDialectsUnchanged) {
   auto original = module->clone();
   TargetRegistry registry;
   PassManager preprocessing(&context);
-  buildTargetPreprocessingPassPipeline(preprocessing, registry);
+  buildCustomCallAndCompositePreprocessingPassPipeline(preprocessing, registry);
   ASSERT_TRUE(succeeded(preprocessing.run(*module)));
   std::string before, after;
   llvm::raw_string_ostream beforeStream(before), afterStream(after);

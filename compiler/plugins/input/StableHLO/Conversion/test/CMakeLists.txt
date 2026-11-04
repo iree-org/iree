@@ -62,9 +62,9 @@ iree_cc_test(
 
 iree_cc_test(
   NAME
-    TargetPreprocessingTest
+    CustomCallAndCompositePreprocessingTest
   SRCS
-    "TargetPreprocessingTest.cpp"
+    "CustomCallAndCompositePreprocessingTest.cpp"
   DEPS
     MLIRArithDialect
     MLIRFuncDialect
@@ -76,8 +76,8 @@ iree_cc_test(
     gmock
     gtest
     iree::compiler::plugins::input::StableHLO::Conversion
+    iree::compiler::plugins::input::StableHLO::Conversion::CustomCallAndCompositePreprocessing
     iree::compiler::plugins::input::StableHLO::Conversion::CustomCallMetadata
-    iree::compiler::plugins::input::StableHLO::Conversion::TargetPreprocessing
     iree::compiler::plugins::input::StableHLO::Conversion::TargetRegistry
     iree::testing::gtest_main
 )
@@ -108,8 +108,8 @@ iree_cc_test(
     iree::compiler::Pipelines::Options
     iree::compiler::PluginAPI
     iree::compiler::plugins::input::StableHLO::Conversion
+    iree::compiler::plugins::input::StableHLO::Conversion::CustomCallAndCompositePreprocessing
     iree::compiler::plugins::input::StableHLO::Conversion::CustomCallMetadata
-    iree::compiler::plugins::input::StableHLO::Conversion::TargetPreprocessing
     iree::compiler::plugins::input::StableHLO::Conversion::TargetRegistry
     iree::testing::gtest_main
 )

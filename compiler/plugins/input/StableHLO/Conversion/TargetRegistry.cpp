@@ -5,11 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "compiler/plugins/input/StableHLO/Conversion/TargetRegistry.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::stablehlo {
+
+#define GEN_PASS_DEF_REWRITEREGISTEREDCUSTOMCALLSANDCOMPOSITESPASS
+#include "compiler/plugins/input/StableHLO/Conversion/TargetRegistryPasses.h.inc"
 
 LogicalResult
 TargetRegistry::addCustomCall(StringRef name, CustomCallHandler handler,
@@ -20,6 +22,8 @@ TargetRegistry::addCustomCall(StringRef name, CustomCallHandler handler,
   auto guardedHandler = [handler = std::move(handler)](
                             mlir::stablehlo::CustomCallOp op,
                             PatternRewriter &rewriter) -> LogicalResult {
+    // Tokens and futures can occur inside tuples. Check every leaf so nested
+    // values cannot bypass the ordering and completion restrictions below.
     auto hasOrderingType = [](Type type) {
       SmallVector<Type> leaves;
       if (auto tuple = dyn_cast<TupleType>(type)) {
@@ -32,6 +36,10 @@ TargetRegistry::addCustomCall(StringRef name, CustomCallHandler handler,
             leaf);
       });
     };
+    // Registered dispatch supports pure value rewrites. Effects and
+    // asynchronous completion need ordering guarantees; aliases need storage
+    // identity. These contracts are outside this registry, so leave such calls
+    // unchanged.
     if (op.getHasSideEffect() || !op.getOutputOperandAliases().empty() ||
         llvm::any_of(op.getOperandTypes(), hasOrderingType) ||
         llvm::any_of(op.getResultTypes(), hasOrderingType)) {
@@ -135,7 +143,9 @@ struct CompositeDispatch final
     return result;
   }
 
-  // Names the composite in the location of every op a handler inserts.
+  // Adds the composite's name to the locations of newly inserted operations.
+  // Handlers must use the supplied rewriter: a separate builder would bypass
+  // both this listener and the greedy rewrite driver.
   struct ProvenanceListener final : RewriterBase::ForwardingListener {
     ProvenanceListener(OpBuilder::Listener *listener, StringAttr provenance)
         : ForwardingListener(listener), provenance(provenance) {}
@@ -157,23 +167,18 @@ void populatePatterns(RewritePatternSet &patterns, RegistrySnapshot registry) {
                                                       registry);
 }
 
-class RewriteRegisteredTargetsPass final
-    : public PassWrapper<RewriteRegisteredTargetsPass,
-                         OperationPass<ModuleOp>> {
+class RewriteRegisteredCustomCallsAndCompositesPass final
+    : public impl::RewriteRegisteredCustomCallsAndCompositesPassBase<
+          RewriteRegisteredCustomCallsAndCompositesPass> {
 public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(RewriteRegisteredTargetsPass)
-  explicit RewriteRegisteredTargetsPass(const TargetRegistry &registry)
+  explicit RewriteRegisteredCustomCallsAndCompositesPass(
+      const TargetRegistry &registry)
       : registry(std::make_shared<const TargetRegistry>(registry)) {}
-  RewriteRegisteredTargetsPass(const RewriteRegisteredTargetsPass &) = default;
+  RewriteRegisteredCustomCallsAndCompositesPass(
+      const RewriteRegisteredCustomCallsAndCompositesPass &) = default;
 
-  StringRef getArgument() const override {
-    return "iree-stablehlo-rewrite-registered-targets";
-  }
-  StringRef getDescription() const override {
-    return "Attempts registered StableHLO custom-call and composite rewrites";
-  }
   void getDependentDialects(DialectRegistry &dialects) const override {
-    dialects.insert<mlir::stablehlo::StablehloDialect>();
+    Base::getDependentDialects(dialects);
     registry->registerDependentDialects(dialects);
   }
   void runOnOperation() override {
@@ -194,9 +199,10 @@ void populateTargetRewritePatterns(RewritePatternSet &patterns,
   populatePatterns(patterns, std::make_shared<const TargetRegistry>(registry));
 }
 
-std::unique_ptr<Pass>
-createRewriteRegisteredTargetsPass(const TargetRegistry &registry) {
-  return std::make_unique<RewriteRegisteredTargetsPass>(registry);
+std::unique_ptr<Pass> createRewriteRegisteredCustomCallsAndCompositesPass(
+    const TargetRegistry &registry) {
+  return std::make_unique<RewriteRegisteredCustomCallsAndCompositesPass>(
+      registry);
 }
 
 } // namespace mlir::iree_compiler::stablehlo
