@@ -149,6 +149,21 @@ function(iree_native_test)
     )
     iree_configure_test(${_TEST_NAME})
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "QEMU_CPU_FLAGS=${RISCV_QEMU_CPU_FLAGS}")
+  elseif((IREE_ARCH STREQUAL "mips_64") AND
+         CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # The test target needs to run within the QEMU emulator for MIPS64 Linux
+    # crosscompile build or on-device.
+    add_test(
+      NAME
+        ${_TEST_NAME}
+      COMMAND
+        "${IREE_ROOT_DIR}/build_tools/cmake/run_mips_test.sh"
+        -L "${MIPS_SYSROOT}"
+        "$<TARGET_FILE:${_SRC_TARGET}>"
+        ${_TEST_ARGS}
+    )
+    iree_configure_test(${_TEST_NAME})
+    set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "QEMU_CPU_FLAGS=${MIPS_QEMU_CPU_FLAGS}")
   elseif(IREE_ARCH STREQUAL "arm_64" AND "requires-arm-sme" IN_LIST _RULE_LABELS)
     add_test(
       NAME

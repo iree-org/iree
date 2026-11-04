@@ -93,6 +93,19 @@ function(iree_hal_cts_testdata)
     return()
   endif()
 
+  # Formats that compile to native ELF executables (llvm-cpu) require codegen
+  # for the target architecture. Skip them on architectures IREE has no
+  # llvm-cpu backend for, where iree-compile cannot produce executables and
+  # aborts (e.g. MIPS, which is VMVX-only). Gating on IREE_ARCH (not
+  # IREE_TARGET_BACKEND_LLVM_CPU) avoids disabling llvm-cpu testdata on
+  # runtime-only builds that can still codegen via the host compiler (riscv,
+  # arm, x86). VMVX (arch-independent bytecode) is unaffected.
+  # TODO: remove this gate once IREE has an llvm-cpu backend for MIPS.
+  if(IREE_ARCH STREQUAL "mips_64" AND
+     "--iree-hal-local-target-device-backends=llvm-cpu" IN_LIST _RULE_FLAGS)
+    return()
+  endif()
+
   if(NOT DEFINED _RULE_TESTDATA_DIR)
     message(SEND_ERROR "iree_hal_cts_testdata requires TESTDATA_DIR")
   endif()
@@ -231,21 +244,23 @@ function(iree_hal_cts_test_suite)
 
   # Executable-dependent test categories (require testdata compiled by
   # iree-compile, which may be unavailable in runtime-only builds).
+  # Keep only the testdata libs whose targets exist. A lib is absent when its
+  # format was skipped (e.g. llvm-cpu on a codegen-less target) or the compiler
+  # is unavailable. Executable tests run against whatever testdata survives, so
+  # dropping one backend (llvm-cpu) does not disable the others (vmvx).
+  set(_AVAILABLE_TESTDATA_LIBS "")
   if(_RULE_TESTDATA_LIBS)
-    # Verify all testdata targets exist (they won't if the compiler is absent).
-    set(_TESTDATA_AVAILABLE TRUE)
     iree_package_ns(_TESTDATA_PACKAGE_NS)
     foreach(_LIB ${_RULE_TESTDATA_LIBS})
       string(REGEX REPLACE "^::" "${_TESTDATA_PACKAGE_NS}::" _FULL_LIB "${_LIB}")
       string(REPLACE "::" "_" _TARGET_NAME "${_FULL_LIB}")
-      if(NOT TARGET "${_TARGET_NAME}")
-        set(_TESTDATA_AVAILABLE FALSE)
-        break()
+      if(TARGET "${_TARGET_NAME}")
+        list(APPEND _AVAILABLE_TESTDATA_LIBS "${_LIB}")
       endif()
     endforeach()
   endif()
 
-  if(_RULE_TESTDATA_LIBS AND _TESTDATA_AVAILABLE)
+  if(_AVAILABLE_TESTDATA_LIBS)
     set(_EXECUTABLE_SUITES
       "dispatch_tests\;iree::hal::cts::command_buffer::all_dispatch_tests"
       "executable_tests\;iree::hal::cts::core::all_executable_tests"
@@ -259,7 +274,7 @@ function(iree_hal_cts_test_suite)
         SRCS "${_TEST_MAIN}"
         DEPS
           ${_COMMON_DEPS}
-          ${_RULE_TESTDATA_LIBS}
+          ${_AVAILABLE_TESTDATA_LIBS}
           ${_TEST_LIB}
         ${_ARGS_BLOCK}
         ${_LABELS_BLOCK}

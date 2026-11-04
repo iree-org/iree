@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
-load("//build_tools/bazel:iree_check_test.bzl", "iree_check_test_suite")
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
@@ -33,15 +33,69 @@ iree_lit_test_suite(
     ],
 )
 
-iree_check_test_suite(
-    name = "check",
+# Each backend is defined explicitly via iree_check_single_backend_test_suite
+# (instead of the iree_check_test_suite default-3-backend convenience macro)
+# so that llvm-cpu can carry its own "nomips" label without also disabling
+# the vmvx/vulkan-spirv variants: the compiler backend availability check is
+# skipped when using a prebuilt host compiler (IREE_HOST_BIN_DIR), so
+# IREE_TARGET_BACKEND_LLVM_CPU=OFF does not by itself stop llvm-cpu tests
+# from being generated/run on a codegen-less target build (e.g. MIPS Phase 1,
+# vmvx only).
+iree_check_single_backend_test_suite(
+    name = "check_vmvx_local-task",
     srcs = ["success.mlir"],
     compiler_flags = ["--iree-input-demote-f64-to-f32=false"],
+    driver = "local-task",
+    target_backend = "vmvx",
 )
 
-iree_check_test_suite(
-    name = "check_failure",
+iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv_vulkan",
+    srcs = ["success.mlir"],
+    compiler_flags = ["--iree-input-demote-f64-to-f32=false"],
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_local-task_generic",
+    srcs = ["success.mlir"],
+    compiler_flags = [
+        "--iree-input-demote-f64-to-f32=false",
+        "--iree-llvmcpu-target-cpu=generic",
+    ],
+    driver = "local-task",
+    tags = ["nomips"],
+    target_backend = "llvm-cpu",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_failure_vmvx_local-task",
     srcs = ["failure.mlir"],
     compiler_flags = ["--iree-input-demote-f64-to-f32=false"],
+    driver = "local-task",
     runner_args = ["--expect_failure"],
+    target_backend = "vmvx",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_failure_vulkan-spirv_vulkan",
+    srcs = ["failure.mlir"],
+    compiler_flags = ["--iree-input-demote-f64-to-f32=false"],
+    driver = "vulkan",
+    runner_args = ["--expect_failure"],
+    target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_failure_llvm-cpu_local-task_generic",
+    srcs = ["failure.mlir"],
+    compiler_flags = [
+        "--iree-input-demote-f64-to-f32=false",
+        "--iree-llvmcpu-target-cpu=generic",
+    ],
+    driver = "local-task",
+    runner_args = ["--expect_failure"],
+    tags = ["nomips"],
+    target_backend = "llvm-cpu",
 )
