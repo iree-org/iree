@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
+#include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
@@ -177,24 +177,25 @@ getPackedBitWidth(DequantizeAffineOp op, SymbolTableCollection &symbolTables) {
 
 /// Returns true when `info` is a constant expression whose roots are inline
 /// constants or loads of immutable globals with an inline initial value.
-static bool isComputedFromInlineData(const ConstValueInfo *info,
+static bool isComputedFromInlineData(const ConstValueInfo &info,
                                      SymbolTableCollection &symbolTables) {
-  if (!info || !info->isConstExpr()) {
+  if (!info.isConstExpr()) {
     return false;
   }
-  return llvm::all_of(info->roots, [&](Value root) {
+  return llvm::all_of(info.roots, [&](Value root) {
     return isa_and_present<ElementsAttr, IntegerAttr, FloatAttr>(
         getConstantAttr(root, symbolTables));
   });
 }
 
 /// Returns true when packing the constant expression of `info` into
-/// `bitWidth` bits takes no more bytes than its roots, so the packing stays
-/// within the hoisting size limit. Returns false if a root has a dynamic shape.
-static bool isPackingNoLargerThanRoots(const ConstValueInfo *info,
+/// `bitWidth` bits takes no more bytes than its roots, which hoisting accepts
+/// under any size threshold. Returns false if a root has a dynamic shape, whose
+/// size is unknown.
+static bool isPackingNoLargerThanRoots(const ConstValueInfo &info,
                                        unsigned bitWidth) {
   int64_t rootBytes = 0;
-  for (Value root : info->roots) {
+  for (Value root : info.roots) {
     auto rootType = dyn_cast<ShapedType>(root.getType());
     if (!rootType) {
       continue;
@@ -204,14 +205,13 @@ static bool isPackingNoLargerThanRoots(const ConstValueInfo *info,
     }
     rootBytes += IREE::Util::getRoundedPhysicalStorageSize(rootType);
   }
-  auto type = cast<ShapedType>(info->constValue.getType());
+  auto type = cast<ShapedType>(info.constValue.getType());
   return type.getNumElements() * bitWidth / 8 <= rootBytes;
 }
 
-/// Returns the uses that read the data of `value` through reshapes: the uses
-/// of every load of the global that `value` is reshaped from, or else of the
-/// value it is reshaped from, and of their reshapes. Returns nullopt when the
-/// global has users other than loads.
+/// Returns every use that reads the data of `value`: reshapes are followed up
+/// to their source and back down, across all loads when the source is a global
+/// load. Returns nullopt if the global has users other than loads.
 static std::optional<SmallVector<OpOperand *>>
 getUsesOfSameData(Value value, const SymbolUserMap &symbolUsers,
                   SymbolTableCollection &symbolTables) {
@@ -298,10 +298,10 @@ static Value buildPackedInput(OpBuilder &builder, Location loc, Value input,
 
   auto narrowType = RankedTensorType::get(inputType.getShape(),
                                           builder.getIntegerType(bitWidth));
-  return IREE::Flow::TensorBitCastOp::create(builder, loc, narrowType,
-                                             packingOp.getResult(0),
-                                             /*source_dims=*/ValueRange{},
-                                             /*result_dims=*/ValueRange{});
+  return IREE::TensorExt::BitCastOp::create(builder, loc, narrowType,
+                                            packingOp.getResult(0),
+                                            /*source_dims=*/ValueRange{},
+                                            /*result_dims=*/ValueRange{});
 }
 
 /// A dequantize whose input fits `bitWidth` bits.
@@ -323,12 +323,12 @@ collectCandidates(ModuleOp moduleOp,
       return;
     }
     const ConstValueInfo *info = constExprs.lookup(op.getInput());
-    if (!isComputedFromInlineData(info, symbolTables)) {
+    if (!info || !isComputedFromInlineData(*info, symbolTables)) {
       LDBG() << "input is not computed from inline data: " << op;
       return;
     }
-    if (!isPackingNoLargerThanRoots(info, *bitWidth)) {
-      LDBG() << "packed input is larger than its inline data: " << op;
+    if (!isPackingNoLargerThanRoots(*info, *bitWidth)) {
+      LDBG() << "packed input may be larger than its inline data: " << op;
       return;
     }
     candidates.push_back({op, *bitWidth});

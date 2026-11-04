@@ -131,7 +131,8 @@ def PropagateAffineQuantizationPass :
     collapsed `[M, G, L]` and `[N, G, L]` operands thus iterates over
     `(m, n, g, l)`. When a contraction consumes the result, the dequantize
     becomes its direct producer so the integer contraction rewrite can match
-    it.
+    it. A pad is not moved onto sub-byte storage such as `i4`, where it could
+    shift values off byte boundaries.
   }];
 }
 
@@ -140,8 +141,8 @@ def PackSubByteQuantizedConstantsPass :
   let summary = "Packs constant quantized values with sub-byte ranges into i2 or i4 storage.";
   let description = [{
     Packs the constant `i8` input of an `iree_linalg_ext.dequantize_affine`
-    into `i2` or `i4` storage, which the dequantize then reads through a
-    `flow.tensor.bitcast`. With `w`-bit storage, element `k * i + j` of the
+    into `i2` or `i4` storage, which the dequantize then reads through an
+    `iree_tensor_ext.bitcast`. With `w`-bit storage, element `k * i + j` of the
     innermost dimension goes to bits `[j * w, (j + 1) * w)` of byte `i`, where
     `k = 8 / w`.
 
@@ -165,7 +166,7 @@ def PackSubByteQuantizedConstantsPass :
     "mlir::arith::ArithDialect",
     "mlir::linalg::LinalgDialect",
     "mlir::tensor::TensorDialect",
-    "IREE::Flow::FlowDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
   ];
 }
 

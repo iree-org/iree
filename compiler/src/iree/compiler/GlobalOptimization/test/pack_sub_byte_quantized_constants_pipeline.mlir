@@ -55,13 +55,13 @@ util.func public @per_channel_signed_linear(%x: tensor<4x16xf32>) -> tensor<4x8x
 //       CHECK:     util.global.store %{{.+}}, @[[$PACKED]] : tensor<8x8xi8>
 // CHECK-LABEL: util.func public @per_channel_signed_linear(
 //       CHECK:   %[[LOADED:.+]] = util.global.load immutable @[[$PACKED]] : tensor<8x8xi8>
-//       CHECK:   %[[WEIGHT:.+]] = flow.tensor.bitcast %[[LOADED]] : tensor<8x8xi8> -> tensor<8x16xi4>
+//       CHECK:   %[[WEIGHT:.+]] = iree_tensor_ext.bitcast %[[LOADED]] : tensor<8x8xi8> -> tensor<8x16xi4>
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%{{.+}}, %[[WEIGHT]] : tensor<4x16xi8>, tensor<8x16xi4>)
 //  CHECK-NEXT:   ^bb0(%{{.+}}: i8, %[[W:[a-zA-Z0-9_]+]]: i4, %{{.+}}: i32):
 //       CHECK:     arith.extsi %[[W]] : i4 to i32
 // DISABLED-LABEL: util.func public @per_channel_signed_linear(
-//   DISABLED-NOT:   flow.tensor.bitcast
+//   DISABLED-NOT:   iree_tensor_ext.bitcast
 //       DISABLED:   linalg.generic
 //  DISABLED-SAME:     ins(%{{.+}}, %{{.+}} : tensor<4x16xi8>, tensor<8x16xi8>)
 
@@ -112,12 +112,12 @@ util.func public @blockwise_unsigned_linear(
 //       CHECK:   util.global private @[[$PACKED:.+]] : tensor<8x2x16xi8>
 // CHECK-LABEL: util.func public @blockwise_unsigned_linear(
 //       CHECK:   %[[LOADED:.+]] = util.global.load immutable @[[$PACKED]] : tensor<8x2x16xi8>
-//       CHECK:   %[[WEIGHT:.+]] = flow.tensor.bitcast %[[LOADED]] : tensor<8x2x16xi8> -> tensor<8x2x32xi4>
+//       CHECK:   %[[WEIGHT:.+]] = iree_tensor_ext.bitcast %[[LOADED]] : tensor<8x2x16xi8> -> tensor<8x2x32xi4>
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%{{.+}}, %[[WEIGHT]] : tensor<4x2x32xi8>, tensor<8x2x32xi4>)
 //  CHECK-NEXT:   ^bb0(%{{.+}}: i8, %[[W:[a-zA-Z0-9_]+]]: i4, %{{.+}}: i32):
 //       CHECK:     arith.extui %[[W]] : i4 to i32
 // DISABLED-LABEL: util.func public @blockwise_unsigned_linear(
-//   DISABLED-NOT:   flow.tensor.bitcast
+//   DISABLED-NOT:   iree_tensor_ext.bitcast
 //       DISABLED:   linalg.generic
 //  DISABLED-SAME:     ins(%{{.+}}, %{{.+}} : tensor<4x2x32xi8>, tensor<8x2x32xi8>)

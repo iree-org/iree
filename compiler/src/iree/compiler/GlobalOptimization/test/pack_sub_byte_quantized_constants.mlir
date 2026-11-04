@@ -61,7 +61,7 @@ util.func public @pack_signed_i2(%scale: tensor<4xf32>) -> tensor<4x8xf32> {
 //       CHECK:     %[[BYTE:.+]] = arith.ori %[[O2]], %[[S3]] : i8
 //  CHECK-NEXT:     linalg.yield %[[BYTE]] : i8
 //       CHECK:   } -> tensor<4x2xi8>
-//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %[[PACKED]] : tensor<4x2xi8> -> tensor<4x8xi2>
+//       CHECK:   %[[NARROW:.+]] = iree_tensor_ext.bitcast %[[PACKED]] : tensor<4x2xi8> -> tensor<4x8xi2>
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     <indexing_maps = [#[[$ID2]], #[[$ROW2]], #[[$ID2]]], quant_min = -2, quant_max = 1>
 //  CHECK-SAME:     ins(%[[NARROW]], %[[SCALE]] : tensor<4x8xi2>, tensor<4xf32>)
@@ -95,7 +95,7 @@ util.func public @decline_wide_range(%scale: tensor<4xf32>) -> tensor<4x8xf32> {
 // CHECK-LABEL: util.func public @decline_wide_range(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x8xi8>
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = -9, quant_max = 7>
 //  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<4x8xi8>, tensor<4xf32>)
@@ -120,7 +120,7 @@ util.func public @decline_unsigned_range_read_as_signed(%scale: tensor<4xf32>) -
 // CHECK-LABEL: util.func public @decline_unsigned_range_read_as_signed(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x8xi8>
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = 0, quant_max = 15>
 //  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<4x8xi8>, tensor<4xf32>)
@@ -164,7 +164,7 @@ util.func public @pack_scalar_zero_point() -> tensor<4x8xf32> {
 // CHECK-LABEL: util.func public @pack_scalar_zero_point(
 //       CHECK:   %[[SCALE:.+]] = arith.constant 2.500000e-01 : f32
 //       CHECK:   %[[ZERO_POINT:.+]] = arith.constant 8 : i64
-//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
+//       CHECK:   %[[NARROW:.+]] = iree_tensor_ext.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[NARROW]], %[[SCALE]], %[[ZERO_POINT]] : tensor<4x8xi4>, f32, i64)
 //       CHECK:   util.return %[[DEQ]]
@@ -192,7 +192,7 @@ util.func public @pack_unsigned_i4_zero_point(%scale: tensor<4xf32>) -> tensor<4
 }
 // CHECK-LABEL: util.func public @pack_unsigned_i4_zero_point(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
-//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
+//       CHECK:   %[[NARROW:.+]] = iree_tensor_ext.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = 0, quant_max = 15, input_unsigned, zp_unsigned>
 //  CHECK-SAME:     ins(%[[NARROW]], %[[SCALE]], %{{.+}} : tensor<4x8xi4>, tensor<4xf32>, tensor<4xi8>)
@@ -220,7 +220,7 @@ util.func public @pack_resource_zero_point(%scale: tensor<4xf32>) -> tensor<4x8x
 }
 // CHECK-LABEL: util.func public @pack_resource_zero_point(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
-//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
+//       CHECK:   %[[NARROW:.+]] = iree_tensor_ext.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = 0, quant_max = 15, input_unsigned>
 //  CHECK-SAME:     ins(%[[NARROW]], %[[SCALE]], %{{.+}} : tensor<4x8xi4>, tensor<4xf32>, tensor<4xi64>)
@@ -255,7 +255,7 @@ util.func public @pack_i2_range_into_i4_for_zero_point(%scale: tensor<4xf32>) ->
 }
 // CHECK-LABEL: util.func public @pack_i2_range_into_i4_for_zero_point(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
-//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
+//       CHECK:   %[[NARROW:.+]] = iree_tensor_ext.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = 0, quant_max = 3, input_unsigned, zp_unsigned>
 //  CHECK-SAME:     ins(%[[NARROW]], %[[SCALE]], %{{.+}} : tensor<4x8xi4>, tensor<4xf32>, tensor<4xi8>)
@@ -283,7 +283,7 @@ util.func public @decline_zero_point_off_grid(%scale: tensor<4xf32>) -> tensor<4
 // CHECK-LABEL: util.func public @decline_zero_point_off_grid(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x8xi8>
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[ZERO_POINT:.+]] = util.global.load @zero_point : tensor<4xi8>
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = 0, quant_max = 15, input_unsigned>
@@ -315,7 +315,7 @@ util.func public @decline_computed_zero_point(%scale: tensor<4xf32>) -> tensor<4
 // CHECK-LABEL: util.func public @decline_computed_zero_point(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x8xi8>
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[ZERO_POINT:.+]] = arith.andi
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]], %[[ZERO_POINT]] : tensor<4x8xi8>, tensor<4xf32>, tensor<4xi8>)
@@ -348,7 +348,7 @@ util.func public @pack_i2_range_into_i4(%scale: tensor<4xf32>) -> tensor<4x6xf32
 }
 // CHECK-LABEL: util.func public @pack_i2_range_into_i4(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
-//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x3xi8> -> tensor<4x6xi4>
+//       CHECK:   %[[NARROW:.+]] = iree_tensor_ext.bitcast %{{.+}} : tensor<4x3xi8> -> tensor<4x6xi4>
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = -2, quant_max = 1>
 //  CHECK-SAME:     ins(%[[NARROW]], %[[SCALE]] : tensor<4x6xi4>, tensor<4xf32>)
@@ -372,7 +372,7 @@ util.func public @decline_dynamic_shape(%input: tensor<?x8xi8>, %scale: tensor<?
 }
 // CHECK-LABEL: util.func public @decline_dynamic_shape(
 //  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<?x8xi8>, %[[SCALE:[a-zA-Z0-9_]+]]: tensor<?xf32>
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[INPUT]], %[[SCALE]] : tensor<?x8xi8>, tensor<?xf32>)
 //       CHECK:   util.return %[[DEQ]]
@@ -395,7 +395,7 @@ util.func public @decline_zero_size(%scale: f32) -> tensor<4x0xf32> {
 // CHECK-LABEL: util.func public @decline_zero_size(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: f32
 //       CHECK:   %[[WEIGHT:.+]] = arith.constant dense<0> : tensor<4x0xi8>
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = -8, quant_max = 7>
 //  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<4x0xi8>, f32)
@@ -434,7 +434,7 @@ util.func public @pack_outside_control_flow(%cond: i1, %scale: tensor<4xf32>) ->
 }
 // CHECK-LABEL: util.func public @pack_outside_control_flow(
 //  CHECK-SAME:     %[[COND:[a-zA-Z0-9_]+]]: i1, %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
-//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
+//       CHECK:   %[[NARROW:.+]] = iree_tensor_ext.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
 //       CHECK:   %[[RESULT:.+]] = scf.if %[[COND]]
 //       CHECK:     %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:       ins(%[[NARROW]], %[[SCALE]] : tensor<4x8xi4>, tensor<4xf32>)
@@ -464,8 +464,8 @@ util.func public @pack_once_at_widest_width(%scale: tensor<4xf32>) -> (tensor<4x
 }
 // CHECK-LABEL: util.func public @pack_once_at_widest_width(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
-//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
-//   CHECK-NOT:   flow.tensor.bitcast
+//       CHECK:   %[[NARROW:.+]] = iree_tensor_ext.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[TWO_BIT:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = -2, quant_max = 1>
 //  CHECK-SAME:     ins(%[[NARROW]], %[[SCALE]] : tensor<4x8xi4>, tensor<4xf32>)
@@ -501,8 +501,10 @@ util.func public @decline_input_read_as_zero_point(%scale: tensor<4xf32>) -> (te
 // CHECK-LABEL: util.func public @decline_input_read_as_zero_point(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x8xi8>
-//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
-//   CHECK-NOT:   flow.tensor.bitcast
+//       CHECK:   %[[OTHER_WEIGHT:.+]] = util.global.load @other_weight : tensor<4x8xi8>
+//       CHECK:   tensor.extract_slice %[[OTHER_WEIGHT]]
+//       CHECK:   %[[NARROW:.+]] = iree_tensor_ext.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<4x8xi8>, tensor<4xf32>)
 //       CHECK:   %[[OTHER:.+]] = iree_linalg_ext.dequantize_affine
@@ -537,13 +539,13 @@ util.func public @dequantize_weight_again(%scale: tensor<4xf32>) -> tensor<4x8xf
 }
 // CHECK-LABEL: util.func public @pack_global_dequantized_twice(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
-//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
+//       CHECK:   %[[NARROW:.+]] = iree_tensor_ext.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[NARROW]], %[[SCALE]] : tensor<4x8xi4>, tensor<4xf32>)
 //       CHECK:   util.return %[[DEQ]]
 // CHECK-LABEL: util.func public @dequantize_weight_again(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
-//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
+//       CHECK:   %[[NARROW:.+]] = iree_tensor_ext.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[NARROW]], %[[SCALE]] : tensor<4x8xi4>, tensor<4xf32>)
 //       CHECK:   util.return %[[DEQ]]
@@ -581,14 +583,14 @@ util.func public @dequantize_reshaped_weight(%scale: tensor<4xf32>) -> tensor<4x
 // CHECK-LABEL: util.func public @decline_global_read_in_two_shapes(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x8xi8>
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<4x8xi8>, tensor<4xf32>)
 //       CHECK:   util.return %[[DEQ]]
 // CHECK-LABEL: util.func public @dequantize_reshaped_weight(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[EXPANDED]], %[[SCALE]] : tensor<4x2x4xi8>, tensor<4xf32>)
 //       CHECK:   util.return %[[DEQ]]
@@ -621,7 +623,7 @@ util.func public @read_weight() -> tensor<4x2x4xi8> {
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x2x4xi8>
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[WEIGHT]]
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = -8, quant_max = 7>
 //  CHECK-SAME:     ins(%[[COLLAPSED]], %[[SCALE]] : tensor<4x8xi8>, tensor<4xf32>)
@@ -634,8 +636,8 @@ util.func public @read_weight() -> tensor<4x2x4xi8> {
 // inline data are packed, so that constant evaluation folds the packing. A
 // runtime value would be packed on every call, and a parameter at every load
 // while its archive keeps the unpacked bytes. Hoisting rejects an expression
-// that grows too much, so the packing must not take more bytes than the data
-// it is computed from.
+// that grows by more than a threshold the pass cannot see, so the packing may
+// take no more bytes than the data it is computed from.
 //===----------------------------------------------------------------------===//
 
 // -----
@@ -654,7 +656,7 @@ util.func public @decline_runtime_value(%input: tensor<4x8xi8>, %scale: tensor<4
 }
 // CHECK-LABEL: util.func public @decline_runtime_value(
 //  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<4x8xi8>, %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = -8, quant_max = 7>
 //  CHECK-SAME:     ins(%[[INPUT]], %[[SCALE]] : tensor<4x8xi8>, tensor<4xf32>)
@@ -701,7 +703,7 @@ util.func public @pack_unpacked_nibbles(%scale: tensor<4xf32>) -> tensor<4x8xf32
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[WEIGHT:.+]] = tensor.collapse_shape
 //       CHECK:   tensor.extract_slice %[[WEIGHT]]
-//       CHECK:   %[[NARROW:.+]] = flow.tensor.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
+//       CHECK:   %[[NARROW:.+]] = iree_tensor_ext.bitcast %{{.+}} : tensor<4x4xi8> -> tensor<4x8xi4>
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[NARROW]], %[[SCALE]] : tensor<4x8xi4>, tensor<4xf32>)
 //       CHECK:   util.return %[[DEQ]]
@@ -711,8 +713,8 @@ util.func public @pack_unpacked_nibbles(%scale: tensor<4xf32>) -> tensor<4x8xf32
 #id2 = affine_map<(d0, d1) -> (d0, d1)>
 #scalar2 = affine_map<(d0, d1) -> ()>
 
-// The broadcast of two bytes packs into eight, which hoisting may leave in the
-// program to run on every call.
+// The broadcast of two bytes packs into eight, more than the data it is
+// computed from.
 util.func public @decline_packing_larger_than_data(%scale: f32) -> tensor<2x8xf32> {
   %values = arith.constant dense<[1, -1]> : tensor<2xi8>
   %empty = tensor.empty() : tensor<2x8xi8>
@@ -728,7 +730,7 @@ util.func public @decline_packing_larger_than_data(%scale: f32) -> tensor<2x8xf3
 // CHECK-LABEL: util.func public @decline_packing_larger_than_data(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: f32
 //       CHECK:   %[[BROADCAST:.+]] = linalg.broadcast
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[BROADCAST]], %[[SCALE]] : tensor<2x8xi8>, f32)
 //       CHECK:   util.return %[[DEQ]]
@@ -752,7 +754,7 @@ util.func public @decline_parameter(%scale: tensor<4xf32>) -> tensor<4x8xf32> {
 // CHECK-LABEL: util.func public @decline_parameter(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x8xi8>
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     quant_min = -8, quant_max = 7>
 //  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<4x8xi8>, tensor<4xf32>)
@@ -784,7 +786,7 @@ util.func public @decline_i4_storage(%scale: tensor<4xf32>) -> tensor<4x8xf32> {
 // CHECK-LABEL: util.func public @decline_i4_storage(
 //  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
 //       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x8xi4>
-//   CHECK-NOT:   flow.tensor.bitcast
+//   CHECK-NOT:   iree_tensor_ext.bitcast
 //       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<4x8xi4>, tensor<4xf32>)
 //       CHECK:   util.return %[[DEQ]]
