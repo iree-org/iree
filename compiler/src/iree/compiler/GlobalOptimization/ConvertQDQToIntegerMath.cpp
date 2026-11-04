@@ -162,13 +162,44 @@ buildIntegerContraction(OpBuilder &b, Location loc, linalg::LinalgOp op,
 // Operand sums
 //===----------------------------------------------------------------------===//
 
+/// Returns the map of a shape-only operand for an integer sum over `maps`, or
+/// a map without results when every extent can be inferred from `maps`.
+/// `partnerMap` is the indexing map of the other contraction operand, and
+/// `unusedDims` are the dimensions of its domain that the sum drops. When
+/// `partnerMap` restricted to the sum's dimensions is a projected permutation
+/// covering the missing extents, it is used: the sum of a convolution input
+/// then reads like a convolution with a ones filter, which im2col rewrites to
+/// share the gather of the main convolution.
+static AffineMap getSumShapeMap(ArrayRef<AffineMap> maps, AffineMap partnerMap,
+                                const llvm::SmallBitVector &unusedDims) {
+  AffineMap shapeMap = getExplicitExtentDimsMap(maps);
+  if (shapeMap.getNumResults() == 0 || !partnerMap.isProjectedPermutation()) {
+    return shapeMap;
+  }
+  llvm::SmallBitVector droppedResults(partnerMap.getNumResults());
+  for (auto [index, expr] : llvm::enumerate(partnerMap.getResults())) {
+    if (unusedDims.test(cast<AffineDimExpr>(expr).getPosition())) {
+      droppedResults.set(index);
+    }
+  }
+  AffineMap partnerShapeMap =
+      compressDims(partnerMap.dropResults(droppedResults), unusedDims);
+  bool coversShape = llvm::all_of(shapeMap.getResults(), [&](AffineExpr expr) {
+    return partnerShapeMap.isFunctionOfDim(
+        cast<AffineDimExpr>(expr).getPosition());
+  });
+  return coversShape ? partnerShapeMap : shapeMap;
+}
+
 /// Builds an integer sum with the given input and output indexing maps.
-/// `outputMap` is a projected permutation. Both maps use the domain described
-/// by `iterationSizes`. Dimensions absent from both maps are dropped; those
+/// `outputMap` is a projected permutation. Both maps, and `partnerMap`, the
+/// map of the other contraction operand, use the domain described by
+/// `iterationSizes`. Dimensions absent from both maps are dropped; those
 /// used only by `inputMap` are reduced. Input values are extended to
 /// `accumulatorType` according to `isUnsigned`.
 static Value buildIntegerSum(OpBuilder &b, Location loc, Value input,
                              AffineMap inputMap, AffineMap outputMap,
+                             AffineMap partnerMap,
                              ArrayRef<OpFoldResult> iterationSizes,
                              IntegerType accumulatorType, bool isUnsigned) {
   SmallVector<AffineMap> maps{inputMap, outputMap};
@@ -190,7 +221,7 @@ static Value buildIntegerSum(OpBuilder &b, Location loc, Value input,
   // Window expressions such as oh * stride + kh * dilation do not expose kh's
   // extent. A shape-only input supplies missing extents without loading data.
   SmallVector<Value> inputs{input};
-  AffineMap shapeMap = getExplicitExtentDimsMap(maps);
+  AffineMap shapeMap = getSumShapeMap(maps, partnerMap, unusedDims);
   if (shapeMap.getNumResults() != 0) {
     SmallVector<OpFoldResult> shapeSizes =
         applyPermutationMap<OpFoldResult>(shapeMap, sizes);
@@ -325,9 +356,9 @@ buildZeroPointCorrection(OpBuilder &b, Location loc,
   if (detail.needsLhsSum()) {
     AffineMap sumMap = identity.dropResults(
         getUnusedDimsBitVector({lhs.inputMap}) | reductionDims);
-    Value sum = buildIntegerSum(b, loc, lhsDequantize.getInput(), lhs.inputMap,
-                                sumMap, iterationSizes, accumulatorType,
-                                lhsDequantize.getInputUnsigned());
+    Value sum = buildIntegerSum(
+        b, loc, lhsDequantize.getInput(), lhs.inputMap, sumMap, rhs.inputMap,
+        iterationSizes, accumulatorType, lhsDequantize.getInputUnsigned());
     terms.push_back(buildIntegerProduct(
         b, loc, {rhsDequantize.getZeroPoint(), rhs.zeroPointMap},
         rhsDequantize.getZpUnsigned(), {sum, sumMap}, /*rhsUnsigned=*/false,
@@ -336,9 +367,9 @@ buildZeroPointCorrection(OpBuilder &b, Location loc,
   if (detail.needsRhsSum()) {
     AffineMap sumMap = identity.dropResults(
         getUnusedDimsBitVector({rhs.inputMap}) | reductionDims);
-    Value sum = buildIntegerSum(b, loc, rhsDequantize.getInput(), rhs.inputMap,
-                                sumMap, iterationSizes, accumulatorType,
-                                rhsDequantize.getInputUnsigned());
+    Value sum = buildIntegerSum(
+        b, loc, rhsDequantize.getInput(), rhs.inputMap, sumMap, lhs.inputMap,
+        iterationSizes, accumulatorType, rhsDequantize.getInputUnsigned());
     terms.push_back(buildIntegerProduct(
         b, loc, {lhsDequantize.getZeroPoint(), lhs.zeroPointMap},
         lhsDequantize.getZpUnsigned(), {sum, sumMap}, /*rhsUnsigned=*/false,

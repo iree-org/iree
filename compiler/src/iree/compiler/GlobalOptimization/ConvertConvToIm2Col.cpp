@@ -16,6 +16,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include <functional>
+#include <optional>
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
@@ -76,6 +77,40 @@ static AffineMap getInputMapWithoutUnitWindows(linalg::LinalgOp convOp,
       replacements, /*symReplacements=*/{}, numLoops, /*numResultSyms=*/0));
 }
 
+/// The access a convolution makes into its input, after filter window loops
+/// of extent one are substituted with zero.
+struct InputAccess {
+  // Indexing map from the convolution's loops to its input.
+  AffineMap inputMap;
+  // The loops `inputMap` uses, in the order the gather iterates them.
+  SmallVector<unsigned> gatherLoops;
+  // `inputMap` rewritten onto the gather loops.
+  AffineMap readMap;
+};
+
+static InputAccess
+getInputAccess(linalg::LinalgOp convOp,
+               const linalg::ConvolutionDimensions &convDims) {
+  MLIRContext *context = convOp.getContext();
+  AffineMap inputMap =
+      getInputMapWithoutUnitWindows(convOp, convDims.filterLoop);
+  SmallVector<unsigned> gatherLoops = llvm::filter_to_vector(
+      getInputLoopOrder(convOp, convDims),
+      [&](unsigned loop) { return inputMap.isFunctionOfDim(loop); });
+  // `loopToGatherDim` renames each gathered loop to its gather dimension; the
+  // remaining loops do not occur in `inputMap`, so their placeholder entry is
+  // never used.
+  SmallVector<AffineExpr> loopToGatherDim(convOp.getNumLoops(),
+                                          getAffineConstantExpr(0, context));
+  for (auto [gatherDim, loop] : llvm::enumerate(gatherLoops)) {
+    loopToGatherDim[loop] = getAffineDimExpr(gatherDim, context);
+  }
+  AffineMap readMap = inputMap.replaceDimsAndSymbols(
+      loopToGatherDim, /*symReplacements=*/{}, gatherLoops.size(),
+      /*numResultSyms=*/0);
+  return {inputMap, std::move(gatherLoops), readMap};
+}
+
 /// A convolution input materialized by `gatherInput`.
 struct GatheredInput {
   // The gathered tensor. It has one dimension per loop the input access uses,
@@ -86,20 +121,19 @@ struct GatheredInput {
   AffineMap contractionMap;
 };
 
-/// Materializes the access `inputMap` makes into the input of `convOp`.
+/// Materializes `access` into the input of `convOp`.
 ///
 /// The gather is an all-parallel copy whose iteration space consists of the
-/// loops `inputMap` uses, ordered as in `loopOrder`. For an NCHW convolution
-/// with `inputMap = (n, oc, oh, ow, c, kh, kw) -> (n, c, oh + kh, ow + kw)` and
-/// loop order (n, oh, ow, c, kh, kw), the gather loops are
-/// (n, oh, ow, c, kh, kw), and
+/// gather loops of `access`. For an NCHW convolution with
+/// `inputMap = (n, oc, oh, ow, c, kh, kw) -> (n, c, oh + kh, ow + kw)`, the
+/// gather loops are (n, oh, ow, c, kh, kw), and
 ///   - the gather reads the input with `inputMap` rewritten onto its own
 ///     loops: `(d0, d1, d2, d3, d4, d5) -> (d0, d3, d1 + d4, d2 + d5)`;
 ///   - the convolution then reads the gathered tensor with
 ///     `(n, oc, oh, ow, c, kh, kw) -> (n, oh, ow, c, kh, kw)`.
 static GatheredInput gatherInput(RewriterBase &rewriter,
-                                 linalg::LinalgOp convOp, AffineMap inputMap,
-                                 ArrayRef<unsigned> loopOrder) {
+                                 linalg::LinalgOp convOp,
+                                 const InputAccess &access) {
   MLIRContext *context = rewriter.getContext();
   Location loc = convOp.getLoc();
   Value input = convOp.getDpsInputs().front();
@@ -107,31 +141,20 @@ static GatheredInput gatherInput(RewriterBase &rewriter,
       llvm::map_to_vector(convOp.createLoopRanges(rewriter, loc),
                           [](Range range) { return range.size; });
 
-  SmallVector<unsigned> gatherLoops = llvm::filter_to_vector(
-      loopOrder, [&](unsigned loop) { return inputMap.isFunctionOfDim(loop); });
-  unsigned gatherRank = gatherLoops.size();
-
-  // `loopToGatherDim` renames each gathered loop to its gather dimension; the
-  // remaining loops do not occur in `inputMap`, so their placeholder entry is
-  // never used. `gatherDimToLoop` is the reverse selection.
-  SmallVector<AffineExpr> loopToGatherDim(convOp.getNumLoops(),
-                                          getAffineConstantExpr(0, context));
+  unsigned gatherRank = access.gatherLoops.size();
   SmallVector<AffineExpr> gatherDimToLoop;
   SmallVector<OpFoldResult> gatherSizes;
-  for (auto [gatherDim, loop] : llvm::enumerate(gatherLoops)) {
-    loopToGatherDim[loop] = getAffineDimExpr(gatherDim, context);
+  for (unsigned loop : access.gatherLoops) {
     gatherDimToLoop.push_back(getAffineDimExpr(loop, context));
     gatherSizes.push_back(loopSizes[loop]);
   }
 
-  AffineMap readMap = inputMap.replaceDimsAndSymbols(
-      loopToGatherDim, /*symReplacements=*/{}, gatherRank,
-      /*numResultSyms=*/0);
   Value init = tensor::EmptyOp::create(rewriter, loc, gatherSizes,
                                        getElementTypeOrSelf(input.getType()));
   auto gatherOp = linalg::GenericOp::create(
       rewriter, loc, init.getType(), input, init,
-      ArrayRef<AffineMap>{readMap, rewriter.getMultiDimIdentityMap(gatherRank)},
+      ArrayRef<AffineMap>{access.readMap,
+                          rewriter.getMultiDimIdentityMap(gatherRank)},
       SmallVector<utils::IteratorType>(gatherRank,
                                        utils::IteratorType::parallel),
       [](OpBuilder &b, Location nestedLoc, ValueRange args) {
@@ -171,46 +194,56 @@ struct ConvertConvToIm2Col final : OpInterfaceRewritePattern<linalg::LinalgOp> {
   ConvertConvToIm2Col(MLIRContext *context, ControlFn controlFn)
       : OpInterfaceRewritePattern(context), controlFn(std::move(controlFn)) {}
 
-  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
-                                PatternRewriter &rewriter) const override {
+  /// Returns the convolution dimensions of `linalgOp` if the rewrite is valid
+  /// for it, and otherwise sets `reason` and fails.
+  static FailureOr<linalg::ConvolutionDimensions>
+  matchConvolution(linalg::LinalgOp linalgOp, StringRef &reason) {
     if (!linalg::isaConvolutionOpInterface(linalgOp)) {
-      return rewriter.notifyMatchFailure(linalgOp, "not a convolution");
+      reason = "not a convolution";
+      return failure();
     }
     // The gather is built on tensors, and the rewrite moves the op's body
     // region into the contraction.
     if (!linalgOp.hasPureTensorSemantics() || linalgOp->getNumRegions() != 1) {
-      return rewriter.notifyMatchFailure(
-          linalgOp, "expected tensor semantics and a body region");
+      reason = "expected tensor semantics and a body region";
+      return failure();
     }
     // A preset compilation info or lowering config refers to the loops of the
     // original op, which the rewrite replaces.
     if (getCompilationInfo(linalgOp) || getLoweringConfig(linalgOp)) {
-      return rewriter.notifyMatchFailure(
-          linalgOp, "has a preset compilation info or lowering config");
+      reason = "has a preset compilation info or lowering config";
+      return failure();
     }
     // Requiring exactly an input and a filter excludes quantized convolutions
     // with zero-point operands; they are lowered before im2col runs.
     FailureOr<linalg::ConvolutionDimensions> convDims =
         linalg::inferConvolutionDims(linalgOp);
     if (failed(convDims)) {
-      return rewriter.notifyMatchFailure(linalgOp,
-                                         "failed to infer convolution dims");
+      reason = "failed to infer convolution dims";
+    }
+    return convDims;
+  }
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    StringRef reason;
+    FailureOr<linalg::ConvolutionDimensions> convDims =
+        matchConvolution(linalgOp, reason);
+    if (failed(convDims)) {
+      return rewriter.notifyMatchFailure(linalgOp, reason);
     }
     if (!controlFn(linalgOp, *convDims)) {
       return rewriter.notifyMatchFailure(linalgOp,
                                          "rejected by the control function");
     }
 
-    AffineMap inputMap =
-        getInputMapWithoutUnitWindows(linalgOp, convDims->filterLoop);
-    SmallVector<unsigned> loopOrder = getInputLoopOrder(linalgOp, *convDims);
+    InputAccess access = getInputAccess(linalgOp, *convDims);
 
     // Gather the input unless its access is already a projected permutation.
     Value newInput = linalgOp.getDpsInputs().front();
-    AffineMap newInputMap = inputMap;
-    if (!inputMap.isProjectedPermutation()) {
-      GatheredInput gathered =
-          gatherInput(rewriter, linalgOp, inputMap, loopOrder);
+    AffineMap newInputMap = access.inputMap;
+    if (!access.inputMap.isProjectedPermutation()) {
+      GatheredInput gathered = gatherInput(rewriter, linalgOp, access);
       newInput = gathered.value;
       newInputMap = gathered.contractionMap;
     }
@@ -271,12 +304,71 @@ hasOutputChannelReuse(linalg::LinalgOp convOp,
                       [&](unsigned loop) { return loopSizes[loop] != 1; });
 }
 
+/// Identifies the gather the rewrite materializes for a convolution. Equal
+/// keys yield identical gathers, which CSE merges into one.
+struct GatherKey {
+  Value input;
+  AffineMap readMap;
+  SmallVector<int64_t> sizes;
+
+  bool operator==(const GatherKey &other) const {
+    return input == other.input && readMap == other.readMap &&
+           sizes == other.sizes;
+  }
+};
+
+/// Returns the key of the gather the rewrite materializes for `convOp`, or
+/// std::nullopt if it reads its input in place or the gather shape is dynamic.
+static std::optional<GatherKey>
+getGatherKey(linalg::LinalgOp convOp,
+             const linalg::ConvolutionDimensions &convDims) {
+  InputAccess access = getInputAccess(convOp, convDims);
+  if (access.inputMap.isProjectedPermutation()) {
+    return std::nullopt;
+  }
+  SmallVector<int64_t> loopSizes = convOp.getStaticLoopRanges();
+  SmallVector<int64_t> sizes = llvm::map_to_vector(
+      access.gatherLoops, [&](unsigned loop) { return loopSizes[loop]; });
+  if (ShapedType::isDynamicShape(sizes)) {
+    return std::nullopt;
+  }
+  return GatherKey{convOp.getDpsInputs().front(), access.readMap,
+                   std::move(sizes)};
+}
+
 struct ConvertConvToIm2ColPass final
     : impl::ConvertConvToIm2ColPassBase<ConvertConvToIm2ColPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
+
+    // A convolution without output channel reuse still pays off when its
+    // gather is the one another rewritten convolution materializes anyway,
+    // e.g. the input window sum of a quantized convolution with a weight zero
+    // point. Collect those gathers up front, so the decision does not depend
+    // on the order in which the convolutions are rewritten.
+    SmallVector<GatherKey> reusedGathers;
+    getOperation()->walk([&](linalg::LinalgOp linalgOp) {
+      StringRef reason;
+      FailureOr<linalg::ConvolutionDimensions> convDims =
+          ConvertConvToIm2Col::matchConvolution(linalgOp, reason);
+      if (failed(convDims) || !hasOutputChannelReuse(linalgOp, *convDims)) {
+        return;
+      }
+      if (std::optional<GatherKey> key = getGatherKey(linalgOp, *convDims)) {
+        reusedGathers.push_back(std::move(*key));
+      }
+    });
+    auto controlFn = [&](linalg::LinalgOp linalgOp,
+                         const linalg::ConvolutionDimensions &convDims) {
+      if (hasOutputChannelReuse(linalgOp, convDims)) {
+        return true;
+      }
+      std::optional<GatherKey> key = getGatherKey(linalgOp, convDims);
+      return key && llvm::is_contained(reusedGathers, *key);
+    };
+
     RewritePatternSet patterns(context);
-    patterns.add<ConvertConvToIm2Col>(context, hasOutputChannelReuse);
+    patterns.add<ConvertConvToIm2Col>(context, controlFn);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }
