@@ -14,16 +14,6 @@ def CleanupNumericNarrowingPass :
   let summary = "Cleans up any numeric narrowing ops inserted by iree-global-opt-infer-numeric-narrowing.";
 }
 
-def ConvertBatchMatmulToMatmulPass :
-    Pass<"iree-global-opt-convert-batch-matmul-to-matmul", ""> {
-  let summary = "Converts batch_matmul to reshape + matmul + reshape.";
-  let dependentDialects = [
-    "mlir::arith::ArithDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::tensor::TensorDialect",
-  ];
-}
-
 def ConvertConvToIm2ColPass :
     Pass<"iree-global-opt-convert-conv-to-im2col", ""> {
   let summary = "Rewrites convolutions as contractions over an im2col gather";
@@ -113,6 +103,26 @@ def EraseUnusedLinalgOperandsPass :
 def ExpandTensorShapesPass :
     Pass<"iree-global-opt-expand-tensor-shapes", "mlir::ModuleOp"> {
   let summary = "Expands tensor shape dimensions into SSA values across the program.";
+}
+
+def FoldBroadcastIntoBatchMatmulPass :
+    InterfacePass<"iree-global-opt-fold-broadcast-into-batch-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Folds broadcasts of batch_matmul inputs into its indexing maps.";
+  let description = [{
+    Rewrites `batch_matmul(A, broadcast(B))`, where the weight is shared across
+    the batch, into a `batch_matmul` over `A` and `B` whose RHS indexing map
+    drops the batch dim. Broadcasts on either input, as `linalg.broadcast` or
+    as a broadcasting generic, are folded by composing their map into the
+    contraction's map. When the named op cannot express the folded map (its
+    verifier accepts only a few broadcast forms, e.g. a batch-broadcast RHS
+    must be [K, N]), the contraction is carried by a `linalg.generic` with the
+    same body instead of moving data. The contraction then consumes its
+    producers directly, so rewrites that match on them (such as the
+    dequantization folding) still apply, and no broadcast is materialized.
+  }];
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+  ];
 }
 
 def PropagateAffineQuantizationPass :
