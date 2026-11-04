@@ -35,8 +35,9 @@ using namespace IREE::VectorExt;
 static constexpr int kMaxCandidatesPerValue = 4;
 
 /// Maximum length of chains of cheap-to-compute operations that get duplicated
-/// for layout conflict resolution.
-static constexpr size_t kMaxChainLength = 8;
+/// for layout conflict resolution. A 3-D mask built from two 1-D bounds takes
+/// about ten.
+static constexpr size_t kMaxChainLength = 16;
 
 //===----------------------------------------------------------------------===//
 // Layout Analysis
@@ -604,7 +605,11 @@ static bool collectDuplicatableChain(Operation *op,
       if (defOp->hasTrait<OpTrait::ConstantLike>()) {
         continue;
       }
-      if (defOp->getBlock() != block) {
+      // Producers in an enclosing block dominate every op of |block|.
+      Block *defBlock = defOp->getBlock();
+      if (defBlock != block &&
+          (defBlock->getParent() == block->getParent() ||
+           !defBlock->getParent()->isAncestor(block->getParent()))) {
         return false;
       }
       worklist.push(defOp);
@@ -645,7 +650,12 @@ void LayoutAnalysis::setLayoutOrClone(OpOperand *val,
         // Sort so cloning visits producers before consumers.
         computeTopologicalSorting(chain);
         IRMapping mapping;
-        b.setInsertionPoint(chain.front());
+        // A chain spanning enclosing blocks is cloned at the use, where all of
+        // its operands are available.
+        bool oneBlock = llvm::all_of(chain, [&](Operation *op) {
+          return op->getBlock() == chain.front()->getBlock();
+        });
+        b.setInsertionPoint(oneBlock ? chain.front() : val->getOwner());
         for (Operation *op : chain) {
           b.clone(*op, mapping);
         }
