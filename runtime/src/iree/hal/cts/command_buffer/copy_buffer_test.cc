@@ -56,7 +56,7 @@ class CommandBufferCopyBufferTest : public CtsTestBase<> {
 
   void RunCopyBufferTest(iree_device_size_t source_offset,
                          iree_device_size_t target_offset,
-                         iree_device_size_t length) {
+                         iree_device_size_t length, bool same_buffer = false) {
     iree_device_size_t buffer_size = source_offset + length;
     if (target_offset + length > buffer_size) {
       buffer_size = target_offset + length;
@@ -68,7 +68,13 @@ class CommandBufferCopyBufferTest : public CtsTestBase<> {
     IREE_ASSERT_OK(CreateDeviceBufferWithData(source_data.data(), buffer_size,
                                               source_buffer.out()));
     Ref<iree_hal_buffer_t> target_buffer;
-    IREE_ASSERT_OK(CreateZeroedDeviceBuffer(buffer_size, target_buffer.out()));
+    if (same_buffer) {
+      iree_hal_buffer_retain(source_buffer);
+      target_buffer.reset(source_buffer);
+    } else {
+      IREE_ASSERT_OK(
+          CreateZeroedDeviceBuffer(buffer_size, target_buffer.out()));
+    }
 
     Ref<iree_hal_command_buffer_t> command_buffer;
     IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -87,6 +93,7 @@ class CommandBufferCopyBufferTest : public CtsTestBase<> {
         SubmitWithBindings(command_buffer, source_buffer, target_buffer));
 
     std::vector<uint8_t> expected(buffer_size, 0);
+    if (same_buffer) expected = source_data;
     std::memcpy(expected.data() + target_offset,
                 source_data.data() + source_offset, length);
     auto actual_data = ReadBufferBytes(target_buffer, 0, buffer_size);
@@ -262,6 +269,14 @@ TEST_P(CommandBufferCopyBufferTest, CopySizeAndAlignmentClasses) {
 
   SCOPED_TRACE("aligned16_mib");
   RunCopyBufferTest(/*source_offset=*/0, /*target_offset=*/0, 1024 * 1024);
+}
+
+TEST_P(CommandBufferCopyBufferTest, CopyAlignedDisjointRangesWithinSameBuffer) {
+  for (iree_device_size_t length : {4, 16, 256, 1024}) {
+    SCOPED_TRACE(::testing::Message() << "length=" << length);
+    RunCopyBufferTest(0, length, length, /*same_buffer=*/true);
+    RunCopyBufferTest(length, 0, length, /*same_buffer=*/true);
+  }
 }
 
 CTS_REGISTER_COMMAND_BUFFER_TEST_SUITE(CommandBufferCopyBufferTest);
