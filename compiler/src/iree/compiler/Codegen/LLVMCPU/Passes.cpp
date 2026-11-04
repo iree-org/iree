@@ -76,6 +76,7 @@ addTileAndDistributePasses(OpPassManager &funcPassManager,
   }
   funcPassManager.addPass(
       createTileAndDistributeToWorkgroupsUsingForallOpPass());
+  funcPassManager.addPass(createLLVMCPUDecomposeGroupMmt4DPass());
   funcPassManager.addPass(createBufferizeDispatchTensorLoadStorePass());
   funcPassManager.addPass(createCombineResultLayoutTransformationPass());
   funcPassManager.addPass(createConfigTrackingCanonicalizerPass());

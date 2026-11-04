@@ -191,6 +191,28 @@ def MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16
 def MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16
     : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16", 0x3121>;
 
+// RISC-V V `vfwmacc.vf` (f16×f16→f32). Lane count is vlen/8. The vector
+// operand stays f16 (LMUL=2) and the accumulator is f32 (LMUL=4).
+// Requires +zvfh.
+def MMA_RISCV_V_VFWMACC_1x8VLsx1_F32_F16
+    : I32EnumAttrCase<"MMA_RISCV_V_VFWMACC_1x8VLsx1_F32_F16", 0x3122>;
+def MMA_RISCV_V_VFWMACC_8VLsx1x1_F32_F16
+    : I32EnumAttrCase<"MMA_RISCV_V_VFWMACC_8VLsx1x1_F32_F16", 0x3123>;
+
+// Zvfhmin f16×f16→f32: extf the vector operand, then f32 vfmacc.vf. The
+// widened vector is LMUL=4. Requires +zvfhmin. +zvfh uses vfwmacc.vf.
+def MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32
+    : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32", 0x3124>;
+def MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32
+    : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32", 0x3125>;
+
+// Zvfhmin f16×f16→f16. The accumulator is widened to f32 for vfmacc.vf and
+// narrowed after the MAC. Requires +zvfhmin. +zvfh uses native f16 vfmacc.
+def MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32
+    : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32", 0x3126>;
+def MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32
+    : I32EnumAttrCase<"MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32", 0x3127>;
+
 // Architecture-agnostic, type-polymorphic generic-scalar fallback. Tile
 // shape is 1×1×1, lowering is a single `vector.contract` over the
 // unrolled (`intrinsics_m`, `intrinsics_n`, `intrinsics_k`) tile. Unlike
@@ -244,6 +266,12 @@ def IREECPU_MMAIntrinsic
            MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F32,
            MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16,
            MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16,
+           MMA_RISCV_V_VFWMACC_1x8VLsx1_F32_F16,
+           MMA_RISCV_V_VFWMACC_8VLsx1x1_F32_F16,
+           MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F16_CASTF32,
+           MMA_RISCV_V_VFMACC_8VLsx1x1_F32_F16_CASTF32,
+           MMA_RISCV_V_VFMACC_1x8VLsx1_F16_F16_WIDENF32,
+           MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32,
 
            // Architecture-agnostic generic-scalar fallback (type-polymorphic).
            MMA_GENERIC_SCALAR_1x1x1_REG8, MMA_GENERIC_SCALAR_1x1x1_REG16]>;

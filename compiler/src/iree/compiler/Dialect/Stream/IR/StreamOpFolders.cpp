@@ -1424,7 +1424,6 @@ struct FoldTensorCloneIntoLoad : OpRewritePattern<TensorLoadOp> {
     if (!transferOp) {
       return failure();
     }
-
     if (!transferOp.getResult().hasOneUse()) {
       return failure();
     }
@@ -1475,7 +1474,8 @@ struct FoldTensorCloneIntoLoad : OpRewritePattern<TensorLoadOp> {
     auto stagedSliceOp = AsyncTransferOp::create(
         rewriter, loc, transferOp.getResult().getType(), sliceOp.getResult(),
         sliceSize, sliceSize, transferOp.getSourceAffinityAttr(),
-        transferOp.getResultAffinityAttr());
+        transferOp.getResultAffinityAttr(),
+        transferOp.getExecutionAffinityAttr(), transferOp.getStorageAttr());
 
     // Load from the staged slice at zero indices.
     rewriter.replaceOpWithNewOp<TensorLoadOp>(
@@ -2184,6 +2184,11 @@ struct SameAffinityTransferToClone : OpRewritePattern<AsyncTransferOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(AsyncTransferOp transferOp,
                                 PatternRewriter &rewriter) const override {
+    if (transferOp.getEffectiveStorage() == TransferStorage::Reuse) {
+      return rewriter.notifyMatchFailure(transferOp,
+                                         "cannot preserve reuse storage policy "
+                                         "when converting transfer to clone");
+    }
     // Check if source and result affinities are the same.
     // This includes the case where both are null (implicit same affinity).
     auto sourceAffinityAttr = transferOp.getSourceAffinityAttr();
@@ -2219,6 +2224,7 @@ struct IntermediateTransferElision : OpRewritePattern<AsyncTransferOp> {
   LogicalResult matchAndRewrite(AsyncTransferOp transferOp,
                                 PatternRewriter &rewriter) const override {
     // Walk up the transfer chain to the first non-transfer op.
+    TransferStorage combinedStorage = transferOp.getEffectiveStorage();
     AsyncTransferOp originTransferOp = transferOp;
     while (true) {
       auto source = originTransferOp.getSource();
@@ -2227,17 +2233,22 @@ struct IntermediateTransferElision : OpRewritePattern<AsyncTransferOp> {
       if (!previousTransferOp) {
         break;
       }
+      if (previousTransferOp.getEffectiveStorage() == TransferStorage::Copy) {
+        combinedStorage = TransferStorage::Copy;
+      }
       originTransferOp = previousTransferOp;
     }
     if (originTransferOp == transferOp) {
       return failure();
     }
+    auto storageAttr =
+        TransferStorageAttr::get(rewriter.getContext(), combinedStorage);
     rewriter.replaceOpWithNewOp<AsyncTransferOp>(
         transferOp, transferOp.getResult().getType(),
         originTransferOp.getSource(), originTransferOp.getSourceSize(),
         transferOp.getResultSize(), originTransferOp.getSourceAffinityAttr(),
         transferOp.getResultAffinityAttr(),
-        transferOp.getExecutionAffinityAttr());
+        transferOp.getExecutionAffinityAttr(), storageAttr);
     return success();
   }
 };
@@ -2376,7 +2387,8 @@ struct FoldAsyncCloneIntoLoad : OpRewritePattern<AsyncLoadOp> {
     auto stagedSliceOp = AsyncTransferOp::create(
         rewriter, loc, transferOp.getResult().getType(), sliceOp.getResult(),
         byteSizeValue, byteSizeValue, transferOp.getSourceAffinityAttr(),
-        transferOp.getResultAffinityAttr());
+        transferOp.getResultAffinityAttr(),
+        transferOp.getExecutionAffinityAttr(), transferOp.getStorageAttr());
 
     // Load from the staged slice at offset 0.
     rewriter.replaceOpWithNewOp<AsyncLoadOp>(

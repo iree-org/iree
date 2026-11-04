@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/CommandLine.h"
@@ -213,6 +214,10 @@ void AnnotateDataTilingHintsPass::runOnOperation() {
       return WalkResult::interrupt();
     }
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+    if (enableMatmul && isa<IREE::LinalgExt::GroupMatmulOp>(op)) {
+      candidates.push_back(op);
+      return WalkResult::advance();
+    }
     if (!linalgOp) {
       return WalkResult::advance();
     }

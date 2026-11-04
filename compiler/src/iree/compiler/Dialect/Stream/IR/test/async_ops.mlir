@@ -171,6 +171,28 @@ util.func private @asyncTransfer(%arg0: !stream.resource<constant>, %arg1: index
 
 // -----
 
+// CHECK-LABEL: @asyncTransferStorageCopy
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
+util.func private @asyncTransferStorageCopy(%source: !stream.resource<constant>, %size: index) -> !stream.resource<staging> {
+  // CHECK: %[[RESULT:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<staging>{%[[SIZE]]} storage = copy
+  %result = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size} storage = copy
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<staging>
+}
+
+// -----
+
+// CHECK-LABEL: @asyncTransferStorageReuse
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
+util.func private @asyncTransferStorageReuse(%source: !stream.resource<constant>, %size: index) -> !stream.resource<staging> {
+  // CHECK: %[[RESULT:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<staging>{%[[SIZE]]} storage = reuse
+  %result = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size} storage = reuse
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<staging>
+}
+
+// -----
+
 util.global private @device : !hal.device
 
 // CHECK-LABEL: @asyncTransferAffinities

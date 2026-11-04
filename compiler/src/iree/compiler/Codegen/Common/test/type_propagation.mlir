@@ -537,7 +537,9 @@ func.func @sort() {
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0], sizes = [1], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1xi8>> -> tensor<1xi8>
   %3 = arith.trunci %2 : tensor<1xi8> to tensor<1xi1>
   %4 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0], sizes = [1], strides = [1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1xi32>> -> tensor<1xi32>
-  %5:2 = iree_linalg_ext.sort dimension(0) outs(%3, %4 : tensor<1xi1>, tensor<1xi32>) {
+  %empty0 = tensor.empty() : tensor<1xi1>
+  %empty1 = tensor.empty() : tensor<1xi32>
+  %5:2 = iree_linalg_ext.sort dimension(0) ins(%3, %4 : tensor<1xi1>, tensor<1xi32>) outs(%empty0, %empty1 : tensor<1xi1>, tensor<1xi32>) {
   ^bb0(%arg0: i1, %arg1: i1, %arg2: i32, %arg3: i32):
     %6 = arith.cmpi ult, %arg0, %arg1 : i1
     iree_linalg_ext.yield %6 : i1
@@ -551,8 +553,10 @@ func.func @sort() {
 //   CHECK-DAG:   %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //   CHECK-DAG:   %[[A_TENSOR:.+]] = iree_tensor_ext.dispatch.tensor.load %[[A]]
 //   CHECK-DAG:   %[[B_TENSOR:.+]] = iree_tensor_ext.dispatch.tensor.load %[[B]]
+//  CHECK:         %[[EMPTY0:.+]] = tensor.empty() : tensor<1xi8>
+//  CHECK:         %[[EMPTY1:.+]] = tensor.empty() : tensor<1xi32>
 //       CHECK:   %[[SORT:.+]]:2 = iree_linalg_ext.sort dimension(0)
-//  CHECK-SAME:       outs(%[[A_TENSOR]], %[[B_TENSOR]] : tensor<1xi8>, tensor<1xi32>)
+//  CHECK-SAME:       ins(%[[A_TENSOR]], %[[B_TENSOR]] : tensor<1xi8>, tensor<1xi32>) outs(%[[EMPTY0]], %[[EMPTY1]] : tensor<1xi8>, tensor<1xi32>)
 //  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i8, %[[ARG1:[a-zA-Z0-9]+]]: i8, %[[ARG2:[a-zA-Z0-9]+]]: i32, %[[ARG3:[a-zA-Z0-9]+]]: i32)
 //   CHECK-DAG:       %[[TRUNC_A_1:.+]] = arith.trunci %[[ARG0]] : i8 to i1
 //   CHECK-DAG:       %[[TRUNC_A_2:.+]] = arith.trunci %[[ARG1]] : i8 to i1
@@ -573,7 +577,9 @@ func.func @sort_secondary() {
   %2 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0], sizes = [1], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1xi32>> -> tensor<1xi32>
   %3 = iree_tensor_ext.dispatch.tensor.load %1, offsets = [0], sizes = [1], strides = [1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<1xi8>> -> tensor<1xi8>
   %4 = arith.trunci %3 : tensor<1xi8> to tensor<1xi1>
-  %5:2 = iree_linalg_ext.sort dimension(0) outs(%2, %4 : tensor<1xi32>, tensor<1xi1>) {
+  %empty0 = tensor.empty() : tensor<1xi32>
+  %empty1 = tensor.empty() : tensor<1xi1>
+  %5:2 = iree_linalg_ext.sort dimension(0) ins(%2, %4 : tensor<1xi32>, tensor<1xi1>) outs(%empty0, %empty1 : tensor<1xi32>, tensor<1xi1>) {
   ^bb0(%arg0: i32, %arg1: i32, %arg2: i1, %arg3: i1):
     %6 = arith.cmpi ult, %arg0, %arg1 : i32
     iree_linalg_ext.yield %6 : i1
@@ -588,8 +594,10 @@ func.func @sort_secondary() {
 //   CHECK-DAG:   %[[B:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(1)
 //   CHECK-DAG:   %[[A_TENSOR:.+]] = iree_tensor_ext.dispatch.tensor.load %[[A]]
 //   CHECK-DAG:   %[[B_TENSOR:.+]] = iree_tensor_ext.dispatch.tensor.load %[[B]]
+//  CHECK:         %[[EMPTY0:.+]] = tensor.empty() : tensor<1xi32>
+//  CHECK:         %[[EMPTY1:.+]] = tensor.empty() : tensor<1xi8>
 //       CHECK:   %[[SORT:.+]]:2 = iree_linalg_ext.sort dimension(0)
-//  CHECK-SAME:       outs(%[[A_TENSOR]], %[[B_TENSOR]] : tensor<1xi32>, tensor<1xi8>)
+//  CHECK-SAME:       ins(%[[A_TENSOR]], %[[B_TENSOR]] : tensor<1xi32>, tensor<1xi8>) outs(%[[EMPTY0]], %[[EMPTY1]] : tensor<1xi32>, tensor<1xi8>)
 //  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i32, %[[ARG1:[a-zA-Z0-9]+]]: i32, %[[ARG2:[a-zA-Z0-9]+]]: i8, %[[ARG3:[a-zA-Z0-9]+]]: i8)
 //   CHECK-DAG:       %[[CMPI:.+]] = arith.cmpi ult, %[[ARG0]], %[[ARG1]] : i32
 //       CHECK:       iree_linalg_ext.yield %[[CMPI]]

@@ -42,10 +42,28 @@ config_setting(
 
 # Same as above. Should be a query on @bazel_tools but this is simpler for now.
 config_setting(
-    name = "iree_is_android",
+    name = "iree_is_android_define",
     define_values = {
         "iree_is_android": "true",
     },
+)
+
+# Detect Android from platform OS setting.
+config_setting(
+    name = "iree_is_android_platforms_os",
+    constraint_values = [
+        "@platforms//os:android",
+    ],
+)
+
+# Matches Android, either via the define or via the platform OS. Use this in
+# select() conditions instead of the two settings above.
+selects.config_setting_group(
+    name = "iree_is_android",
+    match_any = [
+        ":iree_is_android_define",
+        ":iree_is_android_platforms_os",
+    ],
 )
 
 # OS platform constraints. Used in select() for platform-specific backend

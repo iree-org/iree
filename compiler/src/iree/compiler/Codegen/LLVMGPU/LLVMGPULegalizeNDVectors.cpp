@@ -152,13 +152,16 @@ struct ConvertVectorExtract final
     if (srcType.getRank() <= 1) {
       return failure();
     }
-    if (op.hasDynamicPosition()) {
-      op.emitRemark()
-          << "dynamic positions on extract are intentionally disabled";
-      return failure();
+    ArrayRef<int64_t> staticPos = op.getStaticPosition();
+    // Outer positions select a statically known 1-D slice. The innermost
+    // position may be dynamic: extract-chain folding can produce this form
+    // from a static slice extraction followed by a dynamic scalar extraction.
+    if (llvm::is_contained(staticPos.take_front(srcType.getRank() - 1),
+                           ShapedType::kDynamic)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "dynamic outer positions unsupported");
     }
 
-    ArrayRef<int64_t> staticPos = op.getStaticPosition();
     SmallVector<Value> srcValues(adaptor.getSource());
     ArrayRef<int64_t> outerShape = srcType.getShape().drop_back();
     SmallVector<int64_t> outerStrides = computeStrides(outerShape);
@@ -176,9 +179,15 @@ struct ConvertVectorExtract final
 
     if (hasInnerIndex) {
       // Scalar extraction: pick the 1-D vector, then extract the element.
-      rewriter.replaceOp(op, vector::ExtractOp::create(rewriter, op.getLoc(),
-                                                       srcValues[offset],
-                                                       staticPos.back()));
+      OpFoldResult innerPos;
+      if (op.hasDynamicPosition()) {
+        innerPos = adaptor.getDynamicPosition().front().front();
+      } else {
+        innerPos = rewriter.getIndexAttr(staticPos.back());
+      }
+      rewriter.replaceOp(op, vector::ExtractOp::create(
+                                 rewriter, op.getLoc(), srcValues[offset],
+                                 ArrayRef<OpFoldResult>{innerPos}));
     } else {
       // Sub-vector extraction: select a contiguous slice of converted values.
       SmallVector<Value> results(srcValues.begin() + offset,
