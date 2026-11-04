@@ -2923,6 +2923,62 @@ module attributes { transform.with_named_sequence } {
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
+// Buffer tiling writes to destination subviews and must not create SSA results.
+func.func @online_attention_tiling_memref(
+    %query: memref<192x1024x64xf32>, %key: memref<192x1024x64xf32>,
+    %value: memref<192x1024x64xf32>, %output: memref<192x1024x64xf32>,
+    %max: memref<192x1024xf32>, %sum: memref<192x1024xf32>) {
+  %scale = arith.constant 1.0 : f32
+  iree_linalg_ext.online_attention
+      { indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapO, #mapR, #mapR] }
+      ins(%query, %key, %value, %scale : memref<192x1024x64xf32>, memref<192x1024x64xf32>, memref<192x1024x64xf32>, f32)
+      outs(%output, %max, %sum : memref<192x1024x64xf32>, memref<192x1024xf32>, memref<192x1024xf32>) {
+    ^bb0(%score: f32):
+      iree_linalg_ext.yield %score : f32
+  }
+  return
+}
+
+// CHECK-LABEL: func.func @online_attention_tiling_memref(
+// CHECK-SAME: %[[QUERY:[a-zA-Z0-9_]+]]: memref<192x1024x64xf32>
+// CHECK-SAME: %[[KEY:[a-zA-Z0-9_]+]]: memref<192x1024x64xf32>
+// CHECK-SAME: %[[VALUE:[a-zA-Z0-9_]+]]: memref<192x1024x64xf32>
+// CHECK-SAME: %[[OUTPUT:[a-zA-Z0-9_]+]]: memref<192x1024x64xf32>
+// CHECK-SAME: %[[MAX:[a-zA-Z0-9_]+]]: memref<192x1024xf32>
+// CHECK-SAME: %[[SUM:[a-zA-Z0-9_]+]]: memref<192x1024xf32>
+// CHECK: %[[SCALE:.+]] = arith.constant 1.000000e+00 : f32
+// CHECK: scf.for %[[BATCH:.+]] =
+// CHECK: scf.for %[[ROW:.+]] =
+// CHECK: scf.for %[[COL:.+]] =
+// CHECK-DAG: %[[Q:.+]] = memref.subview %[[QUERY]][%[[BATCH]], %[[ROW]], 0] [4, 128, 64] [1, 1, 1]
+// CHECK-DAG: %[[K:.+]] = memref.subview %[[KEY]][%[[BATCH]], 0, 0] [4, 1024, 64] [1, 1, 1]
+// CHECK-DAG: %[[V:.+]] = memref.subview %[[VALUE]][%[[BATCH]], 0, %[[COL]]] [4, 1024, 32] [1, 1, 1]
+// CHECK-DAG: %[[O:.+]] = memref.subview %[[OUTPUT]][%[[BATCH]], %[[ROW]], %[[COL]]] [4, 128, 32] [1, 1, 1]
+// CHECK-DAG: %[[M:.+]] = memref.subview %[[MAX]][%[[BATCH]], %[[ROW]]] [4, 128] [1, 1]
+// CHECK-DAG: %[[S:.+]] = memref.subview %[[SUM]][%[[BATCH]], %[[ROW]]] [4, 128] [1, 1]
+// CHECK: {{^ *}}iree_linalg_ext.online_attention
+// CHECK-SAME: ins(%[[Q]], %[[K]], %[[V]], %[[SCALE]] : memref<
+// CHECK-SAME: outs(%[[O]], %[[M]], %[[S]] : memref<
+// CHECK: iree_linalg_ext.yield
+// CHECK: return
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.online_attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %tiled_att, %loops:3 = transform.structured.tile_using_for %0 tile_sizes [4, 128, 0, 0, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
+}
+
+// -----
+
+#mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
+#mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
+#mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
+#mapS = affine_map<(batch, m, k1, k2, n) -> ()>
+#mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
+#mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
+
 func.func @online_attention_partial_reduction(%query: tensor<192x?x64xf32>, %key: tensor<192x?x64xf32>, %value: tensor<192x?x64xf32>) -> (tensor<192x?x64xf32>, tensor<192x?xf32>) {
   %scale = arith.constant 1.0 : f32
 
