@@ -22,10 +22,13 @@
 
 namespace mlir::iree_compiler::stablehlo {
 
-// Handlers receive the original operation, including all operands and regions.
-// Decomposition fallback requires its complete signature and unchanged IR.
-// Validate applicability before changing IR, including helper symbols and
-// attributes. Success replaces the operation; failure makes no IR changes.
+// Handlers receive the original operation with all its operands and regions.
+// Check applicability before changing IR, including helper symbols and
+// attributes. Success must replace the matched operation. Failure must leave
+// the IR unchanged for later handlers or decomposition.
+//
+// Make all IR changes through the supplied rewriter so the rewrite driver and
+// provenance listener can observe them.
 // Captured handler state must support concurrent calls from pass clones.
 class TargetRegistry {
 public:
@@ -39,6 +42,10 @@ public:
   // Custom calls with effects, tokens, futures or aliases are left unchanged.
   LogicalResult addCustomCall(StringRef name, CustomCallHandler handler,
                               DialectRegistration registerDialects = {});
+  // Registers a handler for this exact composite name and semantic version.
+  // Unregistered versions remain available for decomposition. A custom call's
+  // api_version identifies its calling interface; custom-call handlers must
+  // check which interfaces they support.
   LogicalResult addComposite(StringRef name, int32_t version,
                              CompositeHandler handler,
                              DialectRegistration registerDialects = {});
@@ -61,10 +68,17 @@ private:
 
 // Patterns and passes copy the registry, so later registrations cannot affect
 // an already constructed pipeline.
+//
+// If a handler declines a composite, it remains available for later handlers.
+// The standard input conversion pipeline decomposes any remaining composites.
+// To retain one, the pipeline must exclude it from decomposition and provide a
+// downstream consumer.
 void populateTargetRewritePatterns(RewritePatternSet &patterns,
                                    const TargetRegistry &registry);
-std::unique_ptr<Pass>
-createRewriteRegisteredTargetsPass(const TargetRegistry &registry);
+// The pass requires an explicit registry and cannot be parsed directly from
+// text. Use a named pipeline that constructs the registry for textual callers.
+std::unique_ptr<Pass> createRewriteRegisteredCustomCallsAndCompositesPass(
+    const TargetRegistry &registry);
 
 } // namespace mlir::iree_compiler::stablehlo
 

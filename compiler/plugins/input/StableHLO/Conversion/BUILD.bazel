@@ -144,13 +144,31 @@ iree_compiler_cc_library(
     ],
 )
 
+iree_gentbl_cc_library(
+    name = "TargetRegistryPassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "TargetRegistryPasses.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "TargetRegistryPasses.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
 iree_compiler_cc_library(
     name = "TargetRegistry",
     srcs = ["TargetRegistry.cpp"],
-    hdrs = ["TargetRegistry.h"],
+    hdrs = [
+        "TargetRegistry.h",
+        "TargetRegistryPasses.h.inc",
+    ],
     deps = [
+        ":TargetRegistryPassesIncGen",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TransformUtils",
@@ -160,9 +178,9 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
-    name = "TargetPreprocessing",
-    srcs = ["TargetPreprocessing.cpp"],
-    hdrs = ["TargetPreprocessing.h"],
+    name = "CustomCallAndCompositePreprocessing",
+    srcs = ["CustomCallAndCompositePreprocessing.cpp"],
+    hdrs = ["CustomCallAndCompositePreprocessing.h"],
     deps = [
         ":PassHeaders",
         ":StableHLOLegalization",

@@ -137,16 +137,26 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_tablegen_library(
+  NAME
+    TargetRegistryPassesIncGen
+  TD_FILE
+    "TargetRegistryPasses.td"
+  OUTS
+    --gen-pass-decls TargetRegistryPasses.h.inc
+)
+
 iree_cc_library(
   NAME
     TargetRegistry
   HDRS
     "TargetRegistry.h"
+    "TargetRegistryPasses.h.inc"
   SRCS
     "TargetRegistry.cpp"
   DEPS
+    ::TargetRegistryPassesIncGen
     LLVMSupport
-    MLIRFuncDialect
     MLIRIR
     MLIRPass
     MLIRTransformUtils
@@ -157,11 +167,11 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    TargetPreprocessing
+    CustomCallAndCompositePreprocessing
   HDRS
-    "TargetPreprocessing.h"
+    "CustomCallAndCompositePreprocessing.h"
   SRCS
-    "TargetPreprocessing.cpp"
+    "CustomCallAndCompositePreprocessing.cpp"
   DEPS
     ::PassHeaders
     ::StableHLOLegalization

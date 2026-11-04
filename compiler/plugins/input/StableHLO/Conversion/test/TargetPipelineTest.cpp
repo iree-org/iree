@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "compiler/plugins/input/StableHLO/Conversion/CustomCallAndCompositePreprocessing.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/StableHLOCustomCallMetadata.h"
-#include "compiler/plugins/input/StableHLO/Conversion/TargetPreprocessing.h"
 #include "compiler/plugins/input/StableHLO/Conversion/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
@@ -49,7 +49,7 @@ public:
   void extendInputConversionPreprocessingPassPipeline(
       OpPassManager &manager, InputDialectOptions::Type inputType) override {
     ++preprocessingCalls;
-    buildTargetPreprocessingPassPipeline(manager, registry);
+    buildCustomCallAndCompositePreprocessingPassPipeline(manager, registry);
   }
 
   bool
