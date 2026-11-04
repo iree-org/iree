@@ -901,6 +901,83 @@ hal.executable private @split_reduction_2d_permuted_mapping_executable {
 
 // -----
 
+// Cap oversized static workgroup counts and keep a loop over all iterations.
+// Counts at or below the limit use direct distribution.
+#pipeline_layout = #hal.pipeline.layout<bindings = []>
+hal.executable private @static_workgroup_counts_with_target_limit {
+  hal.executable.variant public @static_workgroup_counts_with_target_limit target(#hal.executable.target<"", "", {
+      iree_codegen.target_info = #iree_codegen.simple_target<max_workgroup_count = [4, 4, 4]>}>) {
+    hal.executable.export public @above_limit layout(#pipeline_layout)
+    count(%device: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    hal.executable.export public @at_limit layout(#pipeline_layout)
+    count(%device: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    hal.executable.export public @below_limit layout(#pipeline_layout)
+    count(%device: !hal.device) -> (index, index, index) {
+      %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice()
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func private @consume(index)
+      func.func @above_limit() {
+        scf.forall (%i) in (9) {
+          func.call @consume(%i) : (index) -> ()
+        } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+        return
+      }
+      func.func @at_limit() {
+        scf.forall (%i) in (4) {
+          func.call @consume(%i) : (index) -> ()
+        } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+        return
+      }
+      func.func @below_limit() {
+        scf.forall (%i) in (2) {
+          func.call @consume(%i) : (index) -> ()
+        } {mapping = [#iree_codegen.workgroup_mapping<x>]}
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: hal.executable.export public @above_limit
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//       CHECK:   hal.return %[[C4]], %[[C1]], %[[C1]]
+// CHECK-LABEL: hal.executable.export public @at_limit
+//   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//       CHECK:   hal.return %[[C4]], %[[C1]], %[[C1]]
+// CHECK-LABEL: hal.executable.export public @below_limit
+//   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//       CHECK:   hal.return %[[C2]], %[[C1]], %[[C1]]
+// CHECK-LABEL: func.func @above_limit()
+//   CHECK-DAG:   %[[C9:.+]] = arith.constant 9 : index
+//   CHECK-DAG:   %[[ID:.+]] = hal.interface.workgroup.id[0] : index
+//   CHECK-DAG:   %[[COUNT:.+]] = hal.interface.workgroup.count[0] : index
+//       CHECK:   scf.for %[[IV:.+]] = %[[ID]] to %[[C9]] step %[[COUNT]] {
+//  CHECK-NEXT:     func.call @consume(%[[IV]]) : (index) -> ()
+//  CHECK-NEXT:   }
+//  CHECK-NEXT:   return
+// CHECK-LABEL: func.func @at_limit()
+//   CHECK-NOT:   scf.for
+//       CHECK:   %[[ID:.+]] = hal.interface.workgroup.id[0] : index
+//  CHECK-NEXT:   call @consume(%[[ID]]) : (index) -> ()
+//  CHECK-NEXT:   return
+// CHECK-LABEL: func.func @below_limit()
+//   CHECK-NOT:   scf.for
+//       CHECK:   %[[ID:.+]] = hal.interface.workgroup.id[0] : index
+//  CHECK-NEXT:   call @consume(%[[ID]]) : (index) -> ()
+//  CHECK-NEXT:   return
+
+// -----
+
 // Check for case where the max workgroup count is specified.
 
 #pipeline_layout = #hal.pipeline.layout<constants = 6, bindings = [
