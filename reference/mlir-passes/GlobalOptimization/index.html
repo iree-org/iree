@@ -3245,17 +3245,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-global-opt-convert-batch-matmul-to-matmul" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        -iree-global-opt-convert-batch-matmul-to-matmul
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#-iree-global-opt-convert-conv-to-im2col" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3382,6 +3371,17 @@
     <span class="md-ellipsis">
       
         -iree-global-opt-expand-tensor-shapes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-global-opt-fold-broadcast-into-batch-matmul" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-global-opt-fold-broadcast-into-batch-matmul
       
     </span>
   </a>
@@ -6486,17 +6486,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#-iree-global-opt-convert-batch-matmul-to-matmul" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        -iree-global-opt-convert-batch-matmul-to-matmul
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#-iree-global-opt-convert-conv-to-im2col" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6623,6 +6612,17 @@
     <span class="md-ellipsis">
       
         -iree-global-opt-expand-tensor-shapes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-iree-global-opt-fold-broadcast-into-batch-matmul" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-global-opt-fold-broadcast-into-batch-matmul
       
     </span>
   </a>
@@ -6848,8 +6848,6 @@
 
 <h3 id="-iree-global-opt-cleanup-numeric-narrowing"><code>-iree-global-opt-cleanup-numeric-narrowing</code><a class="headerlink" href="#-iree-global-opt-cleanup-numeric-narrowing" title="Permanent link">link</a></h3>
 <p><em>Cleans up any numeric narrowing ops inserted by iree-global-opt-infer-numeric-narrowing.</em></p>
-<h3 id="-iree-global-opt-convert-batch-matmul-to-matmul"><code>-iree-global-opt-convert-batch-matmul-to-matmul</code><a class="headerlink" href="#-iree-global-opt-convert-batch-matmul-to-matmul" title="Permanent link">link</a></h3>
-<p><em>Converts batch_matmul to reshape + matmul + reshape.</em></p>
 <h3 id="-iree-global-opt-convert-conv-to-im2col"><code>-iree-global-opt-convert-conv-to-im2col</code><a class="headerlink" href="#-iree-global-opt-convert-conv-to-im2col" title="Permanent link">link</a></h3>
 <p><em>Rewrites convolutions as contractions over an im2col gather</em></p>
 <p>Rewrites every linalg op that implements a convolution, named or generic,
@@ -6902,6 +6900,18 @@ transformation when reference floating-point semantics are required with
 <p><em>Erases unused linalg operand and remove dead code.</em></p>
 <h3 id="-iree-global-opt-expand-tensor-shapes"><code>-iree-global-opt-expand-tensor-shapes</code><a class="headerlink" href="#-iree-global-opt-expand-tensor-shapes" title="Permanent link">link</a></h3>
 <p><em>Expands tensor shape dimensions into SSA values across the program.</em></p>
+<h3 id="-iree-global-opt-fold-broadcast-into-batch-matmul"><code>-iree-global-opt-fold-broadcast-into-batch-matmul</code><a class="headerlink" href="#-iree-global-opt-fold-broadcast-into-batch-matmul" title="Permanent link">link</a></h3>
+<p><em>Folds broadcasts of batch_matmul inputs into its indexing maps.</em></p>
+<p>Rewrites <code>batch_matmul(A, broadcast(B))</code>, where the weight is shared across
+the batch, into a <code>batch_matmul</code> over <code>A</code> and <code>B</code> whose RHS indexing map
+drops the batch dim. Broadcasts on either input, as <code>linalg.broadcast</code> or
+as a broadcasting generic, are folded by composing their map into the
+contraction's map. When the named op cannot express the folded map (its
+verifier accepts only a few broadcast forms, e.g. a batch-broadcast RHS
+must be [K, N]), the contraction is carried by a <code>linalg.generic</code> with the
+same body instead of moving data. The contraction then consumes its
+producers directly, so rewrites that match on them (such as the
+dequantization folding) still apply, and no broadcast is materialized.</p>
 <h3 id="-iree-global-opt-fuse-dequantization-matmul"><code>-iree-global-opt-fuse-dequantization-matmul</code><a class="headerlink" href="#-iree-global-opt-fuse-dequantization-matmul" title="Permanent link">link</a></h3>
 <p><em>Fuses dequantization and matmul linalg.generic ops.</em></p>
 <h3 id="-iree-global-opt-generalize-linalg-named-ops"><code>-iree-global-opt-generalize-linalg-named-ops</code><a class="headerlink" href="#-iree-global-opt-generalize-linalg-named-ops" title="Permanent link">link</a></h3>
