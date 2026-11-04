@@ -231,6 +231,7 @@ iree_cc_library(
     iree::base
     iree::base::internal::arena
     iree::hal
+    iree::hal::utils::files
   PUBLIC
 )
 
