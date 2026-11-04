@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/Interfaces/DataLayoutInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/conversions/linalg/transforms/LegalizeToLinalgUtils.h"
 #include "stablehlo/dialect/StablehloOps.h"
@@ -34,6 +35,56 @@ Value extractIndex(OpBuilder &b, Location loc, Value shapeTensor, int64_t i) {
     return element;
   }
   return arith::IndexCastOp::create(b, loc, b.getIndexType(), element);
+}
+
+Value clampGatherIndex(OpBuilder &builder, Location loc, Value rawIndex,
+                       Type originalElementType, Value upperBound,
+                       unsigned indexWidth) {
+  auto rawType = cast<IntegerType>(rawIndex.getType());
+  bool isUnsigned = originalElementType.isUnsignedInteger();
+  unsigned rawWidth = rawType.getWidth();
+
+  if (rawWidth >= indexWidth) {
+    Value zero =
+        arith::ConstantOp::create(builder, loc, IntegerAttr::get(rawType, 0));
+    Value rawUpperBound;
+    if (isUnsigned) {
+      rawUpperBound =
+          arith::IndexCastUIOp::create(builder, loc, rawType, upperBound);
+    } else {
+      rawUpperBound =
+          arith::IndexCastOp::create(builder, loc, rawType, upperBound);
+    }
+    Value nonnegative;
+    if (isUnsigned) {
+      nonnegative = arith::MaxUIOp::create(builder, loc, rawIndex, zero);
+    } else {
+      nonnegative = arith::MaxSIOp::create(builder, loc, rawIndex, zero);
+    }
+    Value clamped;
+    if (isUnsigned) {
+      clamped =
+          arith::MinUIOp::create(builder, loc, nonnegative, rawUpperBound);
+      return arith::IndexCastUIOp::create(builder, loc, builder.getIndexType(),
+                                          clamped);
+    }
+    clamped = arith::MinSIOp::create(builder, loc, nonnegative, rawUpperBound);
+    return arith::IndexCastOp::create(builder, loc, builder.getIndexType(),
+                                      clamped);
+  }
+
+  Value index;
+  if (isUnsigned) {
+    index = arith::IndexCastUIOp::create(builder, loc, builder.getIndexType(),
+                                         rawIndex);
+  } else {
+    index = arith::IndexCastOp::create(builder, loc, builder.getIndexType(),
+                                       rawIndex);
+  }
+  Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
+  Value nonnegative = arith::MaxSIOp::create(builder, loc, index, zero);
+  Value clamped = arith::MinSIOp::create(builder, loc, nonnegative, upperBound);
+  return clamped;
 }
 
 // Bounds the walk from a size to the ops that define it, the ops one proof
@@ -1150,14 +1201,323 @@ struct DynamicConvolutionOpConversion final
   }
 };
 
+struct WideIndexGatherOpConversion final
+    : OpConversionPattern<mlir::stablehlo::GatherOp> {
+  using Base = OpConversionPattern<mlir::stablehlo::GatherOp>;
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::GatherOp op, OpAdaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto startIndicesType = cast<ShapedType>(op.getStartIndices().getType());
+    auto indexType = dyn_cast<IntegerType>(startIndicesType.getElementType());
+    if (!indexType ||
+        (!indexType.isUnsignedInteger() && indexType.getWidth() < 64)) {
+      return rewriter.notifyMatchFailure(
+          op, "start indices fit signed 32-bit conversion path");
+    }
+
+    auto sliceSizesType =
+        RankedTensorType::get({static_cast<int64_t>(op.getSliceSizes().size())},
+                              rewriter.getI64Type());
+    auto sliceSizesAttr =
+        DenseIntElementsAttr::get(sliceSizesType, op.getSliceSizes());
+    Value sliceSizes = mlir::stablehlo::ConstantOp::create(
+        rewriter, op.getLoc(), sliceSizesAttr);
+    // Preserve source types here so DynamicGatherOpConversion can still
+    // inspect signedness before the type converter removes it.
+    auto dynamicGather = mlir::stablehlo::DynamicGatherOp::create(
+        rewriter, op.getLoc(), op.getType(), op.getOperand(),
+        op.getStartIndices(), sliceSizes, op.getDimensionNumbersAttr(),
+        op.getIndicesAreSortedAttr());
+    rewriter.replaceOp(op, dynamicGather.getResult());
+    return success();
+  }
+};
+
+struct DynamicGatherOpConversion final
+    : OpConversionPattern<mlir::stablehlo::DynamicGatherOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::DynamicGatherOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Location loc = op.getLoc();
+    Value operand = adaptor.getOperand();
+    Value startIndices = adaptor.getStartIndices();
+    auto operandType = dyn_cast<RankedTensorType>(operand.getType());
+    auto startIndicesType = dyn_cast<RankedTensorType>(startIndices.getType());
+    auto resultType =
+        getTypeConverter()->convertType<RankedTensorType>(op.getType());
+    if (!operandType || !startIndicesType || !resultType) {
+      return rewriter.notifyMatchFailure(op, "expected ranked tensors");
+    }
+
+    int64_t operandRank = operandType.getRank();
+    int64_t resultRank = resultType.getRank();
+    auto dims = op.getDimensionNumbers();
+    int64_t indexVectorDim = dims.getIndexVectorDim();
+    ArrayRef<int64_t> offsetDims = dims.getOffsetDims();
+    ArrayRef<int64_t> collapsedSliceDims = dims.getCollapsedSliceDims();
+    ArrayRef<int64_t> operandBatchingDims = dims.getOperandBatchingDims();
+    ArrayRef<int64_t> startIndicesBatchingDims =
+        dims.getStartIndicesBatchingDims();
+    ArrayRef<int64_t> startIndexMap = dims.getStartIndexMap();
+
+    auto isCollapsedOrBatching = [&](int64_t dim) {
+      return llvm::is_contained(collapsedSliceDims, dim) ||
+             llvm::is_contained(operandBatchingDims, dim);
+    };
+    SmallVector<unsigned> remappedOffsetDims;
+    for (int64_t dim = 0; dim < operandRank; ++dim) {
+      if (!isCollapsedOrBatching(dim)) {
+        remappedOffsetDims.push_back(static_cast<unsigned>(dim));
+      }
+    }
+    if (remappedOffsetDims.size() != offsetDims.size()) {
+      return rewriter.notifyMatchFailure(op, "inconsistent offset dimensions");
+    }
+
+    SmallVector<Value> constants;
+    for (int64_t i = 0, e = std::max({resultRank, operandRank, int64_t{2}});
+         i < e; ++i) {
+      constants.push_back(arith::ConstantIndexOp::create(rewriter, loc, i));
+    }
+
+    Value empty = mlir::stablehlo::getEmptyTensorFor(rewriter, loc, resultType,
+                                                     op, adaptor.getOperands());
+    SmallVector<Value> operandDims(operandRank);
+    SmallVector<Value> sliceSizes(operandRank, constants[1]);
+    for (int64_t dim = 0; dim < operandRank; ++dim) {
+      operandDims[dim] =
+          rewriter.createOrFold<tensor::DimOp>(loc, operand, dim);
+    }
+    for (auto [operandDim, resultDim] :
+         llvm::zip_equal(remappedOffsetDims, offsetDims)) {
+      sliceSizes[operandDim] =
+          rewriter.createOrFold<tensor::DimOp>(loc, empty, resultDim);
+    }
+    SmallVector<Value> largestStartIndices(operandRank);
+    for (int64_t dim = 0; dim < operandRank; ++dim) {
+      largestStartIndices[dim] = rewriter.createOrFold<arith::SubIOp>(
+          loc, operandDims[dim], sliceSizes[dim]);
+    }
+
+    unsigned indexWidth = mlir::DataLayout::closest(op)
+                              .getTypeSizeInBits(rewriter.getIndexType())
+                              .getFixedValue();
+    Type originalStartIndicesElementType =
+        cast<ShapedType>(op.getStartIndices().getType()).getElementType();
+    auto linalgOp = linalg::GenericOp::create(
+        rewriter, loc, /*resultTensorTypes=*/resultType,
+        /*inputs=*/ValueRange{}, /*outputs=*/empty,
+        SmallVector<AffineMap>{rewriter.getMultiDimIdentityMap(resultRank)},
+        mlir::stablehlo::getNParallelLoopsAttrs(resultRank),
+        [&](OpBuilder &builder, Location nestedLoc, ValueRange) {
+          SmallVector<Value> resultIndices;
+          SmallVector<Value> gatherIndex;
+          for (int64_t dim = 0; dim < resultRank; ++dim) {
+            Value index = linalg::IndexOp::create(builder, nestedLoc, dim);
+            resultIndices.push_back(index);
+            if (!llvm::is_contained(offsetDims, dim)) {
+              gatherIndex.push_back(index);
+            }
+          }
+
+          SmallVector<Value> startIndexByOperand(operandRank);
+          for (size_t i = 0, e = startIndexMap.size(); i < e; ++i) {
+            SmallVector<Value> indices(gatherIndex);
+            if (indexVectorDim != startIndicesType.getRank()) {
+              indices.insert(indices.begin() + indexVectorDim, constants[i]);
+            }
+            Value index = tensor::ExtractOp::create(builder, nestedLoc,
+                                                    startIndices, indices);
+            startIndexByOperand[startIndexMap[i]] = index;
+          }
+
+          SmallVector<Value> indexFromBatching(operandRank, constants[0]);
+          for (auto [operandDim, indicesDim] :
+               llvm::zip_equal(operandBatchingDims, startIndicesBatchingDims)) {
+            indexFromBatching[operandDim] =
+                gatherIndex[indicesDim - (indicesDim < indexVectorDim ? 0 : 1)];
+          }
+
+          SmallVector<Value> combinedIndex;
+          for (int64_t operandDim = 0; operandDim < operandRank; ++operandDim) {
+            Value startIndex = constants[0];
+            if (startIndexByOperand[operandDim]) {
+              startIndex = clampGatherIndex(
+                  builder, nestedLoc, startIndexByOperand[operandDim],
+                  originalStartIndicesElementType,
+                  largestStartIndices[operandDim], indexWidth);
+            }
+            Value offsetIndex = constants[0];
+            auto offset = llvm::find(remappedOffsetDims, operandDim);
+            if (offset != remappedOffsetDims.end()) {
+              offsetIndex =
+                  resultIndices[offsetDims[offset -
+                                           remappedOffsetDims.begin()]];
+            }
+            combinedIndex.push_back(builder.createOrFold<arith::AddIOp>(
+                nestedLoc, builder.getIndexType(),
+                builder.createOrFold<arith::AddIOp>(
+                    nestedLoc, builder.getIndexType(), startIndex,
+                    indexFromBatching[operandDim]),
+                offsetIndex));
+          }
+
+          Value element = tensor::ExtractOp::create(builder, nestedLoc, operand,
+                                                    combinedIndex);
+          linalg::YieldOp::create(builder, nestedLoc, element);
+        },
+        linalg::getPrunedAttributeList(op));
+    rewriter.replaceOp(op, linalgOp.getResults());
+    return success();
+  }
+};
+
+struct DynamicBroadcastInDimOpConversion final
+    : OpConversionPattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
+  using Base::Base;
+
+  // Shape computation legalization assembles dynamic dimension vectors from
+  // scalar values with tensor.from_elements before this conversion runs.
+  static Value getShapeElement(Value shape, int64_t index) {
+    auto fromElements = shape.getDefiningOp<tensor::FromElementsOp>();
+    if (!fromElements || index < 0 ||
+        index >= static_cast<int64_t>(fromElements.getNumOperands())) {
+      return {};
+    }
+    return fromElements.getOperand(index);
+  }
+
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::DynamicBroadcastInDimOp op,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Value operand = adaptor.getOperand();
+    auto operandType = dyn_cast<RankedTensorType>(operand.getType());
+    auto resultType =
+        getTypeConverter()->convertType<RankedTensorType>(op.getType());
+    if (!operandType || !resultType) {
+      return rewriter.notifyMatchFailure(op, "expected ranked tensors");
+    }
+
+    ArrayRef<int64_t> broadcastDims = op.getBroadcastDimensions();
+    SmallVector<std::optional<bool>> expanding(operandType.getRank());
+    for (auto [i, size] : llvm::enumerate(operandType.getShape())) {
+      if (!ShapedType::isDynamic(size)) {
+        expanding[i] = size == 1;
+      }
+    }
+    if (auto dims = op.getKnownExpandingDimensions()) {
+      for (int64_t i : *dims) {
+        expanding[i] = true;
+      }
+    }
+    if (auto dims = op.getKnownNonexpandingDimensions()) {
+      for (int64_t i : *dims) {
+        expanding[i] = false;
+      }
+    }
+    // One budget bounds every proof for this broadcast.
+    FactorBudget budget;
+    bool inferredNonexpanding = false;
+    for (auto [operandDim, resultDim] : llvm::enumerate(broadcastDims)) {
+      if (expanding[operandDim].has_value()) {
+        continue;
+      }
+      Value outputElement =
+          getShapeElement(op.getOutputDimensions(), resultDim);
+      if (!outputElement) {
+        continue;
+      }
+      std::optional<SizeProduct> sourceSize =
+          factorDim(operand, operandDim, kMaxFactorDepth, budget);
+      std::optional<SizeProduct> outputSize =
+          factorSize(outputElement, kMaxFactorDepth, budget);
+      // A wrapped operand size may be one where the output size is not.
+      if (sourceSize && outputSize && !sourceSize->mayWrap &&
+          equalSizes(*sourceSize, *outputSize)) {
+        expanding[operandDim] = false;
+        inferredNonexpanding = true;
+      }
+    }
+    if (llvm::all_of(expanding, [](auto value) { return value.has_value(); })) {
+      if (!inferredNonexpanding) {
+        return rewriter.notifyMatchFailure(op, "expansion behavior is known");
+      }
+      // Record the proof so the upstream pattern emits an affine-map generic.
+      SmallVector<int64_t> knownExpanding;
+      SmallVector<int64_t> knownNonexpanding;
+      for (auto [i, value] : llvm::enumerate(expanding)) {
+        if (ShapedType::isDynamic(operandType.getDimSize(i))) {
+          (*value ? knownExpanding : knownNonexpanding).push_back(i);
+        }
+      }
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::DynamicBroadcastInDimOp>(
+          op, op.getType(), operand, adaptor.getOutputDimensions(),
+          rewriter.getDenseI64ArrayAttr(broadcastDims),
+          rewriter.getDenseI64ArrayAttr(knownExpanding),
+          rewriter.getDenseI64ArrayAttr(knownNonexpanding));
+      return success();
+    }
+
+    Location loc = op.getLoc();
+    Value empty = mlir::stablehlo::getEmptyTensorFor(rewriter, loc, resultType,
+                                                     op, adaptor.getOperands());
+    Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
+    SmallVector<Value> isExpanding(operandType.getRank());
+    for (int64_t i = 0, e = operandType.getRank(); i < e; ++i) {
+      if (expanding[i].has_value()) {
+        continue;
+      }
+      Value dim = rewriter.createOrFold<tensor::DimOp>(loc, operand, i);
+      isExpanding[i] = rewriter.createOrFold<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::eq, dim, one);
+    }
+
+    int64_t resultRank = resultType.getRank();
+    auto generic = linalg::GenericOp::create(
+        rewriter, loc, /*resultTensorTypes=*/resultType,
+        /*inputs=*/ValueRange{}, /*outputs=*/empty,
+        SmallVector<AffineMap>{rewriter.getMultiDimIdentityMap(resultRank)},
+        mlir::stablehlo::getNParallelLoopsAttrs(resultRank),
+        [&](OpBuilder &builder, Location nestedLoc, ValueRange) {
+          SmallVector<Value> operandIndex;
+          for (auto [operandDim, resultDim] : llvm::enumerate(broadcastDims)) {
+            Value resultIndex =
+                linalg::IndexOp::create(builder, nestedLoc, resultDim);
+            if (expanding[operandDim].has_value()) {
+              operandIndex.push_back(
+                  expanding[operandDim].value() ? zero : resultIndex);
+              continue;
+            }
+            operandIndex.push_back(arith::SelectOp::create(
+                builder, nestedLoc, isExpanding[operandDim], zero,
+                resultIndex));
+          }
+          Value element = tensor::ExtractOp::create(builder, nestedLoc, operand,
+                                                    operandIndex);
+          linalg::YieldOp::create(builder, nestedLoc, element);
+        },
+        linalg::getPrunedAttributeList(op));
+    rewriter.replaceOp(op, generic.getResults());
+    return success();
+  }
+};
+
 } // namespace
 
 void populateDynamicShapeConversionPatterns(MLIRContext *context,
                                             TypeConverter &typeConverter,
                                             RewritePatternSet *patterns) {
-  patterns->add<DynamicReshapeOpConversion, PadOpConversion,
-                DynamicPadOpConversion, DynamicConvolutionOpConversion>(
-      typeConverter, context, PatternBenefit{1000});
+  patterns
+      ->add<DynamicReshapeOpConversion, PadOpConversion, DynamicPadOpConversion,
+            DynamicConvolutionOpConversion, WideIndexGatherOpConversion,
+            DynamicGatherOpConversion, DynamicBroadcastInDimOpConversion>(
+          typeConverter, context, PatternBenefit{1000});
 }
 
 } // namespace mlir::iree_compiler::stablehlo

@@ -285,3 +285,386 @@ func.func @pad_dynamic_negative_interior(%arg0: tensor<?x5xf32>, %pad: tensor<f3
   %0 = stablehlo.pad %arg0, %pad, low = [-1, 2], high = [3, -1], interior = [1, 1] : (tensor<?x5xf32>, tensor<f32>) -> tensor<?x10xf32>
   return %0 : tensor<?x10xf32>
 }
+
+// -----
+
+// The runtime operand size decides whether this dimension expands.
+// CHECK-LABEL: @dynamic_broadcast_undecidable
+// CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
+// CHECK: linalg.generic
+// CHECK-NOT: arith.cmpi
+// CHECK: arith.select %[[EXPANDS]]
+// CHECK: tensor.extract %{{.+}} : tensor<?xf32>
+// CHECK: return %{{.+}} : tensor<?x?xf32>
+func.func @dynamic_broadcast_undecidable(%a: tensor<?xf32>, %s: tensor<2xi64>) -> tensor<?x?xf32> {
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [1] : (tensor<?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  return %r : tensor<?x?xf32>
+}
+
+
+
+// -----
+
+// Two unknown dimensions use runtime expansion checks; the static 1 expands
+// directly. A permuted output mapping also exercises nonidentity dimensions.
+// CHECK-LABEL: @dynamic_broadcast_mixed_permuted
+// CHECK-COUNT-2: arith.cmpi eq
+// CHECK: linalg.generic
+// CHECK-NOT: arith.cmpi
+// CHECK-COUNT-2: arith.select
+// CHECK-NOT: arith.select
+// CHECK: tensor.extract %{{.+}} : tensor<?x1x?xf32>
+// CHECK: return %{{.+}} : tensor<?x?x?x?xf32>
+func.func @dynamic_broadcast_mixed_permuted(%a: tensor<?x1x?xf32>, %s: tensor<4xi64>) -> tensor<?x?x?x?xf32> {
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [3, 1, 0] : (tensor<?x1x?xf32>, tensor<4xi64>) -> tensor<?x?x?x?xf32>
+  return %r : tensor<?x?x?x?xf32>
+}
+
+
+
+// -----
+
+// A partial annotation leaves one dynamic dimension for the runtime path.
+// CHECK-LABEL: @dynamic_broadcast_partial_annotation
+// CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
+// CHECK-NOT: arith.cmpi
+// CHECK: linalg.generic
+// CHECK: arith.select %[[EXPANDS]]
+// CHECK-NOT: arith.select
+// CHECK: return %{{.+}} : tensor<?x?xf32>
+func.func @dynamic_broadcast_partial_annotation(%a: tensor<?x?xf32>, %s: tensor<2xi64>) -> tensor<?x?xf32> {
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [0, 1] {known_nonexpanding_dimensions = array<i64: 0>} : (tensor<?x?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  return %r : tensor<?x?xf32>
+}
+
+
+
+// -----
+
+// An i8 truncation of n says nothing about n: n = 257 ties the operand to one
+// element, which broadcasts to 257. The runtime check stays.
+// CHECK-LABEL: @dynamic_broadcast_truncated_size
+// CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
+// CHECK: linalg.generic
+// CHECK: arith.select %[[EXPANDS]]
+func.func @dynamic_broadcast_truncated_size(%a: tensor<?x3xf32>, %n: index) -> tensor<?x3xf32> {
+  %small = arith.index_cast %n : index to i8
+  %size = arith.index_cast %small : i8 to index
+  %tied = flow.tensor.tie_shape %a : tensor<?x3xf32>{%size}
+  %full = arith.index_cast %n : index to i64
+  %three = arith.constant 3 : i64
+  %shape = tensor.from_elements %full, %three : tensor<2xi64>
+  %r = stablehlo.dynamic_broadcast_in_dim %tied, %shape, dims = [0, 1] : (tensor<?x3xf32>, tensor<2xi64>) -> tensor<?x3xf32>
+  return %r : tensor<?x3xf32>
+}
+
+
+
+// -----
+
+// Thirty squarings of n form a small graph whose product has 2^30 factors. The
+// proof gives up within its budget and the runtime check stays.
+// CHECK-LABEL: @dynamic_broadcast_squaring_chain
+// CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
+// CHECK: linalg.generic
+// CHECK: arith.select %[[EXPANDS]]
+func.func @dynamic_broadcast_squaring_chain(%a: tensor<?x2xf32>, %n: tensor<i32>) -> tensor<?x2xf32> {
+  %p0 = stablehlo.multiply %n, %n : tensor<i32>
+  %p1 = stablehlo.multiply %p0, %p0 : tensor<i32>
+  %p2 = stablehlo.multiply %p1, %p1 : tensor<i32>
+  %p3 = stablehlo.multiply %p2, %p2 : tensor<i32>
+  %p4 = stablehlo.multiply %p3, %p3 : tensor<i32>
+  %p5 = stablehlo.multiply %p4, %p4 : tensor<i32>
+  %p6 = stablehlo.multiply %p5, %p5 : tensor<i32>
+  %p7 = stablehlo.multiply %p6, %p6 : tensor<i32>
+  %p8 = stablehlo.multiply %p7, %p7 : tensor<i32>
+  %p9 = stablehlo.multiply %p8, %p8 : tensor<i32>
+  %p10 = stablehlo.multiply %p9, %p9 : tensor<i32>
+  %p11 = stablehlo.multiply %p10, %p10 : tensor<i32>
+  %p12 = stablehlo.multiply %p11, %p11 : tensor<i32>
+  %p13 = stablehlo.multiply %p12, %p12 : tensor<i32>
+  %p14 = stablehlo.multiply %p13, %p13 : tensor<i32>
+  %p15 = stablehlo.multiply %p14, %p14 : tensor<i32>
+  %p16 = stablehlo.multiply %p15, %p15 : tensor<i32>
+  %p17 = stablehlo.multiply %p16, %p16 : tensor<i32>
+  %p18 = stablehlo.multiply %p17, %p17 : tensor<i32>
+  %p19 = stablehlo.multiply %p18, %p18 : tensor<i32>
+  %p20 = stablehlo.multiply %p19, %p19 : tensor<i32>
+  %p21 = stablehlo.multiply %p20, %p20 : tensor<i32>
+  %p22 = stablehlo.multiply %p21, %p21 : tensor<i32>
+  %p23 = stablehlo.multiply %p22, %p22 : tensor<i32>
+  %p24 = stablehlo.multiply %p23, %p23 : tensor<i32>
+  %p25 = stablehlo.multiply %p24, %p24 : tensor<i32>
+  %p26 = stablehlo.multiply %p25, %p25 : tensor<i32>
+  %p27 = stablehlo.multiply %p26, %p26 : tensor<i32>
+  %p28 = stablehlo.multiply %p27, %p27 : tensor<i32>
+  %p29 = stablehlo.multiply %p28, %p28 : tensor<i32>
+  %size = stablehlo.reshape %p29 : (tensor<i32>) -> tensor<1xi32>
+  %two = stablehlo.constant dense<2> : tensor<1xi32>
+  %shape = stablehlo.concatenate %size, %two, dim = 0 : (tensor<1xi32>, tensor<1xi32>) -> tensor<2xi32>
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %shape, dims = [0, 1] : (tensor<?x2xf32>, tensor<2xi32>) -> tensor<?x2xf32>
+  return %r : tensor<?x2xf32>
+}
+
+
+
+// -----
+
+// A fully known expansion stays on the upstream affine-indexing path.
+// CHECK: #map = affine_map<(d0, d1) -> (0)>
+// CHECK-LABEL: @dynamic_broadcast_known_expanding
+// CHECK: linalg.generic
+// CHECK-SAME: ins(%arg0
+// CHECK-NOT: tensor.extract
+// CHECK-NOT: arith.select
+// CHECK: return %{{.+}} : tensor<?x?xf32>
+func.func @dynamic_broadcast_known_expanding(%a: tensor<?xf32>, %s: tensor<2xi64>) -> tensor<?x?xf32> {
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %s, dims = [1] {known_expanding_dimensions = array<i64: 0>} : (tensor<?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  return %r : tensor<?x?xf32>
+}
+
+
+
+// -----
+
+// An expansion the size proof settles for every dim also takes the affine
+// path.
+// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-LABEL: @dynamic_broadcast_inferred_nonexpanding
+// CHECK: linalg.generic
+// CHECK-SAME: indexing_maps = [#[[$MAP]],
+// CHECK-SAME: ins(%arg0
+// CHECK-NOT: tensor.extract
+// CHECK-NOT: arith.select
+// CHECK: return %{{.+}} : tensor<?x?x?xf32>
+func.func @dynamic_broadcast_inferred_nonexpanding(%a: tensor<?x?xf32>, %n: index) -> tensor<?x?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %d0 = tensor.dim %a, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %a, %c1 : tensor<?x?xf32>
+  %n64 = arith.index_cast %n : index to i64
+  %d064 = arith.index_cast %d0 : index to i64
+  %d164 = arith.index_cast %d1 : index to i64
+  %shape = tensor.from_elements %n64, %d064, %d164 : tensor<3xi64>
+  %r = stablehlo.dynamic_broadcast_in_dim %a, %shape, dims = [1, 2] : (tensor<?x?xf32>, tensor<3xi64>) -> tensor<?x?x?xf32>
+  return %r : tensor<?x?x?xf32>
+}
+
+
+
+// -----
+
+// Without an upper bound on s, s + 1 truncated to i32 may wrap to a size of
+// one, which broadcasts. The runtime check stays.
+// CHECK-LABEL: @dynamic_broadcast_unbounded_sum
+// CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
+// CHECK: linalg.generic
+// CHECK: arith.select %[[EXPANDS]]
+func.func @dynamic_broadcast_unbounded_sum(%cache: tensor<2x?x16xf32>, %row: tensor<2x1x16xf32>, %s: i64) -> tensor<2x?x16xf32> {
+  %length = util.assume.int %s<umin = 1> : i64
+  %rows = arith.index_cast %length : i64 to index
+  %tied = flow.tensor.tie_shape %cache : tensor<2x?x16xf32>{%rows}
+  %grown = stablehlo.concatenate %tied, %row, dim = 1 : (tensor<2x?x16xf32>, tensor<2x1x16xf32>) -> tensor<2x?x16xf32>
+  %one = arith.constant 1 : i64
+  %sum = arith.addi %length, %one : i64
+  %size = arith.trunci %sum : i64 to i32
+  %c2 = arith.constant 2 : i32
+  %c16 = arith.constant 16 : i32
+  %shape = tensor.from_elements %c2, %size, %c16 : tensor<3xi32>
+  %r = stablehlo.dynamic_broadcast_in_dim %grown, %shape, dims = [0, 1, 2] : (tensor<2x?x16xf32>, tensor<3xi32>) -> tensor<2x?x16xf32>
+  return %r : tensor<2x?x16xf32>
+}
+
+
+
+// -----
+
+// An i32 product of x and y may wrap: 641 * 6700417 = 2^32 + 1 gives one row,
+// which broadcasts to the exact product. The runtime check stays.
+// CHECK-LABEL: @dynamic_broadcast_wrapped_product
+// CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
+// CHECK: linalg.generic
+// CHECK: arith.select %[[EXPANDS]]
+func.func @dynamic_broadcast_wrapped_product(%a: tensor<?x3xf32>, %x: i32, %y: i32) -> tensor<?x3xf32> {
+  %narrow = arith.muli %x, %y : i32
+  %rows = arith.index_cast %narrow : i32 to index
+  %tied = flow.tensor.tie_shape %a : tensor<?x3xf32>{%rows}
+  %x64 = arith.extsi %x : i32 to i64
+  %y64 = arith.extsi %y : i32 to i64
+  %wide = arith.muli %x64, %y64 : i64
+  %three = arith.constant 3 : i64
+  %shape = tensor.from_elements %wide, %three : tensor<2xi64>
+  %r = stablehlo.dynamic_broadcast_in_dim %tied, %shape, dims = [0, 1] : (tensor<?x3xf32>, tensor<2xi64>) -> tensor<?x3xf32>
+  return %r : tensor<?x3xf32>
+}
+
+
+
+// -----
+
+// Runtime slice sizes determine the offset dimensions of the result.
+// CHECK-LABEL: @dynamic_gather_dynamic_result
+// CHECK: tensor.empty(%{{.+}}, %{{.+}}) : tensor<2x3x?x?xi32>
+// CHECK: arith.subi
+// CHECK: linalg.generic
+// CHECK: arith.maxsi
+// CHECK: arith.minsi
+// CHECK: tensor.extract %{{.+}} : tensor<3x4x2xi32>
+// CHECK: return %{{.+}} : tensor<2x3x?x?xi32>
+func.func @dynamic_gather_dynamic_result(%a: tensor<3x4x2xi32>, %i: tensor<2x3x2xi64>, %s: tensor<3xi64>) -> tensor<2x3x?x?xi32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [2, 3], collapsed_slice_dims = [0], start_index_map = [1, 0], index_vector_dim = 2>,
+    indices_are_sorted = false
+  } : (tensor<3x4x2xi32>, tensor<2x3x2xi64>, tensor<3xi64>) -> tensor<2x3x?x?xi32>
+  return %r : tensor<2x3x?x?xi32>
+}
+
+
+
+// -----
+
+// Batching uses the result batch index, while the index vector follows the
+// start-indices batch dimensions.
+// CHECK-LABEL: @dynamic_gather_batching
+// CHECK: linalg.generic
+// CHECK: tensor.extract %{{.+}} : tensor<3x7x1xi64>
+// CHECK: tensor.extract %{{.+}} : tensor<3x8x5xi32>
+// CHECK: return %{{.+}} : tensor<3x7x5xi32>
+func.func @dynamic_gather_batching(%a: tensor<3x8x5xi32>, %i: tensor<3x7x1xi64>, %s: tensor<3xi64>) -> tensor<3x7x5xi32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [2], collapsed_slice_dims = [1], operand_batching_dims = [0], start_indices_batching_dims = [0], start_index_map = [1], index_vector_dim = 2>,
+    indices_are_sorted = false
+  } : (tensor<3x8x5xi32>, tensor<3x7x1xi64>, tensor<3xi64>) -> tensor<3x7x5xi32>
+  return %r : tensor<3x7x5xi32>
+}
+
+
+
+// -----
+
+// index_vector_dim=0 and batching dim 1 use batch index 0 after removing the
+// leading index-vector dimension.
+// CHECK-LABEL: @dynamic_gather_leading_index_vector
+// CHECK: linalg.generic
+// CHECK: tensor.extract %{{.+}} : tensor<1x3x2xi64>
+// CHECK: return %{{.+}} : tensor<3x2xi32>
+func.func @dynamic_gather_leading_index_vector(%a: tensor<3x8xi32>, %i: tensor<1x3x2xi64>, %s: tensor<2xi64>) -> tensor<3x2xi32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [], collapsed_slice_dims = [1], operand_batching_dims = [0], start_indices_batching_dims = [1], start_index_map = [1], index_vector_dim = 0>,
+    indices_are_sorted = false
+  } : (tensor<3x8xi32>, tensor<1x3x2xi64>, tensor<2xi64>) -> tensor<3x2xi32>
+  return %r : tensor<3x2xi32>
+}
+
+
+
+// -----
+
+// Signed narrow indices widen before clamping, so an i8 index can address a
+// large operand dimension without narrowing the clamp bound.
+// CHECK-LABEL: @dynamic_gather_narrow_indices
+// CHECK: arith.index_cast %{{.+}} : i8 to index
+// CHECK: arith.maxsi
+// CHECK: arith.minsi
+// CHECK: return %{{.+}} : tensor<2x1xi32>
+func.func @dynamic_gather_narrow_indices(%a: tensor<256x1xi32>, %i: tensor<2x1xi8>, %s: tensor<2xi64>) -> tensor<2x1xi32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [1], collapsed_slice_dims = [0], start_index_map = [0], index_vector_dim = 1>,
+    indices_are_sorted = false
+  } : (tensor<256x1xi32>, tensor<2x1xi8>, tensor<2xi64>) -> tensor<2x1xi32>
+  return %r : tensor<2x1xi32>
+}
+
+
+
+// -----
+
+// Unsigned full-width indices clamp in their unsigned type before conversion
+// to index, preserving ui64 values above the signed range.
+// CHECK-LABEL: @dynamic_gather_unsigned_indices
+// CHECK: arith.minui
+// CHECK: arith.index_castui
+// CHECK: return %{{.+}} : tensor<2x1xi32>
+func.func @dynamic_gather_unsigned_indices(%a: tensor<5x1xi32>, %i: tensor<2x1xui64>, %s: tensor<2xi64>) -> tensor<2x1xi32> {
+  %r = "stablehlo.dynamic_gather"(%a, %i, %s) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [1], collapsed_slice_dims = [0], start_index_map = [0], index_vector_dim = 1>,
+    indices_are_sorted = false
+  } : (tensor<5x1xi32>, tensor<2x1xui64>, tensor<2xi64>) -> tensor<2x1xi32>
+  return %r : tensor<2x1xi32>
+}
+
+
+
+// -----
+
+// Clamp signed i64 gathers before backend index-width reduction.
+// CHECK-LABEL: @gather_wide_signed_indices
+// CHECK: arith.maxsi {{.*}} : i64
+// CHECK: arith.minsi {{.*}} : i64
+// CHECK: arith.index_cast {{.*}} : i64 to index
+func.func @gather_wide_signed_indices(%a: tensor<3x4xi32>, %i: tensor<2x1xi64>) -> tensor<2x4xi32> {
+  %r = "stablehlo.gather"(%a, %i) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [1], collapsed_slice_dims = [0], start_index_map = [0], index_vector_dim = 1>,
+    indices_are_sorted = false,
+    slice_sizes = array<i64: 1, 4>
+  } : (tensor<3x4xi32>, tensor<2x1xi64>) -> tensor<2x4xi32>
+  return %r : tensor<2x4xi32>
+}
+
+// Unsigned gathers use the same source-width clamp, including values whose
+// high bit would otherwise look negative after an index-width conversion.
+// CHECK-LABEL: @gather_unsigned_indices
+// CHECK: arith.minui {{.*}} : i64
+// CHECK: arith.index_cast {{.*}} : i64 to index
+func.func @gather_unsigned_indices(%a: tensor<3x4xi32>, %i: tensor<2x1xui64>) -> tensor<2x4xi32> {
+  %r = "stablehlo.gather"(%a, %i) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [1], collapsed_slice_dims = [0], start_index_map = [0], index_vector_dim = 1>,
+    indices_are_sorted = false,
+    slice_sizes = array<i64: 1, 4>
+  } : (tensor<3x4xi32>, tensor<2x1xui64>) -> tensor<2x4xi32>
+  return %r : tensor<2x4xi32>
+}
+
+// Signless i32 inputs widen before clamping, preserving their signed semantics.
+// CHECK-LABEL: @gather_signless_i32_indices
+// CHECK: arith.extsi {{.*}} : i32 to i64
+// CHECK: arith.maxsi {{.*}} : i64
+// CHECK: arith.minsi {{.*}} : i64
+// CHECK: arith.index_cast {{.*}} : i64 to index
+func.func @gather_signless_i32_indices(%a: tensor<3x4xi32>, %i: tensor<2x1xi32>) -> tensor<2x4xi32> {
+  %r = "stablehlo.gather"(%a, %i) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [1], collapsed_slice_dims = [0], start_index_map = [0], index_vector_dim = 1>,
+    indices_are_sorted = false,
+    slice_sizes = array<i64: 1, 4>
+  } : (tensor<3x4xi32>, tensor<2x1xi32>) -> tensor<2x4xi32>
+  return %r : tensor<2x4xi32>
+}
+
+
+// Dynamic operand shapes use the same typed clamp before index conversion.
+// CHECK-LABEL: @gather_wide_dynamic_operand
+// CHECK: tensor.dim %{{.*}}, %c0
+// CHECK: arith.maxsi {{.*}} : i64
+// CHECK: arith.minsi {{.*}} : i64
+// CHECK: arith.index_cast {{.*}} : i64 to index
+func.func @gather_wide_dynamic_operand(%a: tensor<?x4xi32>, %i: tensor<2x1xi64>) -> tensor<2x4xi32> {
+  %r = "stablehlo.gather"(%a, %i) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [1], collapsed_slice_dims = [0], start_index_map = [0], index_vector_dim = 1>,
+    indices_are_sorted = false,
+    slice_sizes = array<i64: 1, 4>
+  } : (tensor<?x4xi32>, tensor<2x1xi64>) -> tensor<2x4xi32>
+  return %r : tensor<2x4xi32>
+}
+
+// CHECK-LABEL: @gather_unsigned_dynamic_operand
+// CHECK: tensor.dim %{{.*}}, %c0
+// CHECK: arith.minui {{.*}} : i64
+// CHECK: arith.index_castui {{.*}} : i64 to index
+func.func @gather_unsigned_dynamic_operand(%a: tensor<?x4xi32>, %i: tensor<2x1xui64>) -> tensor<2x4xi32> {
+  %r = "stablehlo.gather"(%a, %i) {
+    dimension_numbers = #stablehlo.gather<offset_dims = [1], collapsed_slice_dims = [0], start_index_map = [0], index_vector_dim = 1>,
+    indices_are_sorted = false,
+    slice_sizes = array<i64: 1, 4>
+  } : (tensor<?x4xi32>, tensor<2x1xui64>) -> tensor<2x4xi32>
+  return %r : tensor<2x4xi32>
+}

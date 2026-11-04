@@ -6,8 +6,12 @@
 
 // Implements logic for lowering StableHLO gather to torch_index_select.
 
+#include <limits>
+
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -65,6 +69,22 @@ struct GatherIsTorchIndexSelectPattern final
       return rewriter.notifyMatchFailure(gather, "unranked result");
     }
 
+    // Clamping makes wide indices safe for index_select when every valid
+    // index fits even a 32-bit target index type.
+    auto indexType = cast<IntegerType>(startIndicesTy.getElementType());
+    int64_t indexedSize = operandTy.getDimSize(0);
+    if ((indexType.isUnsignedInteger() || indexType.getWidth() >= 64) &&
+        (ShapedType::isDynamic(indexedSize) || indexedSize <= 0 ||
+         indexedSize - 1 > std::numeric_limits<int32_t>::max())) {
+      return rewriter.notifyMatchFailure(
+          gather, "clamped indices may exceed signed 32-bit range");
+    }
+
+    // The final reshape requires a static result; use generic gather otherwise.
+    if (!resultTy.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(gather, "dynamic result shape");
+    }
+
     // Offset dimensions should be the defaults.
     if (static_cast<int64_t>(dimensionNumbers.getOffsetDims().size()) !=
         resultTy.getRank() - indexVectorDim) {
@@ -106,10 +126,48 @@ struct GatherIsTorchIndexSelectPattern final
       return rewriter.notifyMatchFailure(gather, "collapsed_slice_dims != [0]");
     }
 
+    // Gather clamps indices; torch_index_select requires them to be in bounds.
+    // Widen before clamping so the dimension size fits even for narrow indices.
+    Location loc = gather.getLoc();
+    auto wideIndexType =
+        IntegerType::get(rewriter.getContext(), 64, indexType.getSignedness());
+    auto scalarType = RankedTensorType::get({}, wideIndexType);
+    Value zero = mlir::stablehlo::ConstantOp::create(
+        rewriter, loc, DenseIntElementsAttr::get(scalarType, APInt(64, 0)));
+    Value upperBound;
+    if (operandTy.isDynamicDim(0)) {
+      Value size = tensor::DimOp::create(rewriter, loc, operand, 0);
+      size = arith::IndexCastOp::create(rewriter, loc, rewriter.getI64Type(),
+                                        size);
+      size = tensor::FromElementsOp::create(
+          rewriter, loc, RankedTensorType::get({}, rewriter.getI64Type()),
+          size);
+      size =
+          mlir::stablehlo::ConvertOp::create(rewriter, loc, scalarType, size);
+      Value one = mlir::stablehlo::ConstantOp::create(
+          rewriter, loc, DenseIntElementsAttr::get(scalarType, APInt(64, 1)));
+      upperBound =
+          mlir::stablehlo::SubtractOp::create(rewriter, loc, size, one);
+    } else {
+      upperBound = mlir::stablehlo::ConstantOp::create(
+          rewriter, loc,
+          DenseIntElementsAttr::get(scalarType,
+                                    APInt(64, operandTy.getDimSize(0) - 1)));
+    }
+    Value indices = startIndices;
+    if (indexType != wideIndexType) {
+      indices = mlir::stablehlo::ConvertOp::create(
+          rewriter, loc,
+          RankedTensorType::get(startIndicesTy.getShape(), wideIndexType),
+          indices);
+    }
+    indices = mlir::stablehlo::ClampOp::create(rewriter, loc, zero, indices,
+                                               upperBound);
+
     auto torchIndexSelect = mlir::stablehlo::TorchIndexSelectOp::create(
         rewriter, gather.getLoc(),
         RankedTensorType::get(indexSelectShape, operandTy.getElementType()),
-        operand, gather.getStartIndices(), rewriter.getI64IntegerAttr(0),
+        operand, indices, rewriter.getI64IntegerAttr(0),
         rewriter.getI64IntegerAttr(0));
 
     rewriter.replaceOpWithNewOp<mlir::stablehlo::ReshapeOp>(
@@ -121,6 +179,10 @@ struct GatherIsTorchIndexSelectPattern final
 
 struct GatherToTorchIndexSelect final
     : impl::GatherToTorchIndexSelectBase<GatherToTorchIndexSelect> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<arith::ArithDialect, tensor::TensorDialect>();
+  }
+
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
     RewritePatternSet patterns(ctx);

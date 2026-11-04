@@ -60,6 +60,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRComplexDialect
     MLIRControlFlowDialect
+    MLIRDataLayoutInterfaces
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR

@@ -733,6 +733,54 @@ struct DynamicBroadcastInDimAllDimsNonExpanding final
   }
 };
 
+// Returns whether `op` keeps every operand dimension in place.
+static bool
+hasIdentityBroadcastDims(mlir::stablehlo::DynamicBroadcastInDimOp op) {
+  auto operandType = dyn_cast<RankedTensorType>(op.getOperand().getType());
+  auto resultType = dyn_cast<RankedTensorType>(op.getType());
+  return operandType && resultType &&
+         operandType.getRank() == resultType.getRank() &&
+         llvm::equal(op.getBroadcastDimensions(),
+                     llvm::seq<int64_t>(0, resultType.getRank()));
+}
+
+// A broadcast to the operand's own shape is the operand.
+struct DynamicBroadcastInDimOfOwnShape final
+    : OpRewritePattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DynamicBroadcastInDimOp op,
+                                PatternRewriter &rewriter) const override {
+    auto shapeOf = op.getOutputDimensions().getDefiningOp<shape::ShapeOfOp>();
+    if (!shapeOf || shapeOf.getArg() != op.getOperand() ||
+        !hasIdentityBroadcastDims(op)) {
+      return rewriter.notifyMatchFailure(op, "not the operand's own shape");
+    }
+    rewriter.replaceOp(op, rewriter.createOrFold<tensor::CastOp>(
+                               op.getLoc(), op.getType(), op.getOperand()));
+    return success();
+  }
+};
+
+// A broadcast to the shape a dynamic_reshape just produced is that reshape.
+struct DynamicBroadcastInDimOfDynamicReshape final
+    : OpRewritePattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DynamicBroadcastInDimOp op,
+                                PatternRewriter &rewriter) const override {
+    auto reshape =
+        op.getOperand().getDefiningOp<mlir::stablehlo::DynamicReshapeOp>();
+    if (!reshape || reshape.getOutputShape() != op.getOutputDimensions() ||
+        !hasIdentityBroadcastDims(op)) {
+      return rewriter.notifyMatchFailure(op, "not the reshape's own shape");
+    }
+    rewriter.replaceOp(op, rewriter.createOrFold<tensor::CastOp>(
+                               op.getLoc(), op.getType(), reshape));
+    return success();
+  }
+};
+
 struct NoopReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
   using Base::Base;
 
@@ -1232,7 +1280,8 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       // Broadcast ops.
       BroadcastInDimOpCanon, DynamicBroadcastInDimOpNotActuallyDynamic,
       ChainedDynamicBroadcastInDimCanonicalization,
-      DynamicBroadcastInDimAllDimsNonExpanding,
+      DynamicBroadcastInDimAllDimsNonExpanding, DynamicBroadcastInDimOfOwnShape,
+      DynamicBroadcastInDimOfDynamicReshape,
       // Reduce op.
       NoopReduceOpCanon, EmptyReduceOpCanon,
       // Shape manipulation(-ish) ops.
