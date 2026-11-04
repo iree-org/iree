@@ -173,10 +173,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPredicatedPass(clEnableQuantizedMatmulReassociation,
                          createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createCanonicalizePass)
-      .addPass(mlir::createCSEPass)
-      // Fold broadcasts into batch_matmul indexing maps before transpose
-      // propagation so the contraction consumes its producers directly.
-      .addPass(createFoldBroadcastIntoBatchMatmulPass);
+      .addPass(mlir::createCSEPass);
 
   FunctionLikeNest(mainPassManager)
       // Propagate transposes before QDQ conversion and set encoding/data tiling
@@ -205,6 +202,12 @@ void buildGlobalOptimizationPassPipeline(
       // transformations, before im2col or input demotion can hide them.
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createPropagateAffineQuantizationPass)
+      // Fold broadcasts into batch_matmul indexing maps once transposes have
+      // been propagated and folded into dequantizes and broadcasts, so a
+      // transposed and broadcast operand reaches the fold as a single
+      // producer. The contraction then reads its operands at their native
+      // rank and consumes its dequantize producers directly.
+      .addPass(createFoldBroadcastIntoBatchMatmulPass)
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createConvertQDQToIntegerMathPass)
       .addPredicatedPass(transformOptions.useIm2colForConvs,
