@@ -25,7 +25,10 @@ def ConvertConvToIm2ColPass :
     layouts allow, so standard layouts become plain or batched matmuls.
     Convolutions without an output channel dimension, i.e. depthwise
     convolutions with a unit multiplier and pooling ops, are left unchanged:
-    nothing reuses the gathered input, so the rewrite never pays off.
+    nothing reuses the gathered input, so the rewrite never pays off. The
+    exception is a convolution whose gather is identical to that of another
+    rewritten convolution, such as the input window sum of a quantized
+    convolution with a weight zero point; it reads the shared gather.
 
     The pass expects quantization to be lowered already: quantized
     convolutions such as `linalg.conv_2d_nhwc_hwcf_q` are not matched, and

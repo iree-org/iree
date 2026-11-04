@@ -12,7 +12,9 @@
 
 // Biased QDQ contractions must convert after bias detachment and before im2col
 // or floating-point demotion hides the dequantize producers. The IM2COL checks
-// require an integer gather and a three-loop integer matrix contraction.
+// require an integer gather and a three-loop integer matrix contraction. With a
+// weight zero point, the input window sum reads that same gather rather than
+// re-gathering the convolution windows.
 
 // -----
 
@@ -48,8 +50,11 @@ util.func public @biased_conv(
   util.return %result : tensor<1x2x2x2xf32>
 }
 // CHECK-LABEL: util.func public @biased_conv(
-// IM2COL: linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "parallel", "parallel"]{{.*}}ins(%{{.+}} : tensor<3x3xi8>) outs(%{{.+}} : tensor<2x2x2x2xi8>)
-// IM2COL: linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "reduction"]{{.*}}ins(%{{.+}}, %{{.+}} : tensor<4x4xi8>, tensor<4x2xi8>) outs(%{{.+}} : tensor<4x2xi32>)
+// IM2COL: %[[GATHER:.+]] = linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "parallel", "parallel"]{{.*}}ins(%{{.+}} : tensor<3x3xi8>) outs(%{{.+}} : tensor<2x2x2x2xi8>)
+// IM2COL: %[[COLS:.+]] = tensor.collapse_shape %[[GATHER]] {{.*}} into tensor<4x4xi8>
+// IM2COL: linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "reduction"]{{.*}}ins(%[[COLS]], %{{.+}} : tensor<4x4xi8>, tensor<4x2xi8>) outs(%{{.+}} : tensor<4x2xi32>)
+// IM2COL-NOT: tensor<2x2x2x2xi8>
+// IM2COL: linalg.generic {{.*}}iterator_types = ["parallel", "reduction"]{{.*}}ins(%[[COLS]], %{{.+}} : tensor<4x4xi8>, tensor<4xi8>) outs(%{{.+}} : tensor<4xi32>)
 // CHECK: arith.muli %{{.+}}, %{{.+}} : i32
 // CHECK: arith.sitofp
 // CHECK: arith.addf
@@ -90,8 +95,11 @@ util.func public @biased_nchw(
   util.return %result : tensor<1x2x2x3xf32>
 }
 // CHECK-LABEL: util.func public @biased_nchw(
-// IM2COL: linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]{{.*}}ins(%{{.+}} : tensor<2x3x4xi8>) outs(%{{.+}} : tensor<2x3x2x2x2xi8>)
-// IM2COL: linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "reduction"]{{.*}}ins(%{{.+}}, %{{.+}} : tensor<6x8xi8>, tensor<2x8xi8>) outs(%{{.+}} : tensor<2x6xi32>)
+// IM2COL: %[[GATHER:.+]] = linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]{{.*}}ins(%{{.+}} : tensor<2x3x4xi8>) outs(%{{.+}} : tensor<2x3x2x2x2xi8>)
+// IM2COL: %[[COLS:.+]] = tensor.collapse_shape %[[GATHER]] {{.*}} into tensor<6x8xi8>
+// IM2COL: linalg.generic {{.*}}iterator_types = ["parallel", "parallel", "reduction"]{{.*}}ins(%[[COLS]], %{{.+}} : tensor<6x8xi8>, tensor<2x8xi8>) outs(%{{.+}} : tensor<2x6xi32>)
+// IM2COL-NOT: tensor<2x3x2x2x2xi8>
+// IM2COL: linalg.generic {{.*}}iterator_types = ["parallel", "reduction"]{{.*}}ins(%[[COLS]], %{{.+}} : tensor<6x8xi8>, tensor<8xi8>) outs(%{{.+}} : tensor<6xi32>)
 // CHECK: arith.muli %{{.+}}, %{{.+}} : i32
 // CHECK: arith.sitofp
 // CHECK: arith.addf

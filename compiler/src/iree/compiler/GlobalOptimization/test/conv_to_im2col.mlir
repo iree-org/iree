@@ -480,6 +480,124 @@ func.func @pooling_nhwc_sum(%input: tensor<1x16x16x4xf32>, %window: tensor<3x3xf
 
 // -----
 
+// The input window sum of a quantized convolution with a weight zero point has
+// no output channel, but its gather is the one the convolution materializes
+// anyway, so it is rewritten as well and the two gathers CSE into one.
+#input_map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d1 + d4, d2 + d5)>
+#filter_map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d3, d4, d5)>
+#output_map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+#sum_input_map = affine_map<(d0, d1, d2, d3, d4) -> (d2, d0 + d3, d1 + d4)>
+#sum_shape_map = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
+#sum_output_map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+func.func @window_sum_shares_gather(%input: tensor<4x10x10xi8>, %filter: tensor<8x4x3x3xi8>,
+                                    %init: tensor<8x8x8xi32>, %sum_init: tensor<8x8xi32>)
+    -> (tensor<8x8x8xi32>, tensor<8x8xi32>) {
+  %0 = linalg.generic {indexing_maps = [#input_map, #filter_map, #output_map],
+                       iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]}
+      ins(%input, %filter : tensor<4x10x10xi8>, tensor<8x4x3x3xi8>) outs(%init : tensor<8x8x8xi32>) {
+  ^bb0(%in: i8, %weight: i8, %acc: i32):
+    %in_i32 = arith.extsi %in : i8 to i32
+    %weight_i32 = arith.extsi %weight : i8 to i32
+    %product = arith.muli %in_i32, %weight_i32 : i32
+    %sum = arith.addi %acc, %product : i32
+    linalg.yield %sum : i32
+  } -> tensor<8x8x8xi32>
+  %shape = tensor.empty() : tensor<4x3x3xi8>
+  %1 = linalg.generic {indexing_maps = [#sum_input_map, #sum_shape_map, #sum_output_map],
+                       iterator_types = ["parallel", "parallel", "reduction", "reduction", "reduction"]}
+      ins(%input, %shape : tensor<4x10x10xi8>, tensor<4x3x3xi8>) outs(%sum_init : tensor<8x8xi32>) {
+  ^bb0(%in: i8, %unused: i8, %acc: i32):
+    %in_i32 = arith.extsi %in : i8 to i32
+    %sum = arith.addi %acc, %in_i32 : i32
+    linalg.yield %sum : i32
+  } -> tensor<8x8xi32>
+  return %0, %1 : tensor<8x8x8xi32>, tensor<8x8xi32>
+}
+// CHECK-DAG:  #[[$GATHER_READ:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d2, d0 + d3, d1 + d4)>
+// CHECK-LABEL: func.func @window_sum_shares_gather(
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       indexing_maps = [#[[$GATHER_READ]],
+//  CHECK-SAME:       ins(%{{.+}} : tensor<4x10x10xi8>) outs(%{{.+}} : tensor<8x8x4x3x3xi8>)
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%{{.+}}, %{{.+}} : tensor<64x36xi8>, tensor<8x36xi8>)
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       indexing_maps = [#[[$GATHER_READ]],
+//  CHECK-SAME:       ins(%{{.+}} : tensor<4x10x10xi8>) outs(%{{.+}} : tensor<8x8x4x3x3xi8>)
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       iterator_types = ["parallel", "reduction"]
+//  CHECK-SAME:       ins(%{{.+}}, %{{.+}} : tensor<64x36xi8>, tensor<36xi8>)
+//  CHECK-SAME:       outs(%{{.+}} : tensor<64xi32>)
+
+// -----
+
+// Without a convolution that materializes the same gather, the window sum is
+// left alone like any other convolution without an output channel.
+#sum_input_map = affine_map<(d0, d1, d2, d3, d4) -> (d2, d0 + d3, d1 + d4)>
+#sum_shape_map = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
+#sum_output_map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+func.func @window_sum_without_shared_gather(%input: tensor<4x10x10xi8>,
+                                            %sum_init: tensor<8x8xi32>) -> tensor<8x8xi32> {
+  %shape = tensor.empty() : tensor<4x3x3xi8>
+  %0 = linalg.generic {indexing_maps = [#sum_input_map, #sum_shape_map, #sum_output_map],
+                       iterator_types = ["parallel", "parallel", "reduction", "reduction", "reduction"]}
+      ins(%input, %shape : tensor<4x10x10xi8>, tensor<4x3x3xi8>) outs(%sum_init : tensor<8x8xi32>) {
+  ^bb0(%in: i8, %unused: i8, %acc: i32):
+    %in_i32 = arith.extsi %in : i8 to i32
+    %sum = arith.addi %acc, %in_i32 : i32
+    linalg.yield %sum : i32
+  } -> tensor<8x8xi32>
+  return %0 : tensor<8x8xi32>
+}
+// CHECK-LABEL: func.func @window_sum_without_shared_gather(
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%{{.+}}, %{{.+}} : tensor<4x10x10xi8>, tensor<4x3x3xi8>)
+//   CHECK-NOT:   linalg.generic
+
+// -----
+
+// A convolution over the same input with a different window does not share its
+// gather with the window sum, so the window sum is left alone.
+#input_map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d1 * 2 + d4, d2 * 2 + d5)>
+#filter_map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d3, d4, d5)>
+#output_map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
+#sum_input_map = affine_map<(d0, d1, d2, d3, d4) -> (d2, d0 + d3, d1 + d4)>
+#sum_shape_map = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
+#sum_output_map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1)>
+func.func @window_sum_different_window(%input: tensor<4x10x10xi8>, %filter: tensor<8x4x3x3xi8>,
+                                       %init: tensor<8x4x4xi32>, %sum_init: tensor<8x8xi32>)
+    -> (tensor<8x4x4xi32>, tensor<8x8xi32>) {
+  %0 = linalg.generic {indexing_maps = [#input_map, #filter_map, #output_map],
+                       iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]}
+      ins(%input, %filter : tensor<4x10x10xi8>, tensor<8x4x3x3xi8>) outs(%init : tensor<8x4x4xi32>) {
+  ^bb0(%in: i8, %weight: i8, %acc: i32):
+    %in_i32 = arith.extsi %in : i8 to i32
+    %weight_i32 = arith.extsi %weight : i8 to i32
+    %product = arith.muli %in_i32, %weight_i32 : i32
+    %sum = arith.addi %acc, %product : i32
+    linalg.yield %sum : i32
+  } -> tensor<8x4x4xi32>
+  %shape = tensor.empty() : tensor<4x3x3xi8>
+  %1 = linalg.generic {indexing_maps = [#sum_input_map, #sum_shape_map, #sum_output_map],
+                       iterator_types = ["parallel", "parallel", "reduction", "reduction", "reduction"]}
+      ins(%input, %shape : tensor<4x10x10xi8>, tensor<4x3x3xi8>) outs(%sum_init : tensor<8x8xi32>) {
+  ^bb0(%in: i8, %unused: i8, %acc: i32):
+    %in_i32 = arith.extsi %in : i8 to i32
+    %sum = arith.addi %acc, %in_i32 : i32
+    linalg.yield %sum : i32
+  } -> tensor<8x8xi32>
+  return %0, %1 : tensor<8x4x4xi32>, tensor<8x8xi32>
+}
+// CHECK-LABEL: func.func @window_sum_different_window(
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       outs(%{{.+}} : tensor<4x4x4x3x3xi8>)
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%{{.+}}, %{{.+}} : tensor<16x36xi8>, tensor<8x36xi8>)
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%{{.+}}, %{{.+}} : tensor<4x10x10xi8>, tensor<4x3x3xi8>)
+//   CHECK-NOT:   linalg.generic
+
+// -----
+
 // Quantized convolutions carry zero-point operands and are expected to be
 // lowered before im2col runs.
 func.func @quantized_conv_nhwc_hwcf(%input: tensor<1x10x10x4xi8>, %filter: tensor<3x3x4x16xi8>,
