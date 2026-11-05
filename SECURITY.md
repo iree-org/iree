@@ -124,6 +124,27 @@ Tampering with published artifacts, such as an unauthorized change to a
 package on PyPI or a file on the GitHub releases page, applies to every
 release. Report suspected tampering through the private channels above.
 
+### Verifying release artifacts
+
+The files that IREE's release workflow uploads to
+[GitHub releases](https://github.com/iree-org/iree/releases), such as the
+`iree-base-compiler` and `iree-base-runtime` wheels and the `iree-dist`
+tarballs, carry a build provenance attestation signed with
+[Sigstore](https://www.sigstore.dev/). The attestation records the workflow,
+commit, and run that built each file. Verify a downloaded file with the
+[GitHub CLI](https://cli.github.com/manual/gh_attestation_verify):
+
+```sh
+gh attestation verify <file> \
+  --repo iree-org/iree \
+  --signer-workflow iree-org/iree/.github/workflows/build_package.yml
+```
+
+Verification fails if the file was changed after it was built, or if it was not
+built by IREE's release workflow. Stable wheels on PyPI are not attested yet,
+because promoting a nightly release to a stable release rewrites the version
+inside each wheel.
+
 ## Security model
 
 **A compiled IREE module (`.vmfb`) is an executable.** It contains executable code, that the runtime loads into the host process, including device binaries
@@ -304,6 +325,10 @@ workflows and build scripts must preserve these principles:
   or from an upstream project.
 - **Release builds start clean.** Release packages are built from a tagged
   commit on GitHub-hosted runners, without shared build caches.
+- **Release assets are attested.** The release workflow signs a build
+  provenance attestation with `actions/attest` for every file it uploads to
+  GitHub releases. New release assets must be attested in the job that builds
+  them, before they are uploaded.
 - **Stable releases are promoted, not rebuilt.** A stable release republishes
   the wheels of a tested nightly release with only the version changed.
 - **Publishing to PyPI is a manual step.** Release workflows upload artifacts
