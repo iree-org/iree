@@ -32,12 +32,14 @@ jobs:
     name: "Validate packages"
     # TODO(jennik): Look into testing windows and macos builds.
     runs-on: ubuntu-24.04
+    permissions:
+      actions: read # Download artifacts from the build_package.yml run.
     steps:
       - name: Download packages
         id: download_packages
         uses: dawidd6/action-download-artifact@eab87c9830c39eff17e5a6eadb20bfb4bc880477 # v27
         with:
-          github_token: ${{secrets.WRITE_ACCESS_TOKEN}}
+          github_token: ${{ github.token }}
           workflow: build_package.yml
           run_id: ${{ github.event.inputs.build_run_id }}
       - name: Extract and display downloaded files
@@ -139,19 +141,21 @@ jobs:
     name: "Publish release"
     needs: validate_packages
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write # Publish the release and push latest-snapshot.
+      actions: write # Dispatch the Publish Website workflow.
     steps:
       - name: Publish Release
         id: publish_release
         uses: eregon/publish-release@01df127f5e9a3c26935118e22e738d95b59d10ce # v1.0.6
         env:
-          GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           release_id: ${{ github.event.inputs.release_id }}
 
       - name: Checking out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           persist-credentials: false
           # Get all history. Otherwise the latest-snapshot branch can't be
           # fast-forwarded.
@@ -173,6 +177,15 @@ jobs:
         if: ${{ env.is_patch_release == 'false'}}
         uses: ad-m/github-push-action@881a6320fdb16eb5318c5054f31c218aec2b324c # v1.3.0
         with:
-          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          github_token: ${{ github.token }}
           branch: latest-snapshot
           force: true
+
+      # Releases published with the workflow token do not fire the `release`
+      # event, so publish_website.yml is dispatched explicitly. Mirrors the
+      # condition in that workflow, which skips deploying for candidates.
+      - name: Trigger website publish
+        if: ${{ !contains(github.event.inputs.package_version, 'rc') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run publish_website.yml --repo "${GITHUB_REPOSITORY}" --ref main
