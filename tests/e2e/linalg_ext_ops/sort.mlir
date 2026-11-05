@@ -16,8 +16,11 @@ func.func @sort2D() {
 func.func @sort_nan_olt() {
   %keys = util.unfoldable_constant dense<[2.0, 0x7FC00000, 1.0, 1.0, 0.0]> : tensor<5xf32>
   %values = util.unfoldable_constant dense<[0, 1, 2, 3, 4]> : tensor<5xi32>
+  %empty_keys = tensor.empty() : tensor<5xf32>
+  %empty_values = tensor.empty() : tensor<5xi32>
   %sort:2 = iree_linalg_ext.sort dimension(0)
-      outs(%keys, %values : tensor<5xf32>, tensor<5xi32>) {
+      ins(%keys, %values : tensor<5xf32>, tensor<5xi32>)
+      outs(%empty_keys, %empty_values : tensor<5xf32>, tensor<5xi32>) {
   ^bb0(%lhs: f32, %rhs: f32, %lhs_value: i32, %rhs_value: i32):
     %cmp = arith.cmpf olt, %lhs, %rhs : f32
     iree_linalg_ext.yield %cmp : i1
@@ -34,8 +37,11 @@ func.func @sort_nan_olt() {
 func.func @sort_nan_ogt() {
   %keys = util.unfoldable_constant dense<[0.0, 0x7FC00000, 1.0, 1.0, 2.0]> : tensor<5xf32>
   %values = util.unfoldable_constant dense<[0, 1, 2, 3, 4]> : tensor<5xi32>
+  %empty_keys = tensor.empty() : tensor<5xf32>
+  %empty_values = tensor.empty() : tensor<5xi32>
   %sort:2 = iree_linalg_ext.sort dimension(0)
-      outs(%keys, %values : tensor<5xf32>, tensor<5xi32>) {
+      ins(%keys, %values : tensor<5xf32>, tensor<5xi32>)
+      outs(%empty_keys, %empty_values : tensor<5xf32>, tensor<5xi32>) {
   ^bb0(%lhs: f32, %rhs: f32, %lhs_value: i32, %rhs_value: i32):
     %cmp = arith.cmpf ogt, %lhs, %rhs : f32
     iree_linalg_ext.yield %cmp : i1
@@ -52,8 +58,11 @@ func.func @sort_nan_ogt() {
 func.func @sort_nan_ult() {
   %keys = util.unfoldable_constant dense<[2.0, 0x7FC00000, 1.0, 1.0, 0.0]> : tensor<5xf32>
   %values = util.unfoldable_constant dense<[0, 1, 2, 3, 4]> : tensor<5xi32>
+  %empty_keys = tensor.empty() : tensor<5xf32>
+  %empty_values = tensor.empty() : tensor<5xi32>
   %sort:2 = iree_linalg_ext.sort dimension(0)
-      outs(%keys, %values : tensor<5xf32>, tensor<5xi32>) {
+      ins(%keys, %values : tensor<5xf32>, tensor<5xi32>)
+      outs(%empty_keys, %empty_values : tensor<5xf32>, tensor<5xi32>) {
   ^bb0(%lhs: f32, %rhs: f32, %lhs_value: i32, %rhs_value: i32):
     %cmp = arith.cmpf ult, %lhs, %rhs : f32
     iree_linalg_ext.yield %cmp : i1
