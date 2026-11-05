@@ -484,3 +484,59 @@ util.func public @preserve_conv_strides(%input: tensor<1x8x8x4xf32>, %filter: te
   %result = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>} ins(%input, %filter : tensor<1x8x8x4xf32>, tensor<3x3x4x8xf32>) outs(%init : tensor<1x3x3x8xf32>) -> tensor<1x3x3x8xf32>
   util.return %result : tensor<1x3x3x8xf32>
 }
+
+// -----
+
+// The K=1 outer product that computes rotary-embedding angles from integer
+// positions (Hugging Face: inv_freq[32,1] @ position_ids[1,P]) must not be
+// demoted: bf16/f16 cannot represent positions above 256 exactly, and a
+// reduction of length 1 has nothing to accumulate, so narrower inputs gain
+// nothing. Reduced from granite-3.3-2b prefill, global-optimization phase,
+// `%77 = linalg.batch_matmul ins(%cst_9, %cst_8 : tensor<1x32x1xf32>, tensor<1x1x512xf32>) ...`.
+util.func public @rotary_outer_product(%inv_freq : tensor<1x32x1xf32>,
+    %positions : tensor<1x1x512xf32>, %init : tensor<1x32x512xf32>) -> tensor<1x32x512xf32> {
+  %0 = linalg.batch_matmul ins(%inv_freq, %positions : tensor<1x32x1xf32>, tensor<1x1x512xf32>)
+      outs(%init : tensor<1x32x512xf32>) -> tensor<1x32x512xf32>
+  util.return %0 : tensor<1x32x512xf32>
+}
+
+// BF16-MATMUL-LABEL: @rotary_outer_product
+// BF16-MATMUL-NOT: arith.truncf
+// BF16-MATMUL: linalg.batch_matmul
+// BF16-MATMUL-SAME: ins({{.+}} : tensor<1x32x1xf32>, tensor<1x1x512xf32>)
+
+// F16-MATMUL-LABEL: @rotary_outer_product
+// F16-MATMUL-NOT: arith.truncf
+// F16-MATMUL: linalg.batch_matmul
+// F16-MATMUL-SAME: ins({{.+}} : tensor<1x32x1xf32>, tensor<1x1x512xf32>)
+
+// BF16-CONV-LABEL: @rotary_outer_product
+// BF16-CONV: linalg.batch_matmul
+// F16-CONV-LABEL: @rotary_outer_product
+// F16-CONV: linalg.batch_matmul
+
+// -----
+
+// Same table with a dynamic prompt length: the reduction is still the static 1,
+// so it stays protected; only N is dynamic.
+util.func public @rotary_outer_product_dynamic(%inv_freq : tensor<1x32x1xf32>,
+    %positions : tensor<1x1x?xf32>, %init : tensor<1x32x?xf32>) -> tensor<1x32x?xf32> {
+  %0 = linalg.batch_matmul ins(%inv_freq, %positions : tensor<1x32x1xf32>, tensor<1x1x?xf32>)
+      outs(%init : tensor<1x32x?xf32>) -> tensor<1x32x?xf32>
+  util.return %0 : tensor<1x32x?xf32>
+}
+
+// BF16-MATMUL-LABEL: @rotary_outer_product_dynamic
+// BF16-MATMUL-NOT: arith.truncf
+// BF16-MATMUL: linalg.batch_matmul
+// BF16-MATMUL-SAME: ins({{.+}} : tensor<1x32x1xf32>, tensor<1x1x?xf32>)
+
+// F16-MATMUL-LABEL: @rotary_outer_product_dynamic
+// F16-MATMUL-NOT: arith.truncf
+// F16-MATMUL: linalg.batch_matmul
+// F16-MATMUL-SAME: ins({{.+}} : tensor<1x32x1xf32>, tensor<1x1x?xf32>)
+
+// BF16-CONV-LABEL: @rotary_outer_product_dynamic
+// BF16-CONV: linalg.batch_matmul
+// F16-CONV-LABEL: @rotary_outer_product_dynamic
+// F16-CONV: linalg.batch_matmul
