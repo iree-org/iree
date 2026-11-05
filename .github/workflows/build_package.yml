@@ -113,6 +113,12 @@ jobs:
     needs: setup_metadata
     runs-on: ${{ matrix.runs-on }}
     continue-on-error: ${{ matrix.experimental }}
+    permissions:
+      contents: read
+      # Required by actions/attest to sign and store build provenance.
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     strategy:
       fail-fast: false
       matrix:
@@ -348,6 +354,14 @@ jobs:
           name: wheels-${{ matrix.build-family }}-${{ matrix.build-package }}
           path: ./bindist/*
           retention-days: 5
+
+      # Attest the same files that are uploaded as release assets below, so
+      # users can verify them with `gh attestation verify`.
+      - name: Attest Release Assets
+        if: github.event.inputs.release_id != ''
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ./bindist/iree*.*
 
       # TODO: Upload the tar.bz2 files too when ready
       - name: Upload Release Assets
