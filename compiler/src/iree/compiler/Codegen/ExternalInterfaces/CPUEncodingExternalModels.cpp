@@ -1571,6 +1571,13 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
                         DictionaryAttr config) {
   // Enumerate available tile shapes for the given encoding and config.
   SmallVector<Type> elementTypes = encoding.getElementTypesArray();
+  auto triple = getTargetTriple(config);
+  if (triple && triple->isWasm() && hasFeature(config, "+simd128") &&
+      llvm::all_of(elementTypes, [](Type type) { return type.isF32(); })) {
+    // Four FP32 lanes per Wasm SIMD vector. Keep a small output tile live
+    // while broadcasting scalar LHS elements over contiguous RHS vectors.
+    return {TileMxNxK{4, 8, 1}, TileMxNxK{2, 8, 1}, TileMxNxK{1, 8, 1}};
+  }
   if (isAArch64(config)) {
     return enumerateMatmulTileArm64(elementTypes, config);
   }
