@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+option(IREE_BUILD_COMPILER_PYTHON_TOOLS "Bundle compiler tools with Python bindings" ON)
+
 ################################################################################
 # CAPI library using the LLVM build system.
 #
@@ -313,6 +315,10 @@ add_dependencies(IREECompilerPythonModules IREECompilerBuildPythonModules)
 ################################################################################
 
 function(add_iree_compiler_busybox_tool target)
+  if(NOT IREE_BUILD_COMPILER_PYTHON_TOOLS)
+    return()
+  endif()
+
   cmake_parse_arguments(ARG
     ""
     "OUTPUT_NAME"
