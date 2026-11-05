@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_ENCODING_UTILS_ELEMENTPACKINGUTILS_H_
 #define IREE_COMPILER_DIALECT_ENCODING_UTILS_ELEMENTPACKINGUTILS_H_
 
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Types.h"
@@ -36,11 +37,16 @@ Value calculateStorageElementCountInBytes(Location loc,
                                           ValueRange dynamicDims,
                                           OpBuilder &builder);
 
-/// Emits IR with the given |builder| to calculate the byte offset for the
-/// element at the given |linearizedIndex|.
-Value calculateStorageElementOffsetInBytes(Location loc,
-                                           RankedTensorType originalType,
-                                           Value linearizedIndex,
+/// Maps logical element indices to byte offsets, using the default dense layout
+/// for unencoded tensors. Returns null for unsupported encodings.
+AffineMap getStorageElementOffsetMap(RankedTensorType type);
+
+/// Emits the byte offset of the element at `indices`. `dynamicDims` supplies
+/// the dynamic extents in tensor dimension order. Returns null without emitting
+/// IR if the storage layout is unsupported.
+Value calculateStorageElementOffsetInBytes(Location loc, RankedTensorType type,
+                                           ValueRange dynamicDims,
+                                           ValueRange indices,
                                            OpBuilder &builder);
 
 } // namespace mlir::iree_compiler

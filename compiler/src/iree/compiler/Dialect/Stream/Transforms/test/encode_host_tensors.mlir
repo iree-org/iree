@@ -286,3 +286,14 @@ util.func public @denseTensorDispatch(
   // CHECK: util.return %[[RESULTS]]#0, %[[RESULTS]]#1
   util.return %results#0, %results#1 : !stream.resource<external>, !stream.resource<external>
 }
+
+// -----
+
+// CHECK-LABEL: @denseTensorLoadComplexF32
+// CHECK: %[[BITS:.*]] = stream.async.load {{.*}} -> i64
+// CHECK: %[[VALUE:.*]] = complex.bitcast %[[BITS]] : i64 to complex<f32>
+// CHECK: util.return %[[VALUE]]
+util.func public @denseTensorLoadComplexF32(%buffer: !stream.resource<staging>, %index: index, %size: index) -> complex<f32> {
+  %value = stream.tensor.load %buffer[%index] : tensor<4xcomplex<f32>> in !stream.resource<staging>{%size} -> complex<f32>
+  util.return %value : complex<f32>
+}

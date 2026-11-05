@@ -107,6 +107,30 @@ bool LayoutAttr::isIdentityLayout() const {
                       [](auto attr) { return attr.isIdentityLayout(); });
 }
 
+Type LayoutAttr::getStorageElementType(Type elementType) const {
+  Type result;
+  for (auto layout : getLayouts().getAsRange<SerializableAttr>()) {
+    Type candidate = layout.getStorageElementType(elementType);
+    if (!candidate || (result && result != candidate)) {
+      return {};
+    }
+    result = candidate;
+  }
+  return result;
+}
+
+AffineMap LayoutAttr::getStorageElementOffsetMap(RankedTensorType type) const {
+  AffineMap result;
+  for (auto layout : getLayouts().getAsRange<SerializableAttr>()) {
+    AffineMap candidate = layout.getStorageElementOffsetMap(type);
+    if (!candidate || (result && result != candidate)) {
+      return {};
+    }
+    result = candidate;
+  }
+  return result;
+}
+
 Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
                                               RankedTensorType type,
                                               ValueRange dynamicDims) const {
@@ -142,6 +166,16 @@ LogicalResult LayoutAttr::verifyEncoding(
 //===---------------------------------------------------------------------===//
 
 bool PackedStorageAttr::isSerialized() const { return true; }
+
+Type PackedStorageAttr::getStorageElementType(Type elementType) const {
+  return elementType;
+}
+
+AffineMap
+PackedStorageAttr::getStorageElementOffsetMap(RankedTensorType type) const {
+  return getRowMajorStorageElementOffsetMap(
+      type, getTypeBitWidth(type.getElementType()));
+}
 
 bool PackedStorageAttr::canDropWithoutTensorMaterialization() const {
   return true;
@@ -215,6 +249,63 @@ LogicalResult PackedStorageAttr::verifyEncoding(
 Attribute PackedStorageAttr::getCollapsedEncoding(ArrayRef<int64_t>,
                                                   ArrayRef<int64_t>) const {
   return *this;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.unpacked_storage
+//===---------------------------------------------------------------------===//
+
+bool UnpackedStorageAttr::isSerialized() const { return true; }
+
+Type UnpackedStorageAttr::getStorageElementType(Type elementType) const {
+  return IntegerType::get(getContext(),
+                          getRoundedElementByteWidth(elementType) * 8);
+}
+
+AffineMap
+UnpackedStorageAttr::getStorageElementOffsetMap(RankedTensorType type) const {
+  return getRowMajorStorageElementOffsetMap(
+      type, getRoundedElementByteWidth(type.getElementType()) * 8);
+}
+
+Value UnpackedStorageAttr::calculateStorageSizeInBytes(
+    Location loc, OpBuilder &builder, RankedTensorType type,
+    ValueRange dynamicDims) const {
+  return IdentityAttr::get(getContext())
+      .calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
+}
+
+bool UnpackedStorageAttr::canDropWithoutTensorMaterialization() const {
+  return true;
+}
+
+bool UnpackedStorageAttr::isInvariantUnderDimCollapse() const { return true; }
+
+Attribute UnpackedStorageAttr::getCollapsedEncoding(ArrayRef<int64_t>,
+                                                    ArrayRef<int64_t>) const {
+  return *this;
+}
+
+FailureOr<BitcastEncodingInfo>
+UnpackedStorageAttr::convertForBitcast(ArrayRef<int64_t> shape,
+                                       Type originalElementType,
+                                       Type newElementType) const {
+  if (originalElementType != newElementType) {
+    return failure();
+  }
+  return BitcastEncodingInfo{llvm::to_vector(shape), *this};
+}
+
+LogicalResult UnpackedStorageAttr::verifyEncoding(
+    ArrayRef<int64_t>, Type elementType,
+    function_ref<InFlightDiagnostic()> emitError) const {
+  auto integerType = dyn_cast<IntegerType>(elementType);
+  if (!integerType || !integerType.isSignless() ||
+      integerType.getWidth() > 64) {
+    return emitError() << "unpacked_storage requires signless integer elements "
+                          "with bit-width at most 64";
+  }
+  return success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -536,6 +627,21 @@ bool PaddingAttr::isIdentityLayout() const {
   return llvm::all_of(padding, [](int64_t val) { return val == 0; });
 }
 
+Type PaddingAttr::getStorageElementType(Type elementType) const {
+  if (auto integerType = dyn_cast<IntegerType>(elementType)) {
+    return IntegerType::get(getContext(),
+                            getRoundedElementByteWidth(elementType) * 8,
+                            integerType.getSignedness());
+  }
+  return elementType;
+}
+
+AffineMap PaddingAttr::getStorageElementOffsetMap(RankedTensorType type) const {
+  return getRowMajorStorageElementOffsetMap(
+      type, getRoundedElementByteWidth(type.getElementType()) * 8,
+      getPadding().asArrayRef());
+}
+
 Value PaddingAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
                                                RankedTensorType type,
                                                ValueRange dynamicDims) const {
@@ -619,6 +725,21 @@ bool IdentityAttr::isIdentityLayout() const { return true; }
 
 bool IdentityAttr::isSerialized() const { return true; }
 
+Type IdentityAttr::getStorageElementType(Type elementType) const {
+  if (auto integerType = dyn_cast<IntegerType>(elementType)) {
+    return IntegerType::get(getContext(),
+                            getRoundedElementByteWidth(elementType) * 8,
+                            integerType.getSignedness());
+  }
+  return elementType;
+}
+
+AffineMap
+IdentityAttr::getStorageElementOffsetMap(RankedTensorType type) const {
+  return getRowMajorStorageElementOffsetMap(
+      type, getRoundedElementByteWidth(type.getElementType()) * 8);
+}
+
 //===---------------------------------------------------------------------===//
 // iree_encoding.identity_resolver
 //===---------------------------------------------------------------------===//
@@ -694,6 +815,22 @@ Attribute UnsupportedResolverAttr::getLayout(RankedTensorType) const {
 //===---------------------------------------------------------------------===//
 
 bool TestingAttr::isSerialized() const { return getLayouts() ? true : false; }
+
+Type TestingAttr::getStorageElementType(Type elementType) const {
+  if (!getLayouts() || getLayouts().empty()) {
+    return {};
+  }
+  return LayoutAttr::get(getContext(), getLayouts())
+      .getStorageElementType(elementType);
+}
+
+AffineMap TestingAttr::getStorageElementOffsetMap(RankedTensorType type) const {
+  if (!getLayouts() || getLayouts().empty()) {
+    return {};
+  }
+  return LayoutAttr::get(getContext(), getLayouts())
+      .getStorageElementOffsetMap(type);
+}
 
 Attribute TestingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();

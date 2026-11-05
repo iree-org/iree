@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -276,6 +277,117 @@ Value calculatePackedStorageSizeInBytesImpl(Attribute attr, Location loc,
   }
 
   return result;
+}
+
+// Symbolic tile sizes cannot be used to compute storage offsets.
+static LogicalResult
+applyStorageTileSwizzle(const Codegen::TileSwizzle &swizzle,
+                        SmallVectorImpl<AffineExpr> &indices,
+                        SmallVectorImpl<int64_t> &shape) {
+  using Dim = Codegen::TileSwizzle::Dim;
+  if (swizzle.expandShape().size() != indices.size()) {
+    return failure();
+  }
+  SmallVector<AffineExpr> expandedIndices;
+  SmallVector<int64_t> expandedShape;
+  for (auto [index, extent, dims] :
+       llvm::zip_equal(indices, shape, swizzle.expandShape())) {
+    int64_t stride = 1;
+    SmallVector<AffineExpr> coordinates(dims.size());
+    for (int64_t i = dims.size(); i-- > 0;) {
+      Dim dim = dims[i];
+      if (dim.size() <= 0 ||
+          (dim.kind() == Dim::Kind::Internal &&
+           dim.symbolicMultiplier() != Dim::SymbolicMultiplier::One) ||
+          stride > extent / dim.size()) {
+        return failure();
+      }
+      coordinates[i] = index.floorDiv(stride) % dim.size();
+      stride *= dim.size();
+    }
+    if (stride != extent) {
+      return failure();
+    }
+    llvm::append_range(expandedIndices, coordinates);
+    for (Dim dim : dims) {
+      expandedShape.push_back(dim.size());
+    }
+  }
+  if (swizzle.permutation().size() != expandedIndices.size() ||
+      !isPermutationVector(swizzle.permutation())) {
+    return failure();
+  }
+  applyPermutationToVector(expandedIndices, swizzle.permutation());
+  applyPermutationToVector(expandedShape, swizzle.permutation());
+  indices.assign(expandedIndices.begin(), expandedIndices.end());
+  shape.assign(expandedShape.begin(), expandedShape.end());
+  return success();
+}
+
+AffineMap getPackedStorageElementOffsetMap(Attribute attr,
+                                           RankedTensorType type) {
+  auto serializable = cast<Encoding::SerializableAttr>(attr);
+  if (!serializable.isSerialized()) {
+    return {};
+  }
+  auto materializer = cast<Codegen::PackedLayoutMaterializerAttr>(attr);
+  MaterializeEncodingInfo info = materializer.getEncodingInfo(type);
+  if (llvm::any_of(info.innerTileSizes,
+                   [](int64_t size) { return size <= 0; }) ||
+      (info.scalableTiles && llvm::is_contained(*info.scalableTiles, true))) {
+    return {};
+  }
+
+  if (info.innerDimsPos.size() != info.innerTileSizes.size() ||
+      (!info.outerDimsPerm.empty() &&
+       (info.outerDimsPerm.size() != type.getRank() ||
+        !isPermutationVector(info.outerDimsPerm)))) {
+    return {};
+  }
+  llvm::SmallDenseSet<int64_t> tiledDims;
+  for (int64_t dim : info.innerDimsPos) {
+    if (dim < 0 || dim >= type.getRank() || !tiledDims.insert(dim).second) {
+      return {};
+    }
+  }
+
+  MLIRContext *ctx = type.getContext();
+  SmallVector<AffineExpr> outerIndices, outerShape;
+  int64_t dynamicIndex = 0;
+  for (int64_t i = 0; i < type.getRank(); ++i) {
+    outerIndices.push_back(getAffineDimExpr(i, ctx));
+    outerShape.push_back(type.isDynamicDim(i)
+                             ? getAffineSymbolExpr(dynamicIndex++, ctx)
+                             : getAffineConstantExpr(type.getDimSize(i), ctx));
+  }
+  SmallVector<AffineExpr> innerIndices;
+  SmallVector<int64_t> innerShape;
+  for (auto [dim, tile] :
+       llvm::zip_equal(info.innerDimsPos, info.innerTileSizes)) {
+    innerIndices.push_back(outerIndices[dim] % tile);
+    innerShape.push_back(tile);
+    outerIndices[dim] = outerIndices[dim].floorDiv(tile);
+    outerShape[dim] = outerShape[dim].ceilDiv(tile);
+  }
+  if (!info.outerDimsPerm.empty()) {
+    applyPermutationToVector(outerIndices, info.outerDimsPerm);
+    applyPermutationToVector(outerShape, info.outerDimsPerm);
+  }
+
+  if (info.swizzle && failed(applyStorageTileSwizzle(
+                          *info.swizzle, innerIndices, innerShape))) {
+    return {};
+  }
+
+  AffineExpr offset = getAffineConstantExpr(0, ctx);
+  for (auto [index, extent] : llvm::zip_equal(outerIndices, outerShape)) {
+    offset = offset * extent + index;
+  }
+  for (auto [index, extent] : llvm::zip_equal(innerIndices, innerShape)) {
+    offset = offset * extent + index;
+  }
+  return AffineMap::get(type.getRank(), dynamicIndex,
+                        (offset * type.getElementTypeBitWidth()).floorDiv(8));
 }
 
 DictionaryAttr getPackedLayoutImpl(Attribute attr, RankedTensorType type,
