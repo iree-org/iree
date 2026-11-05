@@ -17,6 +17,9 @@ on:
         type: string
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   test_w7900:
     # Disabled until an iree-w7900 runner is available.

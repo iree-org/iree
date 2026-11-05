@@ -13,6 +13,9 @@ on:
   workflow_dispatch:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   # This may run out of memory / disk space on standard GitHub-hosted runners,
   # so run on self-hosted CPU build runners instead.

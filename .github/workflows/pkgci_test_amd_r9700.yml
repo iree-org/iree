@@ -17,6 +17,9 @@ on:
         type: string
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   test_r9700:
     runs-on: [Linux, X64, iree-r9700]

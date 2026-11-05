@@ -20,8 +20,7 @@ on:
       - '.github/workflows/clang_tidy.yml'
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}

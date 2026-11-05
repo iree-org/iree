@@ -12,6 +12,9 @@ on:
         required: false
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   tag_release:
     if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
@@ -22,6 +25,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Checkout the most recent green commit
@@ -62,7 +66,9 @@ jobs:
           git tag "${tag_name}"
 
       - name: Pushing changes
-        run: git push origin "${tag_name}"
+        env:
+          GH_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
+        run: git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${tag_name}"
 
       - name: Create Release
         id: create_release

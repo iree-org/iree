@@ -17,6 +17,9 @@ on:
         type: string
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   test_onnx_ops:
     name: "test_onnx_ops :: ${{ matrix.name }}"

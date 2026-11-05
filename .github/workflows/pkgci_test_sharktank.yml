@@ -17,6 +17,9 @@ on:
         type: string
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   tests:
     name: "sharktank_tests :: ${{ matrix.name }}"
