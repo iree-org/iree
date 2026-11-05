@@ -265,3 +265,123 @@ util.func public @sizeof_scalable_layout() -> index {
 // Therefore, the calculated size is 2*8*16*1*4(f32)=1024.
 // CHECK:         %[[C1024:.+]] = arith.constant 1024 : index
 // CHECK-NEXT:    util.return %[[C1024]]
+
+// -----
+
+// CHECK-LABEL: @unpacked_size
+// CHECK: %[[SIZE:.*]] = arith.constant 8 : index
+// CHECK: util.return %[[SIZE]]
+util.func public @unpacked_size() -> index {
+  %size = stream.tensor.sizeof tensor<8xi4, #iree_encoding.unpacked_storage> : index
+  util.return %size : index
+}
+
+// -----
+
+// Zero-extension preserves the i5 bit pattern: -1 becomes 31.
+// CHECK-LABEL: @unpacked_constant
+// CHECK: stream.async.constant {{.*}} = dense<[31, 0, 15]> : tensor<3xi8
+util.func public @unpacked_constant() -> !stream.resource<constant> {
+  %result = stream.tensor.constant : tensor<3xi5, #iree_encoding.unpacked_storage> in !stream.resource<constant> = dense<[-1, 0, 15]> : tensor<3xi5, #iree_encoding.unpacked_storage>
+  util.return %result : !stream.resource<constant>
+}
+
+// -----
+
+// CHECK-LABEL: @unpacked_load
+// CHECK: %[[BYTE:.*]] = stream.async.load {{.*}}[%arg1] {{.*}} -> i8
+// CHECK: %[[VALUE:.*]] = arith.trunci %[[BYTE]] : i8 to i5
+// CHECK: util.return %[[VALUE]]
+util.func public @unpacked_load(%buffer: !stream.resource<staging>, %index: index) -> i5 {
+  %size = arith.constant 8 : index
+  %value = stream.tensor.load %buffer[%index] : tensor<8xi5, #iree_encoding.unpacked_storage> in !stream.resource<staging>{%size} -> i5
+  util.return %value : i5
+}
+
+// -----
+
+// CHECK-LABEL: @unpacked_store
+// CHECK: %[[BYTE:.*]] = arith.extui %arg2 : i5 to i8
+// CHECK: stream.async.store %[[BYTE]], {{.*}}[%arg1]
+util.func public @unpacked_store(%buffer: !stream.resource<staging>, %index: index, %value: i5) -> !stream.resource<staging> {
+  %size = arith.constant 8 : index
+  %result = stream.tensor.store %value, %buffer[%index] : i5 -> tensor<8xi5, #iree_encoding.unpacked_storage> in %buffer as !stream.resource<staging>{%size}
+  util.return %result : !stream.resource<staging>
+}
+
+// -----
+
+// Row padding places element [1, 0] at byte offset 16.
+// CHECK-LABEL: @padded_load
+// CHECK: %[[OFFSET:.*]] = arith.constant 16 : index
+// CHECK: stream.async.load {{.*}}[%[[OFFSET]]]
+util.func public @padded_load(%buffer: !stream.resource<staging>) -> i32 {
+  %size = arith.constant 32 : index
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %value = stream.tensor.load %buffer[%c1, %c0] : tensor<2x3xi32, #iree_encoding.padding<[0, 1]>> in !stream.resource<staging>{%size} -> i32
+  util.return %value : i32
+}
+
+// -----
+
+// Byte-range slicing does not support padded layouts.
+// CHECK-LABEL: @do_not_slice_padded
+// CHECK-NOT: stream.async.slice
+// CHECK: stream.tensor.slice
+util.func public @do_not_slice_padded(%buffer: !stream.resource<*>) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %c16 = arith.constant 16 : index
+  %c32 = arith.constant 32 : index
+  %result = stream.tensor.slice %buffer[%c1, %c0 for %c1, %c3] : tensor<2x3xi32, #iree_encoding.padding<[0, 1]>> in !stream.resource<*>{%c32} -> tensor<1x3xi32, #iree_encoding.padding<[0, 1]>> in !stream.resource<*>{%c16}
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @unpacked_dynamic_i9_size
+// CHECK: %[[FOUR:.*]] = arith.constant 4 : index
+// CHECK: %[[SIZE:.*]] = arith.muli %arg0, %[[FOUR]]
+// CHECK: util.return %[[SIZE]]
+util.func public @unpacked_dynamic_i9_size(%dim: index) -> index {
+  %size = stream.tensor.sizeof tensor<2x?xi9, #iree_encoding.unpacked_storage>{%dim} : index
+  util.return %size : index
+}
+
+// -----
+
+// CHECK-LABEL: @unpacked_zero_size
+// CHECK: %[[ZERO:.*]] = arith.constant 0 : index
+// CHECK: util.return %[[ZERO]]
+util.func public @unpacked_zero_size() -> index {
+  %size = stream.tensor.sizeof tensor<0x4xi4, #iree_encoding.unpacked_storage> : index
+  util.return %size : index
+}
+
+// -----
+
+// An unpacked true fills each byte with 1.
+// CHECK-LABEL: @unpacked_boolean_splat
+// CHECK: %[[BYTE:.*]] = arith.extui %arg0 : i1 to i8
+// CHECK: stream.async.splat %[[BYTE]]
+util.func public @unpacked_boolean_splat(%value: i1, %size: index) -> !stream.resource<*> {
+  %result = stream.tensor.splat %value : i1 -> tensor<8xi1, #iree_encoding.unpacked_storage> in !stream.resource<*>{%size}
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// A zero-length fill may begin one past the last element.
+// CHECK-LABEL: @unpacked_empty_fill
+// CHECK: %[[ZERO:.*]] = arith.constant 0 : index
+// CHECK: %[[FOUR:.*]] = arith.constant 4 : index
+// CHECK: %[[BYTE:.*]] = arith.extui %arg1 : i4 to i8
+// CHECK: stream.async.fill %[[BYTE]], %arg0[%[[FOUR]] to %[[FOUR]] for %[[ZERO]]]
+util.func public @unpacked_empty_fill(%buffer: !stream.resource<*>, %value: i4) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %result = stream.tensor.fill %value, %buffer[%c4 for %c0] : i4 -> tensor<4xi4, #iree_encoding.unpacked_storage> in %buffer as !stream.resource<*>{%c4}
+  util.return %result : !stream.resource<*>
+}

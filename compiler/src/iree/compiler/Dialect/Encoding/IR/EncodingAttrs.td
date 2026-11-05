@@ -50,6 +50,8 @@ def EncodingOpTypeAttr:
 def LayoutAttr :
     IREEEncoding_AttrDef<"Layout", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+        "getStorageElementType",
+        "getStorageElementOffsetMap",
         "isSerialized",
         "isIdentityLayout",
         "calculateStorageSizeInBytes",
@@ -89,6 +91,8 @@ def LayoutAttr :
 def PackedStorageAttr :
     IREEEncoding_AttrDef<"PackedStorage", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+        "getStorageElementType",
+        "getStorageElementOffsetMap",
           "isSerialized",
           "calculateStorageSizeInBytes",
           "isCompatibleWith",
@@ -106,6 +110,39 @@ def PackedStorageAttr :
     This attribute takes no arguments.
     The element type of the encoded tensors must be sub-byte (i.e., <8 bits)
     types with power-of-two bitwidth.
+  }];
+  let genVerifyDecl = 0;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.unpacked_storage
+//===---------------------------------------------------------------------===//
+
+def UnpackedStorageAttr :
+    IREEEncoding_AttrDef<"UnpackedStorage", [
+      DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+        "isSerialized",
+        "getStorageElementType",
+        "getStorageElementOffsetMap",
+        "calculateStorageSizeInBytes",
+        "canDropWithoutTensorMaterialization",
+        "isInvariantUnderDimCollapse",
+        "getCollapsedEncoding",
+        "convertForBitcast",
+      ]>,
+      DeclareAttrInterfaceMethods<VerifiableTensorEncoding>
+    ]> {
+  let mnemonic = "unpacked_storage";
+  let summary = [{Stores each integer element in a separate byte-aligned container.}];
+  let description = [{
+    Stores signless integers of 1 to 64 bits in row-major order.
+    Each element occupies the smallest power-of-two number of bytes that can
+    hold it. For example, i1, i4 and i5 use one byte, i9 uses two, and i33 uses
+    eight. Stores zero the unused high bits; loads ignore them. Arithmetic
+    retains the logical element width.
+
+    No additional row or allocation alignment is specified. External storage
+    requires raw buffers; buffer-view import/export is unsupported.
   }];
   let genVerifyDecl = 0;
 }
@@ -217,6 +254,8 @@ def EncodingAttr :
 
 def PaddingAttr : IREEEncoding_AttrDef<"Padding", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+        "getStorageElementType",
+        "getStorageElementOffsetMap",
         "calculateStorageSizeInBytes",
         "cloneWithLayouts",
         "isIdentityLayout",
@@ -269,6 +308,8 @@ def PaddingAttr : IREEEncoding_AttrDef<"Padding", [
 
 def IdentityAttr : IREEEncoding_AttrDef<"Identity", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+        "getStorageElementType",
+        "getStorageElementOffsetMap",
         "calculateStorageSizeInBytes",
         "isIdentityLayout",
         "isSerialized"
@@ -341,6 +382,8 @@ def UnsupportedResolverAttr :
 def TestingAttr :
     IREEEncoding_AttrDef<"Testing", [
       DeclareAttrInterfaceMethods<IREEEncoding_SerializableAttr, [
+        "getStorageElementType",
+        "getStorageElementOffsetMap",
         "isSerialized",
         "cloneWithLayouts",
         "convertForBitcast",

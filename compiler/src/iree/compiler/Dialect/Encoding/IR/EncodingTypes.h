@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtTypes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -134,6 +135,20 @@ struct BitcastEncodingInfo {
   /// The new encoding attribute after bitcasting.
   Attribute encoding;
 };
+
+/// Maps logical indices to row-major byte offsets using `storageBits` per
+/// element and optional trailing padding per dimension. Symbols are dynamic
+/// extents in tensor dimension order. Returns null for negative padding or a
+/// rank mismatch.
+AffineMap getRowMajorStorageElementOffsetMap(RankedTensorType type,
+                                             int64_t storageBits,
+                                             ArrayRef<int64_t> padding = {});
+
+/// Emits a storage-offset expression. Intermediate values must be non-negative
+/// and divisors must be positive constants.
+Value buildStorageElementByteOffset(Location loc, OpBuilder &builder,
+                                    AffineExpr expr, ValueRange indices,
+                                    ValueRange dynamicDims);
 
 } // namespace mlir::iree_compiler::IREE::Encoding
 

@@ -256,3 +256,17 @@ func.func @illegal_unset_encoding_wrong_encoding_dims_count(%arg0 : tensor<?x?xf
   %0 = iree_encoding.unset_encoding %arg0 encoding_dims{%m}: tensor<?x?xf32, #encoding> -> tensor<?x?xf32>{%d0, %d1}
   return %0 : tensor<?x?xf32>
 }
+
+// -----
+
+// expected-error @+1 {{unpacked_storage requires signless integer elements with bit-width at most 64}}
+func.func @unpacked_float(%arg0: tensor<4xf32, #iree_encoding.unpacked_storage>) {
+  return
+}
+
+// -----
+
+// expected-error @+1 {{unpacked_storage requires signless integer elements with bit-width at most 64}}
+func.func @unpacked_wide(%arg0: tensor<4xi65, #iree_encoding.unpacked_storage>) {
+  return
+}
