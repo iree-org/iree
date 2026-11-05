@@ -122,10 +122,9 @@ void collectTiledAndFusedOps(Operation *rootOp,
 
 /// Adds the fusable users of the loop results that `fusedOps` write to (through
 /// `tensor.parallel_insert_slice`) to `candidates`, keeping it free of
-/// duplicates and reverse-sorted by dominance: the candidate dominating others
-/// comes last (so it can be cheaply popped from the vector). The
-/// most-dominating candidate is to be fused first since not fusing it may
-/// prevent dominated candidates to be fused:
+/// duplicates and reverse-sorted by dominance. The most-dominating candidate is
+/// to be fused first since not fusing it may prevent dominated candidates to be
+/// fused:
 ///
 ///     A
 ///     |
