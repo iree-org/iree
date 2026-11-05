@@ -22,6 +22,7 @@
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/SliceUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/Utils/ElementPackingUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
@@ -236,10 +237,20 @@ static void getRangeBounds(TilingInterface op, SmallVectorImpl<int64_t> &lb,
                            [&](Range r) { return getStaticValue(r.size); });
 }
 
+/// Returns true if an operand of `linalgOp` is a tensor whose sub-byte elements
+/// are stored packed.
+static bool hasPackedSubByteOperand(linalg::LinalgOp linalgOp) {
+  return llvm::any_of(linalgOp->getOperandTypes(), [](Type type) {
+    auto tensorType = dyn_cast<RankedTensorType>(type);
+    return tensorType && needToPackSubByteElements(tensorType);
+  });
+}
+
 /// Returns the vectorization pre-processing strategy (peeling, masking) for the
 /// given LinalgOp. It is based on either (in the priority order):
 ///   * user-specified value, or
-///   * IREE's heuristics (e.g. the op traits and the target architecture).
+///   * IREE's heuristics (e.g. the op traits, the operand types and the target
+///     architecture).
 static VectorPreProcStrategy
 getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   // If set, use the strategy selected by a user.
@@ -268,6 +279,13 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
     return WalkResult::advance();
   });
   if (usePeelingStrategy) {
+    return VectorPreProcStrategy::Peeling;
+  }
+
+  // Narrow-type emulation cannot rewrite masked loads and stores of packed
+  // sub-byte elements once their masks are lowered, so peel. Remainders of
+  // dynamic size are still masked.
+  if (hasPackedSubByteOperand(linalgOp)) {
     return VectorPreProcStrategy::Peeling;
   }
 
