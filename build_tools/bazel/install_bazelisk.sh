@@ -10,21 +10,13 @@ set -euox pipefail
 BAZELISK_VERSION="$1"
 
 ARCH="$(dpkg --print-architecture)"
+BAZELISK_URL="https://github.com/bazelbuild/bazelisk/releases/download/v${BAZELISK_VERSION}/bazelisk-linux-${ARCH}"
 
-# SHA-256 of each supported bazelisk release binary.
-case "${BAZELISK_VERSION}-${ARCH}" in
-  1.21.0-amd64) BAZELISK_SHA256="655a5c675dacf3b7ef4970688b6a54598aa30cbaa0b9e717cd1412c1ef9ec5a7" ;;
-  1.21.0-arm64) BAZELISK_SHA256="ff793b461968e30d9f954c080f4acaa557edbdeab1ce276c02e4929b767ead66" ;;
-  *)
-    echo "No SHA-256 known for bazelisk ${BAZELISK_VERSION} on ${ARCH}; add it to $0."
-    exit 1
-    ;;
-esac
-
-curl --silent --fail --show-error --location \
-    "https://github.com/bazelbuild/bazelisk/releases/download/v${BAZELISK_VERSION}/bazelisk-linux-${ARCH}" \
-    --output bazelisk
-echo "${BAZELISK_SHA256}  bazelisk" | sha256sum -c -
+# Releases since v1.29.0 publish a SHA-256 next to each binary.
+curl --silent --fail --show-error --location "${BAZELISK_URL}" --output bazelisk
+curl --silent --fail --show-error --location "${BAZELISK_URL}.sha256" --output bazelisk.sha256
+echo "$(cut -d ' ' -f 1 bazelisk.sha256)  bazelisk" | sha256sum -c -
+rm ./bazelisk.sha256
 
 cp ./bazelisk /usr/local/bin/bazel
 chmod +x /usr/local/bin/bazel
