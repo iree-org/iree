@@ -13,6 +13,9 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   macos_arm64_clang:
     # Prevent scheduled runs in forks (only allow for iree-org or non-schedule triggers).
