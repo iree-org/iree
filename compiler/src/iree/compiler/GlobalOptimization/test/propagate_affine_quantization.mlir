@@ -314,8 +314,8 @@ func.func @decline_pad_with_per_channel_zero_point(%aq: tensor<4x4xi8>, %sa: ten
 #id2 = affine_map<(d0, d1) -> (d0, d1)>
 #scalar2 = affine_map<(d0, d1) -> ()>
 
-// A pad on sub-byte storage can move values off byte boundaries, so the pad
-// stays on the real-valued side.
+// A pad on storage that is not byte-aligned, such as i4, can move values off
+// byte boundaries, so the pad stays on the real-valued side.
 func.func @decline_pad_sub_byte_storage(%aq: tensor<4x4xi4>, %sa: f32)
     -> tensor<4x6xf32> {
   %cst = arith.constant 0.000000e+00 : f32

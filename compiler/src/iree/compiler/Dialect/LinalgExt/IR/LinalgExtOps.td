@@ -1947,7 +1947,8 @@ def IREELinalgExt_DequantizeAffineOp
     whatever the zero point's own element type.
 
     `quant_min`/`quant_max` optionally describe the inclusive range of the
-    quantized input values. They do not clamp the input or change the
+    quantized input values. Input values outside the range give undefined
+    results. The attributes do not clamp the input or change the
     dequantization arithmetic. This preserves information that the storage
     type alone cannot express: an i8 tensor with range `[-8, 7]` uses a
     four-bit quantization grid, which a consumer can use to pack the values
