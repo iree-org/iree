@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
+#include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/GlobalOptimization/QuantizationUtils.h"
@@ -17,6 +18,7 @@
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -25,6 +27,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 #define DEBUG_TYPE "iree-global-opt-pack-sub-byte-quantized-constants"
 
@@ -122,7 +125,7 @@ static bool allValuesInRange(ArrayRef<APSInt> values, QuantMinMax range) {
 }
 
 /// Returns the narrowest bit width the input of `op` can be packed into, or
-/// nullopt if its type, range or zero point rules out packing.
+/// nullopt if its type, shape, range or zero point rules out packing.
 static std::optional<unsigned>
 getPackedBitWidth(DequantizeAffineOp op, SymbolTableCollection &symbolTables) {
   // Quantized values arrive in i8; wider storage would need a truncation
@@ -140,18 +143,17 @@ getPackedBitWidth(DequantizeAffineOp op, SymbolTableCollection &symbolTables) {
     return std::nullopt;
   }
   QuantMinMax range{*quantMin, *op.getQuantMax()};
-  SmallVector<APSInt> zeroPoint;
-  if (Value zeroPointValue = op.getZeroPoint()) {
+  SmallVector<APSInt> zeroPointValues;
+  if (Value zeroPoint = op.getZeroPoint()) {
     // The check reads only the zero point values, which reshapes keep.
-    Attribute attr =
-        getConstantAttr(getReshapeSource(zeroPointValue), symbolTables);
+    Attribute attr = getConstantAttr(getReshapeSource(zeroPoint), symbolTables);
     std::optional<SmallVector<APSInt>> values =
         attr ? getIntegerValues(attr, op.getZpUnsigned()) : std::nullopt;
     if (!values) {
       LDBG() << "zero point is not an integer constant: " << op;
       return std::nullopt;
     }
-    zeroPoint = std::move(*values);
+    zeroPointValues = std::move(*values);
   }
   for (unsigned bitWidth : kPackedBitWidths) {
     QuantMinMax storage = *getStorageRange(bitWidth, op.getInputUnsigned());
@@ -166,7 +168,7 @@ getPackedBitWidth(DequantizeAffineOp op, SymbolTableCollection &symbolTables) {
     }
     // dequantize_affine requires the zero point to fit the input element
     // type, so it must also fit i<bitWidth>.
-    if (!allValuesInRange(zeroPoint, storage)) {
+    if (!allValuesInRange(zeroPointValues, storage)) {
       continue;
     }
     return bitWidth;
@@ -188,30 +190,54 @@ static bool isComputedFromInlineData(const ConstValueInfo &info,
   });
 }
 
-/// Returns true when packing the constant expression of `info` into
-/// `bitWidth` bits takes no more bytes than its roots, which hoisting accepts
-/// under any size threshold. Returns false if a root has a dynamic shape, whose
-/// size is unknown.
-static bool isPackingNoLargerThanRoots(const ConstValueInfo &info,
-                                       unsigned bitWidth) {
-  int64_t rootBytes = 0;
-  for (Value root : info.roots) {
-    auto rootType = dyn_cast<ShapedType>(root.getType());
-    if (!rootType) {
+/// Returns the bytes `values` take, counting values that are not shaped as
+/// zero, or nullopt if one has a dynamic shape.
+static std::optional<int64_t> getStorageBytes(ArrayRef<Value> values) {
+  int64_t bytes = 0;
+  for (Value value : values) {
+    auto type = dyn_cast<ShapedType>(value.getType());
+    if (!type) {
       continue;
     }
-    if (!rootType.hasStaticShape()) {
-      return false;
+    if (!type.hasStaticShape()) {
+      return std::nullopt;
     }
-    rootBytes += IREE::Util::getRoundedPhysicalStorageSize(rootType);
+    bytes += IREE::Util::getRoundedPhysicalStorageSize(type);
   }
-  auto type = cast<ShapedType>(info.constValue.getType());
-  return type.getNumElements() * bitWidth / 8 <= rootBytes;
+  return bytes;
+}
+
+/// Returns true when packing the input that `info` describes into `bitWidth`
+/// bits stores no more bytes than leaving it unpacked. Unpacked, hoisting
+/// stores an input that is a leaf no larger than its roots in a global of its
+/// own, which packing shrinks. Any other input may be computed where it is
+/// used, from roots that stay, so its packing must take no more bytes than
+/// `freedRoots`, the roots that packing frees. Either way, hoisting compares
+/// the packing with all its roots and accepts it at any size threshold.
+static bool isPackingNoLargerThanUnpacked(const ConstValueInfo &info,
+                                          unsigned bitWidth,
+                                          ArrayRef<Value> freedRoots) {
+  std::optional<int64_t> freedBytes = getStorageBytes(freedRoots);
+  std::optional<int64_t> rootBytes =
+      getStorageBytes(llvm::to_vector(info.roots));
+  if (!freedBytes || !rootBytes) {
+    return false;
+  }
+  auto inputType = cast<ShapedType>(info.constValue.getType());
+  int64_t packedBytes = IREE::Util::getRoundedPhysicalStorageSize(
+      inputType.getNumElements(),
+      IntegerType::get(inputType.getContext(), bitWidth));
+  if (packedBytes <= *freedBytes) {
+    return true;
+  }
+  return !info.isRoot && IREE::Util::isHoistableConstExprLeaf(&info) &&
+         IREE::Util::getRoundedPhysicalStorageSize(inputType) <= *rootBytes;
 }
 
 /// Returns every use that reads the data of `value`: reshapes are followed up
 /// to their source and back down, across all loads when the source is a global
-/// load. Returns nullopt if the global has users other than loads.
+/// load. Returns nullopt if the global is public, so that code outside the
+/// module can read it, or has users other than loads.
 static std::optional<SmallVector<OpOperand *>>
 getUsesOfSameData(Value value, const SymbolUserMap &symbolUsers,
                   SymbolTableCollection &symbolTables) {
@@ -219,6 +245,9 @@ getUsesOfSameData(Value value, const SymbolUserMap &symbolUsers,
   SmallVector<Value> worklist;
   if (IREE::Util::GlobalOpInterface globalOp =
           getLoadedGlobal(source, symbolTables)) {
+    if (!globalOp.isGlobalPrivate()) {
+      return std::nullopt;
+    }
     for (Operation *user : symbolUsers.getUsers(globalOp)) {
       auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(user);
       if (!loadOp) {
@@ -241,6 +270,42 @@ getUsesOfSameData(Value value, const SymbolUserMap &symbolUsers,
     }
   }
   return uses;
+}
+
+/// Returns true when packing frees the data of `root`: every op that reads it,
+/// directly or through other ops, is in `producers`, which compute the
+/// candidate inputs, and every read leads to one of `candidateInputs`.
+static bool
+isFreedByPacking(Value root, const SetVector<Operation *> &producers,
+                 const SmallPtrSetImpl<OpOperand *> &candidateInputs,
+                 const SymbolUserMap &symbolUsers,
+                 SymbolTableCollection &symbolTables) {
+  std::optional<SmallVector<OpOperand *>> uses =
+      getUsesOfSameData(root, symbolUsers, symbolTables);
+  if (!uses) {
+    return false;
+  }
+  SmallVector<OpOperand *> worklist = std::move(*uses);
+  SmallPtrSet<Operation *, 8> visited;
+  while (!worklist.empty()) {
+    OpOperand *use = worklist.pop_back_val();
+    if (candidateInputs.contains(use)) {
+      continue;
+    }
+    Operation *owner = use->getOwner();
+    if (!producers.contains(owner)) {
+      return false;
+    }
+    if (!visited.insert(owner).second) {
+      continue;
+    }
+    for (Value result : owner->getResults()) {
+      for (OpOperand &resultUse : result.getUses()) {
+        worklist.push_back(&resultUse);
+      }
+    }
+  }
+  return true;
 }
 
 /// Packs the i8 tensor `input`, whose values fit in `bitWidth` bits and whose
@@ -308,10 +373,12 @@ static Value buildPackedInput(OpBuilder &builder, Location loc, Value input,
 struct PackingCandidate {
   DequantizeAffineOp op;
   unsigned bitWidth;
+  /// The constant expression of the input.
+  const ConstValueInfo *info;
 };
 
 /// Returns the dequantizes in `moduleOp` whose input fits a packed bit width
-/// and is computed from no fewer bytes of inline data than its packing takes.
+/// and is computed from inline data at the top level of a function.
 static SmallVector<PackingCandidate>
 collectCandidates(ModuleOp moduleOp,
                   const IREE::Util::ConstExprAnalysis &constExprs,
@@ -327,67 +394,119 @@ collectCandidates(ModuleOp moduleOp,
       LDBG() << "input is not computed from inline data: " << op;
       return;
     }
-    if (!isPackingNoLargerThanRoots(*info, *bitWidth)) {
-      LDBG() << "packed input may be larger than its inline data: " << op;
+    // Hoisting only reaches the top level of a function, where the packing must
+    // go next to the input.
+    if (!isa<FunctionOpInterface>(
+            op.getInput().getParentRegion()->getParentOp())) {
+      LDBG() << "input is defined inside control flow: " << op;
       return;
     }
-    candidates.push_back({op, *bitWidth});
+    candidates.push_back({op, *bitWidth, info});
   });
   return candidates;
 }
 
-/// Drops the candidates whose data another op also reads as i8, or another
-/// candidate reads in a different shape, since packing it would store the data
-/// twice. Every load of a global, in any function, and every reshape reads the
-/// same data, and only the input operand of a candidate reads it packed.
+/// Drops the candidates whose packing could store more bytes than leaving the
+/// input unpacked, or might not be hoisted. The input data must not be read by
+/// another op as i8, or by another candidate in a different shape, which would
+/// keep it stored twice. Every load of a global, in any function, and every
+/// reshape reads the same data, and only the input operand of a candidate reads
+/// it packed. Dropping a candidate can keep data that others rely on being
+/// freed, so this repeats until none is dropped.
 static void
-dropCandidatesWithOtherReaders(SmallVectorImpl<PackingCandidate> &candidates,
-                               ModuleOp moduleOp,
-                               SymbolTableCollection &symbolTables) {
+dropCandidatesThatGrowStorage(SmallVectorImpl<PackingCandidate> &candidates,
+                              ModuleOp moduleOp,
+                              SymbolTableCollection &symbolTables) {
   if (candidates.empty()) {
     return;
   }
-  llvm::SmallPtrSet<OpOperand *, 16> candidateInputs;
-  for (PackingCandidate candidate : candidates) {
-    candidateInputs.insert(&candidate.op.getInputMutable());
-  }
   SymbolUserMap symbolUsers(symbolTables, moduleOp);
-  llvm::erase_if(candidates, [&](PackingCandidate candidate) {
-    Value input = candidate.op.getInput();
-    std::optional<SmallVector<OpOperand *>> uses =
-        getUsesOfSameData(input, symbolUsers, symbolTables);
-    bool hasOtherReader = !uses || llvm::any_of(*uses, [&](OpOperand *use) {
-      return !candidateInputs.contains(use) ||
-             use->get().getType() != input.getType();
-    });
-    if (hasOtherReader) {
-      LDBG() << "input is also read unpacked or in another shape: "
-             << candidate.op;
+  BackwardSliceOptions sliceOptions;
+  sliceOptions.inclusive = true;
+  sliceOptions.omitBlockArguments = true;
+  size_t numCandidates;
+  do {
+    numCandidates = candidates.size();
+    SmallPtrSet<OpOperand *, 16> candidateInputs;
+    SetVector<Operation *> producers;
+    for (PackingCandidate &candidate : candidates) {
+      candidateInputs.insert(&candidate.op.getInputMutable());
+      [[maybe_unused]] LogicalResult result =
+          getBackwardSlice(candidate.op.getInput(), &producers, sliceOptions);
+      assert(result.succeeded() && "expected the backward slice to succeed");
     }
-    return hasOtherReader;
-  });
+    // Whether packing frees a root depends only on the root in each round.
+    DenseMap<Value, bool> isRootFreed;
+    llvm::erase_if(candidates, [&](PackingCandidate &candidate) {
+      Value input = candidate.op.getInput();
+      std::optional<SmallVector<OpOperand *>> uses =
+          getUsesOfSameData(input, symbolUsers, symbolTables);
+      bool hasOtherReader = !uses || llvm::any_of(*uses, [&](OpOperand *use) {
+        return !candidateInputs.contains(use) ||
+               use->get().getType() != input.getType();
+      });
+      if (hasOtherReader) {
+        LDBG() << "input is also read unpacked or in another shape: "
+               << candidate.op;
+        return true;
+      }
+      SmallVector<Value> freedRoots;
+      for (Value root : candidate.info->roots) {
+        if (!isa<ShapedType>(root.getType())) {
+          continue;
+        }
+        auto [it, inserted] = isRootFreed.try_emplace(root);
+        if (inserted) {
+          it->second = isFreedByPacking(root, producers, candidateInputs,
+                                        symbolUsers, symbolTables);
+        }
+        if (it->second) {
+          freedRoots.push_back(root);
+        }
+      }
+      if (!isPackingNoLargerThanUnpacked(*candidate.info, candidate.bitWidth,
+                                         freedRoots)) {
+        LDBG() << "packing may store more bytes than the unpacked input: "
+               << candidate.op;
+        return true;
+      }
+      return false;
+    });
+  } while (candidates.size() != numCandidates);
 }
 
-/// Packs each candidate input once, at the widest bit width its dequantizes
-/// need, which holds the range of every one of them. The packing goes next to
-/// the input's definition: the const-expr analysis does not follow uses into
-/// nested regions, so packing next to a dequantize in control flow would not
-/// be hoisted.
-static void packCandidates(ArrayRef<PackingCandidate> candidates) {
+/// Packs each candidate input value once, at the widest bit width that the
+/// dequantizes reading its data need, which holds the range of every one of
+/// them. Every load of a global packs at the same width, so the packings in
+/// different functions are identical and are merged later. The packing goes
+/// next to the input's definition: the const-expr analysis does not follow uses
+/// into nested regions, so packing next to a dequantize in control flow would
+/// not be hoisted.
+static void packCandidates(MutableArrayRef<PackingCandidate> candidates,
+                           SymbolTableCollection &symbolTables) {
+  DenseMap<Operation *, unsigned> globalBitWidths;
   DenseMap<Value, unsigned> inputBitWidths;
-  for (PackingCandidate candidate : candidates) {
-    unsigned &inputBitWidth = inputBitWidths[candidate.op.getInput()];
-    inputBitWidth = std::max(inputBitWidth, candidate.bitWidth);
+  // Returns the widest bit width for the data that `input` reads.
+  auto getBitWidth = [&](Value input) -> unsigned & {
+    if (IREE::Util::GlobalOpInterface globalOp =
+            getLoadedGlobal(getReshapeSource(input), symbolTables)) {
+      return globalBitWidths[globalOp.getOperation()];
+    }
+    return inputBitWidths[input];
+  };
+  for (PackingCandidate &candidate : candidates) {
+    unsigned &bitWidth = getBitWidth(candidate.op.getInput());
+    bitWidth = std::max(bitWidth, candidate.bitWidth);
   }
   DenseMap<Value, Value> packedInputs;
-  for (PackingCandidate candidate : candidates) {
+  for (PackingCandidate &candidate : candidates) {
     Value input = candidate.op.getInput();
     Value &packed = packedInputs[input];
     if (!packed) {
       OpBuilder builder(candidate.op.getContext());
       builder.setInsertionPointAfterValue(input);
-      packed = buildPackedInput(builder, input.getLoc(), input,
-                                inputBitWidths[input]);
+      packed =
+          buildPackedInput(builder, input.getLoc(), input, getBitWidth(input));
     }
     candidate.op.getInputMutable().assign(packed);
   }
@@ -403,8 +522,8 @@ struct PackSubByteQuantizedConstantsPass final
     SmallVector<PackingCandidate> candidates = collectCandidates(
         getOperation(), getAnalysis<IREE::Util::ConstExprAnalysis>(),
         symbolTables);
-    dropCandidatesWithOtherReaders(candidates, getOperation(), symbolTables);
-    packCandidates(candidates);
+    dropCandidatesThatGrowStorage(candidates, getOperation(), symbolTables);
+    packCandidates(candidates, symbolTables);
   }
 };
 

@@ -107,6 +107,7 @@ iree_cc_library(
     ::QuantizedContraction
     LLVMSupport
     MLIRAffineDialect
+    MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowDialect

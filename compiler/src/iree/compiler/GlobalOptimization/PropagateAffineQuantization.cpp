@@ -45,10 +45,10 @@ struct BubblePadThroughDequantize : public OpRewritePattern<tensor::PadOp> {
     if (!dequantizeOp) {
       return rewriter.notifyMatchFailure(padOp, "source is not a dequantize");
     }
-    // A pad on sub-byte storage can move values off byte boundaries, which
-    // sub-byte codegen does not handle.
+    // A pad on storage that is not byte-aligned can move values off byte
+    // boundaries, which narrow-type codegen does not handle.
     if (dequantizeOp.getInputType().getElementTypeBitWidth() % 8 != 0) {
-      return rewriter.notifyMatchFailure(padOp, "storage is sub-byte");
+      return rewriter.notifyMatchFailure(padOp, "storage is not byte-aligned");
     }
     // Only a pad with real zero can move to the quantized side, where the zero
     // point represents it.

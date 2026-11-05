@@ -52,7 +52,9 @@ TEST(QuantizationUtilsTest, getStorageRange) {
     EXPECT_EQ(range->max, test.storage.max);
   }
 
-  // Storage the accumulator cannot hold has no range.
+  // Zero-width storage and storage the accumulator cannot hold have no range.
+  EXPECT_FALSE(getStorageRange(0, true));
+  EXPECT_FALSE(getStorageRange(0, false));
   EXPECT_FALSE(getStorageRange(32, true));
   EXPECT_FALSE(getStorageRange(32, false));
 }
