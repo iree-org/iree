@@ -155,6 +155,7 @@ iree_cc_library(
     ::webgpu_imports
     iree::base
     iree::hal
+    iree::hal::utils::resource_set
   PUBLIC
 )
 

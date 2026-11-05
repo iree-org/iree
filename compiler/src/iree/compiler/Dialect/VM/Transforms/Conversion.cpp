@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/ArithCommon/CeilFloorDivExpansion.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"

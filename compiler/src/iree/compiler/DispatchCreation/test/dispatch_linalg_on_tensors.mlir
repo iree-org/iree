@@ -809,7 +809,6 @@ util.func public @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg
 //   CHECK-DAG:     iree_tensor_ext.dispatch.tensor.load %[[ARG2_CAPTURE]]
 //   CHECK-DAG:     iree_tensor_ext.dispatch.tensor.load %[[ARG1_CAPTURE]]
 //   CHECK-DAG:     arith.minsi
-//   CHECK-DAG:     arith.minsi
 //   CHECK-DAG:     arith.maxsi
 //   CHECK-DAG:     arith.maxsi
 //   CHECK-DAG:     index_cast
@@ -892,13 +891,24 @@ util.func public @scatter(
 
 util.func public @sort_3d(%arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
     -> (tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
-  %0, %1 = iree_linalg_ext.sort dimension(0)
-      outs(%arg0, %arg1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %0 = tensor.dim %arg0, %c0 : tensor<?x?x?xi32>
+  %1 = tensor.dim %arg0, %c1 : tensor<?x?x?xi32>
+  %2 = tensor.dim %arg0, %c2 : tensor<?x?x?xi32>
+  %3 = tensor.dim %arg1, %c0 : tensor<?x?x?xf32>
+  %4 = tensor.dim %arg1, %c1 : tensor<?x?x?xf32>
+  %5 = tensor.dim %arg1, %c2 : tensor<?x?x?xf32>
+  %6 = tensor.empty(%0, %1, %2) : tensor<?x?x?xi32>
+  %7 = tensor.empty(%3, %4, %5) : tensor<?x?x?xf32>
+  %8, %9 = iree_linalg_ext.sort dimension(0)
+      ins(%arg0, %arg1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>) outs(%6, %7 : tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
-        %2 = arith.cmpf ogt, %arg4, %arg5 : f32
-        iree_linalg_ext.yield %2 : i1
+        %10 = arith.cmpf ogt, %arg4, %arg5 : f32
+        iree_linalg_ext.yield %10 : i1
       } -> tensor<?x?x?xi32>, tensor<?x?x?xf32>
-  util.return %0, %1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>
+  util.return %8, %9 : tensor<?x?x?xi32>, tensor<?x?x?xf32>
 }
 //      CHECK: util.func public @sort_3d(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?x?xi32>
@@ -915,10 +925,12 @@ util.func public @sort_3d(%arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
 //      CHECK:   %[[RESULT_OUT:.+]]:2 = flow.dispatch.workgroups[
 // CHECK-SAME:       %[[ARG0_D0]], %[[ARG0_D1]], %[[ARG0_D2]], %[[ARG1_D0]], %[[ARG1_D1]], %[[ARG1_D2]]]
 // CHECK-SAME:       (%[[ARG0]], %[[ARG1]], %[[ARG0_D0]], %[[ARG0_D1]], %[[ARG0_D2]], %[[ARG1_D0]], %[[ARG1_D1]], %[[ARG1_D2]])
-// CHECK-NEXT:       (%[[ARG0_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x?xi32>>
-// CHECK-SAME:        %[[ARG1_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readwrite:tensor<?x?x?xf32>>,
+// CHECK-NEXT:       (%[[ARG0_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xi32>>
+// CHECK-SAME:        %[[ARG1_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?x?xf32>>,
 // CHECK-SAME:        %[[ARG0_D0_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG0_D1_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG0_D2_CAPTURE:[a-zA-Z0-9_]+]]: index,
-// CHECK-SAME:        %[[ARG1_D0_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG1_D1_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG1_D2_CAPTURE:[a-zA-Z0-9_]+]]: index) {
+// CHECK-SAME:        %[[ARG1_D0_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG1_D1_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG1_D2_CAPTURE:[a-zA-Z0-9_]+]]: index,
+// CHECK-SAME:        %[[OUT0_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x?xi32>>
+// CHECK-SAME:        %[[OUT1_CAPTURE:[a-zA-Z0-9_]+]]: !iree_tensor_ext.dispatch.tensor<writeonly:tensor<?x?x?xf32>>) {
 //  CHECK-DAG:     %[[ARG0_D0_W:.+]] = iree_tensor_ext.dispatch.workload.ordinal %[[ARG0_D0_CAPTURE]], 0
 //  CHECK-DAG:     %[[ARG0_D1_W:.+]] = iree_tensor_ext.dispatch.workload.ordinal %[[ARG0_D1_CAPTURE]], 1
 //  CHECK-DAG:     %[[ARG0_D2_W:.+]] = iree_tensor_ext.dispatch.workload.ordinal %[[ARG0_D2_CAPTURE]], 2
@@ -929,8 +941,10 @@ util.func public @sort_3d(%arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
 // CHECK-SAME:         offsets = [0, 0, 0], sizes = [%[[ARG0_D0_W]], %[[ARG0_D1_W]], %[[ARG0_D2_W]]]
 //      CHECK:     %[[OUT2:.+]] = iree_tensor_ext.dispatch.tensor.load %[[ARG1_CAPTURE]]
 // CHECK-SAME:         offsets = [0, 0, 0], sizes = [%[[ARG1_D0_W]], %[[ARG1_D1_W]], %[[ARG1_D2_W]]]
+//  CHECK-DAG:     %[[INIT1:.+]] = tensor.empty(%[[ARG0_D0_W]], %[[ARG0_D1_W]], %[[ARG0_D2_W]])
+//  CHECK-DAG:     %[[INIT2:.+]] = tensor.empty(%[[ARG1_D0_W]], %[[ARG1_D1_W]], %[[ARG1_D2_W]])
 //      CHECK:     %[[RESULT:.+]]:2 = iree_linalg_ext.sort dimension(0)
-// CHECK-SAME:         outs(%[[OUT1]], %[[OUT2]] : tensor<?x?x?xi32>, tensor<?x?x?xf32>)
+// CHECK-SAME:         ins(%[[OUT1]], %[[OUT2]] : tensor<?x?x?xi32>, tensor<?x?x?xf32>) outs(%[[INIT1]], %[[INIT2]] : tensor<?x?x?xi32>, tensor<?x?x?xf32>)
 //      CHECK:     iree_tensor_ext.dispatch.tensor.store %[[RESULT]]#0
 // CHECK-SAME:         offsets = [0, 0, 0], sizes = [%[[ARG0_D0_W]], %[[ARG0_D1_W]], %[[ARG0_D2_W]]]
 //      CHECK:     iree_tensor_ext.dispatch.tensor.store %[[RESULT]]#1

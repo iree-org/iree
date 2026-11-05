@@ -84,3 +84,62 @@ func.func @bitcast_extract_extend_1(%input: vector<4xi32>) -> vector<4xi32> {
 //       CHECK:   %[[AND3:.+]] = arith.andi %[[SHR3]], %[[MASK]] : i32
 //       CHECK:   %[[RES:.+]] = vector.from_elements %[[AND0]], %[[AND1]], %[[AND2]], %[[AND3]] : vector<4xi32>
 //       CHECK:   return %[[RES]] : vector<4xi32>
+
+// -----
+
+func.func @bitcast_extract_extend_8_elements(%input: vector<4xi32>) -> vector<8xi32> {
+  %bitcast = vector.bitcast %input : vector<4xi32> to vector<32xi4>
+  %extract = vector.extract_strided_slice %bitcast offsets = [8], sizes = [8], strides = [1] : vector<32xi4> to vector<8xi4>
+  %extend = arith.extui %extract : vector<8xi4> to vector<8xi32>
+  return %extend : vector<8xi32>
+}
+
+// CHECK-LABEL: func @bitcast_extract_extend_8_elements
+//  CHECK-SAME: (%[[INPUT:.+]]: vector<4xi32>)
+//       CHECK: %[[BASE:.+]] = vector.extract %[[INPUT]][1] : i32 from vector<4xi32>
+// CHECK-COUNT-8: arith.andi {{.*}} : i32
+//       CHECK: %[[RES:.+]] = vector.from_elements {{.*}} : vector<8xi32>
+//       CHECK: return %[[RES]] : vector<8xi32>
+
+// -----
+
+// CHECK-LABEL: func @large_elementwise_add
+// CHECK-NOT: arith.addf {{.*}}vector<32xf32>
+// CHECK: arith.addf {{.*}}vector<4xf32>
+// CHECK-NOT: arith.addf {{.*}}vector<32xf32>
+func.func @large_elementwise_add(%lhs: vector<32xf32>, %rhs: vector<32xf32>) -> vector<4xf32> {
+  %sum = arith.addf %lhs, %rhs : vector<32xf32>
+  %part = vector.extract_strided_slice %sum offsets = [8], sizes = [4], strides = [1] : vector<32xf32> to vector<4xf32>
+  return %part : vector<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @native_elementwise_add
+// CHECK: arith.addf {{.*}}vector<4xf32>
+func.func @native_elementwise_add(%lhs: vector<4xf32>, %rhs: vector<4xf32>) -> vector<4xf32> {
+  %sum = arith.addf %lhs, %rhs : vector<4xf32>
+  return %sum : vector<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @elementwise_add_16xi8
+// CHECK-COUNT-4: arith.addi {{.*}} : vector<4xi8>
+// CHECK-NOT: arith.addi
+// CHECK: return {{.*}} : vector<16xi8>
+func.func @elementwise_add_16xi8(%lhs: vector<16xi8>, %rhs: vector<16xi8>) -> vector<16xi8> {
+  %sum = arith.addi %lhs, %rhs : vector<16xi8>
+  return %sum : vector<16xi8>
+}
+
+// -----
+
+// CHECK-LABEL: func @elementwise_add_8xf16
+// CHECK-COUNT-2: arith.addf {{.*}} : vector<4xf16>
+// CHECK-NOT: arith.addf
+// CHECK: return {{.*}} : vector<8xf16>
+func.func @elementwise_add_8xf16(%lhs: vector<8xf16>, %rhs: vector<8xf16>) -> vector<8xf16> {
+  %sum = arith.addf %lhs, %rhs : vector<8xf16>
+  return %sum : vector<8xf16>
+}

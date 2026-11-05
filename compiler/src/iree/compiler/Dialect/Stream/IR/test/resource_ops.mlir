@@ -159,3 +159,19 @@ util.func private @resourceTransientsAffinity(%arg0: !stream.resource<*>, %arg1:
   %0, %1 = stream.resource.transients on(#hal.device.affinity<@dev>) %arg0 : !stream.resource<*>{%arg1} from %arg2 : !stream.resource<transient>{%arg3} => !stream.timepoint
   util.return %0, %1 : !stream.resource<*>, !stream.timepoint
 }
+
+// -----
+
+// CHECK-LABEL: module @resourceConfigFalse
+// CHECK-SAME: alias_mutable_bindings = false
+module @resourceConfigFalse attributes {
+  stream.resources = #stream.resource_config<{alias_mutable_bindings = false}>
+} {}
+
+// -----
+
+// CHECK-LABEL: module @resourceConfigTrue
+// CHECK-SAME: alias_mutable_bindings = true
+module @resourceConfigTrue attributes {
+  stream.resources = #stream.resource_config<{alias_mutable_bindings = true}>
+} {}

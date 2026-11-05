@@ -144,10 +144,29 @@ struct BreakDownCastExtractExtend final : OpRewritePattern<arith::ExtUIOp> {
 
 struct SPIRVBreakDownLargeVectorPass final
     : impl::SPIRVBreakDownLargeVectorPassBase<SPIRVBreakDownLargeVectorPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<arith::ArithDialect, vector::VectorDialect>();
+  }
+
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<BreakDownCastExtractExtend>(context, /*benefits=*/10);
+    vector::populateVectorUnrollPatterns(
+        patterns, vector::UnrollVectorOptions().setNativeShapeFn(
+                      [](Operation *op) -> std::optional<SmallVector<int64_t>> {
+                        if (!OpTrait::hasElementwiseMappableTraits(op) ||
+                            op->getNumResults() != 1) {
+                          return std::nullopt;
+                        }
+                        auto type =
+                            dyn_cast<VectorType>(op->getResult(0).getType());
+                        if (!type || type.getRank() != 1 ||
+                            type.getDimSize(0) <= 4 || type.getDimSize(0) % 4) {
+                          return std::nullopt;
+                        }
+                        return SmallVector<int64_t>{4};
+                      }));
     // Convert vector.extract_strided_slice into a chain of vector.extract and
     // then a chain of vector.insert ops. This helps to cancel with previous
     // vector.insert/extract ops, especially for fP16 cases where we have

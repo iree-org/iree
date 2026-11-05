@@ -11,7 +11,7 @@
 
 namespace {
 
-#if defined(IREE_PLATFORM_LINUX) && !defined(IREE_PLATFORM_EMSCRIPTEN)
+#if defined(IREE_PLATFORM_LINUX) && !defined(IREE_COMPILER_EMSCRIPTEN)
 
 using namespace iree::testing::status;
 
@@ -72,6 +72,6 @@ TEST(SysfsTest, ParseSizeString) {
 
 TEST(SysfsTest, PlatformDisabled) {}
 
-#endif  // IREE_PLATFORM_LINUX && !IREE_PLATFORM_EMSCRIPTEN
+#endif  // IREE_PLATFORM_LINUX && !IREE_COMPILER_EMSCRIPTEN
 
 }  // namespace

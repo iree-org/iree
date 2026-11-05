@@ -99,7 +99,8 @@ annotateKernelForTranslation(LLVM::LLVMFuncOp funcOp,
   if (targetAttr && targetAttr.getConfiguration()) {
     if (IntegerAttr attr =
             getConfigWavesPerEuAttr(targetAttr.getConfiguration())) {
-      rocdlDialect->getWavesPerEuAttrHelper().setAttr(funcOp, attr);
+      rocdlDialect->getWavesPerEuAttrHelper().setAttr(
+          funcOp, builder.getStringAttr(Twine(attr.getInt())));
     }
     if (IREE::Codegen::DenormalFpMathAttr attr =
             getConfigDenormalFpMathF32Attr(targetAttr.getConfiguration());

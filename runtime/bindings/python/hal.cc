@@ -13,7 +13,9 @@
 
 #include <algorithm>
 #include <iterator>
+#include <limits>
 #include <optional>
+#include <stdexcept>
 #include <utility>
 
 #include "./local_dlpack.h"
@@ -185,6 +187,8 @@ py::str HalAllocator::FormattedStatistics() {
   iree_hal_allocator_query_statistics(raw_ptr(), &stats);
   auto status = iree_hal_allocator_statistics_format(&stats, &builder);
   iree_string_view_t view = iree_string_builder_view(&builder);
+  // TODO(#25083): Guard the builder and status if Python string construction
+  // throws.
   py::str result = py::str(view.data, view.size);
   iree_string_builder_deinitialize(&builder);
 
@@ -229,11 +233,11 @@ py::object HalAllocator::AllocateBufferCopy(
           IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
     }
   }
+  HalBuffer owned_buffer = HalBuffer::StealFromRawPtr(hal_buffer);
   CheckApiStatus(status, "Failed to allocate buffer copy");
 
   if (!raw_element_type) {
-    return py::cast(HalBuffer::StealFromRawPtr(hal_buffer),
-                    py::rv_policy::move);
+    return py::cast(std::move(owned_buffer), py::rv_policy::move);
   }
 
   // Create the buffer_view. (note that numpy shape is ssize_t, so we need to
@@ -245,12 +249,10 @@ py::object HalAllocator::AllocateBufferCopy(
   std::vector<iree_hal_dim_t> dims(py_view.ndim);
   std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
   iree_hal_buffer_view_t* hal_buffer_view;
-  CheckApiStatus(
-      iree_hal_buffer_view_create(
-          hal_buffer, dims.size(), dims.data(), element_type, encoding_type,
-          iree_hal_allocator_host_allocator(raw_ptr()), &hal_buffer_view),
-      "Error allocating buffer_view");
-  iree_hal_buffer_release(hal_buffer);
+  status = iree_hal_buffer_view_create(
+      hal_buffer, dims.size(), dims.data(), element_type, encoding_type,
+      iree_hal_allocator_host_allocator(raw_ptr()), &hal_buffer_view);
+  CheckApiStatus(status, "Error allocating buffer_view");
 
   return py::cast(HalBufferView::StealFromRawPtr(hal_buffer_view),
                   py::rv_policy::move);
@@ -292,9 +294,10 @@ HalBuffer HalAllocator::AllocateHostStagingBufferCopy(HalDevice& device,
           IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
     }
   }
+  HalBuffer owned_buffer = HalBuffer::StealFromRawPtr(hal_buffer);
   CheckApiStatus(status, "Failed to allocate device visible buffer");
 
-  return HalBuffer::StealFromRawPtr(hal_buffer);
+  return owned_buffer;
 }
 
 //------------------------------------------------------------------------------
@@ -770,8 +773,12 @@ py::object HalDevice::CreateDLPackCapsule(HalBufferView& buffer_view,
           alloc, buffer, IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION,
           IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE, &external_buffer),
       "Cannot export device buffer");
-  static_assert(sizeof(dl_tensor.data) >=
-                sizeof(external_buffer.handle.device_allocation.ptr));
+  constexpr auto max_address = std::numeric_limits<uintptr_t>::max();
+  if (offset > max_address ||
+      external_buffer.handle.device_allocation.ptr > max_address - offset) {
+    throw std::overflow_error(
+        "DLPack device address does not fit a host pointer");
+  }
   // Set the data pointer to the offset, and the byte_offset to 0.
   // This SHOULD not be required, but some backends (torch GPU for example),
   // ignore the byte_offset entirely.
@@ -949,6 +956,7 @@ std::vector<std::string> HalDriver::Query() {
                                          iree_allocator_system(),
                                          &driver_info_count, &driver_infos),
       "Error enumerating HAL drivers");
+  // TODO(#25083): Guard driver_infos if constructing the result throws.
   std::vector<std::string> driver_names(driver_info_count);
   for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
     driver_names[i] = std::string(driver_infos[i].driver_name.data,
@@ -1002,6 +1010,7 @@ py::list HalDriver::QueryAvailableDevices() {
   CheckApiStatus(iree_hal_driver_query_available_devices(
                      raw_ptr(), iree_allocator_system(), &count, &device_infos),
                  "Error querying devices");
+  // TODO(#25083): Guard device_infos if constructing the Python result throws.
   py::list results;
   for (iree_host_size_t i = 0; i < count; ++i) {
     py::dict device_data;
@@ -1068,6 +1077,7 @@ static iree_status_t CreateSingleDeviceGroup(
 
 static HalDevice StealConfiguredDevice(iree_hal_device_t* device,
                                        std::optional<py::list> allocators) {
+  HalDevice owned_device = HalDevice::StealFromRawPtr(device);
   iree_hal_device_group_t* device_group = nullptr;
   iree_status_t status = ConfigureDevice(device, allocators);
   if (iree_status_is_ok(status)) {
@@ -1076,12 +1086,12 @@ static HalDevice StealConfiguredDevice(iree_hal_device_t* device,
   }
   if (!iree_status_is_ok(status)) {
     iree_hal_device_group_release(device_group);
-    iree_hal_device_release(device);
     CheckApiStatus(
         status,
         "Error configuring the device and assigning its frontier tracker");
   }
-  return HalDevice::StealFromRawPtrAndDeviceGroup(device, device_group);
+  return HalDevice::StealFromRawPtrAndDeviceGroup(owned_device.steal_raw_ptr(),
+                                                  device_group);
 }
 
 HalDevice HalDriver::CreateDefaultDevice(std::optional<py::list> allocators) {
@@ -1376,7 +1386,8 @@ void SetupHalBindings(nanobind::module_ m) {
         py::arg("debug_sink") = py::none());
 
   // Enums.
-  py::enum_<enum iree_hal_memory_type_bits_t>(m, "MemoryType")
+  py::enum_<enum iree_hal_memory_type_bits_t>(
+      m, "MemoryType", py::is_arithmetic(), py::is_flag())
       .value("NONE", IREE_HAL_MEMORY_TYPE_NONE)
       .value("OPTIMAL", IREE_HAL_MEMORY_TYPE_OPTIMAL)
       .value("HOST_VISIBLE", IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)
@@ -1385,30 +1396,20 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("HOST_LOCAL", IREE_HAL_MEMORY_TYPE_HOST_LOCAL)
       .value("DEVICE_VISIBLE", IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)
       .value("DEVICE_LOCAL", IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)
-      .export_values()
-      .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
-      .def("__and__",
-           [](uint64_t self, uint64_t other) { return self & other; })
-      .def("__int__", [](enum iree_hal_memory_type_bits_t self) {
-        return (uint64_t)self;
-      });
+      .export_values();
 
-  py::enum_<enum iree_hal_buffer_compatibility_bits_t>(m, "BufferCompatibility")
+  py::enum_<enum iree_hal_buffer_compatibility_bits_t>(
+      m, "BufferCompatibility", py::is_arithmetic(), py::is_flag())
       .value("NONE", IREE_HAL_BUFFER_COMPATIBILITY_NONE)
       .value("ALLOCATABLE", IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE)
       .value("IMPORTABLE", IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE)
       .value("EXPORTABLE", IREE_HAL_BUFFER_COMPATIBILITY_EXPORTABLE)
       .value("QUEUE_TRANSFER", IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER)
       .value("QUEUE_DISPATCH", IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH)
-      .export_values()
-      .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
-      .def("__and__",
-           [](uint64_t self, uint64_t other) { return self & other; })
-      .def("__int__", [](enum iree_hal_buffer_compatibility_bits_t self) {
-        return (uint64_t)self;
-      });
+      .export_values();
 
-  py::enum_<enum iree_hal_buffer_usage_bits_t>(m, "BufferUsage")
+  py::enum_<enum iree_hal_buffer_usage_bits_t>(
+      m, "BufferUsage", py::is_arithmetic(), py::is_flag())
       .value("NONE", IREE_HAL_BUFFER_USAGE_NONE)
       .value("TRANSFER_SOURCE", IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE)
       .value("TRANSFER_TARGET", IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET)
@@ -1438,34 +1439,22 @@ void SetupHalBindings(nanobind::module_ m) {
              IREE_HAL_BUFFER_USAGE_MAPPING_ACCESS_SEQUENTIAL_WRITE)
       .value("MAPPING", IREE_HAL_BUFFER_USAGE_MAPPING)
       .value("DEFAULT", IREE_HAL_BUFFER_USAGE_DEFAULT)
-      .export_values()
-      .def("__or__", [](enum iree_hal_buffer_usage_bits_t self,
-                        uint64_t other) { return self | other; })
-      .def("__and__", [](enum iree_hal_buffer_usage_bits_t self,
-                         uint64_t other) { return self & other; })
-      .def("__int__", [](enum iree_hal_buffer_usage_bits_t self) {
-        return (uint64_t)self;
-      });
+      .export_values();
 
-  py::enum_<enum iree_hal_memory_access_bits_t>(m, "MemoryAccess")
+  py::enum_<enum iree_hal_memory_access_bits_t>(
+      m, "MemoryAccess", py::is_arithmetic(), py::is_flag())
       .value("NONE", IREE_HAL_MEMORY_ACCESS_NONE)
       .value("READ", IREE_HAL_MEMORY_ACCESS_READ)
       .value("WRITE", IREE_HAL_MEMORY_ACCESS_WRITE)
       .value("DISCARD", IREE_HAL_MEMORY_ACCESS_DISCARD)
       .value("DISCARD_WRITE", IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE)
       .value("ALL", IREE_HAL_MEMORY_ACCESS_ALL)
-      .export_values()
-      .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
-      .def("__and__",
-           [](uint64_t self, uint64_t other) { return self & other; })
-      .def("__int__", [](enum iree_hal_memory_access_bits_t self) {
-        return (uint64_t)self;
-      });
+      .export_values();
 
   // Use compatibility type to enable def_static.
   // See: https://github.com/wjakob/nanobind/issues/597
   auto hal_element_type = nanobind1_compat_enum_<enum iree_hal_element_types_t>(
-      m, "HalElementType");
+      m, "HalElementType", py::is_arithmetic());
   hal_element_type
       .def_static("map_to_dtype",
                   [](iree_hal_element_type_t element_type) {
@@ -1510,9 +1499,7 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("FLOAT_8_E5M2", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2)
       .value("FLOAT_8_E5M2_FNUZ", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E5M2_FNUZ)
       .value("FLOAT_8_E8M0_FNU", IREE_HAL_ELEMENT_TYPE_FLOAT_8_E8M0_FNU)
-      .export_values()
-      .def("__int__",
-           [](enum iree_hal_element_types_t self) { return (uint64_t)self; });
+      .export_values();
 
   py::enum_<iree_hal_external_timepoint_type_t>(
       m, "ExternalTimepointType", py::is_arithmetic(), py::is_flag())
@@ -1521,10 +1508,7 @@ void SetupHalBindings(nanobind::module_ m) {
              IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_ASYNC_PRIMITIVE)
       .value("CUDA_EVENT", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_CUDA_EVENT)
       .value("HIP_EVENT", IREE_HAL_EXTERNAL_TIMEPOINT_TYPE_HIP_EVENT)
-      .export_values()
-      .def("__int__", [](enum iree_hal_memory_type_bits_t self) {
-        return (uint64_t)self;
-      });
+      .export_values();
 
   py::enum_<enum iree_hal_semaphore_compatibility_bits_t>(
       m, "SemaphoreCompatibility", py::is_arithmetic(), py::is_flag())
@@ -1536,24 +1520,12 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("HOST_ONLY", IREE_HAL_SEMAPHORE_COMPATIBILITY_HOST_ONLY)
       .value("DEVICE_ONLY", IREE_HAL_SEMAPHORE_COMPATIBILITY_DEVICE_ONLY)
       .value("ALL", IREE_HAL_SEMAPHORE_COMPATIBILITY_ALL)
-      .export_values()
-      .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
-      .def("__and__",
-           [](uint64_t self, uint64_t other) { return self & other; })
-      .def("__int__", [](enum iree_hal_memory_type_bits_t self) {
-        return (uint64_t)self;
-      });
+      .export_values();
 
   py::enum_<iree_hal_external_timepoint_flag_bits_t>(
       m, "ExternalTimepointFlags", py::is_arithmetic(), py::is_flag())
       .value("NONE", IREE_HAL_EXTERNAL_TIMEPOINT_FLAG_NONE)
-      .export_values()
-      .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
-      .def("__and__",
-           [](uint64_t self, uint64_t other) { return self & other; })
-      .def("__int__", [](enum iree_hal_memory_type_bits_t self) {
-        return (uint64_t)self;
-      });
+      .export_values();
 
   py::class_<HalDevice>(m, "HalDevice")
       .def_prop_ro(
@@ -1624,10 +1596,15 @@ void SetupHalBindings(nanobind::module_ m) {
            [](HalDriver& self, iree_hal_device_id_t device_id) {
              iree_string_builder_t builder;
              iree_string_builder_initialize(iree_allocator_system(), &builder);
-             CheckApiStatus(iree_hal_driver_dump_device_info(
-                                self.raw_ptr(), device_id, &builder),
-                            "Querying device info");
+             iree_status_t status = iree_hal_driver_dump_device_info(
+                 self.raw_ptr(), device_id, &builder);
+             if (!iree_status_is_ok(status)) {
+               iree_string_builder_deinitialize(&builder);
+               CheckApiStatus(status, "Querying device info");
+             }
              iree_string_view_t view = iree_string_builder_view(&builder);
+             // TODO(#25083): Guard the builder if Python string construction
+             // throws.
              py::str result(view.data, view.size);
              iree_string_builder_deinitialize(&builder);
              return result;

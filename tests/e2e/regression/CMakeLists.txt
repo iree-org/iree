@@ -23,12 +23,14 @@ iree_lit_test_suite(
     "trace_dispatch_tensors.mlir"
     "transients_test.mlir"
     "unused_args.mlir"
+    "vm_ref_branch_ownership.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
     iree-compile
     iree-opt
     iree-run-mlir
+    iree-run-module
   LABELS
     "driver=local-task"
     "hostonly"
@@ -52,7 +54,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_llvm-cpu
   SRCS
-    "broadcast_batch_matmul_to_matmul.mlir"
+    "broadcast_batch_matmul.mlir"
     "i1_inlined_constant.mlir"
     "layernorm.mlir"
     "linalg_ops.mlir"

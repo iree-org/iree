@@ -72,8 +72,7 @@ iree_cc_library(
     "Utils.h"
   SRCS
     "CleanupNumericNarrowing.cpp"
-    "ConvertBatchMatmulToMatmul.cpp"
-    "ConvertConv2DToImg2Col.cpp"
+    "ConvertConvToIm2Col.cpp"
     "ConvertQDQToIntegerMath.cpp"
     "ConvertStridedContractionToContraction.cpp"
     "DataLayoutPropagation.cpp"
@@ -82,6 +81,7 @@ iree_cc_library(
     "DetachElementwiseFromNamedOps.cpp"
     "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"
+    "FoldBroadcastIntoBatchMatmul.cpp"
     "FuseDequantizationMatmul.cpp"
     "GeneralizeLinalgNamedOps.cpp"
     "GlobalLoopInvariantCodeMotion.cpp"

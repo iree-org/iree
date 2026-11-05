@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "executable_object_data.mlir"
     "hal_target_device_attributes.mlir"
     "materialize_homogeneous_encodings.mlir"
     "smoketest_embedded.mlir"

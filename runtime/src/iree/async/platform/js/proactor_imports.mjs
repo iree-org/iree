@@ -48,8 +48,12 @@ class ProactorRing {
   }
 
   drain(wasmMemory, bufferPointer, maxCount) {
+    // Wasm64 pointers are BigInts; wasm32 pointers are signed i32 Numbers.
+    const byteOffset = typeof bufferPointer === 'bigint' ?
+        Number(bufferPointer) :
+        bufferPointer >>> 0;
     const wasmView =
-        new Int32Array(wasmMemory.buffer, bufferPointer, maxCount * 2);
+        new Int32Array(wasmMemory.buffer, byteOffset, maxCount * 2);
     let count = 0;
     while (count < maxCount) {
       const head = Atomics.load(this.control, HEAD);
@@ -142,9 +146,13 @@ function createInlineImports(context) {
     ring_drain(bufferPointer, capacity) {
       if (completionQueue.length === 0) return 0;
       const count = Math.min(completionQueue.length, capacity);
+      // Wasm64 pointers are BigInts; wasm32 pointers are signed i32 Numbers.
+      const byteOffset = typeof bufferPointer === 'bigint' ?
+          Number(bufferPointer) :
+          bufferPointer >>> 0;
       // Fresh view each call — memory.grow() can detach the buffer.
       const wasmView =
-          new Int32Array(context.memory.buffer, bufferPointer, count * 2);
+          new Int32Array(context.memory.buffer, byteOffset, count * 2);
       for (let i = 0; i < count; i++) {
         const entry = completionQueue[i];
         wasmView[i * 2] = entry.token;

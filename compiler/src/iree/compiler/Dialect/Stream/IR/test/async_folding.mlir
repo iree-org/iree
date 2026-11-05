@@ -426,26 +426,181 @@ util.func private @AsyncCopyFullSourceToUpdate(%arg0: !stream.resource<*>, %arg1
 
 // -----
 
-// CHECK-LABEL: @FoldAsyncTransferOp
-util.func private @FoldAsyncTransferOp(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.resource<transient> {
+// CHECK-LABEL: @FoldTransferRoundTrip_copy_copy
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>,
+util.func private @FoldTransferRoundTrip_copy_copy(%source: !stream.resource<transient>, %size: index) -> !stream.resource<transient> {
   // CHECK-NOT: stream.async.transfer
   // CHECK-NOT: stream.async.clone
-  %0 = stream.async.transfer %arg0 : !stream.resource<transient>{%arg1} -> !stream.resource<staging>{%arg1}
-  %1 = stream.async.transfer %0 : !stream.resource<staging>{%arg1} -> !stream.resource<transient>{%arg1}
-  util.return %1 : !stream.resource<transient>
+  %inner = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<staging>{%size} storage = copy
+  %outer = stream.async.transfer %inner : !stream.resource<staging>{%size} -> !stream.resource<transient>{%size} storage = copy
+  // CHECK: util.return %[[SOURCE]]
+  util.return %outer : !stream.resource<transient>
 }
 
 // -----
 
-// CHECK-LABEL: @IntermediateTransferElision
-// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
-util.func private @IntermediateTransferElision(%source: !stream.resource<constant>, %size: index) -> !stream.resource<external> {
-  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
-  %transfer0 = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size}
+// CHECK-LABEL: @FoldTransferRoundTrip_copy_reuse
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>,
+util.func private @FoldTransferRoundTrip_copy_reuse(%source: !stream.resource<transient>, %size: index) -> !stream.resource<transient> {
   // CHECK-NOT: stream.async.transfer
-  %transfer1 = stream.async.transfer %transfer0 : !stream.resource<staging>{%size} -> !stream.resource<external>{%size}
-  // CHECK-NEXT: util.return %[[CLONE]]
-  util.return %transfer1 : !stream.resource<external>
+  // CHECK-NOT: stream.async.clone
+  %inner = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<staging>{%size} storage = copy
+  %outer = stream.async.transfer %inner : !stream.resource<staging>{%size} -> !stream.resource<transient>{%size} storage = reuse
+  // CHECK: util.return %[[SOURCE]]
+  util.return %outer : !stream.resource<transient>
+}
+
+// -----
+
+// CHECK-LABEL: @FoldTransferRoundTrip_reuse_copy
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>,
+util.func private @FoldTransferRoundTrip_reuse_copy(%source: !stream.resource<transient>, %size: index) -> !stream.resource<transient> {
+  // CHECK-NOT: stream.async.transfer
+  // CHECK-NOT: stream.async.clone
+  %inner = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<staging>{%size} storage = reuse
+  %outer = stream.async.transfer %inner : !stream.resource<staging>{%size} -> !stream.resource<transient>{%size} storage = copy
+  // CHECK: util.return %[[SOURCE]]
+  util.return %outer : !stream.resource<transient>
+}
+
+// -----
+
+// CHECK-LABEL: @FoldTransferRoundTrip_reuse_reuse
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>,
+util.func private @FoldTransferRoundTrip_reuse_reuse(%source: !stream.resource<transient>, %size: index) -> !stream.resource<transient> {
+  // CHECK-NOT: stream.async.transfer
+  // CHECK-NOT: stream.async.clone
+  %inner = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<staging>{%size} storage = reuse
+  %outer = stream.async.transfer %inner : !stream.resource<staging>{%size} -> !stream.resource<transient>{%size} storage = reuse
+  // CHECK: util.return %[[SOURCE]]
+  util.return %outer : !stream.resource<transient>
+}
+
+// -----
+
+// CHECK-LABEL: @FoldTransferRoundTrip_omitted_reuse
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>,
+util.func private @FoldTransferRoundTrip_omitted_reuse(%source: !stream.resource<transient>, %size: index) -> !stream.resource<transient> {
+  // CHECK-NOT: stream.async.transfer
+  // CHECK-NOT: stream.async.clone
+  %inner = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<staging>{%size}
+  %outer = stream.async.transfer %inner : !stream.resource<staging>{%size} -> !stream.resource<transient>{%size} storage = reuse
+  // CHECK: util.return %[[SOURCE]]
+  util.return %outer : !stream.resource<transient>
+}
+
+// -----
+
+// CHECK-LABEL: @FoldTransferRoundTrip_reuse_omitted
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>,
+util.func private @FoldTransferRoundTrip_reuse_omitted(%source: !stream.resource<transient>, %size: index) -> !stream.resource<transient> {
+  // CHECK-NOT: stream.async.transfer
+  // CHECK-NOT: stream.async.clone
+  %inner = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<staging>{%size} storage = reuse
+  %outer = stream.async.transfer %inner : !stream.resource<staging>{%size} -> !stream.resource<transient>{%size}
+  // CHECK: util.return %[[SOURCE]]
+  util.return %outer : !stream.resource<transient>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideTransfers_AllReuse
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
+util.func private @ElideTransfers_AllReuse(%source: !stream.resource<constant>, %size: index) -> !stream.resource<staging> {
+  // CHECK-NOT: stream.async.transfer
+  %inner = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size} storage = reuse
+  // CHECK: %[[RESULT:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<staging>{%[[SIZE]]} storage = reuse
+  %outer = stream.async.transfer %inner : !stream.resource<staging>{%size} -> !stream.resource<staging>{%size} storage = reuse
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %outer : !stream.resource<staging>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideTransfers_InnerCopy
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
+util.func private @ElideTransfers_InnerCopy(%source: !stream.resource<constant>, %size: index) -> !stream.resource<staging> {
+  // CHECK-NOT: stream.async.transfer
+  %inner = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size} storage = copy
+  // CHECK: %[[RESULT:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<staging>{%[[SIZE]]} storage = copy
+  %outer = stream.async.transfer %inner : !stream.resource<staging>{%size} -> !stream.resource<staging>{%size} storage = reuse
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %outer : !stream.resource<staging>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideTransfers_OuterCopy
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
+util.func private @ElideTransfers_OuterCopy(%source: !stream.resource<constant>, %size: index) -> !stream.resource<staging> {
+  // CHECK-NOT: stream.async.transfer
+  %inner = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size} storage = reuse
+  // CHECK: %[[RESULT:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<staging>{%[[SIZE]]} storage = copy
+  %outer = stream.async.transfer %inner : !stream.resource<staging>{%size} -> !stream.resource<staging>{%size} storage = copy
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %outer : !stream.resource<staging>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideTransfers_InnerOmitted
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
+util.func private @ElideTransfers_InnerOmitted(%source: !stream.resource<constant>, %size: index) -> !stream.resource<staging> {
+  // CHECK-NOT: stream.async.transfer
+  %inner = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size}
+  // CHECK: %[[RESULT:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<staging>{%[[SIZE]]} storage = copy
+  %outer = stream.async.transfer %inner : !stream.resource<staging>{%size} -> !stream.resource<staging>{%size} storage = reuse
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %outer : !stream.resource<staging>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideTransfers_OuterOmitted
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
+util.func private @ElideTransfers_OuterOmitted(%source: !stream.resource<constant>, %size: index) -> !stream.resource<staging> {
+  // CHECK-NOT: stream.async.transfer
+  %inner = stream.async.transfer %source : !stream.resource<constant>{%size} -> !stream.resource<staging>{%size} storage = reuse
+  // CHECK: %[[RESULT:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<staging>{%[[SIZE]]} storage = copy
+  %outer = stream.async.transfer %inner : !stream.resource<staging>{%size} -> !stream.resource<staging>{%size}
+  // CHECK-NEXT: util.return %[[RESULT]]
+  util.return %outer : !stream.resource<staging>
+}
+
+// -----
+
+// CHECK-LABEL: @SameAffinityTransfer_omitted
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+util.func private @SameAffinityTransfer_omitted(%source: !stream.resource<transient>, %size: index) -> !stream.resource<external> {
+  // CHECK-NOT: stream.async.transfer
+  // CHECK: %[[RESULT:.+]] = stream.async.clone %[[SOURCE]] : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+  %result = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<external>{%size}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<external>
+}
+
+// -----
+
+// CHECK-LABEL: @SameAffinityTransfer_copy
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+util.func private @SameAffinityTransfer_copy(%source: !stream.resource<transient>, %size: index) -> !stream.resource<external> {
+  // CHECK-NOT: stream.async.transfer
+  // CHECK: %[[RESULT:.+]] = stream.async.clone %[[SOURCE]] : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
+  %result = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<external>{%size} storage = copy
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<external>
+}
+
+// -----
+
+// CHECK-LABEL: @SameAffinityTransfer_reuse
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
+util.func private @SameAffinityTransfer_reuse(%source: !stream.resource<transient>, %size: index) -> !stream.resource<external> {
+  // CHECK-NOT: stream.async.clone
+  // CHECK: %[[RESULT:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<transient>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]} storage = reuse
+  %result = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<external>{%size} storage = reuse
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<external>
 }
 
 // -----
@@ -460,6 +615,7 @@ util.func private @PreserveTransferExecutionAffinity(%source: !stream.resource<t
   // CHECK: stream.async.transfer on(#hal.device.affinity<@device_a>) %[[SOURCE]]
   // CHECK-SAME: from(#hal.device.affinity<@device_b>)
   // CHECK-SAME: to(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: storage = copy
   %transfer1 = stream.async.transfer on(#hal.device.affinity<@device_a>) %transfer0 : !stream.resource<staging>{%size} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_a>) !stream.resource<external>{%size}
   util.return %transfer1 : !stream.resource<external>
 }
@@ -513,6 +669,74 @@ util.func private @FoldAsyncLoadBitcast(%arg0: !stream.resource<staging>, %arg1:
   %1 = arith.bitcast %0 : i32 to f32
   // CHECK: util.return %[[F32]]
   util.return %1 : f32
+}
+
+// -----
+
+// CHECK-LABEL: @FoldTensorCloneIntoLoad_copy
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>,
+util.func private @FoldTensorCloneIntoLoad_copy(%source: !stream.resource<external>, %size: index) -> f32 {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK-NOT: stream.tensor.clone
+  %clone = stream.tensor.clone %source : tensor<4x4xf32> in !stream.resource<external>{%size} -> tensor<4x4xf32> in !stream.resource<*>{%size}
+  %transfer = stream.async.transfer on(#hal.device.affinity<@device_a>) %clone : !stream.resource<*>{%size} -> !stream.resource<staging>{%size} storage = copy
+  // CHECK: stream.tensor.slice %[[SOURCE]]
+  // CHECK: stream.async.transfer on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: storage = copy
+  // CHECK: stream.tensor.load
+  %value = stream.tensor.load %transfer[%c0, %c1] : tensor<4x4xf32> in !stream.resource<staging>{%size} -> f32
+  util.return %value : f32
+}
+
+// -----
+
+// CHECK-LABEL: @FoldTensorCloneIntoLoad_reuse
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>,
+util.func private @FoldTensorCloneIntoLoad_reuse(%source: !stream.resource<external>, %size: index) -> f32 {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK-NOT: stream.tensor.clone
+  %clone = stream.tensor.clone %source : tensor<4x4xf32> in !stream.resource<external>{%size} -> tensor<4x4xf32> in !stream.resource<*>{%size}
+  %transfer = stream.async.transfer on(#hal.device.affinity<@device_a>) %clone : !stream.resource<*>{%size} -> !stream.resource<staging>{%size} storage = reuse
+  // CHECK: stream.tensor.slice %[[SOURCE]]
+  // CHECK: stream.async.transfer on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: storage = reuse
+  // CHECK: stream.tensor.load
+  %value = stream.tensor.load %transfer[%c0, %c1] : tensor<4x4xf32> in !stream.resource<staging>{%size} -> f32
+  util.return %value : f32
+}
+
+// -----
+
+// CHECK-LABEL: @FoldAsyncCloneIntoLoad_copy
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>,
+util.func private @FoldAsyncCloneIntoLoad_copy(%source: !stream.resource<external>, %size: index, %offset: index) -> f32 {
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %source : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  %transfer = stream.async.transfer on(#hal.device.affinity<@device_a>) %clone : !stream.resource<*>{%size} -> !stream.resource<staging>{%size} storage = copy
+  // CHECK: stream.async.slice %[[SOURCE]]
+  // CHECK: stream.async.transfer on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: storage = copy
+  // CHECK: stream.async.load
+  %value = stream.async.load %transfer[%offset] : !stream.resource<staging>{%size} -> f32
+  util.return %value : f32
+}
+
+// -----
+
+// CHECK-LABEL: @FoldAsyncCloneIntoLoad_reuse
+// CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>,
+util.func private @FoldAsyncCloneIntoLoad_reuse(%source: !stream.resource<external>, %size: index, %offset: index) -> f32 {
+  // CHECK-NOT: stream.async.clone
+  %clone = stream.async.clone %source : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
+  %transfer = stream.async.transfer on(#hal.device.affinity<@device_a>) %clone : !stream.resource<*>{%size} -> !stream.resource<staging>{%size} storage = reuse
+  // CHECK: stream.async.slice %[[SOURCE]]
+  // CHECK: stream.async.transfer on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: storage = reuse
+  // CHECK: stream.async.load
+  %value = stream.async.load %transfer[%offset] : !stream.resource<staging>{%size} -> f32
+  util.return %value : f32
 }
 
 // -----

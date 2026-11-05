@@ -126,8 +126,9 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK:   linalg.yield
 // P = P /= sum
 // CHECK: linalg.generic
+// CHECK: ^bb0(%[[SUM:.*]]: f32, %[[P:.*]]: f32):
 // CHECK-NOT: arith.extf
-// CHECK:   arith.divf
+// CHECK:   arith.divf %[[P]], %[[SUM]]
 // CHECK:   linalg.yield
 // truncf P : f32 to f16
 // CHECK: linalg.generic

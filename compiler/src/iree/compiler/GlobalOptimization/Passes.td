@@ -14,19 +14,23 @@ def CleanupNumericNarrowingPass :
   let summary = "Cleans up any numeric narrowing ops inserted by iree-global-opt-infer-numeric-narrowing.";
 }
 
-def ConvertBatchMatmulToMatmulPass :
-    Pass<"iree-global-opt-convert-batch-matmul-to-matmul", ""> {
-  let summary = "Converts batch_matmul to reshape + matmul + reshape.";
-  let dependentDialects = [
-    "mlir::arith::ArithDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::tensor::TensorDialect",
-  ];
-}
+def ConvertConvToIm2ColPass :
+    Pass<"iree-global-opt-convert-conv-to-im2col", ""> {
+  let summary = "Rewrites convolutions as contractions over an im2col gather";
+  let description = [{
+    Rewrites every linalg op that implements a convolution, named or generic,
+    as an all-parallel `linalg.generic` that gathers the convolved input
+    windows, followed by a contraction over the gathered tensor with the
+    original payload. Contraction loops are collapsed wherever the operand
+    layouts allow, so standard layouts become plain or batched matmuls.
+    Convolutions without an output channel dimension, i.e. depthwise
+    convolutions with a unit multiplier and pooling ops, are left unchanged:
+    nothing reuses the gathered input, so the rewrite never pays off.
 
-def ConvertConv2DToImg2ColPass :
-    Pass<"iree-global-opt-convert-conv2d-to-img2col", ""> {
-  let summary = "Convert linalg convolution ops to matmul img2col based implementation";
+    The pass expects quantization to be lowered already: quantized
+    convolutions such as `linalg.conv_2d_nhwc_hwcf_q` are not matched, and
+    dequantize producers are not looked through.
+  }];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
     "mlir::tensor::TensorDialect",
@@ -101,6 +105,26 @@ def ExpandTensorShapesPass :
   let summary = "Expands tensor shape dimensions into SSA values across the program.";
 }
 
+def FoldBroadcastIntoBatchMatmulPass :
+    InterfacePass<"iree-global-opt-fold-broadcast-into-batch-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Folds broadcasts of batch_matmul inputs into its indexing maps.";
+  let description = [{
+    Rewrites `batch_matmul(A, broadcast(B))`, where the weight is shared across
+    the batch, into a `batch_matmul` over `A` and `B` whose RHS indexing map
+    drops the batch dim. Broadcasts on either input, as `linalg.broadcast` or
+    as a broadcasting generic, are folded by composing their map into the
+    contraction's map. When the named op cannot express the folded map (its
+    verifier accepts only a few broadcast forms, e.g. a batch-broadcast RHS
+    must be [K, N]), the contraction is carried by a `linalg.generic` with the
+    same body instead of moving data. The contraction then consumes its
+    producers directly, so rewrites that match on them (such as the
+    dequantization folding) still apply, and no broadcast is materialized.
+  }];
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+  ];
+}
+
 def PropagateAffineQuantizationPass :
     InterfacePass<"iree-global-opt-propagate-affine-quantization", "mlir::FunctionOpInterface"> {
   let summary = "Propagates affine quantization through adjacent tensor operations.";
@@ -110,9 +134,14 @@ def PropagateAffineQuantizationPass :
     or a zero `tensor.pad` whose padded dimensions do not index the scale and
     whose zero point is per-tensor, before `iree_linalg_ext.dequantize_affine`.
     These shape operations then run on quantized values. A consumer-side
-    `linalg.transpose` is fused into the dequantize's output map instead. When
-    a contraction consumes the result, the dequantize becomes its direct
-    producer so the integer contraction rewrite can match it.
+    `linalg.transpose` is fused into the dequantize's output map instead. A
+    `tensor.collapse_shape` of a dequantized value is absorbed by a consuming
+    `linalg.transpose`, or by a contraction whose inputs are all dequantized,
+    by expanding the consumer's iteration space; a blockwise matmul over
+    collapsed `[M, G, L]` and `[N, G, L]` operands thus iterates over
+    `(m, n, g, l)`. When a contraction consumes the result, the dequantize
+    becomes its direct producer so the integer contraction rewrite can match
+    it.
   }];
 }
 

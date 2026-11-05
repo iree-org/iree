@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --canonicalize -cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-inline-conversion --iree-vm-conversion --cse %s | FileCheck %s --check-prefix=VM
 
 // CHECK-LABEL: @FoldBufferLengthOp
 // CHECK-SAME: (%[[LENGTH:.+]]: index)
@@ -65,4 +66,55 @@ util.func public @SkipBufferViewBufferOp(%buffer: !hal.buffer) -> !hal.buffer {
   %view_buffer = hal_inline.buffer_view.buffer<%view : !hal.buffer_view> : !hal.buffer
   // CHECK: return %[[BUFFER]]
   util.return %view_buffer : !hal.buffer
+}
+
+// -----
+
+// Both resources are written before either is read. Merging the allocations
+// would let the second write overwrite the first resource's value.
+// VM-LABEL: vm.func private @independent_writes(
+// VM-SAME: %[[FIRST:[^: ]+]]: i32, %[[SECOND:[^: ]+]]: i32
+// VM: %[[A:[^: ]+]]:2 = vm.call @hal_inline.buffer.allocate(
+// VM: %[[B:[^: ]+]]:2 = vm.call @hal_inline.buffer.allocate(
+// VM: vm.buffer.store.i32 %[[FIRST]], %[[A]]#1[
+// VM: vm.buffer.store.i32 %[[SECOND]], %[[B]]#1[
+// VM: %[[X:[^ ]+]] = vm.buffer.load.i32 %[[A]]#1[
+// VM: %[[Y:[^ ]+]] = vm.buffer.load.i32 %[[B]]#1[
+// VM: vm.return %[[X]], %[[Y]]
+util.func public @independent_writes(%first: i32, %second: i32) -> (i32, i32) {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %a = stream.resource.alloc uninitialized : !stream.resource<staging>{%c4}
+  %b = stream.resource.alloc uninitialized : !stream.resource<staging>{%c4}
+  stream.resource.store %first, %a[%c0] : i32 -> !stream.resource<staging>{%c4}
+  stream.resource.store %second, %b[%c0] : i32 -> !stream.resource<staging>{%c4}
+  %x = stream.resource.load %a[%c0] : !stream.resource<staging>{%c4} -> i32
+  %y = stream.resource.load %b[%c0] : !stream.resource<staging>{%c4} -> i32
+  util.return %x, %y : i32, i32
+}
+
+// -----
+
+// The same applies to separate mutable copies of the same initial contents.
+// VM-LABEL: vm.func private @independent_initialized_writes(
+// VM-SAME: %[[FIRST:[^: ]+]]: i32, %[[SECOND:[^: ]+]]: i32
+// VM: %[[A:[^: ]+]]:2 = vm.call @hal_inline.buffer.allocate.initialized(
+// VM: %[[B:[^: ]+]]:2 = vm.call @hal_inline.buffer.allocate.initialized(
+// VM: vm.buffer.store.i32 %[[FIRST]], %[[A]]#1[
+// VM: vm.buffer.store.i32 %[[SECOND]], %[[B]]#1[
+// VM: %[[X:[^ ]+]] = vm.buffer.load.i32 %[[A]]#1[
+// VM: %[[Y:[^ ]+]] = vm.buffer.load.i32 %[[B]]#1[
+// VM: vm.return %[[X]], %[[Y]]
+util.func public @independent_initialized_writes(%first: i32, %second: i32) -> (i32, i32) {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c64 = arith.constant 64 : index
+  %source = util.buffer.constant : !util.buffer = dense<0> : tensor<1xi32>
+  %a, %sa = hal_inline.buffer.allocate.initialized source(%source : !util.buffer)[%c0, %c4] alignment(%c64) : !hal.buffer{%c4} in !util.buffer
+  %b, %sb = hal_inline.buffer.allocate.initialized source(%source : !util.buffer)[%c0, %c4] alignment(%c64) : !hal.buffer{%c4} in !util.buffer
+  util.buffer.store %first, %sa[%c0 for %c4] : i32 -> !util.buffer{%c4}
+  util.buffer.store %second, %sb[%c0 for %c4] : i32 -> !util.buffer{%c4}
+  %x = util.buffer.load %sa[%c0 for %c4] : !util.buffer{%c4} -> i32
+  %y = util.buffer.load %sb[%c0 for %c4] : !util.buffer{%c4} -> i32
+  util.return %x, %y : i32, i32
 }
