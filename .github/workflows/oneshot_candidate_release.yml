@@ -8,6 +8,9 @@ on:
         type: string
         default: "rc"
 
+permissions:
+  contents: read
+
 jobs:
   tag_release:
     name: "Tag candidate release"
@@ -17,6 +20,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          persist-credentials: false
 
       # Compute version suffix based on inputs (default to 'rc')
       - name: Compute stable version suffix

@@ -13,6 +13,8 @@ on:
   workflow_dispatch:
   workflow_call:
 
+permissions:
+  contents: read
 
 jobs:
   linux_arm64_clang:
