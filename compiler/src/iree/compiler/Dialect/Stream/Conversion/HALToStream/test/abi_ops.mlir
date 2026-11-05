@@ -8,6 +8,7 @@ util.func public @importBufferView(%view: !hal.buffer_view) -> tensor<?x?x4xf32>
   %dim0 = hal.buffer_view.dim<%view : !hal.buffer_view>[0] : index
   //  CHECK-DAG: %[[DIM1:.+]] = hal.buffer_view.dim{{.+}}[1]
   %dim1 = hal.buffer_view.dim<%view : !hal.buffer_view>[1] : index
+  // CHECK: hal.buffer_view.assert
   //  CHECK-DAG: %[[SIZE:.+]] = stream.tensor.sizeof tensor<?x?x4xf32>{%[[DIM0]], %[[DIM1]]} : index
   //      CHECK: %[[RESOURCE:.+]] = stream.tensor.import %[[VIEW]] : !hal.buffer_view ->
   // CHECK-SAME:     tensor<?x?x4xf32>{%[[DIM0]], %[[DIM1]]} in !stream.resource<external>{%[[SIZE]]}
@@ -91,6 +92,42 @@ util.func public @importBufferViewAsync(%view: !hal.buffer_view, %fence: !hal.fe
   %0 = hal.tensor.import wait(%fence) => %view : !hal.buffer_view -> tensor<4xf32>
   // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
   util.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @importPackedStatic
+// CHECK-NOT: hal.buffer_view.assert
+// CHECK-NOT: hal.encoding_type
+// CHECK: stream.tensor.sizeof tensor<2x4xi1, #iree_encoding.packed_storage>
+// CHECK-NOT: hal.buffer_view.assert
+// CHECK-NOT: hal.encoding_type
+// CHECK: stream.tensor.import {{.*}} : !hal.buffer_view ->
+// CHECK-SAME: tensor<2x4xi1, #iree_encoding.packed_storage>
+// CHECK-NOT: hal.buffer_view.assert
+// CHECK-NOT: hal.encoding_type
+// CHECK: util.return
+util.func public @importPackedStatic(%view: !hal.buffer_view) -> tensor<2x4xi1, #iree_encoding.packed_storage> {
+  %0 = hal.tensor.import %view : !hal.buffer_view -> tensor<2x4xi1, #iree_encoding.packed_storage>
+  util.return %0 : tensor<2x4xi1, #iree_encoding.packed_storage>
+}
+
+// -----
+
+// CHECK-LABEL: @importPackedDynamic
+// CHECK-NOT: hal.buffer_view.assert
+// CHECK-NOT: hal.encoding_type
+// CHECK: stream.tensor.sizeof tensor<?x4xi1, #iree_encoding.packed_storage>
+// CHECK-NOT: hal.buffer_view.assert
+// CHECK-NOT: hal.encoding_type
+// CHECK: stream.tensor.import {{.*}} : !hal.buffer_view ->
+// CHECK-SAME: tensor<?x4xi1, #iree_encoding.packed_storage>
+// CHECK-NOT: hal.buffer_view.assert
+// CHECK-NOT: hal.encoding_type
+// CHECK: util.return
+util.func public @importPackedDynamic(%view: !hal.buffer_view, %dim: index) -> tensor<?x4xi1, #iree_encoding.packed_storage> {
+  %0 = hal.tensor.import %view : !hal.buffer_view -> tensor<?x4xi1, #iree_encoding.packed_storage>{%dim}
+  util.return %0 : tensor<?x4xi1, #iree_encoding.packed_storage>
 }
 
 // -----
