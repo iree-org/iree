@@ -78,6 +78,7 @@ def IREEEncoding_UnsetEncodingOp : IREEEncoding_PureOp<"unset_encoding", [
     attr-dict $source (`encoding_dims` `{` $encoding_dims^ `}`)? `:` type($source) `->` type($result) (`` `{` $result_dims^ `}`)?
   }];
 
+  let hasFolder = 1;
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
