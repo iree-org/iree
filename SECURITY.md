@@ -52,6 +52,8 @@ Please include:
 - You found a way to compromise IREE's CI or release infrastructure, or
   evidence that it has been compromised. For example:
   - A workflow that gives pull request code access to secrets.
+  - A way to publish to PyPI without a release maintainer approving the
+    `pypi` deployment environment.
   - A leaked token or credential, or a compromised account of an `iree-org`
     member.
   - A way to run or persist code on a self-hosted CI runner outside the job
@@ -126,24 +128,38 @@ release. Report suspected tampering through the private channels above.
 
 ### Verifying release artifacts
 
-The files that IREE's release workflow uploads to
-[GitHub releases](https://github.com/iree-org/iree/releases), such as the
-`iree-base-compiler` and `iree-base-runtime` wheels and the `iree-dist`
-tarballs, carry a build provenance attestation signed with
-[Sigstore](https://www.sigstore.dev/). The attestation records the workflow,
-commit, and run that built each file. Verify a downloaded file with the
-[GitHub CLI](https://cli.github.com/manual/gh_attestation_verify):
+IREE's release workflows sign a build provenance attestation with
+[Sigstore](https://www.sigstore.dev/) for every file they publish. The
+attestation records the workflow, commit, and run that produced the file.
+Verification fails if the file was changed afterwards, or if it was produced
+by anything other than IREE's release workflows. Files published before IREE
+introduced attestations have none.
+
+| Files | Signing workflow |
+| --- | --- |
+| Nightly candidate release assets on [GitHub releases](https://github.com/iree-org/iree/releases), such as the `iree-base-compiler` and `iree-base-runtime` wheels and the `iree-dist` tarballs | `build_package.yml` |
+| Stable wheels on PyPI and on the stable GitHub release | `publish_pypi.yml` |
+
+Verify a downloaded file with the
+[GitHub CLI](https://cli.github.com/manual/gh_attestation_verify), using the
+signing workflow from the table:
 
 ```sh
 gh attestation verify <file> \
   --repo iree-org/iree \
-  --signer-workflow iree-org/iree/.github/workflows/build_package.yml
+  --signer-workflow iree-org/iree/.github/workflows/<signing workflow>
 ```
 
-Verification fails if the file was changed after it was built, or if it was not
-built by IREE's release workflow. Stable wheels on PyPI are not attested yet,
-because promoting a nightly release to a stable release rewrites the version
-inside each wheel.
+Stable wheels are uploaded to PyPI with
+[trusted publishing](https://docs.pypi.org/trusted-publishers/), so PyPI also
+stores a [PEP 740](https://peps.python.org/pep-0740/) attestation for each file
+and shows it on the file's page. Verify it with
+[pypi-attestations](https://github.com/pypi/pypi-attestations):
+
+```sh
+pypi-attestations verify pypi --repository https://github.com/iree-org/iree \
+  pypi:<wheel file name>
+```
 
 ## Security model
 
@@ -325,16 +341,22 @@ workflows and build scripts must preserve these principles:
   or from an upstream project.
 - **Release builds start clean.** Release packages are built from a tagged
   commit on GitHub-hosted runners, without shared build caches.
-- **Release assets are attested.** The release workflow signs a build
-  provenance attestation with `actions/attest` for every file it uploads to
-  GitHub releases. New release assets must be attested in the job that builds
-  them, before they are uploaded.
+- **Published files are attested.** The release workflows sign a build
+  provenance attestation with `actions/attest` for every file they upload to
+  GitHub releases or PyPI. New release files must be attested in the job that
+  produces them, before they are uploaded.
 - **Stable releases are promoted, not rebuilt.** A stable release republishes
   the wheels of a tested nightly release with only the version changed.
-- **Publishing to PyPI is a manual step.** Release workflows upload artifacts
-  to GitHub releases with a repository-scoped token. PyPI credentials are not
-  stored in GitHub; a release maintainer uploads packages from a reviewed
-  release (see the
+- **PyPI uploads use trusted publishing.** The `publish_pypi.yml` workflow
+  publishes stable releases with
+  [trusted publishing](https://docs.pypi.org/trusted-publishers/). No PyPI
+  credentials are stored in GitHub: PyPI exchanges the publishing job's OIDC
+  token for a short-lived upload token.
+- **Publishing needs approval.** Publishing jobs run in the protected `pypi`
+  environment, which only a release maintainer can approve and which only
+  accepts runs from `main`. These jobs have no permissions besides
+  `id-token: write`, and they only upload wheels that an earlier job promoted,
+  checked, and attested (see the
   [release management guide](https://iree.dev/developers/general/release-management/)).
 - **Two-factor authentication is required.** The `iree-org` GitHub
   organization requires two-factor authentication. GitHub removes members and
