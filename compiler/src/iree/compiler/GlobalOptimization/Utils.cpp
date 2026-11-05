@@ -6,9 +6,15 @@
 
 #include "iree/compiler/GlobalOptimization/Utils.h"
 
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/ADT/SmallVectorExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/SymbolTable.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
@@ -166,6 +172,128 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
                linalg::YieldOp::create(b, loc, sum);
              })
       .getResult(0);
+}
+
+IREE::Util::GlobalOpInterface
+getLoadedGlobal(Value value, SymbolTableCollection &symbolTables) {
+  auto loadOp = value.getDefiningOp<IREE::Util::GlobalLoadOpInterface>();
+  if (!loadOp) {
+    return {};
+  }
+  return IREE::Util::lookupGlobalOp(loadOp, loadOp.getGlobalAttr(),
+                                    symbolTables);
+}
+
+Value getReshapeSource(Value value) {
+  while (isa_and_present<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
+      value.getDefiningOp())) {
+    value = value.getDefiningOp()->getOperand(0);
+  }
+  return value;
+}
+
+std::optional<SmallVector<OpOperand *>>
+getUsesOfSameData(Value value, const SymbolUserMap &symbolUsers,
+                  SymbolTableCollection &symbolTables) {
+  Value source = getReshapeSource(value);
+  SmallVector<Value> worklist;
+  if (IREE::Util::GlobalOpInterface globalOp =
+          getLoadedGlobal(source, symbolTables)) {
+    if (!globalOp.isGlobalPrivate()) {
+      return std::nullopt;
+    }
+    for (Operation *user : symbolUsers.getUsers(globalOp)) {
+      auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(user);
+      if (!loadOp) {
+        return std::nullopt;
+      }
+      worklist.push_back(loadOp.getLoadedGlobalValue());
+    }
+  } else {
+    worklist.push_back(source);
+  }
+  SmallVector<OpOperand *> uses;
+  while (!worklist.empty()) {
+    Value data = worklist.pop_back_val();
+    for (OpOperand &use : data.getUses()) {
+      if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(use.getOwner())) {
+        worklist.push_back(use.getOwner()->getResult(0));
+      } else {
+        uses.push_back(&use);
+      }
+    }
+  }
+  return uses;
+}
+
+/// Returns the attribute holding `value` when it is a constant or a load of an
+/// immutable global, or null otherwise. For a global this is its initial
+/// value, which may be a parameter reference rather than data.
+static Attribute getConstantAttr(Value value,
+                                 SymbolTableCollection &symbolTables) {
+  Attribute attr;
+  if (matchPattern(value, m_Constant(&attr))) {
+    return attr;
+  }
+  IREE::Util::GlobalOpInterface globalOp = getLoadedGlobal(value, symbolTables);
+  if (!globalOp || globalOp.isGlobalMutable()) {
+    return {};
+  }
+  return globalOp.getGlobalInitialValue();
+}
+
+/// Returns the integers in `attr`, read as unsigned if `isUnsigned`, or nullopt
+/// when `attr` holds no readable integers. A splat gives a single value.
+static std::optional<SmallVector<APSInt>> getIntegerValues(Attribute attr,
+                                                           bool isUnsigned) {
+  using Values = std::optional<SmallVector<APSInt>>;
+  auto toAPSInt = [&](const APInt &value) { return APSInt(value, isUnsigned); };
+  return llvm::TypeSwitch<Attribute, Values>(attr)
+      .Case([&](IntegerAttr intAttr) -> Values {
+        return SmallVector<APSInt>{toAPSInt(intAttr.getValue())};
+      })
+      .Case([&](DenseIntElementsAttr denseAttr) -> Values {
+        if (denseAttr.isSplat()) {
+          return SmallVector<APSInt>{
+              toAPSInt(denseAttr.getSplatValue<APInt>())};
+        }
+        return llvm::map_to_vector(denseAttr.getValues<APInt>(), toAPSInt);
+      })
+      .Case<DenseI8ResourceElementsAttr, DenseI16ResourceElementsAttr,
+            DenseI32ResourceElementsAttr, DenseI64ResourceElementsAttr>(
+          [&](auto resourceAttr) -> Values {
+            unsigned bitWidth = resourceAttr.getType().getElementTypeBitWidth();
+            auto values = resourceAttr.tryGetAsArrayRef();
+            if (!values) {
+              return std::nullopt;
+            }
+            return llvm::map_to_vector(*values, [&](auto value) {
+              return toAPSInt(APInt(bitWidth, value, /*isSigned=*/true));
+            });
+          })
+      .Default(std::nullopt);
+}
+
+std::optional<SmallVector<APSInt>>
+getConstantIntegerValues(Value value, bool isUnsigned,
+                         SymbolTableCollection &symbolTables) {
+  Attribute attr = getConstantAttr(getReshapeSource(value), symbolTables);
+  if (!attr) {
+    return std::nullopt;
+  }
+  return getIntegerValues(attr, isUnsigned);
+}
+
+bool isComputedFromInlineData(
+    const IREE::Util::ConstExprAnalysis::ConstValueInfo &info,
+    SymbolTableCollection &symbolTables) {
+  if (!info.isConstExpr()) {
+    return false;
+  }
+  return llvm::all_of(info.roots, [&](Value root) {
+    return isa_and_present<ElementsAttr, IntegerAttr, FloatAttr>(
+        getConstantAttr(root, symbolTables));
+  });
 }
 
 } // namespace mlir::iree_compiler::GlobalOptimization

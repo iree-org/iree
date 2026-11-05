@@ -158,6 +158,22 @@ FailureOr<QuantizedContraction> getQuantizedContraction(linalg::LinalgOp op) {
   return detail;
 }
 
+IntegerContractionMaps
+getIntegerContractionMaps(linalg::LinalgOp op,
+                          const QuantizedContraction &detail) {
+  MLIRContext *context = op.getContext();
+  SmallVector<AffineExpr> resultExprs(detail.outputMap.getResults());
+  SmallVector<utils::IteratorType> iteratorTypes = op.getIteratorTypesArray();
+  for (unsigned dim : detail.floatingReductionDims) {
+    resultExprs.push_back(getAffineDimExpr(dim, context));
+    iteratorTypes[dim] = utils::IteratorType::parallel;
+  }
+  AffineMap resultMap =
+      AffineMap::get(detail.outputMap.getNumDims(), 0, resultExprs, context);
+  return {{detail.lhs.inputMap, detail.rhs.inputMap, resultMap},
+          std::move(iteratorTypes)};
+}
+
 AffineMap getExplicitExtentDimsMap(ArrayRef<AffineMap> maps) {
   unsigned rank = maps.front().getNumDims();
   llvm::SmallBitVector namedDims(rank);

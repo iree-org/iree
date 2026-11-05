@@ -41,7 +41,9 @@ using IREE::LinalgExt::DequantizeAffineOp;
 namespace {
 
 using detail::getExplicitExtentDimsMap;
+using detail::getIntegerContractionMaps;
 using detail::getQuantizedContraction;
+using detail::IntegerContractionMaps;
 using detail::QuantizedContraction;
 using detail::QuantizedOperand;
 
@@ -116,33 +118,21 @@ buildIntegerContraction(OpBuilder &b, Location loc, linalg::LinalgOp op,
   bool lhsUnsigned = lhsDequantize.getInputUnsigned();
   bool rhsUnsigned = rhsDequantize.getInputUnsigned();
 
-  MLIRContext *context = b.getContext();
-  const IntegerType accumulatorType = getAccumulatorType(context);
+  const IntegerType accumulatorType = getAccumulatorType(b.getContext());
 
-  // Retain a partial result for each block; the epilogue scales and reduces it.
-  SmallVector<AffineExpr> resultExprs(detail.outputMap.getResults());
-  SmallVector<utils::IteratorType> iteratorTypes = op.getIteratorTypesArray();
-  for (unsigned dim : detail.floatingReductionDims) {
-    resultExprs.push_back(getAffineDimExpr(dim, context));
-    iteratorTypes[dim] = utils::IteratorType::parallel;
-  }
-  AffineMap resultMap =
-      AffineMap::get(detail.outputMap.getNumDims(), 0, resultExprs, context);
-  SmallVector<OpFoldResult> resultSizes =
-      applyPermutationMap<OpFoldResult>(resultMap, iterationSizes);
+  IntegerContractionMaps maps = getIntegerContractionMaps(op, detail);
+  SmallVector<OpFoldResult> resultSizes = applyPermutationMap<OpFoldResult>(
+      maps.indexingMaps.back(), iterationSizes);
 
   Value init = buildZeroFilledTensor(b, loc, resultSizes, accumulatorType);
-
-  SmallVector<AffineMap> maps{detail.lhs.inputMap, detail.rhs.inputMap,
-                              resultMap};
 
   // Scalar body: accumulate the product of quantized inputs into an i32 sum.
   //   a = lhsUnsigned ? extui(lhsElement) : extsi(lhsElement)
   //   b = rhsUnsigned ? extui(rhsElement) : extsi(rhsElement)
   //   yield accumulator + a * b
   auto genericOp = linalg::GenericOp::create(
-      b, loc, init.getType(), ValueRange{lhs, rhs}, ValueRange{init}, maps,
-      iteratorTypes,
+      b, loc, init.getType(), ValueRange{lhs, rhs}, ValueRange{init},
+      maps.indexingMaps, maps.iteratorTypes,
       [&](OpBuilder &nested, Location nestedLoc, ValueRange args) {
         Value lhsValue =
             convertScalarToDtype(nested, nestedLoc, args[0], accumulatorType,

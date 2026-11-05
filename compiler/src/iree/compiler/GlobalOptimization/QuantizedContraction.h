@@ -60,6 +60,22 @@ struct QuantizedContraction {
 /// reduction.
 FailureOr<QuantizedContraction> getQuantizedContraction(linalg::LinalgOp op);
 
+/// Indexing maps and iterator types of an integer contraction.
+struct IntegerContractionMaps {
+  /// Maps of the lhs, rhs and result, in that order.
+  SmallVector<AffineMap> indexingMaps;
+  /// Iterator types of the integer contraction's loops.
+  SmallVector<utils::IteratorType> iteratorTypes;
+};
+
+/// Returns the indexing maps and iterator types of the integer contraction that
+/// replaces `op`. Its operands read the quantized inputs. Each floating
+/// reduction dim becomes parallel and is appended to the result, which keeps
+/// one partial result per block for the epilogue to scale and reduce.
+IntegerContractionMaps
+getIntegerContractionMaps(linalg::LinalgOp op,
+                          const QuantizedContraction &detail);
+
 /// Returns a map selecting domain dimensions that do not appear as bare results
 /// in any of `maps`, a nonempty list with a shared domain. These dimensions
 /// need explicit extents because Linalg cannot infer them from operand shapes.
