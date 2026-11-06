@@ -418,22 +418,22 @@ public:
     // Phase 1: simple checks (no CFG analysis needed).
     if (failed(verifyModuleOrderDependencies(globalTable, initializerOps,
                                              opOrdinalMap, moduleOp))) {
-      return;
+      return signalPassFailure();
     }
 
     if (failed(verifyDoubleInitialization(globalTable, initializerOps))) {
-      return;
+      return signalPassFailure();
     }
 
     if (failed(verifyInitialValueConflicts(globalTable, initializerOps,
                                            opOrdinalMap))) {
-      return;
+      return signalPassFailure();
     }
 
     // Phase 2: conservative reachability analysis with warnings.
     auto reachability = computeInitializerReachability(moduleOp);
     if (failed(verifyImmutableStoresWithWarnings(globalTable, reachability))) {
-      return;
+      return signalPassFailure();
     }
   }
 };
