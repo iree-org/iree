@@ -7419,8 +7419,8 @@ into the dispatch region, allowing producers to be outside.</p>
 -fuse-multi-use-producers    : Enable experimental fusion of producers with multiple non-dim uses
 -fuse-pad-with-consumers     : Enable fusing pad with consumer
 -fuse-pad-with-producers     : Enable fusion of pad with producers
--fuse-mmt4d                  : Fuse layout-preserving elementwise consumers and the result unpack into mmt4d and batch_mmt4d dispatches
--fuse-data-tiled-convolution : Fuse the result unpack, after layout-preserving elementwise consumers, into data-tiled convolution dispatches
+-fuse-mmt4d                  : Fuse layout-preserving elementwise consumers and the result unpack into mmt4d and batch_mmt4d dispatches. Modules with the iree.encoding.materialized_layout_target attribute always enable it, even if it is set to false
+-fuse-data-tiled-convolution : Fuse the result unpack, after layout-preserving elementwise consumers, into data-tiled convolution dispatches. Modules with the iree.encoding.materialized_layout_target attribute always enable it, even if it is set to false
 </code></pre></div>
 <h3 id="-iree-dispatch-creation-form-scalar-dispatches"><code>-iree-dispatch-creation-form-scalar-dispatches</code><a class="headerlink" href="#-iree-dispatch-creation-form-scalar-dispatches" title="Permanent link">link</a></h3>
 <p><em>Form Dispatch Regions for scalar computations.</em></p>
