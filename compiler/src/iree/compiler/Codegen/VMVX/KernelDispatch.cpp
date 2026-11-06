@@ -11,6 +11,8 @@
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Attributes.h"
 
 #define DEBUG_TYPE "vmvx-kernel-dispatch"
@@ -49,6 +51,36 @@ getDefaultDistributionTileSizes(TilingInterface op) {
 
   auto partitionedLoops = cast<PartitionableLoopsInterface>(op.getOperation())
                               .getPartitionableLoops(kNumMaxParallelDims);
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation())) {
+    auto loopRanges = linalgOp.getStaticLoopRanges();
+    auto allPartitionableLoops =
+        cast<PartitionableLoopsInterface>(op.getOperation())
+            .getPartitionableLoops(std::nullopt);
+    // Prefer dynamic loops over static loops when there are more parallel
+    // loops than workgroup dimensions. Leaving a dynamic loop untiled can
+    // require a temporary allocation covering its entire runtime extent.
+    for (unsigned loop : allPartitionableLoops) {
+      if (!ShapedType::isDynamic(loopRanges[loop]) ||
+          llvm::is_contained(partitionedLoops, loop)) {
+        continue;
+      }
+      // Keep larger static loops tiled to limit the temporary's footprint.
+      auto staticLoop = partitionedLoops.end();
+      for (auto it = partitionedLoops.begin(); it != partitionedLoops.end();
+           ++it) {
+        if (!ShapedType::isDynamic(loopRanges[*it]) &&
+            (staticLoop == partitionedLoops.end() ||
+             loopRanges[*it] < loopRanges[*staticLoop])) {
+          staticLoop = it;
+        }
+      }
+      if (staticLoop == partitionedLoops.end()) {
+        break;
+      }
+      *staticLoop = loop;
+    }
+    llvm::sort(partitionedLoops);
+  }
   SmallVector<int64_t> distTileSizes(numLoops, kDefaultDistTileSize);
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
                                                partitionedLoops.end());
