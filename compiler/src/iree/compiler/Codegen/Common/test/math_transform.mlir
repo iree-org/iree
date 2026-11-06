@@ -265,7 +265,19 @@ func.func @roundeven_expanded_on_x86_without_sse41(%arg0: f32) -> f32 attributes
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+sse2", target_triple = "x86_64-xyz-xyz"}>
 } {
   // CHECK-NOT: math.roundeven
-  // CHECK:     return
+  // CHECK-DAG: arith.constant 1.000000e+00 : f32
+  // CHECK-DAG: arith.constant 23 : i32
+  // CHECK-DAG: arith.constant 127 : i32
+  // CHECK-DAG: arith.constant 255 : i32
+  // CHECK-DAG: arith.constant 8388607 : i32
+  // CHECK-DAG: arith.constant 4194304 : i32
+  // CHECK:     arith.bitcast %arg0 : f32 to i32
+  // CHECK:     %[[ROUND:.*]] = math.round %arg0 : f32
+  // CHECK:     arith.bitcast %[[ROUND]] : f32 to i32
+  // CHECK:     %[[SIGN:.*]] = math.copysign %{{.*}}, %arg0 : f32
+  // CHECK:     %[[SHIFTED:.*]] = arith.subf %[[ROUND]], %[[SIGN]] : f32
+  // CHECK:     %[[SELECT:.*]] = arith.select %{{.*}}, %[[SHIFTED]], %[[ROUND]] : f32
+  // CHECK:     math.copysign %[[SELECT]], %arg0 : f32
   %0 = math.roundeven %arg0 : f32
   return %0 : f32
 }
@@ -288,7 +300,19 @@ func.func @roundeven_expanded_on_riscv64_without_d(%arg0: f32) -> f32 attributes
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+m,+a,+f,+c", target_triple = "riscv64-xyz-xyz"}>
 } {
   // CHECK-NOT: math.roundeven
-  // CHECK:     return
+  // CHECK-DAG: arith.constant 1.000000e+00 : f32
+  // CHECK-DAG: arith.constant 23 : i32
+  // CHECK-DAG: arith.constant 127 : i32
+  // CHECK-DAG: arith.constant 255 : i32
+  // CHECK-DAG: arith.constant 8388607 : i32
+  // CHECK-DAG: arith.constant 4194304 : i32
+  // CHECK:     arith.bitcast %arg0 : f32 to i32
+  // CHECK:     %[[ROUND:.*]] = math.round %arg0 : f32
+  // CHECK:     arith.bitcast %[[ROUND]] : f32 to i32
+  // CHECK:     %[[SIGN:.*]] = math.copysign %{{.*}}, %arg0 : f32
+  // CHECK:     %[[SHIFTED:.*]] = arith.subf %[[ROUND]], %[[SIGN]] : f32
+  // CHECK:     %[[SELECT:.*]] = arith.select %{{.*}}, %[[SHIFTED]], %[[ROUND]] : f32
+  // CHECK:     math.copysign %[[SELECT]], %arg0 : f32
   %0 = math.roundeven %arg0 : f32
   return %0 : f32
 }
@@ -300,7 +324,19 @@ func.func @roundeven_expanded_on_riscv32(%arg0: f64) -> f64 attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+m,+a,+f,+d,+c", target_triple = "riscv32-xyz-xyz"}>
 } {
   // CHECK-NOT: math.roundeven
-  // CHECK:     return
+  // CHECK-DAG: arith.constant 1.000000e+00 : f64
+  // CHECK-DAG: arith.constant 52 : i64
+  // CHECK-DAG: arith.constant 1023 : i64
+  // CHECK-DAG: arith.constant 2047 : i64
+  // CHECK-DAG: arith.constant 4503599627370495 : i64
+  // CHECK-DAG: arith.constant 2251799813685248 : i64
+  // CHECK:     arith.bitcast %arg0 : f64 to i64
+  // CHECK:     %[[ROUND:.*]] = math.round %arg0 : f64
+  // CHECK:     arith.bitcast %[[ROUND]] : f64 to i64
+  // CHECK:     %[[SIGN:.*]] = math.copysign %{{.*}}, %arg0 : f64
+  // CHECK:     %[[SHIFTED:.*]] = arith.subf %[[ROUND]], %[[SIGN]] : f64
+  // CHECK:     %[[SELECT:.*]] = arith.select %{{.*}}, %[[SHIFTED]], %[[ROUND]] : f64
+  // CHECK:     math.copysign %[[SELECT]], %arg0 : f64
   %0 = math.roundeven %arg0 : f64
   return %0 : f64
 }
@@ -310,7 +346,19 @@ func.func @roundeven_expanded_on_riscv32(%arg0: f64) -> f64 attributes {
 // CHECK-LABEL: @roundeven_expanded_without_target
 func.func @roundeven_expanded_without_target(%arg0: f32) -> f32 {
   // CHECK-NOT: math.roundeven
-  // CHECK:     return
+  // CHECK-DAG: arith.constant 1.000000e+00 : f32
+  // CHECK-DAG: arith.constant 23 : i32
+  // CHECK-DAG: arith.constant 127 : i32
+  // CHECK-DAG: arith.constant 255 : i32
+  // CHECK-DAG: arith.constant 8388607 : i32
+  // CHECK-DAG: arith.constant 4194304 : i32
+  // CHECK:     arith.bitcast %arg0 : f32 to i32
+  // CHECK:     %[[ROUND:.*]] = math.round %arg0 : f32
+  // CHECK:     arith.bitcast %[[ROUND]] : f32 to i32
+  // CHECK:     %[[SIGN:.*]] = math.copysign %{{.*}}, %arg0 : f32
+  // CHECK:     %[[SHIFTED:.*]] = arith.subf %[[ROUND]], %[[SIGN]] : f32
+  // CHECK:     %[[SELECT:.*]] = arith.select %{{.*}}, %[[SHIFTED]], %[[ROUND]] : f32
+  // CHECK:     math.copysign %[[SELECT]], %arg0 : f32
   %0 = math.roundeven %arg0 : f32
   return %0 : f32
 }
