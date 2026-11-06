@@ -115,7 +115,7 @@ performance if it is enabled. The targets that support data-tiling are:
 * GPU (ROCm)
 * VMVX
 
-There are two paths in data-tiling:
+There are three paths in data-tiling:
 
 * `--iree-dispatch-creation-data-tiling` (off): Starts data-tiling from dispatch
   creation phase. This is the current default path, if the flag is on. This is
@@ -126,17 +126,48 @@ There are two paths in data-tiling:
   optimization phase. The path will be deprecated in the future, because it
   breaks the core IREE concept in terms of retargetability and modularity. Any
   features built on top of the path may be deprecated.
+* `--iree-opt-experimental-early-data-tiling` (off): Experimental. Assigns,
+  propagates and materializes data-tiling layouts in the global optimization
+  phase, so that the layouts propagate through the surrounding tensor graph and
+  data-tiled ops such as `linalg.mmt4d` still fuse with their elementwise
+  epilogues and result unpacks in dispatch creation. Unlike the global
+  optimization path, it normalizes contraction dimensions and propagates layouts
+  through elementwise ops before materializing them.
 
-Note that the flag will override the other two flags if it is explicitly set,
-because it has higher priority. You have to disable the flag to use a specific
-path.
+    This makes global optimization target aware on purpose, so the path is
+    limited to modules that it can commit to a single target:
 
-| Feature             | GlobalOptimization path | DispatchCreation path |
-|---------------------|-------------------------|-----------------------|
-| ConstExpr Hoisting  | ✔️                      | ✔️                    |
-| Constant Evaluation | ✔️                      | ❌                    |
-| Matmul Fusion       | ❌                      | ✔️                    |
-| Multi-device        | ❌                      | ✔️                    |
+    * The module has a single executable target that supports materializing
+      layouts on the host: currently `llvm-cpu` on x86_64 or AArch64, with the
+      CPU encoding resolver and without inner-tiled layouts.
+    * The encoding strategy is the default one
+      (`--iree-dispatch-creation-set-encoding-strategy=generic`).
+
+    Other modules fall back to the dispatch creation path. Because of that, the
+    op families and the encoding strategy come from the dispatch creation flags
+    (`--iree-dispatch-creation-experimental-set-data-tiling-ops` and
+    `--iree-dispatch-creation-set-encoding-strategy`). A module whose layouts
+    were materialized records its target in the
+    `iree.encoding.materialized_layout_target` attribute, even if nothing was
+    data-tiled. Dispatch creation then does not assign encodings again, and
+    rejects compiling the module for any other target, e.g. when compilation is
+    resumed from an intermediate phase.
+    [#25031](https://github.com/iree-org/iree/issues/25031) tracks moving the
+    layout decision into its own component that decides per affinity, which
+    would lift these limits.
+
+Note that `--iree-opt-data-tiling` will override the dispatch creation and
+global optimization flags if it is explicitly set, because it has higher
+priority. You have to disable the flag to use a specific path.
+`--iree-opt-experimental-early-data-tiling` overrides all of them, so
+conflicting data-tiling flags are not an error when it is set.
+
+| Feature             | GlobalOptimization path | DispatchCreation path | Early path (experimental) |
+|---------------------|-------------------------|-----------------------|---------------------------|
+| ConstExpr Hoisting  | ✔️                      | ✔️                    | ✔️                        |
+| Constant Evaluation | ✔️                      | ❌                    | ✔️                        |
+| Matmul Fusion       | ❌                      | ✔️                    | ✔️                        |
+| Multi-device        | ❌                      | ✔️                    | ❌                        |
 
 Note: Constant Evaluation is not yet implemented in the dispatch creation path.
 It is a planned feature.
