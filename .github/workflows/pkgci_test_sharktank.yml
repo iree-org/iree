@@ -57,7 +57,7 @@ jobs:
           persist-credentials: false
           submodules: false
 
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v5.4.0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
