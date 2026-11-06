@@ -7,6 +7,41 @@
 
 // -----
 
+// Folding all unit dimensions reduces dequantization to rank zero. Propagation
+// must restore its adjacency to the contraction before the single late QDQ
+// pass. The signed-zero behavior is covered numerically by contraction_scaling.
+util.func public @unit_matmul_negative_zero_init(
+    %aq: tensor<1x1xi8>, %bq: tensor<1x1xi8>, %scale: f32) -> tensor<1x1xf32> {
+  %ai = tensor.empty() : tensor<1x1xf32>
+  %a = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(m, k) -> (m, k)>,
+                        affine_map<(m, k) -> ()>,
+                        affine_map<(m, k) -> (m, k)>]>
+      ins(%aq, %scale : tensor<1x1xi8>, f32)
+      outs(%ai : tensor<1x1xf32>) -> tensor<1x1xf32>
+  %bi = tensor.empty() : tensor<1x1xf32>
+  %b = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(k, n) -> (k, n)>,
+                        affine_map<(k, n) -> ()>,
+                        affine_map<(k, n) -> (k, n)>]>
+      ins(%bq, %scale : tensor<1x1xi8>, f32)
+      outs(%bi : tensor<1x1xf32>) -> tensor<1x1xf32>
+  %zero = arith.constant -0.0 : f32
+  %empty = tensor.empty() : tensor<1x1xf32>
+  %init = linalg.fill ins(%zero : f32) outs(%empty : tensor<1x1xf32>) -> tensor<1x1xf32>
+  %result = linalg.matmul ins(%a, %b : tensor<1x1xf32>, tensor<1x1xf32>)
+      outs(%init : tensor<1x1xf32>) -> tensor<1x1xf32>
+  util.return %result : tensor<1x1xf32>
+}
+// CHECK-LABEL: util.func public @unit_matmul_negative_zero_init(
+// CHECK: arith.muli %{{.+}}, %{{.+}} : i32
+// CHECK: arith.sitofp
+// DISABLED-LABEL: util.func public @unit_matmul_negative_zero_init(
+// DISABLED: iree_linalg_ext.dequantize_affine
+// DISABLED: linalg.matmul
+
+// -----
+
 // Unit batch dimensions must not hide dequantize producers before the rewrite.
 util.func public @convolution_zero_point_corrections(
     %aq: tensor<1x5x5x1xi8>,

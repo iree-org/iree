@@ -68,16 +68,6 @@ static SmallVector<DimSize> getDimSizes(Value v) {
   return sizes;
 }
 
-static bool
-isIdentityReassoc(const SmallVector<ReassociationIndices> &indices) {
-  for (auto &index : indices) {
-    if (index.size() != 1) {
-      return false;
-    }
-  }
-  return true;
-};
-
 static SmallVector<ReassociationIndices>
 computeReassocFromShapeMap(ArrayRef<SmallVector<DimSize>> shapeMap) {
   SmallVector<ReassociationIndices> reassoc;
@@ -103,6 +93,11 @@ struct ReshapeOperandInfo {
   // that dim doesn't map to the iteration space. For example, the indexed
   // dimensions in a LinalgExt::ScatterOp.
   SmallVector<int64_t> operandToIterationSpace;
+
+  // Whether the op requires this operand to be indexed by every loop. Only
+  // such operands gain the new loops of an expanded zero-loop op; other rank-0
+  // operands broadcast over them.
+  bool spansIterationSpace = false;
 };
 
 /// Information needed to expand an operation to fold the reshape with
@@ -121,18 +116,14 @@ public:
 
   std::optional<Value> getOrCreateExpanded(Location loc, OpOperand *operand,
                                            RewriterBase &rewriter) {
-    auto shapeMap = this->getShapeMap(operand);
-    auto reassoc = computeReassocFromShapeMap(shapeMap);
-    if (isIdentityReassoc(reassoc)) {
+    if (!isExpanded(operand)) {
       return operand->get();
     }
-    SmallVector<OpFoldResult> outputShape;
-    for (auto &shape : shapeMap) {
-      llvm::append_range(
-          outputShape, llvm::map_range(shape, [&rewriter](const DimSize &size) {
-            return size.materialize(rewriter);
-          }));
-    }
+    auto reassoc = getReassoc(operand);
+    SmallVector<OpFoldResult> outputShape = llvm::map_to_vector(
+        getExpandedShape(operand), [&rewriter](const DimSize &size) {
+          return size.materialize(rewriter);
+        });
     auto [staticShape, dynamicShape] = decomposeMixedValues(outputShape);
     (void)dynamicShape;
     auto oldType = cast<ShapedType>(operand->get().getType());
@@ -165,7 +156,39 @@ public:
     return shapeMap;
   }
 
+  /// Returns whether `operand` is a rank-0 operand of an expanded zero-loop
+  /// op that gains all of the new loops.
+  bool isExpandedScalar(OpOperand *operand) const {
+    return !zeroLoopExpandedShape.empty() &&
+           reshapeInfos[operand->getOperandNumber()].spansIterationSpace;
+  }
+
+  /// Get the shape of the operand in the expanded op.
+  SmallVector<DimSize> getExpandedShape(OpOperand *operand) const {
+    if (isExpandedScalar(operand)) {
+      return zeroLoopExpandedShape;
+    }
+    SmallVector<DimSize> shape;
+    for (const SmallVector<DimSize> &dims : getShapeMap(operand)) {
+      llvm::append_range(shape, dims);
+    }
+    return shape;
+  }
+
+  /// Returns whether the operand has a different shape in the expanded op.
+  /// Every original dimension maps to at least one expanded dimension, so the
+  /// shape only changes if the rank does.
+  bool isExpanded(OpOperand *operand) const {
+    auto type = dyn_cast<ShapedType>(operand->get().getType());
+    return type && static_cast<int64_t>(getExpandedShape(operand).size()) !=
+                       type.getRank();
+  }
+
   SmallVector<ReassociationIndices> getReassoc(OpOperand *operand) const {
+    // Reshaping a rank-0 tensor has an empty reassociation.
+    if (isExpandedScalar(operand)) {
+      return {};
+    }
     auto shapeMap = this->getShapeMap(operand);
     return computeReassocFromShapeMap(shapeMap);
   }
@@ -184,6 +207,9 @@ private:
   unsigned expandedOpNumDims;
   /// Info about the reassociation and original shape for each operand.
   SmallVector<ReshapeOperandInfo> reshapeInfos;
+  /// Extents of the loops of an expanded zero-loop op, none of which refines
+  /// an original loop. Empty unless the op has no loops.
+  SmallVector<DimSize> zeroLoopExpandedShape;
 };
 
 class CollapsingInfo {
@@ -241,8 +267,26 @@ LogicalResult ExpansionInfo::compute(
     SmallVector<ReshapeOperandInfo> infos, SmallVector<int64_t> loopRanges,
     OpOperand *fusableOpOperand, ArrayRef<ReassociationIndices> operandReassoc,
     ArrayRef<DimSize> expandedShape) {
+  this->zeroLoopExpandedShape.clear();
+  // A rank-0 operand maps to no loop, so its reshape has an empty
+  // reassociation and its expanded shape consists of new unit dimensions. An
+  // op with loops cannot absorb these: they would refine none of its loops.
+  // An op without loops gains them as its whole iteration space, which the
+  // operands that must span it gain as well.
   if (operandReassoc.empty()) {
-    return failure();
+    if (!loopRanges.empty() || expandedShape.empty() ||
+        !infos[fusableOpOperand->getOperandNumber()].spansIterationSpace ||
+        !llvm::all_of(expandedShape,
+                      [](const DimSize &size) { return size.isStatic(); })) {
+      return failure();
+    }
+    this->loopReassoc.clear();
+    this->loopShapeMap.clear();
+    this->zeroLoopExpandedShape.assign(expandedShape.begin(),
+                                       expandedShape.end());
+    this->expandedOpNumDims = expandedShape.size();
+    this->reshapeInfos = std::move(infos);
+    return success();
   }
 
   // Check that the operand dim size matches the iteration space dim size. This
@@ -355,11 +399,16 @@ CollapsingInfo::initialize(unsigned origNumLoops,
 }
 
 /// Derives the reshape info of an op that states an indexing map for every
-/// operand, where each map is a projected permutation.
+/// operand, where each map is a projected permutation. Inits and the operands
+/// in `spanningOperands` must be indexed by every loop.
 template <typename OpTy>
-static SmallVector<ReshapeOperandInfo> getMappedOperandsReshapeInfo(OpTy op) {
+static SmallVector<ReshapeOperandInfo>
+getMappedOperandsReshapeInfo(OpTy op, ArrayRef<OpOperand *> spanningOperands) {
   return llvm::map_to_vector(op->getOpOperands(), [&](OpOperand &opOperand) {
     ReshapeOperandInfo operandInfo;
+    operandInfo.spansIterationSpace =
+        op.isDpsInit(&opOperand) ||
+        llvm::is_contained(spanningOperands, &opOperand);
     auto operandType = dyn_cast<ShapedType>(opOperand.get().getType());
     if (!operandType) {
       assert(op.getMatchingIndexingMap(&opOperand).getNumResults() == 0 &&
@@ -378,22 +427,26 @@ static SmallVector<ReshapeOperandInfo> getMappedOperandsReshapeInfo(OpTy op) {
 
 static SmallVector<ReshapeOperandInfo>
 getReshapeInfo(LinalgExt::AttentionOp attentionOp) {
-  return getMappedOperandsReshapeInfo(attentionOp);
+  return getMappedOperandsReshapeInfo(attentionOp, {});
 }
 
 static SmallVector<ReshapeOperandInfo>
 getReshapeInfo(LinalgExt::OnlineAttentionOp attentionOp) {
-  return getMappedOperandsReshapeInfo(attentionOp);
+  return getMappedOperandsReshapeInfo(attentionOp, {});
 }
 
 static SmallVector<ReshapeOperandInfo>
 getReshapeInfo(LinalgExt::QuantizeAffineOp quantizeOp) {
-  return getMappedOperandsReshapeInfo(quantizeOp);
+  // The op is elementwise over the value it quantizes.
+  return getMappedOperandsReshapeInfo(quantizeOp,
+                                      {&quantizeOp.getInputMutable()});
 }
 
 static SmallVector<ReshapeOperandInfo>
 getReshapeInfo(LinalgExt::DequantizeAffineOp dequantizeOp) {
-  return getMappedOperandsReshapeInfo(dequantizeOp);
+  // The op is elementwise over the value it dequantizes.
+  return getMappedOperandsReshapeInfo(dequantizeOp,
+                                      {&dequantizeOp.getInputMutable()});
 }
 
 static SmallVector<ReshapeOperandInfo>
@@ -478,8 +531,12 @@ getReshapeInfo(LinalgExt::GatherOp gatherOp) {
 };
 
 static AffineMap
-getIndexingMapInExpandedOp(OpBuilder &builder, AffineMap indexingMap,
+getIndexingMapInExpandedOp(OpBuilder &builder, OpOperand *operand,
+                           AffineMap indexingMap,
                            const ExpansionInfo &expansionInfo) {
+  if (expansionInfo.isExpandedScalar(operand)) {
+    return builder.getMultiDimIdentityMap(expansionInfo.getExpandedNumLoops());
+  }
   SmallVector<AffineExpr> newExprs;
   for (AffineExpr expr : indexingMap.getResults()) {
     unsigned pos = cast<AffineDimExpr>(expr).getPosition();
@@ -548,8 +605,9 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
                 std::is_same_v<OpTy, QuantizeAffineOp> ||
                 std::is_same_v<OpTy, DequantizeAffineOp>) {
     auto expandedOpIndexingMaps = llvm::to_vector_of<AffineMap, 6>(
-        llvm::map_range(op.getIndexingMapsArray(), [&](AffineMap m) {
-          return getIndexingMapInExpandedOp(rewriter, m, info);
+        llvm::map_range(op->getOpOperands(), [&](OpOperand &operand) {
+          return getIndexingMapInExpandedOp(
+              rewriter, &operand, op.getMatchingIndexingMap(&operand), info);
         }));
     newOp.setIndexingMapsAttr(
         rewriter.getAffineMapArrayAttr(expandedOpIndexingMaps));
@@ -558,15 +616,13 @@ fuseWithReshapeByExpansion(OpTy op, Operation *reshapeOp,
   SmallVector<Value> replacements;
   replacements.reserve(op->getNumResults());
   for (auto [i, initOperand] : llvm::enumerate(op.getDpsInitsMutable())) {
-    SmallVector<ReassociationIndices> originalReassoc =
-        info.getReassoc(&initOperand);
     Value newResult = newOp->getResult(i);
-    if (isIdentityReassoc(originalReassoc)) {
+    if (!info.isExpanded(&initOperand)) {
       replacements.push_back(newResult);
     } else {
       replacements.push_back(tensor::CollapseShapeOp::create(
           rewriter, loc, op->getResult(i).getType(), newResult,
-          originalReassoc));
+          info.getReassoc(&initOperand)));
     }
   }
   return replacements;

@@ -23,6 +23,23 @@ namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
+// Named matmul-like ops whose inputs may be demoted.
+static bool isDemotableNamedMatmul(Operation *op) {
+  return IREE::LinalgExt::isPureMatmul(op) ||
+         IREE::LinalgExt::isPureBatchMatmul(op) ||
+         isa<linalg::MatvecOp, linalg::VecmatOp, linalg::BatchMatvecOp,
+             linalg::BatchVecmatOp, linalg::MatmulTransposeAOp,
+             linalg::MatmulTransposeBOp, linalg::BatchMatmulTransposeAOp,
+             linalg::BatchMatmulTransposeBOp>(op);
+}
+
+// Named convolution ops whose inputs may be demoted.
+static bool isDemotableNamedConv(Operation *op) {
+  return isa<linalg::Conv2DOp, linalg::Conv2DNchwFchwOp,
+             linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNhwcFhwcOp,
+             linalg::Conv2DNgchwFgchwOp, linalg::Conv2DNgchwGfchwOp>(op);
+}
+
 // Template pattern for demoting contraction inputs to a narrower floating-point
 // type.
 // SrcType: The source floating-point type (e.g., Float32Type)
@@ -39,11 +56,26 @@ struct DemoteContractionInputsPattern
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (demoteOperation == DemoteOperation::None) {
-      return failure();
-    }
-    if (!isa<linalg::ContractionOpInterface, linalg::ConvolutionOpInterface>(
-            linalgOp.getOperation())) {
+    bool demoteMatmul = (demoteOperation == DemoteOperation::All) ||
+                        (demoteOperation == DemoteOperation::Matmul);
+    bool demoteConv = (demoteOperation == DemoteOperation::All) ||
+                      (demoteOperation == DemoteOperation::Conv);
+
+    Operation *op = linalgOp.getOperation();
+    auto genericOp = dyn_cast<linalg::GenericOp>(op);
+    bool isMatmul = genericOp ? linalg::isaContractionOpInterface(linalgOp)
+                              : isDemotableNamedMatmul(op);
+    // The convolution interface checks only indexing maps, which pooling
+    // shares, so a generic op also needs a multiply-accumulate body.
+    bool isConv = genericOp ? linalg::isaConvolutionOpInterface(linalgOp) &&
+                                  linalg::detail::isContractionBody(
+                                      *genericOp.getBlock(),
+                                      [](Operation *mul, Operation *add) {
+                                        return isa<arith::MulFOp>(mul) &&
+                                               isa<arith::AddFOp>(add);
+                                      })
+                            : isDemotableNamedConv(op);
+    if (!(demoteMatmul && isMatmul) && !(demoteConv && isConv)) {
       return failure();
     }
 
@@ -55,86 +87,57 @@ struct DemoteContractionInputsPattern
       return failure();
     }
 
-    auto replaceOpInputs = [&](auto *typePtr) {
-      Location loc = linalgOp.getLoc();
-      Type destType = DestType::get(rewriter.getContext());
-      SmallVector<Value> demotedInputs;
-      for (auto inputOperand : linalgOp.getDpsInputOperands()) {
-        auto input = inputOperand->get();
-        auto inputType = cast<RankedTensorType>(input.getType());
-        auto demotedInputType = RankedTensorType::get(
-            inputType.getShape(), destType, inputType.getEncoding());
-        SmallVector<AffineMap> maps(
-            2, rewriter.getMultiDimIdentityMap(inputType.getRank()));
-        SmallVector<utils::IteratorType> iteratorTypes(
-            inputType.getRank(), utils::IteratorType::parallel);
-        SmallVector<OpFoldResult> mixedSizes =
-            tensor::getMixedSizes(rewriter, loc, input);
-        Value empty =
-            tensor::EmptyOp::create(rewriter, loc, mixedSizes, destType);
-        demotedInputs.push_back(
-            linalg::GenericOp::create(
-                rewriter, loc, TypeRange{demotedInputType}, ValueRange{input},
-                ValueRange{empty}, maps, iteratorTypes,
-                [&](OpBuilder &b, Location loc, ValueRange args) {
-                  Value result =
-                      arith::TruncFOp::create(b, loc, destType, args[0]);
-                  linalg::YieldOp::create(b, loc, result);
-                })
-                ->getResult(0));
-      }
-      using OpTy = std::remove_pointer_t<decltype(typePtr)>;
-      auto namedOp = cast<OpTy>(linalgOp.getOperation());
-      llvm::append_range(demotedInputs, linalgOp.getDpsInits());
+    Location loc = linalgOp.getLoc();
+    Type destType = DestType::get(rewriter.getContext());
+    SmallVector<Value> demotedOperands;
+    for (auto inputOperand : linalgOp.getDpsInputOperands()) {
+      auto input = inputOperand->get();
+      auto inputType = cast<RankedTensorType>(input.getType());
+      auto demotedInputType = RankedTensorType::get(
+          inputType.getShape(), destType, inputType.getEncoding());
+      SmallVector<AffineMap> maps(
+          2, rewriter.getMultiDimIdentityMap(inputType.getRank()));
+      SmallVector<utils::IteratorType> iteratorTypes(
+          inputType.getRank(), utils::IteratorType::parallel);
+      SmallVector<OpFoldResult> mixedSizes =
+          tensor::getMixedSizes(rewriter, loc, input);
+      Value empty =
+          tensor::EmptyOp::create(rewriter, loc, mixedSizes, destType);
+      demotedOperands.push_back(
+          linalg::GenericOp::create(
+              rewriter, loc, TypeRange{demotedInputType}, ValueRange{input},
+              ValueRange{empty}, maps, iteratorTypes,
+              [&](OpBuilder &b, Location loc, ValueRange args) {
+                Value result =
+                    arith::TruncFOp::create(b, loc, destType, args[0]);
+                linalg::YieldOp::create(b, loc, result);
+              })
+              ->getResult(0));
+    }
+    llvm::append_range(demotedOperands, linalgOp.getDpsInits());
+
+    if (!genericOp) {
       auto newOp = IREE::LinalgExt::cloneNamedLinalgOpWithNewTypes(
-          rewriter, cast<linalg::LinalgOp>(namedOp.getOperation()),
-          namedOp->getResultTypes(), demotedInputs);
+          rewriter, linalgOp, linalgOp->getResultTypes(), demotedOperands);
       rewriter.replaceOp(linalgOp, newOp->getResults());
-    };
-
-    bool demoteMatmul = (demoteOperation == DemoteOperation::All) ||
-                        (demoteOperation == DemoteOperation::Matmul);
-
-    bool demoteConv = (demoteOperation == DemoteOperation::All) ||
-                      (demoteOperation == DemoteOperation::Conv);
-
-    Operation *op = linalgOp.getOperation();
-    if (demoteMatmul && IREE::LinalgExt::isPureMatmul(op)) {
-      replaceOpInputs(static_cast<linalg::MatmulOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::MatvecOp>(op)) {
-      replaceOpInputs(static_cast<linalg::MatvecOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::VecmatOp>(op)) {
-      replaceOpInputs(static_cast<linalg::VecmatOp *>(nullptr));
-    } else if (demoteMatmul && IREE::LinalgExt::isPureBatchMatmul(op)) {
-      replaceOpInputs(static_cast<linalg::BatchMatmulOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::BatchMatvecOp>(op)) {
-      replaceOpInputs(static_cast<linalg::BatchMatvecOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::BatchVecmatOp>(op)) {
-      replaceOpInputs(static_cast<linalg::BatchVecmatOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::MatmulTransposeAOp>(op)) {
-      replaceOpInputs(static_cast<linalg::MatmulTransposeAOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::MatmulTransposeBOp>(op)) {
-      replaceOpInputs(static_cast<linalg::MatmulTransposeBOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::BatchMatmulTransposeAOp>(op)) {
-      replaceOpInputs(static_cast<linalg::BatchMatmulTransposeAOp *>(nullptr));
-    } else if (demoteMatmul && isa<linalg::BatchMatmulTransposeBOp>(op)) {
-      replaceOpInputs(static_cast<linalg::BatchMatmulTransposeBOp *>(nullptr));
-    } else if (demoteConv && isa<linalg::Conv2DOp>(op)) {
-      replaceOpInputs(static_cast<linalg::Conv2DOp *>(nullptr));
-    } else if (demoteConv && isa<linalg::Conv2DNchwFchwOp>(op)) {
-      replaceOpInputs(static_cast<linalg::Conv2DNchwFchwOp *>(nullptr));
-    } else if (demoteConv && isa<linalg::Conv2DNhwcHwcfOp>(op)) {
-      replaceOpInputs(static_cast<linalg::Conv2DNhwcHwcfOp *>(nullptr));
-    } else if (demoteConv && isa<linalg::Conv2DNhwcFhwcOp>(op)) {
-      replaceOpInputs(static_cast<linalg::Conv2DNhwcFhwcOp *>(nullptr));
-    } else if (demoteConv && isa<linalg::Conv2DNgchwFgchwOp>(op)) {
-      replaceOpInputs(static_cast<linalg::Conv2DNgchwFgchwOp *>(nullptr));
-    } else if (demoteConv && isa<linalg::Conv2DNgchwGfchwOp>(op)) {
-      replaceOpInputs(static_cast<linalg::Conv2DNgchwGfchwOp *>(nullptr));
-    } else {
-      return failure();
+      return success();
     }
 
+    // Preserve the payload (including fast-math attributes) and accumulate in
+    // the original type, just as the named mixed-precision ops do.
+    auto newOp = cast<linalg::GenericOp>(rewriter.clone(*op));
+    newOp->setOperands(demotedOperands);
+    OpBuilder::InsertionGuard guard(rewriter);
+    Block &body = newOp.getRegion().front();
+    rewriter.setInsertionPointToStart(&body);
+    for (BlockArgument arg :
+         body.getArguments().take_front(newOp.getNumDpsInputs())) {
+      arg.setType(destType);
+      Value extended = arith::ExtFOp::create(rewriter, loc, srcType, arg,
+                                             arith::FastMathFlagsAttr{});
+      arg.replaceAllUsesExcept(extended, extended.getDefiningOp());
+    }
+    rewriter.replaceOp(linalgOp, newOp->getResults());
     return success();
   }
 
