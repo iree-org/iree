@@ -53,9 +53,9 @@ vm.module @cmp_eq_f32_near_folds {
     //  CHECK-DAG:   %zero = vm.const.f32.zero
     //  CHECK-DAG:   %c1 = vm.const.i32 1
     //  CHECK-DAG:   [[THRESHOLD:%.+]] = vm.const.i32
-    // CHECK-NEXT:   %0 = vm.cmp.lt.f32.o %arg0, %zero : f32
+    // CHECK-NEXT:   %0 = vm.cmp.lt.f32.u %arg0, %zero : f32
     // CHECK-NEXT:   %1 = vm.xor.i32 %0, %c1 : i32
-    // CHECK-NEXT:   %2 = vm.cmp.lt.f32.o %arg1, %zero : f32
+    // CHECK-NEXT:   %2 = vm.cmp.lt.f32.u %arg1, %zero : f32
     // CHECK-NEXT:   %3 = vm.xor.i32 %2, %c1 : i32
     // CHECK-NEXT:   %ne = vm.cmp.ne.i32 %1, %3 : i32
     // CHECK-NEXT:   vm.cond_br %ne, ^bb1, ^bb2
@@ -613,5 +613,212 @@ vm.module @cast_f32_si32_folds {
     %0 = vm.const.f32 2.5
     %1 = vm.cast.f32.si32 %0 : f32 -> i32
     vm.return %1 : i32
+  }
+}
+
+// -----
+
+// NaN-dependent self comparisons must survive canonicalization.
+vm.module @float_nan_semantics {
+  // CHECK-LABEL: @self_nan_dependent_f32
+  vm.func @self_nan_dependent_f32(%arg0 : f32) -> (i32, i32, i32, i32, i32, i32) {
+    // CHECK-DAG: vm.cmp.eq.f32.o %arg0, %arg0
+    // CHECK-DAG: vm.cmp.ne.f32.u %arg0, %arg0
+    // CHECK-DAG: vm.cmp.lt.f32.u %arg0, %arg0
+    // CHECK-DAG: vm.cmp.lte.f32.o %arg0, %arg0
+    %r0 = vm.cmp.eq.f32.o %arg0, %arg0 : f32
+    %r1 = vm.cmp.ne.f32.u %arg0, %arg0 : f32
+    %r2 = vm.cmp.lt.f32.u %arg0, %arg0 : f32
+    %r3 = vm.cmp.lte.f32.o %arg0, %arg0 : f32
+    %r4 = vm.cmp.gt.f32.u %arg0, %arg0 : f32
+    %r5 = vm.cmp.gte.f32.o %arg0, %arg0 : f32
+    vm.return %r0, %r1, %r2, %r3, %r4, %r5 : i32, i32, i32, i32, i32, i32
+  }
+
+  // CHECK-LABEL: @self_nan_independent_f32
+  vm.func @self_nan_independent_f32(%arg0 : f32) -> (i32, i32, i32, i32, i32, i32) {
+    // CHECK-DAG: [[TRUE_f32:%.*]] = vm.const.i32 1
+    // CHECK-DAG: [[FALSE_f32:%.*]] = vm.const.i32.zero
+    // CHECK: vm.return [[TRUE_f32]], [[FALSE_f32]], [[FALSE_f32]], [[TRUE_f32]], [[FALSE_f32]], [[TRUE_f32]] : i32, i32, i32, i32, i32, i32
+    %r0 = vm.cmp.eq.f32.u %arg0, %arg0 : f32
+    %r1 = vm.cmp.ne.f32.o %arg0, %arg0 : f32
+    %r2 = vm.cmp.lt.f32.o %arg0, %arg0 : f32
+    %r3 = vm.cmp.lte.f32.u %arg0, %arg0 : f32
+    %r4 = vm.cmp.gt.f32.o %arg0, %arg0 : f32
+    %r5 = vm.cmp.gte.f32.u %arg0, %arg0 : f32
+    vm.return %r0, %r1, %r2, %r3, %r4, %r5 : i32, i32, i32, i32, i32, i32
+  }
+
+  // CHECK-LABEL: @nan_not_equal_f32
+  vm.func @nan_not_equal_f32() -> (i32, i32, i32) {
+    // CHECK-DAG: [[NTRUE_f32:%.*]] = vm.const.i32 1
+    // CHECK-DAG: [[NFALSE_f32:%.*]] = vm.const.i32.zero
+    // CHECK: vm.return [[NFALSE_f32]], [[NTRUE_f32]], [[NFALSE_f32]] : i32, i32, i32
+    %nan = vm.const.f32 0x7FC00000
+    %zero = vm.const.f32.zero
+    %ordered = vm.cmp.ne.f32.o %nan, %zero : f32
+    %unordered = vm.cmp.ne.f32.u %nan, %zero : f32
+    %nz = vm.cmp.nz.f32.o %nan : f32
+    vm.return %ordered, %unordered, %nz : i32, i32, i32
+  }
+
+  // CHECK-LABEL: @invert_eq_f32
+  vm.func @invert_eq_f32(%lhs : f32, %rhs : f32) -> (i32, i32) {
+    // CHECK-DAG: vm.cmp.ne.f32.u %arg0, %arg1
+    // CHECK-DAG: vm.cmp.ne.f32.o %arg0, %arg1
+    %one = vm.const.i32 1
+    %o = vm.cmp.eq.f32.o %lhs, %rhs : f32
+    %not_o = vm.xor.i32 %o, %one : i32
+    %u = vm.cmp.eq.f32.u %lhs, %rhs : f32
+    %not_u = vm.xor.i32 %u, %one : i32
+    vm.return %not_o, %not_u : i32, i32
+  }
+
+  // CHECK-LABEL: @invert_ne_f32
+  vm.func @invert_ne_f32(%lhs : f32, %rhs : f32) -> (i32, i32) {
+    // CHECK-DAG: vm.cmp.eq.f32.u %arg0, %arg1
+    // CHECK-DAG: vm.cmp.eq.f32.o %arg0, %arg1
+    %one = vm.const.i32 1
+    %o = vm.cmp.ne.f32.o %lhs, %rhs : f32
+    %not_o = vm.xor.i32 %o, %one : i32
+    %u = vm.cmp.ne.f32.u %lhs, %rhs : f32
+    %not_u = vm.xor.i32 %u, %one : i32
+    vm.return %not_o, %not_u : i32, i32
+  }
+
+  // CHECK-LABEL: @invert_gt_f32
+  vm.func @invert_gt_f32(%lhs : f32, %rhs : f32) -> (i32, i32) {
+    // CHECK-DAG: vm.cmp.lte.f32.u %arg0, %arg1
+    // CHECK-DAG: vm.cmp.lte.f32.o %arg0, %arg1
+    %one = vm.const.i32 1
+    %o = vm.cmp.gt.f32.o %lhs, %rhs : f32
+    %not_o = vm.xor.i32 %o, %one : i32
+    %u = vm.cmp.gt.f32.u %lhs, %rhs : f32
+    %not_u = vm.xor.i32 %u, %one : i32
+    vm.return %not_o, %not_u : i32, i32
+  }
+
+  // CHECK-LABEL: @invert_gte_f32
+  vm.func @invert_gte_f32(%lhs : f32, %rhs : f32) -> (i32, i32) {
+    // CHECK-DAG: vm.cmp.lt.f32.u %arg0, %arg1
+    // CHECK-DAG: vm.cmp.lt.f32.o %arg0, %arg1
+    %one = vm.const.i32 1
+    %o = vm.cmp.gte.f32.o %lhs, %rhs : f32
+    %not_o = vm.xor.i32 %o, %one : i32
+    %u = vm.cmp.gte.f32.u %lhs, %rhs : f32
+    %not_u = vm.xor.i32 %u, %one : i32
+    vm.return %not_o, %not_u : i32, i32
+  }
+
+  // CHECK-LABEL: @self_nan_dependent_f64
+  vm.func @self_nan_dependent_f64(%arg0 : f64) -> (i32, i32, i32, i32, i32, i32) {
+    // CHECK-DAG: vm.cmp.eq.f64.o %arg0, %arg0
+    // CHECK-DAG: vm.cmp.ne.f64.u %arg0, %arg0
+    // CHECK-DAG: vm.cmp.lt.f64.u %arg0, %arg0
+    // CHECK-DAG: vm.cmp.lte.f64.o %arg0, %arg0
+    %r0 = vm.cmp.eq.f64.o %arg0, %arg0 : f64
+    %r1 = vm.cmp.ne.f64.u %arg0, %arg0 : f64
+    %r2 = vm.cmp.lt.f64.u %arg0, %arg0 : f64
+    %r3 = vm.cmp.lte.f64.o %arg0, %arg0 : f64
+    %r4 = vm.cmp.gt.f64.u %arg0, %arg0 : f64
+    %r5 = vm.cmp.gte.f64.o %arg0, %arg0 : f64
+    vm.return %r0, %r1, %r2, %r3, %r4, %r5 : i32, i32, i32, i32, i32, i32
+  }
+
+  // CHECK-LABEL: @self_nan_independent_f64
+  vm.func @self_nan_independent_f64(%arg0 : f64) -> (i32, i32, i32, i32, i32, i32) {
+    // CHECK-DAG: [[TRUE_f64:%.*]] = vm.const.i32 1
+    // CHECK-DAG: [[FALSE_f64:%.*]] = vm.const.i32.zero
+    // CHECK: vm.return [[TRUE_f64]], [[FALSE_f64]], [[FALSE_f64]], [[TRUE_f64]], [[FALSE_f64]], [[TRUE_f64]] : i32, i32, i32, i32, i32, i32
+    %r0 = vm.cmp.eq.f64.u %arg0, %arg0 : f64
+    %r1 = vm.cmp.ne.f64.o %arg0, %arg0 : f64
+    %r2 = vm.cmp.lt.f64.o %arg0, %arg0 : f64
+    %r3 = vm.cmp.lte.f64.u %arg0, %arg0 : f64
+    %r4 = vm.cmp.gt.f64.o %arg0, %arg0 : f64
+    %r5 = vm.cmp.gte.f64.u %arg0, %arg0 : f64
+    vm.return %r0, %r1, %r2, %r3, %r4, %r5 : i32, i32, i32, i32, i32, i32
+  }
+
+  // CHECK-LABEL: @nan_not_equal_f64
+  vm.func @nan_not_equal_f64() -> (i32, i32, i32) {
+    // CHECK-DAG: [[NTRUE_f64:%.*]] = vm.const.i32 1
+    // CHECK-DAG: [[NFALSE_f64:%.*]] = vm.const.i32.zero
+    // CHECK: vm.return [[NFALSE_f64]], [[NTRUE_f64]], [[NFALSE_f64]] : i32, i32, i32
+    %nan = vm.const.f64 0x7FF8000000000000
+    %zero = vm.const.f64.zero
+    %ordered = vm.cmp.ne.f64.o %nan, %zero : f64
+    %unordered = vm.cmp.ne.f64.u %nan, %zero : f64
+    %nz = vm.cmp.nz.f64.o %nan : f64
+    vm.return %ordered, %unordered, %nz : i32, i32, i32
+  }
+
+  // CHECK-LABEL: @invert_eq_f64
+  vm.func @invert_eq_f64(%lhs : f64, %rhs : f64) -> (i32, i32) {
+    // CHECK-DAG: vm.cmp.ne.f64.u %arg0, %arg1
+    // CHECK-DAG: vm.cmp.ne.f64.o %arg0, %arg1
+    %one = vm.const.i32 1
+    %o = vm.cmp.eq.f64.o %lhs, %rhs : f64
+    %not_o = vm.xor.i32 %o, %one : i32
+    %u = vm.cmp.eq.f64.u %lhs, %rhs : f64
+    %not_u = vm.xor.i32 %u, %one : i32
+    vm.return %not_o, %not_u : i32, i32
+  }
+
+  // CHECK-LABEL: @invert_ne_f64
+  vm.func @invert_ne_f64(%lhs : f64, %rhs : f64) -> (i32, i32) {
+    // CHECK-DAG: vm.cmp.eq.f64.u %arg0, %arg1
+    // CHECK-DAG: vm.cmp.eq.f64.o %arg0, %arg1
+    %one = vm.const.i32 1
+    %o = vm.cmp.ne.f64.o %lhs, %rhs : f64
+    %not_o = vm.xor.i32 %o, %one : i32
+    %u = vm.cmp.ne.f64.u %lhs, %rhs : f64
+    %not_u = vm.xor.i32 %u, %one : i32
+    vm.return %not_o, %not_u : i32, i32
+  }
+
+  // CHECK-LABEL: @invert_gt_f64
+  vm.func @invert_gt_f64(%lhs : f64, %rhs : f64) -> (i32, i32) {
+    // CHECK-DAG: vm.cmp.lte.f64.u %arg0, %arg1
+    // CHECK-DAG: vm.cmp.lte.f64.o %arg0, %arg1
+    %one = vm.const.i32 1
+    %o = vm.cmp.gt.f64.o %lhs, %rhs : f64
+    %not_o = vm.xor.i32 %o, %one : i32
+    %u = vm.cmp.gt.f64.u %lhs, %rhs : f64
+    %not_u = vm.xor.i32 %u, %one : i32
+    vm.return %not_o, %not_u : i32, i32
+  }
+
+  // CHECK-LABEL: @invert_gte_f64
+  vm.func @invert_gte_f64(%lhs : f64, %rhs : f64) -> (i32, i32) {
+    // CHECK-DAG: vm.cmp.lt.f64.u %arg0, %arg1
+    // CHECK-DAG: vm.cmp.lt.f64.o %arg0, %arg1
+    %one = vm.const.i32 1
+    %o = vm.cmp.gte.f64.o %lhs, %rhs : f64
+    %not_o = vm.xor.i32 %o, %one : i32
+    %u = vm.cmp.gte.f64.u %lhs, %rhs : f64
+    %not_u = vm.xor.i32 %u, %one : i32
+    vm.return %not_o, %not_u : i32, i32
+  }
+
+}
+
+// -----
+
+// Negative zero must retain its sign when constants canonicalize.
+vm.module @negative_zero {
+  // CHECK-LABEL: @negative_zero_f32
+  vm.func @negative_zero_f32() -> f32 {
+    // CHECK: [[NEGZERO32:%.*]] = vm.const.f32 -0.000000e+00
+    // CHECK-NEXT: vm.return [[NEGZERO32]] : f32
+    %value = vm.const.f32 0x80000000
+    vm.return %value : f32
+  }
+
+  // CHECK-LABEL: @negative_zero_f64
+  vm.func @negative_zero_f64() -> f64 {
+    // CHECK: [[NEGZERO64:%.*]] = vm.const.f64 -0.000000e+00
+    // CHECK-NEXT: vm.return [[NEGZERO64]] : f64
+    %value = vm.const.f64 0x8000000000000000
+    vm.return %value : f64
   }
 }
