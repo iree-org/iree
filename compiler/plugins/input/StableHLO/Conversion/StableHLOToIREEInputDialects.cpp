@@ -122,27 +122,59 @@ struct ConcatenateOpConversion final
   }
 };
 
-static bool isSupportedLowPrecisionDotAlgorithm(
-    mlir::stablehlo::DotAlgorithmAttr algorithm) {
-  Type lhsPrecision = algorithm.getLhsPrecisionType();
-  Type rhsPrecision = algorithm.getRhsPrecisionType();
-  auto isF8 = [](Type type) {
-    auto floatType = dyn_cast<FloatType>(type);
-    return floatType && floatType.getWidth() == 8;
-  };
-  // Any two f8 types may allow imprecise accumulation, which exact f32
-  // accumulation satisfies; f16 and bf16 must match and accumulate exactly.
-  bool f8Inputs = isF8(lhsPrecision) && isF8(rhsPrecision);
-  bool halfInputs = isa<Float16Type, BFloat16Type>(lhsPrecision) &&
-                    rhsPrecision == lhsPrecision;
-  return (f8Inputs || halfInputs) && algorithm.getAccumulationType().isF32() &&
-         algorithm.getLhsComponentCount() == 1 &&
-         algorithm.getRhsComponentCount() == 1 &&
-         algorithm.getNumPrimitiveOperations() == 1 &&
-         (!algorithm.getAllowImpreciseAccumulation() || f8Inputs);
+/// Creates coefficients based on DFT definition, see
+/// https://en.wikipedia.org/wiki/Discrete_Fourier_transform.
+Value getDFTMatmulCoeff(OpBuilder b, Location loc, RankedTensorType matrixType,
+                        bool isRealPart) {
+  // scale = 2 * pi / N
+  double scale = 2 * M_PI / matrixType.getDimSize(0);
+
+  SmallVector<Attribute> values;
+  assert(matrixType.getRank() == 2 && "expected 2D matrix");
+  for (auto i : llvm::seq<unsigned>(0, matrixType.getDimSize(0))) {
+    for (auto j : llvm::seq<unsigned>(0, matrixType.getDimSize(1))) {
+      double v = scale * i * j;
+      if (isRealPart) {
+        v = cos(v);
+      } else {
+        v = -sin(v);
+      }
+      values.push_back(b.getF32FloatAttr(v));
+    }
+  }
+  return arith::ConstantOp::create(
+      b, loc, matrixType, DenseFPElementsAttr::get(matrixType, values));
 }
 
-// Lowers supported low-precision dot algorithms with explicit F32 accumulation.
+Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
+                                  RankedTensorType resultType, Value lhs,
+                                  Value rhs) {
+  Value zero = arith::ConstantOp::create(
+      b, loc, b.getZeroAttr(resultType.getElementType()));
+  Value emptyTensor = mlir::tensor::EmptyOp::create(
+      b, loc, resultType.getShape(), resultType.getElementType(),
+      /*dyn_size=*/ValueRange{});
+  Value zeroTensor =
+      linalg::FillOp::create(b, loc, zero, emptyTensor).getResult(0);
+
+  switch (cast<RankedTensorType>(lhs.getType()).getRank()) {
+  case 1:
+    return linalg::VecmatOp::create(b, loc, TypeRange{resultType},
+                                    ValueRange{lhs, rhs},
+                                    ValueRange{zeroTensor})
+        .getResult(0);
+  case 2:
+    return linalg::MatmulOp::create(b, loc, TypeRange{resultType},
+                                    ValueRange{lhs, rhs},
+                                    ValueRange{zeroTensor})
+        .getResult(0);
+  default:
+    assert(false && "unhandled matmul type");
+    return Value();
+  }
+}
+
+/// Converts stablehlo.fft operation to Linalg ops.
 struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
   using Base::Base;
 
