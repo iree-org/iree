@@ -1,0 +1,16 @@
+# Configuration for zizmor (https://docs.zizmor.sh/), which the `zizmor`
+# pre-commit hook runs on GitHub Actions workflows and dependabot.yml.
+# Prefer an inline `# zizmor: ignore[<audit>] <reason>` comment for single
+# findings, and keep this file for ignores that apply to whole files.
+
+rules:
+  self-repository:
+    # These workflows call reusable workflows as `./.github/workflows/...`.
+    # GitHub loads such workflows from the caller's commit, not from the
+    # runner's filesystem, so the `$/...` syntax adds no protection here, and
+    # actionlint does not accept `$/` yet. This repository has no in-repo
+    # actions, so the ignore only covers reusable workflow calls today.
+    ignore:
+      - ci.yml
+      - pkgci.yml
+      - samples.yml
