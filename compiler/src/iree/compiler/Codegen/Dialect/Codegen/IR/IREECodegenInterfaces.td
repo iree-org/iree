@@ -250,6 +250,33 @@ def IREECodegen_InnerTileDescAttrInterface :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Variant of `buildUnderlyingOperations` that also receives the relevant
+        lowering options. Implementations that do not care about the options
+        can rely on the default implementation, which forwards to
+        `buildUnderlyingOperations`.
+
+        `skipIntermediateRoundings` reflects the corresponding compilation
+        option: when false, lowered operations must preserve intermediate
+        rounding steps even if that prevents conversion hoisting/cancellation.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"buildUnderlyingOperationsWithOptions",
+      /*args=*/(ins
+        "::mlir::OpBuilder&":$builder,
+        "::mlir::Location":$loc,
+        "::mlir::ValueRange":$inputs,
+        "::mlir::ValueRange":$outputs,
+        "::llvm::SmallVectorImpl<::mlir::Value>&":$results,
+        "bool":$skipIntermediateRoundings
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return $_attr.buildUnderlyingOperations(builder, loc, inputs, outputs,
+                                                results);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns a vector where each element is a vector of iterator types for
         each dimension of each operand.
         These dimensions are taken from the unexpanded, undistributed tile

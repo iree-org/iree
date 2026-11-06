@@ -71,7 +71,7 @@ def IREECPU_DataTiledMMAAttr
                "getDistributedTileTypes", "getUndistributedTileDimExpansion",
                "populateOperandOffsetsSizesStrides",
                "getDistributionMappingKind", "getDistributionWorkerCount",
-               "buildUnderlyingOperations",
+               "buildUnderlyingOperationsWithOptions",
 ]>]> {
   let mnemonic = "data_tiled_mma_layout";
   let cppNamespace = "::mlir::iree_compiler::IREE::CPU";
