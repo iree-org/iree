@@ -224,3 +224,93 @@ func.func @rewrite_fpowi_const_exponent_on_rocm(%arg0: f32) -> f32 attributes {
   %0 = math.fpowi %arg0, %c3 : f32, i32
   return %0 : f32
 }
+
+// -----
+
+// CHECK-LABEL: @roundeven_native_on_aarch64
+func.func @roundeven_native_on_aarch64(%arg0: vector<4xf32>) -> vector<4xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "aarch64-xyz-xyz"}>
+} {
+  // CHECK: math.roundeven {{.*}} : vector<4xf32>
+  %0 = math.roundeven %arg0 : vector<4xf32>
+  return %0 : vector<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @roundeven_native_on_x86_sse41
+func.func @roundeven_native_on_x86_sse41(%arg0: vector<8xf32>) -> vector<8xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+sse4.1", target_triple = "x86_64-xyz-xyz"}>
+} {
+  // CHECK: math.roundeven {{.*}} : vector<8xf32>
+  %0 = math.roundeven %arg0 : vector<8xf32>
+  return %0 : vector<8xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @roundeven_native_on_x86_avx2_only
+func.func @roundeven_native_on_x86_avx2_only(%arg0: vector<8xf32>) -> vector<8xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+avx2", target_triple = "x86_64-xyz-xyz"}>
+} {
+  // CHECK: math.roundeven {{.*}} : vector<8xf32>
+  %0 = math.roundeven %arg0 : vector<8xf32>
+  return %0 : vector<8xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @roundeven_expanded_on_x86_without_sse41
+func.func @roundeven_expanded_on_x86_without_sse41(%arg0: f32) -> f32 attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+sse2", target_triple = "x86_64-xyz-xyz"}>
+} {
+  // CHECK-NOT: math.roundeven
+  // CHECK:     return
+  %0 = math.roundeven %arg0 : f32
+  return %0 : f32
+}
+
+// -----
+
+// CHECK-LABEL: @roundeven_native_on_riscv64_d
+func.func @roundeven_native_on_riscv64_d(%arg0: f64) -> f64 attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+m,+a,+f,+d,+c,+v", target_triple = "riscv64-xyz-xyz"}>
+} {
+  // CHECK: math.roundeven {{.*}} : f64
+  %0 = math.roundeven %arg0 : f64
+  return %0 : f64
+}
+
+// -----
+
+// CHECK-LABEL: @roundeven_expanded_on_riscv64_without_d
+func.func @roundeven_expanded_on_riscv64_without_d(%arg0: f32) -> f32 attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+m,+a,+f,+c", target_triple = "riscv64-xyz-xyz"}>
+} {
+  // CHECK-NOT: math.roundeven
+  // CHECK:     return
+  %0 = math.roundeven %arg0 : f32
+  return %0 : f32
+}
+
+// -----
+
+// CHECK-LABEL: @roundeven_expanded_on_riscv32
+func.func @roundeven_expanded_on_riscv32(%arg0: f64) -> f64 attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {cpu_features = "+m,+a,+f,+d,+c", target_triple = "riscv32-xyz-xyz"}>
+} {
+  // CHECK-NOT: math.roundeven
+  // CHECK:     return
+  %0 = math.roundeven %arg0 : f64
+  return %0 : f64
+}
+
+// -----
+
+// CHECK-LABEL: @roundeven_expanded_without_target
+func.func @roundeven_expanded_without_target(%arg0: f32) -> f32 {
+  // CHECK-NOT: math.roundeven
+  // CHECK:     return
+  %0 = math.roundeven %arg0 : f32
+  return %0 : f32
+}
