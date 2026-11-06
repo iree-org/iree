@@ -362,6 +362,11 @@ bool isRISCV64(DictionaryAttr targetConfig) {
   return triple && triple.value().isRISCV64();
 }
 
+bool isWasm(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
+  return triple && triple.value().isWasm();
+}
+
 std::array<int64_t, 3> getMaxWorkgroupCount(DictionaryAttr targetConfig) {
   // TODO(MaheshRavishankar): For now the target info is only available for
   // GPUs, and is recorded in the configuration with the name `iree.gpu.target`.
