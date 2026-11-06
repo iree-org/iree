@@ -146,7 +146,8 @@ public:
 
     // The schema expects each shader module to have entry points named "dN",
     // where N is the entry point ordinal. For each executable entry point op,
-    // rename the entry point symbol using that convention.
+    // rename the shader symbol using that convention. Keep the HAL export
+    // name unchanged because runtime function lookups use it.
     auto exportOps = llvm::to_vector(variantOp.getExportOps());
     SymbolTableCollection symbolTable;
     SymbolUserMap symbolUsers(symbolTable, variantOp);
@@ -166,7 +167,6 @@ public:
           mlir::StringAttr::get(variantOp->getContext(), symbolName);
 
       symbolUsers.replaceAllUsesWith(entryPointFunc, nameAttr);
-      exportOp.setName(symbolName); // Same symbol reference? Not in table?
       SymbolTable::setSymbolName(entryPointFunc, symbolName);
     }
 
@@ -233,7 +233,9 @@ public:
       }
       int64_t ordinal = ordinalAttr.getInt();
 
-      auto entryPointRef = builder.createString(exportOp.getName());
+      auto entryPointRef =
+          builder.createString(llvm::formatv("d{}", ordinal).str());
+      auto exportNameRef = builder.createString(exportOp.getName());
 
       iree_hal_webgpu_WorkgroupSize_t workgroupSize = {0};
       if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
@@ -266,6 +268,7 @@ public:
       // TODO(#7824): Support multiple shader modules per executable.
       iree_hal_webgpu_ExportDef_shader_module_ordinal_add(builder, 0);
       iree_hal_webgpu_ExportDef_entry_point_add(builder, entryPointRef);
+      iree_hal_webgpu_ExportDef_name_add(builder, exportNameRef);
       iree_hal_webgpu_ExportDef_workgroup_size_add(builder, &workgroupSize);
       iree_hal_webgpu_ExportDef_constant_count_add(builder, constantCount);
       iree_hal_webgpu_ExportDef_binding_flags_add(builder, bindingFlagsRef);

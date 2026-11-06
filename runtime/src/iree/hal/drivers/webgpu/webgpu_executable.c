@@ -54,6 +54,18 @@ static iree_hal_webgpu_executable_t* iree_hal_webgpu_executable_cast(
   return (iree_hal_webgpu_executable_t*)base_value;
 }
 
+static iree_string_view_t iree_hal_webgpu_executable_export_name(
+    iree_hal_webgpu_ExportDef_table_t export_def) {
+  flatbuffers_string_t name = iree_hal_webgpu_ExportDef_name_get(export_def);
+  if (!name || flatbuffers_string_len(name) == 0) {
+    name = iree_hal_webgpu_ExportDef_entry_point_get(export_def);
+  }
+  if (!name) {
+    return iree_string_view_empty();
+  }
+  return iree_make_string_view(name, flatbuffers_string_len(name));
+}
+
 static iree_status_t iree_hal_webgpu_executable_calculate_name_storage_size(
     iree_hal_webgpu_ExportDef_vec_t exports_vec, iree_host_size_t export_count,
     iree_host_size_t* out_name_storage_size) {
@@ -61,16 +73,13 @@ static iree_status_t iree_hal_webgpu_executable_calculate_name_storage_size(
   for (iree_host_size_t i = 0; i < export_count; ++i) {
     iree_hal_webgpu_ExportDef_table_t export_def =
         iree_hal_webgpu_ExportDef_vec_at(exports_vec, i);
-    flatbuffers_string_t entry_point =
-        iree_hal_webgpu_ExportDef_entry_point_get(export_def);
-    iree_host_size_t entry_point_length =
-        entry_point ? flatbuffers_string_len(entry_point) : 0;
-    if (entry_point_length == 0) {
+    iree_string_view_t name =
+        iree_hal_webgpu_executable_export_name(export_def);
+    if (iree_string_view_is_empty(name)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "exports[%" PRIhsz "] has no entry point name",
-                              i);
+                              "exports[%" PRIhsz "] has no export name", i);
     }
-    if (!iree_host_size_checked_add(name_storage_size, entry_point_length + 1,
+    if (!iree_host_size_checked_add(name_storage_size, name.size + 1,
                                     &name_storage_size)) {
       return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                               "WebGPU executable export name storage exceeds "
@@ -119,11 +128,11 @@ static iree_status_t iree_hal_webgpu_executable_initialize_export(
                             "exports[%" PRIhsz "] has no entry point name",
                             export_ordinal);
   }
-  memcpy(*inout_name_storage, entry_point, entry_point_length);
-  (*inout_name_storage)[entry_point_length] = '\0';
-  out_entry->name =
-      iree_make_string_view(*inout_name_storage, entry_point_length);
-  *inout_name_storage += entry_point_length + 1;
+  iree_string_view_t name = iree_hal_webgpu_executable_export_name(export_def);
+  memcpy(*inout_name_storage, name.data, name.size);
+  (*inout_name_storage)[name.size] = '\0';
+  out_entry->name = iree_make_string_view(*inout_name_storage, name.size);
+  *inout_name_storage += name.size + 1;
 
   uint32_t constant_count =
       iree_hal_webgpu_ExportDef_constant_count_get(export_def);
@@ -163,8 +172,8 @@ static iree_status_t iree_hal_webgpu_executable_initialize_export(
   out_entry->pipeline_handle =
       iree_hal_webgpu_import_device_create_compute_pipeline(
           device_handle, /*layout_handle=*/0, (uintptr_t)wgsl_source,
-          (uint32_t)wgsl_source_length, (uintptr_t)out_entry->name.data,
-          (uint32_t)out_entry->name.size);
+          (uint32_t)wgsl_source_length, (uintptr_t)entry_point,
+          (uint32_t)entry_point_length);
   if (out_entry->pipeline_handle == 0) {
     return iree_make_status(
         IREE_STATUS_INTERNAL,
