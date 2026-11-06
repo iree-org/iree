@@ -26,4 +26,28 @@ iree_lit_test_suite(
     iree-opt
 )
 
+iree_lit_test_suite(
+  NAME
+    lit_aarch64
+  SRCS
+    "ukernel_inlining_aarch64.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+  LABELS
+    "requires-llvm-target-aarch64"
+)
+
+iree_lit_test_suite(
+  NAME
+    lit_riscv64
+  SRCS
+    "ukernel_inlining_riscv64.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+  LABELS
+    "requires-llvm-target-riscv"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
