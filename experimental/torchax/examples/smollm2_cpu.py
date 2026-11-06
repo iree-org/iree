@@ -112,7 +112,9 @@ def export_programs(args):
             ),
             dynamic_shapes=shapes,
         )
-        program, artifact = iree_torchax.exported_program_to_stablehlo(exported)
+        program, artifact = iree_torchax.exported_program_to_stablehlo(
+            exported, donate_state=not args.retain_state
+        )
         module = str(artifact.mlir_module())
         assert 'stablehlo.composite "torch.scaled_dot_product_attention"' in module
         (args.output_dir / f"{name}.export.mlir").write_text(module)
@@ -133,6 +135,7 @@ def export_programs(args):
         "revision": MODEL_REVISION,
         "dtype": "f32",
         "capacity": args.capacity,
+        "state_donated": not args.retain_state,
         "local_model_dir": args.model_dir,
         "parameter_archive_sha256": archive_hash,
         "constant_names": first.constant_names,
@@ -251,13 +254,22 @@ def run_programs(args, metadata, binaries, reference, fallback):
         context = runtime.SystemContext(vm_modules=[parameters, module], config=config)
         contexts.append(context)
         mains[name] = context.modules[module.name].main
-    state = [np.zeros(shape, np.float32) for shape in metadata["state_shapes"]]
+    state = [
+        runtime.asdevicearray(config.device, np.zeros(shape, np.float32))
+        for shape in metadata["state_shapes"]
+    ]
     results = []
     for step, expected in enumerate(reference):
         name = "prefill" if step == 0 else "decode"
+        retained = state if args.retain_state else []
+        snapshots = [value.to_host().copy() for value in retained]
         *state, logits = mains[name](
             *state, expected["tokens"], np.arange(expected["length"], dtype=np.int64)
         )
+        for value, before in zip(retained, snapshots, strict=True):
+            # Read device storage independently of the previous host mapping.
+            actual = runtime.DeviceArray(config.device, value._buffer_view).to_host()
+            np.testing.assert_array_equal(actual, before)
         actual_logits = logits.to_host()
         np.testing.assert_allclose(
             actual_logits, expected["logits"], rtol=1e-4, atol=1e-4
@@ -275,6 +287,7 @@ def run_programs(args, metadata, binaries, reference, fallback):
             "stage": name,
             "prefix_length": expected["length"],
             "next_token": predicted,
+            "retained_state_checked": args.retain_state,
             "max_logit_error": float(
                 np.max(np.abs(actual_logits - expected["logits"]))
             ),
@@ -294,6 +307,11 @@ def main():
     parser.add_argument("--prompt", default="The capital of France is")
     parser.add_argument("--export-only", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--reuse-export", action="store_true")
+    parser.add_argument(
+        "--retain-state",
+        action="store_true",
+        help="disable donation and check every previous cache value",
+    )
     parser.add_argument(
         "--target-backend",
         choices=("llvm-cpu", "vmvx", "cuda", "rocm", "vulkan-spirv", "metal-spirv"),
@@ -330,7 +348,10 @@ def main():
             [sys.executable, __file__, *sys.argv[1:], "--export-only"], check=True
         )
     metadata = json.loads((args.output_dir / "export.json").read_text())
-    assert metadata["capacity"] == args.capacity and metadata["dtype"] == "f32"
+    if metadata["capacity"] != args.capacity or metadata["dtype"] != "f32":
+        parser.error("reused export must match capacity and f32 profile")
+    if metadata.get("state_donated", True) == args.retain_state:
+        parser.error("reused export must match --retain-state")
     reference = make_reference(args, metadata)
     gc.collect()
     results = {
