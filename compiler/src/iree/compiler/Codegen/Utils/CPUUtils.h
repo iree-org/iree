@@ -77,6 +77,10 @@ bool hasAnyVFeature(DictionaryAttr targetConfig);
 /// Returns true if target supports scalable vector code generation.
 bool targetSupportsScalableVectors(DictionaryAttr targetConfig);
 
+/// Returns true if LLVM lowers `llvm.roundeven` to instructions for both f32
+/// and f64 on the given CPU target.
+bool hasNativeRoundEven(IREE::HAL::ExecutableTargetAttr targetAttr);
+
 /// Reads the vscale range from the target config, if present.
 std::optional<std::pair<int64_t, int64_t>>
 getConfigVscaleRange(DictionaryAttr targetConfig);
