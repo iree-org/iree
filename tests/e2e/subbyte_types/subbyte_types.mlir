@@ -127,3 +127,27 @@ func.func @i4_representation_2d() {
   check.expect_eq_const(%bar, dense<[[1, 2], [3, 4]]> : tensor<2x2xi4>) : tensor<2x2xi4>
   return
 }
+
+// 34 elements are not a multiple of the vector width, so vectorization leaves a
+// tail.
+func.func @i4_to_f32_tail() {
+  %input = util.unfoldable_constant dense<[
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+    1, 2
+  ]> : tensor<34xi4>
+  %0 = tensor.empty() : tensor<34xf32>
+  %res = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
+    ins(%input : tensor<34xi4>) outs(%0 : tensor<34xf32>) {
+  ^bb0(%in: i4, %out: f32):
+    %1 = arith.extui %in : i4 to i32
+    %2 = arith.uitofp %1 : i32 to f32
+    linalg.yield %2 : f32
+  } -> tensor<34xf32>
+  check.expect_eq_const(%res, dense<[
+    0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
+    0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0,
+    1.0, 2.0
+  ]> : tensor<34xf32>) : tensor<34xf32>
+  return
+}
