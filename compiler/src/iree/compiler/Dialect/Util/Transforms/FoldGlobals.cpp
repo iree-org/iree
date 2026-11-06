@@ -174,7 +174,14 @@ static bool updateGlobalImmutability(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
     if (!global.isCandidate()) {
       return GlobalAction::PRESERVE;
-    } else if (!global.storeOps.empty() && !global.onlyInitialized) {
+    }
+    if (!global.storeOps.empty() && !global.onlyInitialized) {
+      return GlobalAction::PRESERVE;
+    }
+    if (global.op.isGlobalMutable() && !global.storeOps.empty() &&
+        global.op.getGlobalInitialValue()) {
+      // Making this immutable would leave both an initial value and an
+      // initializer store. Keep the initial value for loads before the store.
       return GlobalAction::PRESERVE;
     }
     bool didChangeAny = global.op.isGlobalMutable() != false;
