@@ -377,10 +377,11 @@ static iree_status_t iree_hal_sync_device_assign_topology_info(
     iree_hal_device_t* base_device,
     const iree_hal_device_topology_info_t* topology_info) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
-  if (!topology_info) {
-    iree_hal_sync_device_clear_topology_info(device);
-    return iree_ok_status();
-  }
+  // Retire any prior assignment: NULL only unwinds it, and a device may be
+  // regrouped (e.g. from a standalone single-device group into a multi-device
+  // group).
+  iree_hal_sync_device_clear_topology_info(device);
+  if (!topology_info) return iree_ok_status();
   iree_async_frontier_tracker_t* frontier_tracker =
       topology_info->frontier.tracker;
   iree_async_axis_t axis = topology_info->frontier.base_axis;
