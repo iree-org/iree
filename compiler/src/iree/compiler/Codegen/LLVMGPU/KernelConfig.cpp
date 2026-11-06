@@ -1843,10 +1843,27 @@ static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
 // Default Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
+/// Runs |rootOp|'s dispatch on one thread of one workgroup, without workgroup
+/// tiling.
+static LogicalResult setSingleThreadConfig(mlir::FunctionOpInterface entryPoint,
+                                           Operation *rootOp) {
+  MLIRContext *context = rootOp->getContext();
+  TileSizesListType tileSizes;
+  tileSizes.push_back({});
+  auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, rootOp, config,
+      getGPUTranslationInfo(context, GPUPipeline::Distribute, {1, 1, 1}));
+}
+
 // Basic default properties for linalg ops that haven't been tuned.
 static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
                                           mlir::FunctionOpInterface entryPoint,
                                           Operation *op) {
+  // Distribute only distributes linalg ops; others would run on every thread.
+  if (!isa<linalg::LinalgOp>(op)) {
+    return setSingleThreadConfig(entryPoint, op);
+  }
   MLIRContext *context = op->getContext();
   GPUPipeline passPipeline = GPUPipeline::Distribute;
   TileSizesListType tileSizes;
