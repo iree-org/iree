@@ -247,6 +247,7 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "unsigned_start_indices.mlir"
     "while.mlir"
+    "zero_extent.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER
@@ -365,6 +366,7 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "unsigned_start_indices.mlir"
     "while.mlir"
+    "zero_extent.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
@@ -716,6 +718,7 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "unsigned_start_indices.mlir"
     "while.mlir"
+    "zero_extent.mlir"
   TARGET_BACKEND
     "metal-spirv"
   DRIVER

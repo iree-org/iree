@@ -80,8 +80,8 @@ ALL_SRCS = enforce_glob(
         "torch_index_select.mlir",
         "transpose.mlir",
         "unsigned_start_indices.mlir",
-        "zero_extent.mlir",
         "while.mlir",
+        "zero_extent.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
@@ -192,6 +192,7 @@ iree_check_single_backend_test_suite(
             "transpose.mlir",
             "unsigned_start_indices.mlir",
             "while.mlir",
+            "zero_extent.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
@@ -308,6 +309,7 @@ iree_check_single_backend_test_suite(
             "transpose.mlir",
             "unsigned_start_indices.mlir",
             "while.mlir",
+            "zero_extent.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
@@ -466,6 +468,7 @@ iree_check_single_backend_test_suite(
             "transpose.mlir",
             "unsigned_start_indices.mlir",
             "while.mlir",
+            "zero_extent.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
