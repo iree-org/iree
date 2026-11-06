@@ -23,6 +23,46 @@ func.func @simd32(%lhs: tensor<?x?xf32, #lhs>, %rhs: tensor<?x?xf32, #rhs>, %acc
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [2, ?, ?]>
+#rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [2, ?, ?]>
+#out = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [2, ?, ?]>
+func.func @simd32_narrow_m2(%lhs: tensor<2x?xf32, #lhs>, %rhs: tensor<?x?xf32, #rhs>, %acc: tensor<2x?xf32, #out>) -> tensor<2x?xf32, #out> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "system-wasm-wasm_32", {target_triple = "wasm32-unknown-emscripten", cpu_features = "+simd128", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %result = linalg.matmul ins(%lhs, %rhs : tensor<2x?xf32, #lhs>, tensor<?x?xf32, #rhs>) outs(%acc : tensor<2x?xf32, #out>) -> tensor<2x?xf32, #out>
+  return %result : tensor<2x?xf32, #out>
+}
+// CHECK-LABEL: func @simd32_narrow_m2(
+// CHECK-SAME: tensor<1x?x2x1xf32>
+// CHECK-SAME: tensor<?x?x8x1xf32>
+// CHECK-SAME: tensor<1x?x2x8xf32>
+// CHECK: linalg.mmt4d
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [1, ?, ?]>
+#rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [1, ?, ?]>
+#out = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [1, ?, ?]>
+func.func @simd32_narrow_m1(%lhs: tensor<1x?xf32, #lhs>, %rhs: tensor<?x?xf32, #rhs>, %acc: tensor<1x?xf32, #out>) -> tensor<1x?xf32, #out> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "system-wasm-wasm_32", {target_triple = "wasm32-unknown-emscripten", cpu_features = "+simd128", iree.encoding.resolver = #iree_cpu.cpu_encoding_resolver<>}>
+} {
+  %result = linalg.matmul ins(%lhs, %rhs : tensor<1x?xf32, #lhs>, tensor<?x?xf32, #rhs>) outs(%acc : tensor<1x?xf32, #out>) -> tensor<1x?xf32, #out>
+  return %result : tensor<1x?xf32, #out>
+}
+// CHECK-LABEL: func @simd32_narrow_m1(
+// CHECK-SAME: tensor<1x?x1x1xf32>
+// CHECK-SAME: tensor<?x?x8x1xf32>
+// CHECK-SAME: tensor<1x?x1x8xf32>
+// CHECK: linalg.mmt4d
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #lhs = #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #rhs = #iree_encoding.encoding<operand_index = 1, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
 #out = #iree_encoding.encoding<operand_index = 2, op_type = matmul, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2], iteration_sizes = [?, ?, ?]>
