@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "force_single_dispatch.mlir"
     "globals.mlir"
     "libm_linking.mlir"
+    "narrow_integer_comparisons.mlir"
     "scalar.mlir"
     "stream_reference_counting_aliased_loop_results.mlir"
     "trace_dispatch_tensors.mlir"
