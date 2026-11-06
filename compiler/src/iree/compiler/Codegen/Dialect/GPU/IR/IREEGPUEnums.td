@@ -278,6 +278,11 @@ def NV_MMA_SYNC_F32_16x8x16_BF16 : I32EnumAttrCase<"NV_MMA_SYNC_F32_16x8x16_BF16
 def NV_MMA_SYNC_F32_16x8x32_F8E4M3FN : I32EnumAttrCase<"NV_MMA_SYNC_F32_16x8x32_F8E4M3FN", 0x2023>;
 def NV_MMA_SYNC_F32_16x8x32_F8E5M2 : I32EnumAttrCase<"NV_MMA_SYNC_F32_16x8x32_F8E5M2", 0x2024>;
 
+// NV structured-sparse MMA. The descriptor is intentionally separate from
+// dense mma.sync because the sparse operation has a compressed A operand and
+// an additional metadata operand.
+def NV_MMA_SP_F32_16x8x32_F16 : I32EnumAttrCase<"NV_MMA_SP_F32_16x8x32_F16", 0x2025>;
+
 // opaque NV intrinsics
 def NV_WMMA_F32_16x16x16_F16 : I32EnumAttrCase<"NV_WMMA_F32_16x16x16_F16", 0x2120>;
 def NV_WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"NV_WMMA_F16_16x16x16_F16", 0x2121>;
@@ -404,6 +409,11 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32EnumAttr<"MMAIntrinsic",
       // opaque NV intrinsics.
       NV_WMMA_F32_16x16x16_F16,
       NV_WMMA_F16_16x16x16_F16,
+    ]>;
+
+def IREEGPU_SparseMMAIntrinsic : IREEGPU_I32EnumAttr<"SparseMMAIntrinsic",
+    "Descriptor for structured-sparse MMA intrinsics", [
+      NV_MMA_SP_F32_16x8x32_F16,
     ]>;
 
 def VMFMA_F32_16x16x32_F16  : I32EnumAttrCase<"VMFMA_F32_16x16x32_F16", 0>;
