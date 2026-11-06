@@ -39,6 +39,7 @@ iree_cc_library(
     "DumpDispatchGraph.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FormDispatchRegions.cpp"
+    "GeneralizeExecutables.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
     "InjectTensorTracing.cpp"
