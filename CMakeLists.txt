@@ -769,15 +769,15 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # "Bootstrapping" by first looking for the optional Development component
   # seems to be robust generally.
   # See: https://reviews.llvm.org/D118148
-  # If building Python packages, we have a hard requirement on 3.10+.
-  find_package(Python3 3.10 COMPONENTS Interpreter Development NumPy)
-  find_package(Python3 3.10 COMPONENTS Interpreter Development.Module Development.SABIModule NumPy REQUIRED)
+  # If building Python packages, we have a hard requirement on 3.11+.
+  find_package(Python3 3.11 COMPONENTS Interpreter Development NumPy)
+  find_package(Python3 3.11 COMPONENTS Interpreter Development.Module Development.SABIModule NumPy REQUIRED)
   # Some parts of the build use FindPython instead of FindPython3. Why? No
   # one knows, but they are different. So make sure to bootstrap this one too.
   # Not doing this here risks them diverging, which on multi-Python systems,
   # can be troublesome. Note that nanobind requires FindPython.
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
-  find_package(Python 3.10 COMPONENTS Interpreter Development.Module Development.SABIModule NumPy REQUIRED)
+  find_package(Python 3.11 COMPONENTS Interpreter Development.Module Development.SABIModule NumPy REQUIRED)
 
   # Auto-detect IREE_ENABLE_PYTHON_STABLE_ABI: enable for CPython 3.12+ with
   # GIL. Can be overridden by explicitly setting the cache variable.
