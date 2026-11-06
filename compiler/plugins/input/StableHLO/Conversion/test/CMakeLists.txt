@@ -42,6 +42,7 @@ iree_lit_test_suite(
     "verify_compiler_input_legality.mlir"
     "vhlo_stablehlo_mix_invalid.mlir"
   TOOLS
+    ${IREE_LLD_TARGET}
     FileCheck
     iree-compile
     iree-opt
