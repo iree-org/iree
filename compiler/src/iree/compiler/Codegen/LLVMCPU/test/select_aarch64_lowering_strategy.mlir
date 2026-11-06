@@ -287,10 +287,13 @@ func.func @gather_attention(
 }
 // Gather ops should have vector_reduction set for dims mapping to attention
 // reduction dims (d5, d6). This is critical for correct vectorization.
-//  CHECK-DAG: #[[GATHER_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 0, 1, 0, {{[0-9]+}}], vector_reduction = [0, 1, 0, 4, 0]>
-//  CHECK-DAG: #[[ATTN_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 2, 32, 0, 0, 0], vector_common_parallel = [1, 1, 1, 4, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 0, 1, 4]>
+//  CHECK-DAG: #[[KEY_GATHER_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 0, 1, 0, 0], vector_reduction = [0, 1, 0, 16, 32]>
+//  CHECK-DAG: #[[VALUE_GATHER_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 0, 1, 0, 32], vector_reduction = [0, 1, 0, 16, 0]>
+//  CHECK-DAG: #[[ATTN_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 2, 32, 0, 0, 0], vector_common_parallel = [1, 1, 2, 32, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 32, 1, 16]>
 //      CHECK: func.func @gather_attention(
 //      CHECK:   iree_linalg_ext.gather
-// CHECK-SAME:     lowering_config = #[[GATHER_CONFIG]]
+// CHECK-SAME:     lowering_config = #[[KEY_GATHER_CONFIG]]
+//      CHECK:   iree_linalg_ext.gather
+// CHECK-SAME:     lowering_config = #[[VALUE_GATHER_CONFIG]]
 //      CHECK:   iree_linalg_ext.online_attention
 // CHECK-SAME:     lowering_config = #[[ATTN_CONFIG]]

@@ -105,4 +105,34 @@ AffineMap AttentionOpDetail::getSMap() const {
   return sMap;
 }
 
+SmallVector<AffineMap> getStandardAttentionIndexingMaps(MLIRContext *context,
+                                                        int64_t numBatches,
+                                                        bool hasMask,
+                                                        bool maskHasBatch) {
+  int64_t rank = numBatches + 4;
+  SmallVector<AffineExpr> batch;
+  for (int64_t i = 0; i < numBatches; ++i) {
+    batch.push_back(getAffineDimExpr(i, context));
+  }
+  AffineExpr m = getAffineDimExpr(numBatches, context);
+  AffineExpr n = getAffineDimExpr(numBatches + 1, context);
+  AffineExpr k1 = getAffineDimExpr(numBatches + 2, context);
+  AffineExpr k2 = getAffineDimExpr(numBatches + 3, context);
+  auto map = [&](ArrayRef<AffineExpr> leading, ArrayRef<AffineExpr> trailing) {
+    return AffineMap::get(
+        rank, /*symbolCount=*/0,
+        llvm::to_vector(llvm::concat<const AffineExpr>(leading, trailing)),
+        context);
+  };
+  SmallVector<AffineMap> maps = {map(batch, {m, k1}), map(batch, {k2, k1}),
+                                 map(batch, {k2, n}), map({}, {})};
+  // Add mask map only if it exists
+  if (hasMask) {
+    maps.push_back(
+        map(maskHasBatch ? ArrayRef(batch) : ArrayRef<AffineExpr>{}, {m, k2}));
+  }
+  maps.push_back(map(batch, {m, n}));
+  return maps;
+}
+
 }; // namespace mlir::iree_compiler::IREE::LinalgExt

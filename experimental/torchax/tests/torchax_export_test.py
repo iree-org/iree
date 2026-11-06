@@ -313,6 +313,65 @@ def _run_with_jax(module, *inputs):
     return [np.asarray(output) for output in outputs]
 
 
+class _CachedAttention(torch.nn.Module):
+    """Writes one key and value row, then attends over the visible prefix."""
+
+    def __init__(self, capacity=8, heads=2, width=4):
+        super().__init__()
+        self.register_buffer("k_cache", torch.zeros(1, heads, capacity, width))
+        self.register_buffer("v_cache", torch.zeros(1, heads, capacity, width))
+
+    def forward(self, query, key, value, length):
+        n = length.shape[0]
+        self.k_cache[:, :, n - 1 : n, :] = key
+        self.v_cache[:, :, n - 1 : n, :] = value
+        visible = torch.ones(1, n, dtype=torch.bool)
+        return torch.nn.functional.scaled_dot_product_attention(
+            query,
+            self.k_cache[:, :, :n, :],
+            self.v_cache[:, :, :n, :],
+            attn_mask=visible,
+        )
+
+
+class _CachedGroupedAttention(torch.nn.Module):
+    """Two key and value heads serve four query heads over the visible prefix."""
+
+    def __init__(self, capacity=8, width=4):
+        super().__init__()
+        self.register_buffer("k_cache", torch.zeros(1, 2, capacity, width))
+        self.register_buffer("v_cache", torch.zeros(1, 2, capacity, width))
+
+    def forward(self, query, key, value, length):
+        n = length.shape[0]
+        self.k_cache[:, :, n - 1 : n, :] = key
+        self.v_cache[:, :, n - 1 : n, :] = value
+        # One mask for every head.
+        visible = torch.ones(1, 1, 1, n, dtype=torch.bool)
+        return torch.nn.functional.scaled_dot_product_attention(
+            query,
+            self.k_cache[:, :, :n, :],
+            self.v_cache[:, :, :n, :],
+            attn_mask=visible,
+            enable_gqa=True,
+        )
+
+
+class _CachedPrefill(_CachedAttention):
+    """Writes the first n key and value rows, then attends causally over them."""
+
+    def forward(self, query, key, value):
+        n = query.shape[2]
+        self.k_cache[:, :, 0:n, :] = key
+        self.v_cache[:, :, 0:n, :] = value
+        return torch.nn.functional.scaled_dot_product_attention(
+            query,
+            self.k_cache[:, :, :n, :],
+            self.v_cache[:, :, :n, :],
+            is_causal=True,
+        )
+
+
 class TorchaxExportTest(unittest.TestCase):
     def test_cache_update_aliases_the_donated_buffer(self):
         example = tuple(torch.from_numpy(a) for a in _CALLS[0])
@@ -1037,6 +1096,155 @@ class TorchaxExportTest(unittest.TestCase):
         )
         expected = torch.sigmoid(torch.from_numpy(x)).numpy()
         np.testing.assert_allclose(np.asarray(result), expected, rtol=1e-6)
+
+    @unittest.skipIf(iree_runtime is None, "iree.runtime not available")
+    def test_symbolic_cache_sdpa_decode(self):
+        # The full-capacity slice would add a guard on n, so n stops one short.
+        length = torch.export.Dim("n", min=1, max=7)
+        rows = [torch.randn(1, 2, 1, 4) for _ in range(3)]
+        exported = torch.export.export(
+            _CachedAttention(),
+            (*rows, torch.zeros(3)),
+            dynamic_shapes=({}, {}, {}, {0: length}),
+        )
+        program, artifact = torchax_export.exported_program_to_stablehlo(exported)
+        module = str(artifact.mlir_module())
+        self.assertIn(
+            'stablehlo.composite "torch.scaled_dot_product_attention"', module
+        )
+        lowered = _compile(module, "--compile-to=input").decode()
+        self.assertIn("iree_linalg_ext.attention", lowered)
+        configured = _compile(module, "--compile-to=executable-configurations").decode()
+        self.assertIn("iree_linalg_ext.online_attention", configured)
+        # The scores stay in tiles: no (1, 2, 1, n) score tensor, with or
+        # without its unit dimensions.
+        self.assertNotRegex(configured, r"tensor<(1x)?2x(1x)?\?xf32>")
+
+        main, device = _session(_compile(module))
+        reference = _CachedAttention()
+        state = [
+            iree_runtime.asdevicearray(device, np.asarray(a)) for a in program.mutable
+        ]
+        rng = np.random.default_rng(0)
+        for length in (2, 3):
+            storage = [cache._buffer_view.get_buffer() for cache in state]
+            query, key, value = (
+                rng.standard_normal((1, 2, 1, 4)).astype(np.float32) for _ in range(3)
+            )
+            lengths = np.zeros(length, np.float32)
+            *state, output = main(*state, query, key, value, lengths)
+            self.assertEqual(
+                [cache._buffer_view.get_buffer() for cache in state], storage
+            )
+            with torch.no_grad():
+                want = reference(
+                    *(torch.from_numpy(a) for a in (query, key, value, lengths))
+                )
+            np.testing.assert_allclose(
+                output.to_host(), want.numpy(), rtol=1e-5, atol=1e-5
+            )
+            # Rows past n stay zero.
+            np.testing.assert_array_equal(state[0].to_host(), reference.k_cache.numpy())
+            np.testing.assert_array_equal(state[1].to_host(), reference.v_cache.numpy())
+
+    @unittest.skipIf(iree_runtime is None, "iree.runtime not available")
+    def test_symbolic_cache_sdpa_prefill(self):
+        length = torch.export.Dim("n", min=1, max=7)
+        exported = torch.export.export(
+            _CachedPrefill(),
+            tuple(torch.randn(1, 2, 4, 4) for _ in range(3)),
+            dynamic_shapes=({2: length}, {2: length}, {2: length}),
+        )
+        program, artifact = torchax_export.exported_program_to_stablehlo(exported)
+        module = str(artifact.mlir_module())
+        self.assertIn(
+            'stablehlo.composite "torch.scaled_dot_product_attention"', module
+        )
+        lowered = _compile(module, "--compile-to=input").decode()
+        # The causal mask is applied in the attention region, from the score
+        # indices.
+        self.assertRegex(
+            lowered,
+            r"iree_linalg_ext\.attention[\s\S]*?iree_linalg_ext\.index 3"
+            r"[\s\S]*?arith\.cmpi ugt",
+        )
+        configured = _compile(module, "--compile-to=executable-configurations").decode()
+        self.assertIn("iree_linalg_ext.online_attention", configured)
+        # No (2, n, n) score tensor, with or without its unit dimension.
+        self.assertNotRegex(configured, r"tensor<(1x)?2x\?x\?xf32>")
+
+        main, _ = _session(_compile(module))
+        reference = _CachedPrefill()
+        state = [np.asarray(a) for a in program.mutable]
+        rng = np.random.default_rng(1)
+        for length in (2, 4):
+            query, key, value = (
+                rng.standard_normal((1, 2, length, 4)).astype(np.float32)
+                for _ in range(3)
+            )
+            *state, output = main(*state, query, key, value)
+            with torch.no_grad():
+                want = reference(*(torch.from_numpy(a) for a in (query, key, value)))
+            np.testing.assert_allclose(
+                output.to_host(), want.numpy(), rtol=1e-5, atol=1e-5
+            )
+            np.testing.assert_array_equal(state[0].to_host(), reference.k_cache.numpy())
+            np.testing.assert_array_equal(state[1].to_host(), reference.v_cache.numpy())
+
+    @unittest.skipIf(iree_runtime is None, "iree.runtime not available")
+    def test_gqa_cached_decode(self):
+        length = torch.export.Dim("n", min=1, max=7)
+        example = (
+            torch.randn(1, 4, 1, 4),
+            torch.randn(1, 2, 1, 4),
+            torch.randn(1, 2, 1, 4),
+            torch.zeros(3),
+        )
+        exported = torch.export.export(
+            _CachedGroupedAttention(),
+            example,
+            dynamic_shapes=({}, {}, {}, {0: length}),
+        )
+        program, artifact = torchax_export.exported_program_to_stablehlo(exported)
+        module = str(artifact.mlir_module())
+        self.assertIn("enable_gqa = true", module)
+        configured = _compile(module, "--compile-to=executable-configurations").decode()
+        self.assertIn("iree_linalg_ext.online_attention", configured)
+        # No key or value cache repeated to four heads, and no (4, 1, n) score
+        # tensor, grouped or not, with or without unit dimensions.
+        self.assertNotRegex(configured, r"tensor<(1x)?4x\?x4xf32>")
+        self.assertNotRegex(configured, r"tensor<(1x)?(2x2x|4x)(1x)?\?xf32>")
+
+        main, _ = _session(_compile(module))
+        reference = _CachedGroupedAttention()
+        state = [np.asarray(a) for a in program.mutable]
+        rng = np.random.default_rng(2)
+        for length in (2, 3):
+            query = rng.standard_normal((1, 4, 1, 4)).astype(np.float32)
+            key, value = (
+                rng.standard_normal((1, 2, 1, 4)).astype(np.float32) for _ in range(2)
+            )
+            lengths = np.zeros(length, np.float32)
+            *state, output = main(*state, query, key, value, lengths)
+            with torch.no_grad():
+                want = reference(
+                    *(torch.from_numpy(a) for a in (query, key, value, lengths))
+                )
+            np.testing.assert_allclose(
+                output.to_host(), want.numpy(), rtol=1e-5, atol=1e-5
+            )
+            np.testing.assert_array_equal(state[0].to_host(), reference.k_cache.numpy())
+            np.testing.assert_array_equal(state[1].to_host(), reference.v_cache.numpy())
+
+    def test_attention_stays_a_composite(self):
+        rows = [torch.randn(1, 2, 1, 4) for _ in range(3)]
+        example = (*rows, torch.zeros(3))
+        program, module = _lower(_CachedAttention(), example)
+        self.assertEqual(program.mutable_names, ["k_cache", "v_cache"])
+        # A decomposed attention would leave matmuls and a softmax instead.
+        self.assertIn(
+            'stablehlo.composite "torch.scaled_dot_product_attention"', module
+        )
 
 
 if __name__ == "__main__":

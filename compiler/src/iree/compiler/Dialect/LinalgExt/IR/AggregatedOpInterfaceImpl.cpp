@@ -175,8 +175,8 @@ static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
   return genericOp.getResult(0);
 }
 
-static Value applyPostQKMatmulElementwise(OpBuilder &builder, Location loc,
-                                          Region &region, Value value) {
+static Value buildScoreRegion(OpBuilder &builder, Location loc, Region &region,
+                              Value value) {
   auto rank = cast<RankedTensorType>(value.getType()).getRank();
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(rank, builder.getContext());
@@ -222,9 +222,6 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
   SmallVector<utils::IteratorType> iteratorTypes(qkMap.getNumDims(),
                                                  utils::IteratorType::parallel);
 
-  Value zero = arith::ConstantOp::create(
-      builder, loc,
-      builder.getFloatAttr(getElementTypeOrSelf(qk.getType()), 0.0));
   Value negInf = arith::ConstantOp::create(
       builder, loc,
       builder.getFloatAttr(getElementTypeOrSelf(qk.getType()),
@@ -236,6 +233,8 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
         Value qkVal = args[1];
         Value maskVal = args[0];
 
+        // An excluded position scores -inf whatever its key holds.
+        Value result;
         // TODO: Replace bool mask condition once treated as i1 (instead of i8)
         auto maskValType = maskVal.getType();
         if (maskValType.isInteger()) {
@@ -243,25 +242,88 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
             maskVal =
                 arith::TruncIOp::create(b, loc, builder.getI1Type(), maskVal);
           }
-          maskVal = arith::SelectOp::create(b, loc, maskVal, zero, negInf);
+          result = arith::SelectOp::create(b, loc, maskVal, qkVal, negInf);
         } else {
           maskVal = convertScalarToDtype(b, loc, maskVal, qkVal.getType(),
                                          /*isUnsignedCast=*/false);
+          Value excluded = arith::CmpFOp::create(
+              b, loc, arith::CmpFPredicate::OEQ, maskVal, negInf);
           // Scaling to compensate for base-2 softmax
           if (useExp2) {
             Value log2e = arith::ConstantOp::create(
                 b, loc, b.getFloatAttr(qkVal.getType(), M_LOG2E));
             maskVal = arith::MulFOp::create(b, loc, maskVal, log2e);
           }
+          Value add = arith::AddFOp::create(b, loc, qkVal, maskVal);
+          result = arith::SelectOp::create(b, loc, excluded, negInf, add);
         }
-        // Finally, set the returned value to the qk element plus the mask
-        // element (or 0/-infinity if bool mask). We opt for a AddFOp (instead
-        // of a SelectFOp to stay consistent with the additive definition of
-        // attention masking)
-        Value add = arith::AddFOp::create(b, loc, qkVal, maskVal);
-        linalg::YieldOp::create(b, loc, add);
+        linalg::YieldOp::create(b, loc, result);
       });
 
+  return genericOp.getResult(0);
+}
+
+// Zeroes V at the keys `mask` excludes when every query row of the tile sees
+// the same keys: P @ V stays a contraction, and excluded NaN or Inf in V
+// cannot reach the output. Returns `value` unchanged otherwise.
+static Value excludeMaskedValues(OpBuilder &b, Location loc, Value value,
+                                 AffineMap valueMap, Value mask,
+                                 AffineMap maskMap,
+                                 const AttentionOpDetail &opInfo,
+                                 ArrayRef<OpFoldResult> sizes) {
+  if (!valueMap.isProjectedPermutation()) {
+    return value;
+  }
+  // Index the mask in the iteration space of V; a unit query dimension is 0.
+  SmallVector<AffineExpr> maskExprs;
+  for (AffineExpr expr : maskMap.getResults()) {
+    auto dimExpr = dyn_cast<AffineDimExpr>(expr);
+    if (!dimExpr) {
+      return value;
+    }
+    unsigned dim = dimExpr.getPosition();
+    if (std::optional<unsigned> pos = valueMap.getResultPosition(dimExpr)) {
+      maskExprs.push_back(b.getAffineDimExpr(*pos));
+    } else if (llvm::is_contained(opInfo.getMDims(), dim) &&
+               isConstantIntValue(sizes[dim], 1)) {
+      maskExprs.push_back(b.getAffineConstantExpr(0));
+    } else {
+      return value;
+    }
+  }
+  int64_t rank = valueMap.getNumResults();
+  AffineMap identity = b.getMultiDimIdentityMap(rank);
+  AffineMap valueMaskMap = AffineMap::get(rank, 0, maskExprs, b.getContext());
+  Value init =
+      tensor::EmptyOp::create(b, loc, tensor::getMixedSizes(b, loc, value),
+                              getElementTypeOrSelf(value.getType()));
+  auto genericOp = linalg::GenericOp::create(
+      b, loc, value.getType(), ValueRange{mask, value}, init,
+      SmallVector<AffineMap>{valueMaskMap, identity, identity},
+      SmallVector<utils::IteratorType>(rank, utils::IteratorType::parallel),
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value maskVal = args[0];
+        Value valueVal = args[1];
+        Value zero = arith::ConstantOp::create(
+            b, loc, b.getZeroAttr(valueVal.getType()));
+        // The exclusion predicate of applyMask.
+        Value result;
+        if (maskVal.getType().isInteger()) {
+          if (maskVal.getType().getIntOrFloatBitWidth() != 1) {
+            maskVal = arith::TruncIOp::create(b, loc, b.getI1Type(), maskVal);
+          }
+          result = arith::SelectOp::create(b, loc, maskVal, valueVal, zero);
+        } else {
+          Value negInf = arith::ConstantOp::create(
+              b, loc,
+              b.getFloatAttr(maskVal.getType(),
+                             -std::numeric_limits<double>::infinity()));
+          Value excluded = arith::CmpFOp::create(
+              b, loc, arith::CmpFPredicate::OEQ, maskVal, negInf);
+          result = arith::SelectOp::create(b, loc, excluded, zero, valueVal);
+        }
+        linalg::YieldOp::create(b, loc, result);
+      });
   return genericOp.getResult(0);
 }
 
@@ -269,95 +331,112 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
 // Attention Helpers
 //===----------------------------------------------------------------------===//
 
-Value computeQKAndElementwise(Location loc, OpBuilder &b, Value query,
-                              Value key, Value scale, std::optional<Value> mask,
-                              AffineMap qMap, AffineMap kMap, AffineMap sMap,
-                              std::optional<AffineMap> maskMap,
-                              SmallVector<OpFoldResult> iterationDomain,
-                              Type sElementType, Region &elementwiseRegion,
-                              DictionaryAttr qkAttrs, bool lowPrecision,
-                              bool useExp2, bool specialize = false) {
-  MLIRContext *ctx = b.getContext();
+// Scale the already allocated score tile rather than copying a dynamic query.
+static Value buildScaledScores(OpBuilder &builder, Location loc, Value scores,
+                               Value scale) {
+  int64_t rank = cast<RankedTensorType>(scores.getType()).getRank();
+  AffineMap scoreMap = builder.getMultiDimIdentityMap(rank);
+  AffineMap scaleMap = AffineMap::get(rank, 0, builder.getContext());
+  return elementwiseValueInPlace<arith::MulFOp>(builder, loc, scoreMap,
+                                                scaleMap, scores, scale);
+}
+
+// Preserve the low-precision region/scale/offset order. Moving query scaling
+// across fp8 conversion loses precision; the offset keeps softmax weights in
+// the usable fp8 range without changing their final normalization.
+static Value buildLowPrecisionScores(OpBuilder &builder, Location loc,
+                                     Value scores, Value scale,
+                                     FloatType queryType) {
+  scores = buildScaledScores(builder, loc, scores, scale);
+  double maximum =
+      APFloat::getLargest(queryType.getFloatSemantics(), /*Negative=*/false)
+          .convertToDouble();
+  Type scoreType = getElementTypeOrSelf(scores);
+  Value offset = arith::ConstantOp::create(
+      builder, loc,
+      builder.getFloatAttr(scoreType, clAttentionSoftmaxMax / maximum));
+  int64_t rank = cast<RankedTensorType>(scores.getType()).getRank();
+  return elementwiseValueInPlace<arith::AddFOp>(
+      builder, loc, builder.getMultiDimIdentityMap(rank),
+      AffineMap::get(rank, 0, builder.getContext()), scores, offset);
+}
+
+static Value buildAttentionScores(
+    Location loc, OpBuilder &builder, Value query, Value key, Value scale,
+    std::optional<Value> mask, AffineMap queryMap, AffineMap keyMap,
+    AffineMap scoreMap, std::optional<AffineMap> maskMap,
+    SmallVector<OpFoldResult> iterationDomain, Type scoreElementType,
+    Region &elementwiseRegion, DictionaryAttr qkAttrs, bool lowPrecision,
+    bool useExp2, bool specialize = false) {
+  MLIRContext *context = builder.getContext();
   // If using exp2 for attention instead of the original exp, we have to
   // multiply the scale by log2(e). We use exp2 instead of exp as most platforms
   // have better support for exp2 (we verified that we gain some speedup on
   // some GPUs).
   if (useExp2) {
     Value log2e = arith::ConstantOp::create(
-        b, loc, b.getFloatAttr(scale.getType(), M_LOG2E));
-    scale = arith::MulFOp::create(b, loc, scale, log2e);
+        builder, loc, builder.getFloatAttr(scale.getType(), M_LOG2E));
+    scale = arith::MulFOp::create(builder, loc, scale, log2e);
   }
 
-  auto qETy = getElementTypeOrSelf(query.getType());
+  auto queryElementType = getElementTypeOrSelf(query.getType());
 
-  AffineMap scaleMap = AffineMap::get(/*dimCount=*/qMap.getNumInputs(),
-                                      /*symbolCount=*/0, ctx);
+  AffineMap scaleMap = AffineMap::get(/*dimCount=*/queryMap.getNumInputs(),
+                                      /*symbolCount=*/0, context);
 
-  // In the original algorithm, the scaling is done after the softmax:
-  //        softmax(Q @ K.T * scale) @ V
-  //
-  // But, it is mathematically equivalent to do it on Q first and then multiply
-  // it by K.T. This just allows us to do the scaling once, instead of each
-  // iteration of the loop. This is only valid for f16 or f32 types as f8
-  // is extremely limited on its dynamic range therefore this would
-  // significantly affect numerics.
-  if (!lowPrecision) {
-    query = elementwiseValueInPlace<arith::MulFOp>(b, loc, qMap, scaleMap,
-                                                   query, scale);
+  // Prescale a static query to avoid repeatedly scaling score tiles. A
+  // dynamic query would require an unbounded copy, so scale its scores instead.
+  // Low-precision inputs retain their separate post-region scaling contract.
+  bool scaleQuery =
+      !lowPrecision && cast<ShapedType>(query.getType()).hasStaticShape();
+  if (scaleQuery) {
+    query = elementwiseValueInPlace<arith::MulFOp>(builder, loc, queryMap,
+                                                   scaleMap, query, scale);
   }
 
   // ---- QK Matmul ----
 
-  // Get sizes for S.
-  SmallVector<OpFoldResult> sSizes;
-  for (AffineExpr dimExpr : sMap.getResults()) {
+  // Allocate the score tile from the attention iteration domain.
+  SmallVector<OpFoldResult> scoreSizes;
+  for (AffineExpr dimExpr : scoreMap.getResults()) {
     int dim = cast<AffineDimExpr>(dimExpr).getPosition();
-    sSizes.push_back(iterationDomain[dim]);
+    scoreSizes.push_back(iterationDomain[dim]);
   }
 
   // S = Q @ K
   // SMap = QMap @ KMap
-  Value emptyS = tensor::EmptyOp::create(b, loc, sSizes, sElementType);
-  Value sZero = arith::ConstantOp::create(b, loc, b.getZeroAttr(sElementType));
-  Value s = linalg::FillOp::create(b, loc, sZero, emptyS).getResult(0);
+  Value emptyS =
+      tensor::EmptyOp::create(builder, loc, scoreSizes, scoreElementType);
+  Value sZero = arith::ConstantOp::create(
+      builder, loc, builder.getZeroAttr(scoreElementType));
+  Value scores =
+      linalg::FillOp::create(builder, loc, sZero, emptyS).getResult(0);
 
-  s = computeMatmul(b, loc, qMap, kMap, sMap, query, key, s, specialize);
+  scores = computeMatmul(builder, loc, queryMap, keyMap, scoreMap, query, key,
+                         scores, specialize);
   if (qkAttrs) {
-    s.getDefiningOp()->setAttrs(qkAttrs);
+    scores.getDefiningOp()->setAttrs(qkAttrs);
   }
 
-  s = applyPostQKMatmulElementwise(b, loc, elementwiseRegion, s);
-
+  if (!scaleQuery && !lowPrecision) {
+    // A dynamic query must present scaled scores to the region just as the
+    // static-query path does. Arbitrary region operations do not commute with
+    // scaling; in particular, scaling a causal -inf by zero creates NaN.
+    scores = buildScaledScores(builder, loc, scores, scale);
+  }
+  scores = buildScoreRegion(builder, loc, elementwiseRegion, scores);
   if (lowPrecision) {
-    // For low bit-depth types we perform post Q @ K scaling. This is to avoid
-    // losing numerical precision due to the low dynamic range of fp8 types when
-    // pre applying the scaling.
-    AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
-    AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
-                                        /*symbolCount=*/0, ctx);
-    s = elementwiseValueInPlace<arith::MulFOp>(b, loc, sMap, scaleMap, s,
-                                               scale);
-
-    // If we need to truncate to fp8 post softmax we apply a scaling to use the
-    // full fp8 range. We can do this with a offset as post `exp2` this equates
-    // to multiplying by a static value. We are able to do this as `max` and
-    // `sum` are scaled by the same value so the end result is the same.
-    auto fpTy = cast<FloatType>(qETy);
-    double mx =
-        APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
-            .convertToDouble();
-    Value offset = arith::ConstantOp::create(
-        b, loc, b.getFloatAttr(sElementType, clAttentionSoftmaxMax / mx));
-    s = elementwiseValueInPlace<arith::AddFOp>(b, loc, sMap, scaleMap, s,
-                                               offset);
+    scores = buildLowPrecisionScores(builder, loc, scores, scale,
+                                     cast<FloatType>(queryElementType));
   }
 
   // S += mask
   if (mask != nullptr) {
-    s = applyMask(b, loc, sMap, *maskMap, s, mask.value(), useExp2);
+    scores = applyMask(builder, loc, scoreMap, *maskMap, scores, mask.value(),
+                       useExp2);
   }
 
-  return s;
+  return scores;
 }
 
 //===----------------------------------------------------------------------===//
@@ -398,7 +477,7 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   Type f32Type = b.getF32Type();
 
   // ---- QK Matmul + elementwise math ----
-  Value s = computeQKAndElementwise(
+  Value s = buildAttentionScores(
       loc, b, query, key, getScale(), mask, qMap, kMap, sMap, getMaskMap(),
       sizes, f32Type, getRegion(), qkAttrs, lowPrecision, /*useExp2=*/true,
       /*specialize=*/true);
@@ -465,6 +544,11 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
     p = truncateFloat(b, loc, pMap, pMap, p, convertP, lowPrecision);
   }
 
+  if (mask && *mask) {
+    value = excludeMaskedValues(b, loc, value, getValueMap(), *mask,
+                                *getMaskMap(), opInfo, sizes);
+  }
+
   // result = P @ V + acc
   Value result = computeMatmul(b, loc, pMap, getValueMap(), accMap, p, value,
                                accFill, /*specialize=*/true);
@@ -518,9 +602,9 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   bool lowPrecision = qETy.getIntOrFloatBitWidth() <= 8;
 
   // ---- QK Matmul + elementwise math ----
-  Value s = computeQKAndElementwise(
-      loc, b, query, key, getScale(), mask, qMap, kMap, sMap, getMaskMap(),
-      sizes, elementType, getRegion(), qkAttrs, lowPrecision, useExp2);
+  Value s = buildAttentionScores(loc, b, query, key, getScale(), mask, qMap,
+                                 kMap, sMap, getMaskMap(), sizes, elementType,
+                                 getRegion(), qkAttrs, lowPrecision, useExp2);
 
   // TODO: This decomposition should be in a separate op called
   // "online softmax".
@@ -570,6 +654,11 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
                                                         oldAcc, norm);
 
   // ---- Matmul 2 ----
+
+  if (mask && *mask) {
+    value = excludeMaskedValues(b, loc, value, getValueMap(), *mask,
+                                *getMaskMap(), opInfo, sizes);
+  }
 
   // newAcc = P @ V + newAcc
   newAcc = computeMatmul(b, loc, pMap, getValueMap(), accMap, p, value, newAcc);
