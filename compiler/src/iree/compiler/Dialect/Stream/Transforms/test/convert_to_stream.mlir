@@ -32,7 +32,7 @@ util.func public @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attrib
   // CHECK: hal.buffer_view.assert<%arg0 : !hal.buffer_view> message("tensor") shape([%0, %c4]) type(%[[ELEMENT_TYPE]]) encoding(%[[ENCODING_TYPE]])
   // CHECK: %[[ARG0_SIZE:.+]] = stream.tensor.sizeof tensor<?x4xf32>{%[[DIM0]]} : index
   // CHECK: %[[ARG0_IMPORT:.+]] = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%[[DIM0]]} in !stream.resource<external>{%[[ARG0_SIZE]]}
-  // CHECK: %[[ARG0_T:.+]] = stream.async.cast %[[ARG0_IMPORT]] : !stream.resource<external>{%[[ARG0_SIZE]]} -> !stream.resource<*>{%[[ARG0_SIZE]]}
+  // CHECK: %[[ARG0_T:.+]] = stream.async.clone %[[ARG0_IMPORT]] : !stream.resource<external>{%[[ARG0_SIZE]]} -> !stream.resource<*>{%[[ARG0_SIZE]]}
   %0 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%dim0}
 
   %c1 = arith.constant 1 : index
