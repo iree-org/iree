@@ -4,8 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-option(IREE_BUILD_COMPILER_PYTHON_TOOLS "Bundle compiler tools with Python bindings" ON)
-
 ################################################################################
 # CAPI library using the LLVM build system.
 #
@@ -314,64 +312,62 @@ add_dependencies(IREECompilerPythonModules IREECompilerBuildPythonModules)
 # Tools linked against the shared CAPI library
 ################################################################################
 
-function(add_iree_compiler_busybox_tool target)
-  if(NOT IREE_BUILD_COMPILER_PYTHON_TOOLS)
-    return()
-  endif()
+if(IREE_BUILD_COMPILER_PYTHON_TOOLS)
+  function(add_iree_compiler_busybox_tool target)
+    cmake_parse_arguments(ARG
+      ""
+      "OUTPUT_NAME"
+      "SRCS"
+      ${ARGN})
 
-  cmake_parse_arguments(ARG
-    ""
-    "OUTPUT_NAME"
-    "SRCS"
-    ${ARGN})
+    add_executable(
+      ${target}
+      ${ARG_SRCS}
+    )
+    target_link_libraries(${target}
+      iree_compiler_bindings_c_headers
+      iree_compiler_API_Impl)
+    set_target_properties(${target}
+      PROPERTIES
+        OUTPUT_NAME "${ARG_OUTPUT_NAME}"
+        RUNTIME_OUTPUT_DIRECTORY "${_PYTHON_BUILD_PREFIX}/iree/compiler/_mlir_libs"
+    )
+    mlir_python_setup_extension_rpath(${target})
+    add_dependencies(IREECompilerPythonModules ${target})
+    install(TARGETS ${target}
+      DESTINATION "${_PYTHON_INSTALL_PREFIX}/iree/compiler/_mlir_libs"
+    )
+  endfunction()
 
-  add_executable(
-    ${target}
-    ${ARG_SRCS}
-  )
-  target_link_libraries(${target}
-    iree_compiler_bindings_c_headers
-    iree_compiler_API_Impl)
-  set_target_properties(${target}
-    PROPERTIES
-      OUTPUT_NAME "${ARG_OUTPUT_NAME}"
-      RUNTIME_OUTPUT_DIRECTORY "${_PYTHON_BUILD_PREFIX}/iree/compiler/_mlir_libs"
-  )
-  mlir_python_setup_extension_rpath(${target})
-  add_dependencies(IREECompilerPythonModules ${target})
-  install(TARGETS ${target}
-    DESTINATION "${_PYTHON_INSTALL_PREFIX}/iree/compiler/_mlir_libs"
-  )
-endfunction()
-
-add_iree_compiler_busybox_tool(
-  IREECompilerIREECompileTool
-  OUTPUT_NAME iree-compile
-  SRCS
-    IREECompileTool.c
-)
-
-add_iree_compiler_busybox_tool(
-  IREECompilerIREELinkTool
-  OUTPUT_NAME iree-link
-  SRCS
-    IREELinkTool.c
-)
-
-add_iree_compiler_busybox_tool(
-  IREECompilerIREEOptTool
-  OUTPUT_NAME iree-opt
-  SRCS
-    IREEOptTool.c
-)
-
-if(TARGET lld)
   add_iree_compiler_busybox_tool(
-    IREECompilerLldTool
-    OUTPUT_NAME iree-lld
+    IREECompilerIREECompileTool
+    OUTPUT_NAME iree-compile
     SRCS
-      LldTool.c
+      IREECompileTool.c
   )
+
+  add_iree_compiler_busybox_tool(
+    IREECompilerIREELinkTool
+    OUTPUT_NAME iree-link
+    SRCS
+      IREELinkTool.c
+  )
+
+  add_iree_compiler_busybox_tool(
+    IREECompilerIREEOptTool
+    OUTPUT_NAME iree-opt
+    SRCS
+      IREEOptTool.c
+  )
+
+  if(TARGET lld)
+    add_iree_compiler_busybox_tool(
+      IREECompilerLldTool
+      OUTPUT_NAME iree-lld
+      SRCS
+        LldTool.c
+    )
+  endif()
 endif()
 
 ################################################################################
