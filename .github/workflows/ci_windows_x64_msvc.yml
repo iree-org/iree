@@ -26,6 +26,7 @@ jobs:
       - name: "Checking out repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: true
       # TODO(#18813): Remove this. Environment setup needs to happen on runners, not in workflows.
       - name: "Create build dir"
