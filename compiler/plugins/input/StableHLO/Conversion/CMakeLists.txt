@@ -40,12 +40,16 @@ iree_cc_library(
   SRCS
     "CheckVHLOStableHloMixUsage.cpp"
     "ConvertCollectives.cpp"
+    "DynamicShapeOps.cpp"
+    "InlineShapeAssertionHelpers.cpp"
     "LegalizeControlFlow.cpp"
     "LegalizeShapeComputations.cpp"
     "LegalizeToLinalgUtils.cpp"
     "LegalizeToLinalgUtils.h"
     "MapStableHLOToScalarOp.h"
     "StableHLOCustomCalls.cpp"
+    "StableHLOStatusCheck.cpp"
+    "StableHLOStatusCheck.h"
     "StableHLOToIREEInputDialects.cpp"
     "StableHLOToLinalgExt.cpp"
     "VerifyCompilerInputLegality.cpp"
@@ -55,10 +59,12 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
+    MLIRAnalysis
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRComplexDialect
     MLIRControlFlowDialect
+    MLIRDataLayoutInterfaces
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
@@ -71,12 +77,14 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRShapeDialect
     MLIRShapeOpsTransforms
+    MLIRSideEffectInterfaces
     MLIRSparseTensorDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
     MLIRTransformUtils
     MLIRTransforms
+    MLIRValueBoundsOpInterface
     MLIRVectorDialect
     StablehloBroadcastUtils
     StablehloLinalgTransforms

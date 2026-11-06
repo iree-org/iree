@@ -2747,3 +2747,55 @@ func.func @group_mmt4d_short_row_stride(
       outs(%output : tensor<2x1x4x1xf32>) -> tensor<2x1x4x1xf32>
   return %result : tensor<2x1x4x1xf32>
 }
+
+// -----
+
+func.func @general_scatter_unsigned_indices(%updates: tensor<2xi32>, %indices: tensor<2x1xui64>, %original: tensor<4xi32>) -> tensor<4xi32> {
+  // expected-error @+1 {{expects signless integer indices of at most 64 bits}}
+  %result = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [], inserted_window_dims = [0], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates : tensor<2xi32>) indices(%indices : tensor<2x1xui64>)
+    outs(%original : tensor<4xi32>) {
+  ^bb0(%current: i32, %update: i32):
+    iree_linalg_ext.yield %update : i32
+  } -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}
+
+// -----
+
+func.func @general_scatter_signed_indices(%updates: tensor<2xi32>, %indices: tensor<2x1xsi32>, %original: tensor<4xi32>) -> tensor<4xi32> {
+  // expected-error @+1 {{expects signless integer indices of at most 64 bits}}
+  %result = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [], inserted_window_dims = [0], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates : tensor<2xi32>) indices(%indices : tensor<2x1xsi32>)
+    outs(%original : tensor<4xi32>) {
+  ^bb0(%current: i32, %update: i32):
+    iree_linalg_ext.yield %update : i32
+  } -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}
+
+// -----
+
+func.func @general_scatter_wide_indices(%updates: tensor<2xi32>, %indices: tensor<2x1xi128>, %original: tensor<4xi32>) -> tensor<4xi32> {
+  // expected-error @+1 {{expects signless integer indices of at most 64 bits}}
+  %result = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [], inserted_window_dims = [0], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates : tensor<2xi32>) indices(%indices : tensor<2x1xi128>)
+    outs(%original : tensor<4xi32>) {
+  ^bb0(%current: i32, %update: i32):
+    iree_linalg_ext.yield %update : i32
+  } -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}
+
+// -----
+
+func.func @general_scatter_float_indices(%updates: tensor<2xi32>, %indices: tensor<2x1xf32>, %original: tensor<4xi32>) -> tensor<4xi32> {
+  // expected-error @+1 {{expects signless integer indices of at most 64 bits}}
+  %result = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [], inserted_window_dims = [0], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates : tensor<2xi32>) indices(%indices : tensor<2x1xf32>)
+    outs(%original : tensor<4xi32>) {
+  ^bb0(%current: i32, %update: i32):
+    iree_linalg_ext.yield %update : i32
+  } -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}

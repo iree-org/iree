@@ -805,31 +805,90 @@ util.func public @dequantize_conv_unit_batch(%q: tensor<1x4x4x2xi8>, %s: tensor<
 
 // -----
 
-// A constant value may supply a dimension whose tensor type is still dynamic.
-// Folding unit dimensions must preserve that type while shortening the reshape.
-util.func public @fold_constant_dynamic_size(%arg0: tensor<?xf32>) -> tensor<?x784xf32> {
-  %c1 = arith.constant 1 : index
-  %expanded = tensor.expand_shape %arg0 [[0, 1, 2, 3]] output_shape [%c1, 1, 1, 784] : tensor<?xf32> into tensor<?x1x1x784xf32>
-  %collapsed = tensor.collapse_shape %expanded [[0, 1, 2], [3]] : tensor<?x1x1x784xf32> into tensor<?x784xf32>
-  util.return %collapsed : tensor<?x784xf32>
+// The stride-2 window of the single output column reads columns 0 and 1 of 3.
+util.func public @keep_unit_dim_of_strided_access_with_unread_tail(
+    %input: tensor<2x7x3x4xf32>, %filter: tensor<3x2x4x6xf32>,
+    %init: tensor<2x5x1x6xf32>) -> tensor<2x5x1x6xf32> {
+  %0 = linalg.generic {
+      indexing_maps = [
+        affine_map<(n, oh, ow, f, kh, kw, c) -> (n, oh + kh, ow * 2 + kw, c)>,
+        affine_map<(n, oh, ow, f, kh, kw, c) -> (kh, kw, c, f)>,
+        affine_map<(n, oh, ow, f, kh, kw, c) -> (n, oh, ow, f)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel",
+                        "reduction", "reduction", "reduction"]}
+      ins(%input, %filter : tensor<2x7x3x4xf32>, tensor<3x2x4x6xf32>)
+      outs(%init : tensor<2x5x1x6xf32>) {
+  ^bb0(%in: f32, %weight: f32, %out: f32):
+    %1 = arith.mulf %in, %weight : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<2x5x1x6xf32>
+  util.return %0 : tensor<2x5x1x6xf32>
 }
-// CHECK-LABEL: util.func public @fold_constant_dynamic_size
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?xf32>
-//       CHECK:   %[[C1:.+]] = arith.constant 1 : index
-//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1]] output_shape [%[[C1]], 784] : tensor<?xf32> into tensor<?x784xf32>
-//   CHECK-NOT:   tensor.collapse_shape
-//       CHECK:   util.return %[[EXPANDED]] : tensor<?x784xf32>
+// CHECK-LABEL: func public @keep_unit_dim_of_strided_access_with_unread_tail
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 * 2 + d5, d6)>
+//  CHECK-SAME:     ins({{.+}} : tensor<2x7x3x4xf32>, tensor<3x2x4x6xf32>)
+//  CHECK-SAME:     outs({{.+}} : tensor<2x5x1x6xf32>)
 
 // -----
 
-// non constant size stays dynamic
-util.func public @preserve_unknown_dynamic_size(%arg0: tensor<?xf32>, %size: index) -> tensor<?x784xf32> {
-  %expanded = tensor.expand_shape %arg0 [[0, 1, 2, 3]] output_shape [%size, 1, 1, 784] : tensor<?xf32> into tensor<?x1x1x784xf32>
-  %collapsed = tensor.collapse_shape %expanded [[0, 1, 2], [3]] : tensor<?x1x1x784xf32> into tensor<?x784xf32>
-  util.return %collapsed : tensor<?x784xf32>
+// The stride-2 window of the single output column reads both columns.
+util.func public @fold_unit_dim_of_strided_access_reading_all(
+    %input: tensor<2x7x2x4xf32>, %filter: tensor<3x2x4x6xf32>,
+    %init: tensor<2x5x1x6xf32>) -> tensor<2x5x1x6xf32> {
+  %0 = linalg.generic {
+      indexing_maps = [
+        affine_map<(n, oh, ow, f, kh, kw, c) -> (n, oh + kh, ow * 2 + kw, c)>,
+        affine_map<(n, oh, ow, f, kh, kw, c) -> (kh, kw, c, f)>,
+        affine_map<(n, oh, ow, f, kh, kw, c) -> (n, oh, ow, f)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel",
+                        "reduction", "reduction", "reduction"]}
+      ins(%input, %filter : tensor<2x7x2x4xf32>, tensor<3x2x4x6xf32>)
+      outs(%init : tensor<2x5x1x6xf32>) {
+  ^bb0(%in: f32, %weight: f32, %out: f32):
+    %1 = arith.mulf %in, %weight : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<2x5x1x6xf32>
+  util.return %0 : tensor<2x5x1x6xf32>
 }
-// CHECK-LABEL: util.func public @preserve_unknown_dynamic_size
-//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?xf32>, %[[SIZE:[a-zA-Z0-9]+]]: index
-//       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[ARG0]] {{\[}}[0, 1]] output_shape [%[[SIZE]], 784] : tensor<?xf32> into tensor<?x784xf32>
-//   CHECK-NOT:   tensor.collapse_shape
-//       CHECK:   util.return %[[EXPANDED]] : tensor<?x784xf32>
+// CHECK-LABEL: func public @fold_unit_dim_of_strided_access_reading_all
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1 + d3, d4, d5)>
+//  CHECK-SAME:     ins({{.+}} : tensor<2x7x2x4xf32>, tensor<3x2x4x6xf32>)
+//  CHECK-SAME:     outs({{.+}} : tensor<2x5x6xf32>)
+
+// -----
+
+// Dropping a unit dim follows the score map: the unit outer `n` iteration dim
+// precedes the query dim but is no score coordinate, so no index moves.
+util.func public @fold_unit_dims_attention_score_indices(%q: tensor<3x5x4xf32>, %k: tensor<3x7x4xf32>, %v: tensor<3x7x1x6xf32>, %scale: f32) -> tensor<3x5x1x6xf32> {
+  %init = tensor.empty() : tensor<3x5x1x6xf32>
+  %0 = iree_linalg_ext.attention <indexing_maps = [
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d3)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d4, d1, d5)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d1, d5)>]>
+    ins(%q, %k, %v, %scale : tensor<3x5x4xf32>, tensor<3x7x4xf32>, tensor<3x7x1x6xf32>, f32) outs(%init : tensor<3x5x1x6xf32>) {
+    ^bb0(%score: f32):
+      %b = iree_linalg_ext.index 0 : index
+      %qi = iree_linalg_ext.index 1 : index
+      %ki = iree_linalg_ext.index 2 : index
+      %limit = arith.addi %qi, %b : index
+      %hidden = arith.cmpi ugt, %ki, %limit : index
+      %ninf = arith.constant 0xFF800000 : f32
+      %masked = arith.select %hidden, %ninf, %score : f32
+      iree_linalg_ext.yield %masked : f32
+  } -> tensor<3x5x1x6xf32>
+  util.return %0 : tensor<3x5x1x6xf32>
+}
+// CHECK-LABEL: util.func public @fold_unit_dims_attention_score_indices
+//       CHECK:   iree_linalg_ext.attention
+//  CHECK-SAME:     tensor<3x5x4xf32>, tensor<3x7x4xf32>, tensor<3x7x6xf32>, f32
+//       CHECK:     %[[B:.+]] = iree_linalg_ext.index 0 : index
+//       CHECK:     %[[Q:.+]] = iree_linalg_ext.index 1 : index
+//       CHECK:     %[[K:.+]] = iree_linalg_ext.index 2 : index
+//       CHECK:     %[[LIMIT:.+]] = arith.addi %[[Q]], %[[B]] : index
+//       CHECK:     arith.cmpi ugt, %[[K]], %[[LIMIT]] : index
