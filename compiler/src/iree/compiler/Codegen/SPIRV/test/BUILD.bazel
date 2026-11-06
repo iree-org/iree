@@ -64,6 +64,7 @@ iree_lit_test_suite(
             "map_memref_storage_class.mlir",
             "materialize_executable_conditions.mlir",
             "physical_storage_buffer_addresses.mlir",
+            "pipeline_attention.mlir",
             "pipeline_full_smoketests.mlir",
             "pipeline_matmul_cooperative_ops.mlir",
             "pipeline_matmul_promotion.mlir",
@@ -96,6 +97,7 @@ iree_lit_test_suite(
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
+        "//tools:iree-compile",
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],
