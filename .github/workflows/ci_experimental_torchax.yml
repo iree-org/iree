@@ -1,0 +1,54 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: CI - Experimental Torchax
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  torchax:
+    runs-on: azure-linux-scale
+    container:
+      image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
+    defaults:
+      run:
+        shell: bash
+    env:
+      BUILD_DIR: build
+      IREE_HAL_DRIVER_CUDA: OFF
+      IREE_HAL_DRIVER_HIP: OFF
+      IREE_TARGET_BACKEND_CUDA: OFF
+      IREE_TARGET_BACKEND_ROCM: OFF
+      IREE_TARGET_BACKEND_WEBGPU_SPIRV: OFF
+      IREE_BUILD_TEST_DEPS: 0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install build and export dependencies
+        run: |
+          python -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+          python -m pip install -r build_tools/github_actions/ci_requirements.txt
+          python -m pip install -r experimental/torchax/requirements-test.txt \
+            --extra-index-url https://us-python.pkg.dev/ml-oss-artifacts-published/jax-public-nightly-artifacts-registry/simple/
+      - name: Build IREE
+        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+      - name: Install the Torchax wheel
+        run: |
+          python -m pip wheel --no-deps --wheel-dir /tmp/torchax-wheels experimental/torchax
+          python -m pip install --no-deps /tmp/torchax-wheels/iree_torchax-*.whl
+      - name: Test Torchax
+        run: |
+          export PYTHONPATH="$PWD/${BUILD_DIR}/compiler/bindings/python:$PWD/${BUILD_DIR}/runtime/bindings/python"
+          python experimental/torchax/run_tests.py
