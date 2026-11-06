@@ -12,8 +12,9 @@
 
 namespace mlir::iree_compiler::stablehlo {
 
-// For plugin preprocessing hooks: normalize raw VHLO before rewriting
-// registered custom calls and composites. Unhandled operations remain available
+// For plugin preprocessing hooks: normalize raw VHLO and public tuple
+// signatures before rewriting registered custom calls and composites.
+// Unhandled operations remain available
 // to later handlers or decomposition.
 void buildCustomCallAndCompositePreprocessingPassPipeline(
     OpPassManager &passManager, const TargetRegistry &registry);

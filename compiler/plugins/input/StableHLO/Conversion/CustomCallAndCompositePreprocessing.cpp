@@ -7,6 +7,7 @@
 #include "compiler/plugins/input/StableHLO/Conversion/CustomCallAndCompositePreprocessing.h"
 
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
+#include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/TargetRegistry.h"
 #include "mlir/Pass/PassManager.h"
 #include "stablehlo/transforms/Passes.h"
@@ -17,6 +18,7 @@ void buildCustomCallAndCompositePreprocessingPassPipeline(
     OpPassManager &passManager, const TargetRegistry &registry) {
   passManager.addPass(createCheckVHLOStableHloMixUsage());
   mlir::stablehlo::createStablehloDeserializePipeline(passManager);
+  passManager.addPass(createFlattenPublicTupleSignatures());
   passManager.addPass(
       createRewriteRegisteredCustomCallsAndCompositesPass(registry));
 }
