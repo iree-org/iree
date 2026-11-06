@@ -25,11 +25,40 @@ iree_lit_test_suite(
             "ukernel_inlining.mlir",
         ],
         include = ["*.mlir"],
+        exclude = [
+            "ukernel_inlining_aarch64.mlir",
+            "ukernel_inlining_riscv64.mlir",
+        ],
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
         "//tools:iree-compile",
         "//tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
+
+# Tests that need an LLVM target other than X86. The tags let builds whose LLVM
+# lacks the target exclude them, like build_and_test_byo_llvm.sh does.
+
+iree_lit_test_suite(
+    name = "lit_aarch64",
+    srcs = ["ukernel_inlining_aarch64.mlir"],
+    cfg = "//compiler:lit.cfg.py",
+    tags = ["requires-llvm-target-aarch64"],
+    tools = [
+        "//tools:iree-compile",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
+
+iree_lit_test_suite(
+    name = "lit_riscv64",
+    srcs = ["ukernel_inlining_riscv64.mlir"],
+    cfg = "//compiler:lit.cfg.py",
+    tags = ["requires-llvm-target-riscv"],
+    tools = [
+        "//tools:iree-compile",
         "@llvm-project//llvm:FileCheck",
     ],
 )
