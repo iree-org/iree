@@ -13,17 +13,40 @@ set(protobuf_BUILD_TESTS OFF)
 # to prevent protobuf itself from using `find_package`
 set(protobuf_FORCE_FETCH_DEPENDENCIES ON)
 
-# pin the version of protobuf
+# pin the version of protobuf and the commit its tag must point to
 set(protobuf_VERSION 29.1)
+set(protobuf_COMMIT 796e49f6ca82f763d1087d2ff7355d2f0d7b71b1)
 
+# A shallow clone needs a tag rather than a commit, so only populate the
+# source here and check the commit before adding it to the build.
 FetchContent_Declare(
   protobuf
   GIT_REPOSITORY https://github.com/protocolbuffers/protobuf
   GIT_TAG v${protobuf_VERSION}
   GIT_SHALLOW ON
+  SOURCE_SUBDIR do-not-add-subdirectory
 )
 
 FetchContent_MakeAvailable(protobuf)
+
+# skip the check for a local source dir set with FETCHCONTENT_SOURCE_DIR_PROTOBUF
+if(NOT FETCHCONTENT_SOURCE_DIR_PROTOBUF)
+  find_package(Git REQUIRED)
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+    WORKING_DIRECTORY ${protobuf_SOURCE_DIR}
+    OUTPUT_VARIABLE _protobuf_commit
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    COMMAND_ERROR_IS_FATAL ANY
+  )
+  if(NOT _protobuf_commit STREQUAL protobuf_COMMIT)
+    message(FATAL_ERROR
+      "protobuf v${protobuf_VERSION} was fetched at commit ${_protobuf_commit}, "
+      "expected ${protobuf_COMMIT}")
+  endif()
+endif()
+
+add_subdirectory(${protobuf_SOURCE_DIR} ${protobuf_BINARY_DIR})
 
 # make protobuf_generate() function available
 include(${protobuf_SOURCE_DIR}/cmake/protobuf-generate.cmake)

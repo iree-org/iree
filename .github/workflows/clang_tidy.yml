@@ -71,12 +71,17 @@ jobs:
           cat .iree-clang-tidy/llvm-project-revision.txt
           .iree-clang-tidy/clang-tidy --version
 
+      # Use uv instead of plain pip since cpp-linter uses it anyway.
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.7"
+          # uv-x86_64-unknown-linux-gnu.tar.gz, as published in uv's release.
+          checksum: "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"
+          enable-cache: false
+
       - name: Install Python requirements
         run: |
-          # Use uv instead of plain pip since cpp-linter uses it anyway.
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          export PATH="$HOME/.local/bin:$PATH"
           uv pip install --system -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
           uv pip install --system -r ./build_tools/github_actions/ci_requirements.txt
 

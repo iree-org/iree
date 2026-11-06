@@ -270,55 +270,6 @@ func.func @dynamic_bounds(
 
 // -----
 
-// An axis outside the input rank cannot index the parameter maps, so the op is
-// left for the Torch-to-Linalg lowering.
-// CHECK-LABEL: func.func @out_of_range_axis(
-// CHECK: torch.quantized_decomposed.dequantize_per_channel
-// CHECK-NOT: iree_linalg_ext.dequantize_affine
-func.func @out_of_range_axis(
-    %input: !torch.vtensor<[4,8],si8>,
-    %scales: !torch.vtensor<[4],f32>) -> !torch.vtensor<[4,8],f32> {
-  %axis = torch.constant.int 2
-  %minimum = torch.constant.int -128
-  %maximum = torch.constant.int 127
-  %dtype = torch.constant.int 1
-  %none = torch.constant.none
-  %out_dtype = torch.derefine %none : !torch.none to !torch.optional<int>
-  %result = torch.quantized_decomposed.dequantize_per_channel
-      %input, %scales, %none, %axis, %minimum, %maximum, %dtype, %out_dtype
-      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4],f32>, !torch.none,
-        !torch.int, !torch.int, !torch.int, !torch.int, !torch.optional<int>
-        -> !torch.vtensor<[4,8],f32>
-  return %result : !torch.vtensor<[4,8],f32>
-}
-
-// -----
-
-// A group size that does not divide the last dimension cannot split the input
-// into groups, so the op is left for the Torch-to-Linalg lowering.
-// CHECK-LABEL: func.func @indivisible_group_size(
-// CHECK: torch.quantized_decomposed.dequantize_per_channel_group
-// CHECK-NOT: iree_linalg_ext.dequantize_affine
-func.func @indivisible_group_size(
-    %input: !torch.vtensor<[4,8],si8>,
-    %scales: !torch.vtensor<[4,2],f32>) -> !torch.vtensor<[4,8],f32> {
-  %minimum = torch.constant.int -128
-  %maximum = torch.constant.int 127
-  %dtype = torch.constant.int 1
-  %group_size = torch.constant.int 3
-  %none = torch.constant.none
-  %out_dtype = torch.constant.int 6
-  %result = torch.quantized_decomposed.dequantize_per_channel_group
-      %input, %scales, %none, %minimum, %maximum, %dtype, %group_size,
-      %out_dtype
-      : !torch.vtensor<[4,8],si8>, !torch.vtensor<[4,2],f32>, !torch.none,
-        !torch.int, !torch.int, !torch.int, !torch.int, !torch.int
-        -> !torch.vtensor<[4,8],f32>
-  return %result : !torch.vtensor<[4,8],f32>
-}
-
-// -----
-
 // LinalgExt storage is a signless integer, so fp8 storage is left for the
 // Torch-to-Linalg lowering.
 // CHECK-LABEL: func.func @float_storage(

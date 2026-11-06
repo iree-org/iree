@@ -102,7 +102,7 @@ The layout changes can be propagated as far as possible across the workload, so
 the entire workload can use the updated layouts, as opposed to having to perform
 layout transformations at runtime. This may involve fusions or
 constant-evaluation that can amortize or remove layout-transformation overheads.
-See the [blog post](https://iree.dev/community/blog/2025-08-25-data-tiling-walkthrough/)
+See the [blog post](../blog/posts/data-tiling-walkthrough.md)
 to learn more about details.
 
 Data-tiling is an optional optimization technique, and it is not supported by
