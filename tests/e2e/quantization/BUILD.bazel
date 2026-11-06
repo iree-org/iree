@@ -39,3 +39,29 @@ iree_check_single_backend_test_suite(
     runner_args = ["--gtest_filter=-*_rewritten"],
     target_backend = "llvm-cpu",
 )
+
+iree_check_single_backend_test_suite(
+    name = "check_sub_byte_llvm-cpu_local-task",
+    srcs = [
+        "sub_byte_weights.mlir",
+    ],
+    compiler_flags = [
+        "--iree-llvmcpu-target-cpu=generic",
+        "--iree-global-opt-enable-sub-byte-quantized-storage=true",
+    ],
+    driver = "local-task",
+    target_backend = "llvm-cpu",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_sub_byte_reference_llvm-cpu_local-task",
+    srcs = [
+        "sub_byte_weights.mlir",
+    ],
+    compiler_flags = [
+        "--iree-llvmcpu-target-cpu=generic",
+        "--iree-global-opt-enable-sub-byte-quantized-storage=false",
+    ],
+    driver = "local-task",
+    target_backend = "llvm-cpu",
+)
