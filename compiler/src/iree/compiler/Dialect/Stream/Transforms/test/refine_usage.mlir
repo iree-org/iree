@@ -761,6 +761,47 @@ util.func private @parameter_load_refines_to_constant(%scope: !util.buffer, %key
 
 // -----
 
+// A concrete await result needs a transfer when its analyzed lifetime differs.
+// Revisiting the await must reuse that transfer instead of extending the chain.
+
+// CHECK-LABEL: @await_variable_parameter_load_refines_once
+util.func public @await_variable_parameter_load_refines_once(%timepoint: !stream.timepoint) -> !stream.resource<transient> {
+  %c0 = arith.constant 0 : index
+  %c0_i64 = arith.constant 0 : i64
+  %c1024 = arith.constant 1024 : index
+  %scope = util.buffer.constant : !util.buffer = "scope"
+  %key = util.buffer.constant : !util.buffer = "key"
+  %slab = stream.async.alloca : !stream.resource<transient>{%c1024}
+  // CHECK: %[[LOADED:.+]], %[[TIMEPOINT:.+]] = stream.async.parameter.load
+  %result, %result_timepoint = stream.async.parameter.load await(%timepoint) %scope::%key[%c0_i64] : !stream.resource<variable>{%c1024} => !stream.timepoint
+  // CHECK: %[[LOAD_TRANSFER:.+]] = stream.async.transfer %[[LOADED]] : !stream.resource<variable>{%[[SIZE:.+]]} -> !stream.resource<transient>{%[[SIZE]]}
+  // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[LOAD_TRANSFER]] : !stream.resource<transient>{%[[SIZE]]}
+  %ready = stream.timepoint.await %result_timepoint => %result : !stream.resource<variable>{%c1024}
+  // CHECK-NEXT: %[[AWAIT_TRANSFER:.+]] = stream.async.transfer %[[READY]] : !stream.resource<variable>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
+  %updated = stream.async.update %ready, %slab[%c0 to %c1024] : !stream.resource<variable>{%c1024} -> %slab as !stream.resource<transient>{%c1024}
+  // CHECK-NOT: stream.async.transfer
+  // CHECK: util.return %[[AWAIT_TRANSFER]] : !stream.resource<transient>
+  util.return %updated : !stream.resource<transient>
+}
+
+// -----
+
+// An await result already consumed by a transfer to a concrete lifetime must
+// not gain another transfer, even when analysis disagrees with its type.
+
+// CHECK-LABEL: @await_variable_with_existing_transfer
+// CHECK-SAME: (%[[TIMEPOINT:.+]]: !stream.timepoint, %[[RESOURCE:.+]]: !stream.resource<variable>, %[[SIZE:.+]]: index)
+util.func private @await_variable_with_existing_transfer(%timepoint: !stream.timepoint, %resource: !stream.resource<variable>, %size: index) -> !stream.resource<transient> {
+  // CHECK: %[[READY:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[RESOURCE]] : !stream.resource<variable>{%[[SIZE]]}
+  %ready = stream.timepoint.await %timepoint => %resource : !stream.resource<variable>{%size}
+  // CHECK-NEXT: %[[TRANSFER:.+]] = stream.async.transfer %[[READY]] : !stream.resource<variable>{%[[SIZE]]} -> !stream.resource<transient>{%[[SIZE]]}
+  %transferred = stream.async.transfer %ready : !stream.resource<variable>{%size} -> !stream.resource<transient>{%size}
+  // CHECK-NEXT: util.return %[[TRANSFER]] : !stream.resource<transient>
+  util.return %transferred : !stream.resource<transient>
+}
+
+// -----
+
 // Tests that stream.async.cast propagates its constraint to the source value.
 // The cast asserts the result must be external, so the source (splat) must also
 // become external. After refinement, the cast folds away since types match.
