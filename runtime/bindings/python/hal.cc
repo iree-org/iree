@@ -1386,8 +1386,15 @@ void SetupHalBindings(nanobind::module_ m) {
         py::arg("debug_sink") = py::none());
 
   // Enums.
-  py::enum_<enum iree_hal_memory_type_bits_t>(
-      m, "MemoryType", py::is_arithmetic(), py::is_flag())
+  //
+  // MemoryType, BufferCompatibility, BufferUsage and MemoryAccess are
+  // IntEnums, so `|` and `&` return plain ints. They are not IntFlags
+  // (py::is_flag()) because nanobind fills the enum.Flag internals the way
+  // Python 3.11.4 and later read them: on Python 3.11.0 to 3.11.3, `|` raises
+  // for members with a bit that no single-bit member has, such as
+  // MemoryType.HOST_LOCAL.
+  py::enum_<enum iree_hal_memory_type_bits_t>(m, "MemoryType",
+                                              py::is_arithmetic())
       .value("NONE", IREE_HAL_MEMORY_TYPE_NONE)
       .value("OPTIMAL", IREE_HAL_MEMORY_TYPE_OPTIMAL)
       .value("HOST_VISIBLE", IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)
@@ -1398,8 +1405,8 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("DEVICE_LOCAL", IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)
       .export_values();
 
-  py::enum_<enum iree_hal_buffer_compatibility_bits_t>(
-      m, "BufferCompatibility", py::is_arithmetic(), py::is_flag())
+  py::enum_<enum iree_hal_buffer_compatibility_bits_t>(m, "BufferCompatibility",
+                                                       py::is_arithmetic())
       .value("NONE", IREE_HAL_BUFFER_COMPATIBILITY_NONE)
       .value("ALLOCATABLE", IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE)
       .value("IMPORTABLE", IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE)
@@ -1408,8 +1415,8 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("QUEUE_DISPATCH", IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH)
       .export_values();
 
-  py::enum_<enum iree_hal_buffer_usage_bits_t>(
-      m, "BufferUsage", py::is_arithmetic(), py::is_flag())
+  py::enum_<enum iree_hal_buffer_usage_bits_t>(m, "BufferUsage",
+                                               py::is_arithmetic())
       .value("NONE", IREE_HAL_BUFFER_USAGE_NONE)
       .value("TRANSFER_SOURCE", IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE)
       .value("TRANSFER_TARGET", IREE_HAL_BUFFER_USAGE_TRANSFER_TARGET)
@@ -1441,8 +1448,8 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("DEFAULT", IREE_HAL_BUFFER_USAGE_DEFAULT)
       .export_values();
 
-  py::enum_<enum iree_hal_memory_access_bits_t>(
-      m, "MemoryAccess", py::is_arithmetic(), py::is_flag())
+  py::enum_<enum iree_hal_memory_access_bits_t>(m, "MemoryAccess",
+                                                py::is_arithmetic())
       .value("NONE", IREE_HAL_MEMORY_ACCESS_NONE)
       .value("READ", IREE_HAL_MEMORY_ACCESS_READ)
       .value("WRITE", IREE_HAL_MEMORY_ACCESS_WRITE)
