@@ -34,12 +34,17 @@ on:
   schedule:
     - cron: "0 14 * * *"
 
+permissions:
+  contents: read
+
 jobs:
   publish_website:
     if: ${{ github.repository_owner == 'iree-org' || github.event_name == 'workflow_dispatch' }}
 
     # Note: a clean build of `iree-tblgen` takes ~5 minutes on standard runners.
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write # Push to the gh-pages branch.
     env:
       CC: clang
       CXX: clang++
@@ -48,7 +53,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: true
-          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          persist-credentials: false
       - name: Fetching base gh-pages branch
         # We have to explicitly fetch the gh-pages branch as well to preserve history
         run: git fetch --no-tags --prune --depth=1 origin "gh-pages:gh-pages"
@@ -105,4 +110,8 @@ jobs:
       - name: Deploying to gh-pages
         if: ${{ github.event_name != 'release' || !contains(github.event.release.tag_name, 'rc') }}
         working-directory: docs/website
-        run: mkdocs gh-deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git remote set-url --push origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          mkdocs gh-deploy

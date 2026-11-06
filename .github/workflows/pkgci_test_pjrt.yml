@@ -23,6 +23,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   build_and_test:
     strategy:
@@ -33,6 +36,9 @@ jobs:
           - runner: ubuntu-24.04
             pjrt_platform: cuda
     name: Build and test
+    permissions:
+      contents: read
+      actions: read  # setup_venv.py --fetch-gh-workflow (dispatch with artifact_run_id).
     runs-on: ${{ matrix.runner }}
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages

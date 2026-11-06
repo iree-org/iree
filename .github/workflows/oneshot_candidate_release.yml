@@ -8,15 +8,21 @@ on:
         type: string
         default: "rc"
 
+permissions:
+  contents: read
+
 jobs:
   tag_release:
     name: "Tag candidate release"
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write # Push the candidate tag and create the draft release.
+      actions: write # Dispatch the Build Release Packages workflow.
     steps:
       - name: Checking out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          persist-credentials: false
 
       # Compute version suffix based on inputs (default to 'rc')
       - name: Compute stable version suffix
@@ -64,7 +70,7 @@ jobs:
       - name: Pushing changes
         uses: ad-m/github-push-action@881a6320fdb16eb5318c5054f31c218aec2b324c # v1.3.0
         with:
-          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          github_token: ${{ github.token }}
           branch: ${{ github.ref_name }}
           tags: true
 
@@ -78,13 +84,13 @@ jobs:
             Automatic candidate release of iree.
           draft: true
           prerelease: true
-          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          token: ${{ github.token }}
 
       - name: "Invoke workflow :: Build Release Packages"
         uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1.3.3
         with:
           workflow: Build Release Packages
-          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          token: ${{ github.token }}
           ref: "${{ env.tag_name }}"
           inputs: |
             {

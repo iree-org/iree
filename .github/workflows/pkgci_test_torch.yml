@@ -24,6 +24,9 @@ on:
 jobs:
   test_torch_ops:
     name: "test_torch_ops :: ${{ matrix.name }}"
+    permissions:
+      contents: read
+      actions: read  # setup_venv.py --fetch-gh-workflow (dispatch with artifact_run_id).
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
