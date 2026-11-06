@@ -223,6 +223,7 @@ iree_cc_library(
     ::TargetRegistry
     MLIRPass
     StablehloPasses
+    iree::compiler::plugins::input::StableHLO::Conversion::Preprocessing
   PUBLIC
 )
 

@@ -140,5 +140,34 @@ TEST_F(CustomCallAndCompositePreprocessingTest,
   original->destroy();
 }
 
+TEST_F(CustomCallAndCompositePreprocessingTest, FlattensPublicTupleSignatures) {
+  auto module = parseSourceString<ModuleOp>(R"mlir(
+    module {
+      func.func @run(%x: tuple<tensor<2xi32>, tensor<3xi32>>)
+          -> tuple<tensor<2xi32>, tensor<3xi32>> {
+        return %x : tuple<tensor<2xi32>, tensor<3xi32>>
+      }
+    }
+  )mlir",
+                                            &context);
+  ASSERT_TRUE(module);
+  TargetRegistry registry;
+  PassManager preprocessing(&context);
+  buildCustomCallAndCompositePreprocessingPassPipeline(preprocessing, registry);
+  ASSERT_TRUE(succeeded(preprocessing.run(*module)));
+  auto function = module->lookupSymbol<func::FuncOp>("run");
+  ASSERT_TRUE(function);
+  auto type = function.getFunctionType();
+  ASSERT_EQ(type.getNumInputs(), 2u);
+  ASSERT_EQ(type.getNumResults(), 2u);
+  EXPECT_EQ(type.getInput(0),
+            RankedTensorType::get({2}, IntegerType::get(&context, 32)));
+  EXPECT_EQ(type.getInput(1),
+            RankedTensorType::get({3}, IntegerType::get(&context, 32)));
+  EXPECT_EQ(type.getInputs(), type.getResults());
+  EXPECT_TRUE(function->hasAttr("iree.abi.declaration"));
+  EXPECT_TRUE(succeeded(verify(*module)));
+}
+
 } // namespace
 } // namespace mlir::iree_compiler::stablehlo
