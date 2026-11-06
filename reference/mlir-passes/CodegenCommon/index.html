@@ -5070,6 +5070,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-iree-eliminate-empty-tensors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -5107,7 +5124,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_26" class="md-nav__link">
+  <a href="#options_27" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -9300,6 +9317,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="-iree-eliminate-empty-tensors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#options_26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -9337,7 +9371,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#options_26" class="md-nav__link">
+  <a href="#options_27" class="md-nav__link">
     <span class="md-ellipsis">
       
         Options
@@ -9667,8 +9701,9 @@ values, util.assume.int bounds), and pipeline-specific constraints.</p>
 <h3 id="-iree-codegen-iree-comprehensive-bufferize"><code>-iree-codegen-iree-comprehensive-bufferize</code><a class="headerlink" href="#-iree-codegen-iree-comprehensive-bufferize" title="Permanent link">link</a></h3>
 <p><em>Convert from to Linalg ops on tensors to buffers</em></p>
 <h4 id="options_13">Options<a class="headerlink" href="#options_13" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-test-analysis-only : Only runs inplaceability analysis (for testing purposes only)
--print-conflicts    : Annotates IR with RaW conflicts. Requires test-analysis-only.
+<div class="highlight"><pre><span></span><code>-allow-return-allocs-from-loops : Allow newly allocated buffers to be returned from loops
+-test-analysis-only             : Only runs inplaceability analysis (for testing purposes only)
+-print-conflicts                : Annotates IR with RaW conflicts. Requires test-analysis-only.
 </code></pre></div>
 <h3 id="-iree-codegen-link-tuning-specs"><code>-iree-codegen-link-tuning-specs</code><a class="headerlink" href="#-iree-codegen-link-tuning-specs" title="Permanent link">link</a></h3>
 <p><em>Link nested transform dialect tuning specs named sequences into a single entry point</em></p>
@@ -9957,6 +9992,9 @@ preserved and handled by separate expansion patterns in later passes.</p>
 </code></pre></div>
 <h3 id="-iree-eliminate-empty-tensors"><code>-iree-eliminate-empty-tensors</code><a class="headerlink" href="#-iree-eliminate-empty-tensors" title="Permanent link">link</a></h3>
 <p><em>Eliminate tensor.empty ops to avoid buffer allocations</em></p>
+<h4 id="options_26">Options<a class="headerlink" href="#options_26" title="Permanent link">link</a></h4>
+<div class="highlight"><pre><span></span><code>-allow-return-allocs-from-loops : Allow newly allocated buffers to be returned from loops
+</code></pre></div>
 <h3 id="-iree-loop-invariant-code-motion"><code>-iree-loop-invariant-code-motion</code><a class="headerlink" href="#-iree-loop-invariant-code-motion" title="Permanent link">link</a></h3>
 <p><em>Performs LICM on loops guaranteed to have &gt;= 1 trip</em></p>
 <p>This is a mirror of the upstream LICM pass that restricts to loops that are
@@ -9972,7 +10010,7 @@ and is explicitly disabled.</p>
 <p>This pass runs the transform dialect interpreter and applies the named
 sequence transformation specified by the provided name (defaults to
 <code>TransformDialect::kTransformEntryPointSymbolName</code> (i.e. <code>__transform_main</code>)).</p>
-<h4 id="options_26">Options<a class="headerlink" href="#options_26" title="Permanent link">link</a></h4>
+<h4 id="options_27">Options<a class="headerlink" href="#options_27" title="Permanent link">link</a></h4>
 <div class="highlight"><pre><span></span><code>-entry-point       : Entry point of the pass pipeline.
 -library-file-name : File path to load a library of transform dialect strategies from.
 </code></pre></div>
