@@ -271,8 +271,11 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   }
 
   // Make the call with the updated types.
-  auto callOp = IREE::Util::CallOp::create(entryBuilder, importOp.getLoc(),
-                                           importOp, arguments);
+  auto utilImportOp = dyn_cast<IREE::Util::FuncOp>(importOp.getOperation());
+  auto tiedOperandsAttr =
+      utilImportOp ? utilImportOp.getTiedOperandsAttr() : ArrayAttr();
+  auto callOp = IREE::Util::CallOp::create(
+      entryBuilder, importOp.getLoc(), importOp, arguments, tiedOperandsAttr);
 
   // Determine if we need to await the signal fence on the host.
   // We only need to await if:
@@ -445,10 +448,11 @@ static void formatIOAttr(DictionaryAttr attrs, llvm::raw_ostream &os) {
 // it to be helpful instead of something a user could compile. This means we
 // want to bake away argument/result attributes if we can do something
 // meaningful with them (like names).
-static StringAttr
-formatSourceDeclaration(IREE::ABI::InvocationModel invocationModel,
-                        FunctionOpInterface exportOp, StringRef publicName,
-                        ArrayAttr allArgAttrs, ArrayAttr allResultAttrs) {
+StringAttr formatSourceDeclaration(IREE::ABI::InvocationModel invocationModel,
+                                   FunctionOpInterface exportOp,
+                                   StringRef publicName, ArrayAttr allArgAttrs,
+                                   ArrayAttr allResultAttrs,
+                                   function_ref<Type(Type)> mapType) {
   std::string decl;
   llvm::raw_string_ostream os(decl);
   switch (invocationModel) {
@@ -464,30 +468,32 @@ formatSourceDeclaration(IREE::ABI::InvocationModel invocationModel,
   }
   os << "func @" << publicName;
   os << "(";
+  unsigned publicIndex = 0;
   for (auto arg : exportOp.getArguments()) {
-    if (arg.getArgNumber() > 0) {
+    if (publicIndex > 0) {
       os << ", ";
     }
     os << "%";
-    os << inferArgumentName(exportOp.getContext(), arg.getArgNumber(),
+    os << inferArgumentName(exportOp.getContext(), publicIndex++,
                             getIOAttr(allArgAttrs, arg.getArgNumber()))
               .getValue();
-    os << ": " << arg.getType();
+    os << ": " << (mapType ? mapType(arg.getType()) : arg.getType());
     if (auto argAttrs = getIOAttr(allArgAttrs, arg.getArgNumber())) {
       formatIOAttr(argAttrs, os);
     }
   }
   os << ") -> (";
+  publicIndex = 0;
   for (auto [resultNumber, resultType] :
        llvm::enumerate(exportOp.getResultTypes())) {
-    if (resultNumber > 0) {
+    if (publicIndex > 0) {
       os << ", ";
     }
     os << "%";
-    os << inferResultName(exportOp.getContext(), resultNumber,
+    os << inferResultName(exportOp.getContext(), publicIndex++,
                           getIOAttr(allResultAttrs, resultNumber))
               .getValue();
-    os << ": " << resultType;
+    os << ": " << (mapType ? mapType(resultType) : resultType);
     if (auto resultAttrs = getIOAttr(allResultAttrs, resultNumber)) {
       formatIOAttr(resultAttrs, os);
     }
@@ -791,6 +797,27 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   return wrapperOp;
 }
 
+// A tied export result would claim the caller's argument storage, which the
+// native ABI expresses only through iree.abi.output.
+static LogicalResult verifyUntiedExport(IREE::Util::FuncOp exportOp) {
+  ArrayAttr ties = exportOp.getTiedOperandsAttr();
+  for (unsigned i = 0, e = exportOp.getNumResults(); i < e; ++i) {
+    bool tied = static_cast<bool>(exportOp.getResultAttr(i, "iree.abi.tied"));
+    if (!tied && ties && i < ties.size()) {
+      auto tie = dyn_cast<IntegerAttr>(ties[i]);
+      tied = tie && tie.getInt() != IREE::Util::TiedOpInterface::kUntiedIndex;
+    }
+    if (tied) {
+      return exportOp.emitError()
+             << "native ABI exports do not support tied results; use "
+                "iree.abi.output on an argument to provide result storage "
+                "(result "
+             << i << ")";
+    }
+  }
+  return success();
+}
+
 // Replaces |exportOp| with a wrapper function that exports the native ABI.
 // The original function will be made private and be renamed.
 // This allows us to support multiple binding schemes as transforms from other
@@ -856,6 +883,11 @@ public:
       } else {
         // Exported function.
         exportOps.push_back(funcOp);
+      }
+    }
+    for (auto exportOp : exportOps) {
+      if (failed(verifyUntiedExport(cast<IREE::Util::FuncOp>(exportOp)))) {
+        return signalPassFailure();
       }
     }
     if (importOps.empty() && exportOps.empty()) {

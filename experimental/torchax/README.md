@@ -117,3 +117,47 @@ into the next invocation and discard the donated inputs. Use
 `exported_program_to_stablehlo(exported, donate_state=False)` when earlier state
 values must remain available. This preserves functional values across invocations
 and allows the compiler to reuse storage only where its ownership rules permit it.
+
+## Pretrained inference check
+
+The f32 SmolLM2-135M example pins the pretrained checkpoint revision and uses
+its Transformers decoder layers with registered tensor cache buffers. Explicit
+position inputs supply causal coordinates and symbolic prefix lengths. Export
+runs in a child process, preserving the reference process's Torch environment.
+
+After installing the separate Torchax wheel, install the model dependencies
+and run through the Bazel bindings:
+
+```sh
+python -m pip install -r experimental/torchax/requirements-smollm2.txt \
+  --extra-index-url https://us-python.pkg.dev/ml-oss-artifacts-published/jax-public-nightly-artifacts-registry/simple/
+python experimental/torchax/run_bazel.py \
+  experimental/torchax/examples/smollm2_cpu.py --output-dir /tmp/smollm2-cpu
+```
+
+This downloads the pinned weights/tokenizer, exports symbolic prefill and decode,
+and writes an external IRPA parameter archive. It runs one prefill and two decode
+invocations, passing all 60 returned cache tensors forward. Logits and every cache
+tensor are compared with Torch at `rtol=atol=1e-4`; the cached reference is also
+checked against ordinary full-prefix inference. Predictions must agree.
+
+Both registered attention specialization and portable decomposition run. The
+fallback check deliberately changes the attention composite to unsupported
+version 2 while retaining its decomposition. Input IR checks confirm the two
+lowering paths. `results.json` records dependency/model versions, archive hash,
+predictions, and maximum numerical errors; the directory also retains MLIR and
+compiled modules. `--model-dir` accepts an already-downloaded snapshot of the
+pinned revision; `--reuse-export` reuses its existing exported artifacts.
+
+The default profile uses batch one, capacity 16, generic LLVM CPU and local-task.
+Select a native backend with `--target-backend` and, when needed, a runtime
+device URI with `--device`. Repeat `--compiler-arg=...` for target options.
+For example, `--target-backend=vmvx` uses local-task, and
+`--target-backend=vulkan-spirv --device=vulkan` uses Vulkan. Use a separate
+output directory for each target. Backend and device failures propagate; the
+harness does not skip unavailable or failing targets. WASM deployment requires
+its own runtime runner and is not exercised by this Python harness.
+It does not establish BF16 or GPU conformance: the broader suite currently has
+a BF16 mixed-matmul discrepancy also present when weights are ordinary arguments.
+Graduation still requires maintained dependency compatibility and a settled
+export/environment contract beyond this initial pretrained CPU checkpoint.

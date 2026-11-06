@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "convert_streamable_ops.mlir"
     "wrap_entry_points.mlir"
     "wrap_entry_points_coarse_fences.mlir"
+    "wrap_entry_points_tied_export.mlir"
   TOOLS
     FileCheck
     iree-opt

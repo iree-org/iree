@@ -49,6 +49,7 @@ void buildStableHLOInputConversionPassPipelineImpl(
   // If the input is StableHLO, this pass is considered a NOP.
   passManager.addPass(stablehlo::createCheckVHLOStableHloMixUsage());
   ::mlir::stablehlo::createStablehloDeserializePipeline(passManager);
+  passManager.addPass(createFlattenPublicTupleSignatures());
   TargetRegistry torchTargets;
   if (failed(populateTorchAttentionTargetRegistry(torchTargets))) {
     llvm::report_fatal_error("Torch attention registration failed");

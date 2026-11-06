@@ -83,9 +83,13 @@ iree_cc_library(
     MLIRTransforms
     StablehloBase
     StablehloOps
+    iree::compiler::Bindings::Native::Transforms
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::Util::IR
     iree::compiler::plugins::input::StableHLO::Conversion::PaddingUtils
+    iree::compiler::plugins::input::StableHLO::Conversion::SignatureMetadata
   PUBLIC
 )
 

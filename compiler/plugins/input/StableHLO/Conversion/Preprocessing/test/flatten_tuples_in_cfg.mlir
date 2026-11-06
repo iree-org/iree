@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-stablehlo-preprocessing-flatten-cfg-tuples %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --iree-stablehlo-preprocessing-flatten-cfg-tuples %s | FileCheck %s
 
 // CHECK-LABEL: @flatten_func
 module @flatten_func {
@@ -27,4 +27,48 @@ module @flatten_func {
     %2 = stablehlo.tuple %phi1, %phi1 : tuple<tensor<f32>, tensor<f32>>
     cf.br ^bb1(%2 : tuple<tensor<f32>, tensor<f32>>)
   }
+}
+
+// -----
+
+// Function recreation preserves metadata on the tensor following the tuple.
+// CHECK-LABEL: func.func private @metadata_callee
+// CHECK-SAME: tensor<3xf32>, %{{.+}}: tensor<3xf32>, %{{.+}}: tensor<3xf32> {iree.abi.output = 2 : index}
+// CHECK-SAME: -> (tensor<3xf32>, tensor<3xf32>, tensor<3xf32> {iree.abi.tied = 2 : i64})
+func.func private @metadata_callee(%t: tuple<tensor<3xf32>, tensor<3xf32>>, %x: tensor<3xf32> {iree.abi.output = 1 : index}) -> (tuple<tensor<3xf32>, tensor<3xf32>>, tensor<3xf32> {iree.abi.tied = 1 : i64}) {
+  return %t, %x : tuple<tensor<3xf32>, tensor<3xf32>>, tensor<3xf32>
+}
+// CHECK-LABEL: func.func @metadata_caller
+// CHECK: call @metadata_callee
+// CHECK-SAME: <arg_attrs = [{}, {}, {tf.aliasing_output = 2 : i32}], res_attrs = [{}, {}, {iree.abi.tied = 2 : i64}], no_inline>
+// CHECK-SAME: {iree.abi.tied_operands = [-1 : index, -1 : index, 2 : index], test.marker = "kept"}
+func.func @metadata_caller(%t: tuple<tensor<3xf32>, tensor<3xf32>>, %x: tensor<3xf32>) -> tensor<3xf32> {
+  %r:2 = "func.call"(%t, %x) <{callee = @metadata_callee, no_inline, arg_attrs = [{}, {tf.aliasing_output = 1 : i32}], res_attrs = [{}, {iree.abi.tied = 1 : i64}]}> {iree.abi.tied_operands = [-1 : index, 1 : index], test.marker = "kept"} : (tuple<tensor<3xf32>, tensor<3xf32>>, tensor<3xf32>) -> (tuple<tensor<3xf32>, tensor<3xf32>>, tensor<3xf32>)
+  return %r#1 : tensor<3xf32>
+}
+
+// -----
+
+// expected-error @+1 {{attributes on a tuple slot are unsupported}}
+func.func private @tuple_slot_attributes(%t: tuple<tensor<3xf32>> {test.keep = 1 : i32}) -> tuple<tensor<3xf32>> {
+  return %t : tuple<tensor<3xf32>>
+}
+
+// -----
+
+func.func @indirect_tuple_call(%callee: (tuple<tensor<3xf32>>) -> tensor<3xf32>, %value: tuple<tensor<3xf32>>) -> tensor<3xf32> {
+  // expected-error @+1 {{tuple signatures support only direct calls}}
+  %r = func.call_indirect %callee(%value) : (tuple<tensor<3xf32>>) -> tensor<3xf32>
+  return %r : tensor<3xf32>
+}
+
+// -----
+
+func.func private @addressed_tuple(%t: tuple<tensor<3xf32>>) -> tuple<tensor<3xf32>> {
+  return %t : tuple<tensor<3xf32>>
+}
+func.func @tuple_function_address() {
+  // expected-error @+1 {{tuple signatures support only direct calls and result-dimension helper references}}
+  %f = func.constant @addressed_tuple : (tuple<tensor<3xf32>>) -> tuple<tensor<3xf32>>
+  return
 }

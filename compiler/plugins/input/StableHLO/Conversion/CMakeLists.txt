@@ -67,6 +67,7 @@ iree_cc_library(
   DEPS
     ::PaddingUtils
     ::PassHeaders
+    ::SignatureMetadata
     ChloOps
     LLVMSupport
     MLIRAffineDialect
@@ -222,6 +223,21 @@ iree_cc_library(
     ::TargetRegistry
     MLIRPass
     StablehloPasses
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    SignatureMetadata
+  HDRS
+    "StableHLOSignatureMetadata.h"
+  SRCS
+    "StableHLOSignatureMetadata.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRSupport
+    MLIRTransforms
   PUBLIC
 )
 
