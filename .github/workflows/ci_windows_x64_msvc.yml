@@ -8,6 +8,9 @@ name: CI - Windows x64 MSVC
 
 on:
   workflow_call:
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING:
+        required: false
   workflow_dispatch:
 
 permissions:

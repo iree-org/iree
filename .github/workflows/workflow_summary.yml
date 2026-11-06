@@ -20,7 +20,8 @@
 #          - job_1
 #          - job_2
 #        uses: ./.github/workflows/workflow_summary.yml
-#        secrets: inherit
+#        secrets:
+#          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 #        with:
 #          jobs-json: ${{ toJson(needs) }}
 #   ```
@@ -37,6 +38,9 @@ on:
         jobs-json:
           type: string
           description: The output of `toJson(needs)`
+    secrets:
+      DISCORD_WEBHOOK:
+        required: false
 
 permissions:
   contents: read

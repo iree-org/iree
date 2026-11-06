@@ -12,6 +12,11 @@ on:
     - cron: "15 9 * * 1-5"
   workflow_dispatch:
   workflow_call:
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING:
+        required: false
+      DISCORD_WEBHOOK:
+        required: false
 
 permissions:
   contents: read

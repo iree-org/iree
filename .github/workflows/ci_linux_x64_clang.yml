@@ -8,6 +8,9 @@ name: CI - Linux x64 clang
 
 on:
   workflow_call:
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING:
+        required: false
   workflow_dispatch:
 
 permissions:

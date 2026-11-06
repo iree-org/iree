@@ -12,6 +12,9 @@ on:
     - cron: "15 9 * * 1-5"
   workflow_dispatch:
   workflow_call:
+    secrets:
+      DISCORD_WEBHOOK:
+        required: false
 
 permissions:
   contents: read

@@ -289,73 +289,85 @@ jobs:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_bazel')
     uses: ./.github/workflows/ci_linux_x64_bazel.yml
-    secrets: inherit
 
   linux_x64_clang:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang')
     uses: ./.github/workflows/ci_linux_x64_clang.yml
-    secrets: inherit
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING: ${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}
 
   linux_x64_gcc:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_gcc')
     uses: ./.github/workflows/ci_linux_x64_gcc.yml
-    secrets: inherit
+    secrets:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 
   linux_arm64_clang:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_arm64_clang')
     uses: ./.github/workflows/ci_linux_arm64_clang.yml
-    secrets: inherit
+    secrets:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 
   linux_x64_clang_debug:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_debug')
     uses: ./.github/workflows/ci_linux_x64_clang_debug.yml
-    secrets: inherit
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING: ${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 
   linux_x64_clang_dynamic_plugins:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_dynamic_plugins')
     uses: ./.github/workflows/ci_linux_x64_clang_dynamic_plugins.yml
-    secrets: inherit
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING: ${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}
 
   linux_x64_clang_asan:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_asan')
     uses: ./.github/workflows/ci_linux_x64_clang_asan.yml
-    secrets: inherit
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING: ${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}
 
   linux_x64_clang_ubsan:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_ubsan')
     uses: ./.github/workflows/ci_linux_x64_clang_ubsan.yml
-    secrets: inherit
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING: ${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}
 
   linux_x64_clang_tsan:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_tsan')
     uses: ./.github/workflows/ci_linux_x64_clang_tsan.yml
-    secrets: inherit
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING: ${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 
   linux_x64_clang_byollvm:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'linux_x64_clang_byollvm')
     uses: ./.github/workflows/ci_linux_x64_clang_byollvm.yml
-    secrets: inherit
+    secrets:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 
   macos_arm64_clang:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'macos_arm64_clang')
     uses: ./.github/workflows/ci_macos_arm64_clang.yml
-    secrets: inherit
+    secrets:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 
   windows_x64_msvc:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'windows_x64_msvc')
     uses: ./.github/workflows/ci_windows_x64_msvc.yml
-    secrets: inherit
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING: ${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}
 
   ##############################################################################
 
@@ -385,7 +397,8 @@ jobs:
       - macos_arm64_clang
       - windows_x64_msvc
     uses: ./.github/workflows/workflow_summary.yml
-    secrets: inherit
+    secrets:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
     with:
       jobs-json: ${{ toJson(needs) }}
       ci-deferred: ${{ needs.setup.outputs.ci-deferred == 'true' }}
