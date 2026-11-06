@@ -17,6 +17,53 @@ func.func @cbrt_cpu_vector(%arg0: vector<4xf32>) -> vector<4xf32> attributes {
 
 // -----
 
+// CHECK-LABEL: @erfc_webgpu_scalar
+func.func @erfc_webgpu_scalar(%arg0: f32) -> f32 attributes {
+  hal.executable.target = #hal.executable.target<"webgpu-spirv", "webgpu-wgsl-fb", {}>
+} {
+  // CHECK: math.absf
+  // CHECK: math.fma
+  // CHECK: math.exp
+  // CHECK: arith.cmpf ole
+  // CHECK-NOT: math.erfc
+  // CHECK: return
+  %0 = math.erfc %arg0 : f32
+  return %0 : f32
+}
+
+// -----
+
+// CHECK-LABEL: @erfc_webgpu_vector
+func.func @erfc_webgpu_vector(%arg0: vector<4xf32>) -> vector<4xf32> attributes {
+  hal.executable.target = #hal.executable.target<"webgpu-spirv", "webgpu-wgsl-fb", {}>
+} {
+  // CHECK: math.absf {{.*}} : vector<4xf32>
+  // CHECK: math.fma {{.*}} : vector<4xf32>
+  // CHECK: math.exp {{.*}} : vector<4xf32>
+  // CHECK: arith.cmpf ole
+  // CHECK-NOT: math.erfc
+  // CHECK: return
+  %0 = math.erfc %arg0 : vector<4xf32>
+  return %0 : vector<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @erfc_webgpu_f16
+func.func @erfc_webgpu_f16(%arg0: f16) -> f16 attributes {
+  hal.executable.target = #hal.executable.target<"webgpu-spirv", "webgpu-wgsl-fb", {}>
+} {
+  // CHECK: arith.extf %arg0 : f16 to f32
+  // CHECK: math.exp {{.*}} : f32
+  // CHECK: arith.truncf {{.*}} : f32 to f16
+  // CHECK-NOT: math.erfc
+  // CHECK: return
+  %0 = math.erfc %arg0 : f16
+  return %0 : f16
+}
+
+// -----
+
 // CHECK-LABEL: @rewrite_tan
 func.func @rewrite_tan(%arg0: f16) -> f16 attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz"}>
