@@ -529,10 +529,10 @@ func.func @only_scattered_dim(%arg0: tensor<48xf32>,
 }
 
 // CHECK-LABEL: func.func @only_scattered_dim(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<Distribute> workgroup_size = [128, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<Distribute> workgroup_size = [1, 1, 1]
 
 //       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_codegen.lowering_config
-//  CHECK-SAME:     tile_sizes = {{\[}}[128]]
+//  CHECK-SAME:     tile_sizes = {{\[}}[]]
 
 // -----
 

@@ -155,11 +155,11 @@ func.func @scatter_output_type_mismatch(
 // -----
 
 func.func @scatter_dim_mismatch(
-    %update : tensor<?x?xf32>, %indices : tensor<48x1xi32>,
+    %update : tensor<47x?xf32>, %indices : tensor<48x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @below {{'iree_linalg_ext.scatter' op mismatch in shape of indices and update value at dim#0}}
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
-    ins(%update, %indices : tensor<?x?xf32>, tensor<48x1xi32>)
+    ins(%update, %indices : tensor<47x?xf32>, tensor<48x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = arith.addf %arg1, %arg2 : f32
@@ -171,11 +171,11 @@ func.func @scatter_dim_mismatch(
 // -----
 
 func.func @scatter_dim_mismatch(
-    %update : tensor<48x?x?xf32>, %indices : tensor<48x10x1xi32>,
+    %update : tensor<48x9x?xf32>, %indices : tensor<48x10x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @below {{'iree_linalg_ext.scatter' op mismatch in shape of indices and update value at dim#1}}
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
-    ins(%update, %indices : tensor<48x?x?xf32>, tensor<48x10x1xi32>)
+    ins(%update, %indices : tensor<48x9x?xf32>, tensor<48x10x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = arith.addf %arg1, %arg2 : f32
