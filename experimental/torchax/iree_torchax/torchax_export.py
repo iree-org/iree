@@ -108,17 +108,23 @@ def exported_program_to_jax(
     return program._replace(constants=constants, mutable=mutable)
 
 
-def exported_program_to_stablehlo(exported_program: torch.export.ExportedProgram):
+def exported_program_to_stablehlo(
+    exported_program: torch.export.ExportedProgram, *, donate_state: bool = True
+):
     """Exports `exported_program` with symbolic input shapes, keeping mutations.
 
     Returns `(program, artifact)`: the `jax.export.Exported` of `program.func`
-    with the mutable buffers and parameters donated, and `program` as
+    with mutable buffers donated by default, and `program` as
     `exported_program_to_jax` returns it except that its constants and initial
     state are the exported program's own tensors. The export reads no weight
     data, so weights on the meta device export too; `save_parameters` writes
     the constants. The user inputs keep the dynamic
     dimensions and bounds of `exported_program`; constants and state keep their
     shapes.
+
+    Set `donate_state=False` when the caller retains old state values. With
+    donation enabled, the caller gives up the input state and must use the
+    returned state for subsequent calls.
 
     The caller threads the state through calls:
 
@@ -145,7 +151,11 @@ def exported_program_to_stablehlo(exported_program: torch.export.ExportedProgram
 
         # main keeps every argument, unused constants included, in program order.
         artifact = jax.export.export(
-            jax.jit(program.func, donate_argnums=(1,), keep_unused=True)
+            jax.jit(
+                program.func,
+                donate_argnums=(1,) if donate_state else (),
+                keep_unused=True,
+            )
         )(avals(program.constants), avals(program.mutable), tuple(inputs))
     return program, artifact
 
