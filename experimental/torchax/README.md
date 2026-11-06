@@ -161,3 +161,9 @@ It does not establish BF16 or GPU conformance: the broader suite currently has
 a BF16 mixed-matmul discrepancy also present when weights are ordinary arguments.
 Graduation still requires maintained dependency compatibility and a settled
 export/environment contract beyond this initial pretrained CPU checkpoint.
+
+Use a separate output directory with `--retain-state` to disable cache donation
+and check that every old input cache remains unchanged after each invocation.
+This exercises the functional ownership path in addition to the default donated
+state path. The exported signature and recorded `state_donated` setting must
+match when reusing an export.
