@@ -1067,9 +1067,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createIREELowerAffinePass)
       // Software emulation for small float types (fp4/fp8).
       .addPredicatedPass(forROCDL, [] {
-        return createConvertUnsupportedFloatArithPass(
-            ConvertUnsupportedFloatArithPassOptions{
-                clLLVMGPUEnableSmallFloatEmulation});
+        ConvertUnsupportedFloatArithPassOptions options;
+        options.enableExtTruncEmulation = clLLVMGPUEnableSmallFloatEmulation;
+        return createConvertUnsupportedFloatArithPass(options);
       });
 
   // Group global loads together to improve AMDGPU instruction scheduling.

@@ -296,4 +296,16 @@ iree_vmasm_module(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    ops_test
+  SRCS
+    "ops_test.cc"
+  DEPS
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::vm
+    iree::vm::ops
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

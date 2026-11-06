@@ -642,7 +642,7 @@ static inline int32_t vm_cmp_eq_f32u(float lhs, float rhs) {
   return (isunordered(lhs, rhs) || (lhs == rhs)) ? 1 : 0;
 }
 static inline int32_t vm_cmp_ne_f32o(float lhs, float rhs) {
-  return (lhs != rhs) ? 1 : 0;
+  return (!isunordered(lhs, rhs) && (lhs != rhs)) ? 1 : 0;
 }
 static inline int32_t vm_cmp_ne_f32u(float lhs, float rhs) {
   return (isunordered(lhs, rhs) || (lhs != rhs)) ? 1 : 0;
@@ -845,7 +845,7 @@ static inline int32_t vm_cmp_eq_f64u(double lhs, double rhs) {
   return (isunordered(lhs, rhs) || (lhs == rhs)) ? 1 : 0;
 }
 static inline int32_t vm_cmp_ne_f64o(double lhs, double rhs) {
-  return (lhs != rhs) ? 1 : 0;
+  return (!isunordered(lhs, rhs) && (lhs != rhs)) ? 1 : 0;
 }
 static inline int32_t vm_cmp_ne_f64u(double lhs, double rhs) {
   return (isunordered(lhs, rhs) || (lhs != rhs)) ? 1 : 0;
