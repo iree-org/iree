@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/FastMathPatterns.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/Transforms/Approximation.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
@@ -40,30 +41,6 @@ static void populateMathFunctionsRewritePatterns(
     }
   }
   math::populateExpansionPatterns(patterns, opNames);
-}
-
-static bool hasNativeRoundEven(IREE::HAL::ExecutableTargetAttr target) {
-  if (!isLLVMCPUBackend(target)) {
-    return false;
-  }
-  DictionaryAttr config = target.getConfiguration();
-  // FRINTN, scalar and vector.
-  if (isAArch64(config)) {
-    return true;
-  }
-  // ROUNDPS/ROUNDPD with round-to-nearest-even (SSE4.1, and their AVX forms).
-  // An explicit feature list may only name a feature that implies SSE4.1.
-  if (isX86(config)) {
-    return hasFeature(config, "+sse4.1") || hasFeature(config, "+sse4.2") ||
-           hasFeature(config, "+avx") || hasFeature(config, "+avx2") ||
-           hasFeature(config, "+avx512f");
-  }
-  // Custom lowering through FCVT with RNE, which needs F for f32, and D and
-  // 64-bit integer registers for f64 (scalar f64 is a libcall on riscv32).
-  if (isRISCV64(config)) {
-    return hasFeature(config, "+d");
-  }
-  return false;
 }
 
 static bool predicateRewrite(StringRef name,

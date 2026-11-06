@@ -185,6 +185,30 @@ bool targetSupportsScalableVectors(DictionaryAttr targetConfig) {
          (isRISCV(targetConfig) && hasAnyVFeature(targetConfig));
 }
 
+bool hasNativeRoundEven(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (!isLLVMCPUBackend(targetAttr)) {
+    return false;
+  }
+  DictionaryAttr config = targetAttr.getConfiguration();
+  // FRINTN, scalar and vector.
+  if (isAArch64(config)) {
+    return true;
+  }
+  // ROUNDPS/ROUNDPD with round-to-nearest-even (SSE4.1, and their AVX forms).
+  // An explicit feature list may only name a feature that implies SSE4.1.
+  if (isX86(config)) {
+    return hasFeature(config, "+sse4.1") || hasFeature(config, "+sse4.2") ||
+           hasFeature(config, "+avx") || hasFeature(config, "+avx2") ||
+           hasFeature(config, "+avx512f");
+  }
+  // Custom lowering through FCVT with RNE, which needs F for f32, and D and
+  // 64-bit integer registers for f64 (scalar f64 is a libcall on riscv32).
+  if (isRISCV64(config)) {
+    return hasFeature(config, "+d");
+  }
+  return false;
+}
+
 std::optional<std::pair<int64_t, int64_t>>
 getConfigVscaleRange(DictionaryAttr targetConfig) {
   auto attr = targetConfig.getAs<ArrayAttr>(kVscaleRangeAttrName);
