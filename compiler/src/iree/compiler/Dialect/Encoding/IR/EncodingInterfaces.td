@@ -270,8 +270,10 @@ def IREEEncoding_SerializableAttr :
       /*desc=*/[{
         Returns the storage element type, or null to use default storage
         legalization. Sub-byte types denote tightly packed elements. Integer
-        types wider than `elementType` denote zero-extended containers; loads
-        truncate them to the logical type. This is a pure query.
+        types wider than `elementType` denote zero-extended bit-pattern
+        containers; loads truncate them to the logical width. Floating-point
+        elements are bitcast to and from their integer bit patterns, without
+        numerical conversion. This is a pure query.
       }],
       /*retTy=*/"::mlir::Type",
       /*methodName=*/"getStorageElementType",

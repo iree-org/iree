@@ -1132,3 +1132,40 @@ dialect_resources: {
   }
 }
 #-}
+
+// -----
+
+// CHECK-LABEL: @unpacked_fp4_constant
+// CHECK: arith.constant dense<[0, 8, 2, 11]> : tensor<4xi8>
+// CHECK-NOT: unpacked_storage
+func.func @unpacked_fp4_constant() {
+  %c = arith.constant dense<[0.0, -0.0, 1.0, -1.5]> : tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>
+  util.optimization_barrier %c : tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @unpacked_fp4_negate
+// CHECK-SAME: %[[INPUT:.*]]: tensor<4xi8>
+// CHECK: linalg.generic
+// CHECK: ^bb0(%[[IN:.*]]: i8, %{{.*}}: i8):
+// CHECK: %[[BITS:.*]] = arith.trunci %[[IN]] : i8 to i4
+// CHECK: %[[VALUE:.*]] = arith.bitcast %[[BITS]] : i4 to f4E2M1FN
+// CHECK: %[[NEG:.*]] = arith.negf %[[VALUE]] : f4E2M1FN
+// CHECK: %[[OUT_BITS:.*]] = arith.bitcast %[[NEG]] : f4E2M1FN to i4
+// CHECK: %[[BYTE:.*]] = arith.extui %[[OUT_BITS]] : i4 to i8
+// CHECK: linalg.yield %[[BYTE]] : i8
+func.func @unpacked_fp4_negate(%input: tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>) -> tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage> {
+  %empty = tensor.empty() : tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%input : tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>)
+      outs(%empty : tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>) {
+    ^bb0(%in: f4E2M1FN, %out: f4E2M1FN):
+      %neg = arith.negf %in : f4E2M1FN
+      linalg.yield %neg : f4E2M1FN
+  } -> tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>
+  return %result : tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>
+}

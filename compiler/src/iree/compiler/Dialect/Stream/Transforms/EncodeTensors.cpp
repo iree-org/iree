@@ -341,7 +341,13 @@ struct EncodeTensorConstantOp final
     RankedTensorType alignedType = alignTensorType(resultType);
     Attribute encodedAttr = op.getValue();
     if (alignedType != resultType) {
-      if (auto sourceAttr = dyn_cast<DenseIntElementsAttr>(encodedAttr)) {
+      if (auto sourceAttr = dyn_cast<DenseElementsAttr>(encodedAttr);
+          sourceAttr &&
+          isa<IntegerType, FloatType>(sourceAttr.getElementType())) {
+        if (isa<FloatType>(sourceAttr.getElementType())) {
+          sourceAttr = sourceAttr.bitcast(rewriter.getIntegerType(
+              sourceAttr.getType().getElementTypeBitWidth()));
+        }
         auto alignedBitWidth = alignedType.getElementTypeBitWidth();
         encodedAttr = sourceAttr.mapValues(
             alignedType.getElementType(), [=](APInt sourceValue) {
@@ -352,7 +358,7 @@ struct EncodeTensorConstantOp final
             });
       } else {
         return rewriter.notifyMatchFailure(
-            op, "storage widening requires dense integer elements");
+            op, "storage widening requires dense integer or float elements");
       }
     }
 
@@ -583,7 +589,7 @@ struct EncodeTensorLoadOp final : OpRewritePattern<IREE::Stream::TensorLoadOp> {
       return rewriter.notifyMatchFailure(op,
                                          "unsupported storage element offset");
     }
-    if (isa<IntegerType>(op.getType())) {
+    if (isa<IntegerType, FloatType>(op.getType())) {
       loadType = legalizeStorageElementType(sourceType);
     }
 
@@ -595,9 +601,9 @@ struct EncodeTensorLoadOp final : OpRewritePattern<IREE::Stream::TensorLoadOp> {
         sourceOffset);
 
     if (loadType != op.getType()) {
-      if (isa<IntegerType>(op.getType())) {
-        load =
-            arith::TruncIOp::create(rewriter, op.getLoc(), op.getType(), load);
+      if (isa<IntegerType, FloatType>(op.getType())) {
+        load = convertStorageElementType(op.getLoc(), load, op.getType(),
+                                         rewriter);
       } else {
         load = complex::BitcastOp::create(rewriter, op.getLoc(), op.getType(),
                                           load);
@@ -639,8 +645,10 @@ struct EncodeTensorStoreOp final
         op.getLoc(), targetType, targetDims, op.getIndices(), rewriter);
     Value value = op.getValue();
     Type storageType = legalizeStorageElementType(targetType);
-    if (isa<IntegerType>(value.getType()) && storageType != value.getType()) {
-      value = arith::ExtUIOp::create(rewriter, op.getLoc(), storageType, value);
+    if (isa<IntegerType, FloatType>(value.getType()) &&
+        storageType != value.getType()) {
+      value =
+          convertStorageElementType(op.getLoc(), value, storageType, rewriter);
     }
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncStoreOp>(
         op, op.getTarget(), op.getTargetSize(), targetOffset, value);
@@ -858,15 +866,14 @@ struct EncodeDispatchTensorLoadOp
                alignedType.getElementTypeBitWidth() &&
            "loads must truncate");
 
-    // Truncate the byte -> sub-byte type; e.g. i8 -> i1.
-    auto loadedValue = op.getResult();
-    rewriter.setInsertionPointAfterValue(loadedValue);
-    auto truncOp =
-        arith::TruncIOp::create(rewriter, op.getLoc(), targetType, loadedValue);
-    rewriter.modifyOpInPlace(op, [&]() {
-      loadedValue.replaceAllUsesExcept(truncOp, truncOp);
-      loadedValue.setType(alignedType);
-    });
+    // Load containers, then restore the logical element bit patterns.
+    auto loadOp =
+        cast<IREE::TensorExt::DispatchTensorLoadOp>(rewriter.clone(*op));
+    rewriter.modifyOpInPlace(
+        loadOp, [&]() { loadOp.getResult().setType(alignedType); });
+    Value value = convertStorageElementType(op.getLoc(), loadOp.getResult(),
+                                            targetType, rewriter);
+    rewriter.replaceOp(op, value);
     return success();
   }
 };
@@ -893,11 +900,10 @@ struct EncodeDispatchTensorStoreOp
                alignedType.getElementTypeBitWidth() &&
            "stores must extend");
 
-    // Extend the sub-byte -> byte type; e.g. i1 -> i8.
-    auto extOp = arith::ExtUIOp::create(rewriter, op.getLoc(), alignedType,
-                                        op.getValue());
-    rewriter.modifyOpInPlace(
-        op, [&]() { op.getValueMutable().assign(extOp.getResult()); });
+    // Zero-extend the logical element bit patterns into containers.
+    Value value = convertStorageElementType(op.getLoc(), op.getValue(),
+                                            alignedType, rewriter);
+    rewriter.modifyOpInPlace(op, [&]() { op.getValueMutable().assign(value); });
     return success();
   }
 };

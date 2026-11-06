@@ -196,14 +196,14 @@ func.func @negative_layout_encoding(%arg0: tensor<?x?x?xf32, #encoding>) -> tens
 
 // -----
 
-// expected-error @+1 {{bit-width of the element type is 12 but packed_storage is currently only supported for sub-byte types}}
+// expected-error @+1 {{packed_storage requires a power-of-two element bit-width}}
 func.func @negative_packed_storage_superbyte(%arg0: tensor<?x4xi12, #iree_encoding.packed_storage>) -> tensor<?x4xi12, #iree_encoding.packed_storage> {
   return %arg0 : tensor<?x4xi12, #iree_encoding.packed_storage>
 }
 
 // -----
 
-// expected-error @+1 {{bit-width of the element type is 3 but packed_storage currently only supports types with power-of-two bitwidth}}
+// expected-error @+1 {{packed_storage requires a power-of-two element bit-width}}
 func.func @negative_packed_storage_non_po2(%arg0: tensor<?x4xi3, #iree_encoding.packed_storage>) -> tensor<?x4xi3, #iree_encoding.packed_storage> {
   return %arg0 : tensor<?x4xi3, #iree_encoding.packed_storage>
 }
@@ -212,9 +212,9 @@ func.func @negative_packed_storage_non_po2(%arg0: tensor<?x4xi3, #iree_encoding.
 
 // Test the verification of `#iree_encoding.layout`. `packed_storage` is just used as a utility here to check that the error gets propagated.
 
-// expected-error @+1 {{bit-width of the element type is 32 but packed_storage is currently only supported for sub-byte types}}
-func.func @negative_layout_packed_storage_superbyte(%arg0: tensor<?x4xf32, #iree_encoding.layout<[#iree_encoding.packed_storage]>>) -> tensor<?x4xf32, #iree_encoding.layout<[#iree_encoding.packed_storage]>> {
-  return %arg0 : tensor<?x4xf32, #iree_encoding.layout<[#iree_encoding.packed_storage]>>
+// expected-error @+1 {{packed_storage requires an element bit-width between 1 and 64}}
+func.func @negative_layout_packed_storage_superbyte(%arg0: tensor<?x4xf128, #iree_encoding.layout<[#iree_encoding.packed_storage]>>) -> tensor<?x4xf128, #iree_encoding.layout<[#iree_encoding.packed_storage]>> {
+  return %arg0 : tensor<?x4xf128, #iree_encoding.layout<[#iree_encoding.packed_storage]>>
 }
 
 // -----
@@ -259,14 +259,35 @@ func.func @illegal_unset_encoding_wrong_encoding_dims_count(%arg0 : tensor<?x?xf
 
 // -----
 
-// expected-error @+1 {{unpacked_storage requires signless integer elements with bit-width at most 64}}
-func.func @unpacked_float(%arg0: tensor<4xf32, #iree_encoding.unpacked_storage>) {
+// expected-error @+1 {{unpacked_storage requires an element bit-width between 1 and 64}}
+func.func @negative_unpacked_fp128(%arg0: tensor<4xf128, #iree_encoding.unpacked_storage>) {
   return
 }
 
 // -----
 
-// expected-error @+1 {{unpacked_storage requires signless integer elements with bit-width at most 64}}
-func.func @unpacked_wide(%arg0: tensor<4xi65, #iree_encoding.unpacked_storage>) {
+// expected-error @+1 {{unpacked_storage requires an element bit-width between 1 and 64}}
+func.func @negative_unpacked_i65(%arg0: tensor<4xi65, #iree_encoding.unpacked_storage>) {
+  return
+}
+
+// -----
+
+// expected-error @+1 {{unpacked_storage requires signless integer or floating-point elements}}
+func.func @negative_unpacked_signed(%arg0: tensor<4xsi4, #iree_encoding.unpacked_storage>) {
+  return
+}
+
+// -----
+
+// expected-error @+1 {{packed_storage requires signless integer or floating-point elements}}
+func.func @negative_packed_unsigned(%arg0: tensor<4xui4, #iree_encoding.packed_storage>) {
+  return
+}
+
+// -----
+
+// expected-error @+1 {{packed_storage requires a power-of-two element bit-width}}
+func.func @negative_packed_fp6(%arg0: tensor<4xf6E3M2FN, #iree_encoding.packed_storage>) {
   return
 }

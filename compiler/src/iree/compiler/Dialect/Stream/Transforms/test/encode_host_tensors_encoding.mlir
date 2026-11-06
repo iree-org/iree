@@ -325,6 +325,41 @@ util.func public @padded_load(%buffer: !stream.resource<staging>) -> i32 {
 
 // -----
 
+// Three unpacked i4 elements at [1, 1] occupy bytes [6, 9).
+// CHECK-LABEL: @unpacked_slice
+// CHECK-DAG: %[[LENGTH:.*]] = arith.constant 3 : index
+// CHECK-DAG: %[[OFFSET:.*]] = arith.constant 6 : index
+// CHECK-DAG: %[[END:.*]] = arith.constant 9 : index
+// CHECK-DAG: %[[SIZE:.*]] = arith.constant 10 : index
+// CHECK: %[[RESULT:.*]] = stream.async.slice %arg0[%[[OFFSET]] to %[[END]]] : !stream.resource<*>{%[[SIZE]]} -> !stream.resource<*>{%[[LENGTH]]}
+// CHECK: util.return %[[RESULT]]
+util.func public @unpacked_slice(%buffer: !stream.resource<*>) -> !stream.resource<*> {
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %c10 = arith.constant 10 : index
+  %result = stream.tensor.slice %buffer[%c1, %c1 for %c1, %c3] : tensor<2x5xi4, #iree_encoding.unpacked_storage> in !stream.resource<*>{%c10} -> tensor<1x3xi4, #iree_encoding.unpacked_storage> in !stream.resource<*>{%c3}
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @unpacked_update
+// CHECK-DAG: %[[LENGTH:.*]] = arith.constant 3 : index
+// CHECK-DAG: %[[OFFSET:.*]] = arith.constant 6 : index
+// CHECK-DAG: %[[END:.*]] = arith.constant 9 : index
+// CHECK-DAG: %[[SIZE:.*]] = arith.constant 10 : index
+// CHECK: %[[RESULT:.*]] = stream.async.update %arg1, %arg0[%[[OFFSET]] to %[[END]]] : !stream.resource<*>{%[[LENGTH]]} -> %arg0 as !stream.resource<*>{%[[SIZE]]}
+// CHECK: util.return %[[RESULT]]
+util.func public @unpacked_update(%buffer: !stream.resource<*>, %update: !stream.resource<*>) -> !stream.resource<*> {
+  %c1 = arith.constant 1 : index
+  %c3 = arith.constant 3 : index
+  %c10 = arith.constant 10 : index
+  %result = stream.tensor.update %update, %buffer[%c1, %c1] : tensor<1x3xi4, #iree_encoding.unpacked_storage> in !stream.resource<*>{%c3} -> tensor<2x5xi4, #iree_encoding.unpacked_storage> in %buffer as !stream.resource<*>{%c10}
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
 // Byte-range slicing does not support padded layouts.
 // CHECK-LABEL: @do_not_slice_padded
 // CHECK-NOT: stream.async.slice
@@ -384,4 +419,117 @@ util.func public @unpacked_empty_fill(%buffer: !stream.resource<*>, %value: i4) 
   %c4 = arith.constant 4 : index
   %result = stream.tensor.fill %value, %buffer[%c4 for %c0] : i4 -> tensor<4xi4, #iree_encoding.unpacked_storage> in %buffer as !stream.resource<*>{%c4}
   util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// Preserve signed zero and FP4 bit patterns in byte containers.
+// CHECK-LABEL: @unpacked_fp4_constant
+// CHECK: stream.async.constant {{.*}} = dense<[0, 8, 2, 11]> : tensor<4xi8
+util.func public @unpacked_fp4_constant() -> !stream.resource<constant> {
+  %result = stream.tensor.constant : tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage> in !stream.resource<constant> = dense<[0.0, -0.0, 1.0, -1.5]> : tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>
+  util.return %result : !stream.resource<constant>
+}
+
+// -----
+
+// CHECK-LABEL: @unpacked_fp4_load
+// CHECK: %[[BYTE:.*]] = stream.async.load %arg0[%arg1] {{.*}} -> i8
+// CHECK: %[[BITS:.*]] = arith.trunci %[[BYTE]] : i8 to i4
+// CHECK: %[[VALUE:.*]] = arith.bitcast %[[BITS]] : i4 to f4E2M1FN
+// CHECK: util.return %[[VALUE]]
+util.func public @unpacked_fp4_load(%buffer: !stream.resource<staging>, %index: index) -> f4E2M1FN {
+  %size = arith.constant 4 : index
+  %value = stream.tensor.load %buffer[%index] : tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage> in !stream.resource<staging>{%size} -> f4E2M1FN
+  util.return %value : f4E2M1FN
+}
+
+// -----
+
+// CHECK-LABEL: @unpacked_fp4_store
+// CHECK: %[[BITS:.*]] = arith.bitcast %arg2 : f4E2M1FN to i4
+// CHECK: %[[BYTE:.*]] = arith.extui %[[BITS]] : i4 to i8
+// CHECK: %[[RESULT:.*]] = stream.async.store %[[BYTE]], %arg0[%arg1]
+// CHECK: util.return %[[RESULT]]
+util.func public @unpacked_fp4_store(%buffer: !stream.resource<staging>, %index: index, %value: f4E2M1FN) -> !stream.resource<staging> {
+  %size = arith.constant 4 : index
+  %result = stream.tensor.store %value, %buffer[%index] : f4E2M1FN -> tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage> in %buffer as !stream.resource<staging>{%size}
+  util.return %result : !stream.resource<staging>
+}
+
+// -----
+
+// Splat repeats the low nibble once per byte.
+// CHECK-LABEL: @unpacked_fp4_splat
+// CHECK: %[[BITS:.*]] = arith.bitcast %arg0 : f4E2M1FN to i4
+// CHECK: %[[BYTE:.*]] = arith.extui %[[BITS]] : i4 to i8
+// CHECK: %[[RESULT:.*]] = stream.async.splat %[[BYTE]]
+// CHECK: util.return %[[RESULT]]
+util.func public @unpacked_fp4_splat(%value: f4E2M1FN) -> !stream.resource<*> {
+  %c4 = arith.constant 4 : index
+  %result = stream.tensor.splat %value : f4E2M1FN -> tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage> in !stream.resource<*>{%c4}
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @unpacked_fp4_fill
+// CHECK: %[[BITS:.*]] = arith.bitcast %arg0 : f4E2M1FN to i4
+// CHECK: %[[BYTE:.*]] = arith.extui %[[BITS]] : i4 to i8
+// CHECK: %[[RESULT:.*]] = stream.async.fill %[[BYTE]], %arg1
+// CHECK: util.return %[[RESULT]]
+util.func public @unpacked_fp4_fill(%value: f4E2M1FN, %buffer: !stream.resource<*>) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %result = stream.tensor.fill %value, %buffer[%c0 for %c4] : f4E2M1FN -> tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage> in %buffer as !stream.resource<*>{%c4}
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// Byte-aligned packed storage scales by bytes per element, not elements per byte.
+// CHECK-LABEL: @packed_byte_aligned_sizes
+// CHECK-DAG: %[[EIGHT:.*]] = arith.constant 8 : index
+// CHECK-DAG: %[[SIXTEEN:.*]] = arith.constant 16 : index
+// CHECK: %[[DYNAMIC:.*]] = arith.muli %arg0, %[[EIGHT]]
+// CHECK: util.return %[[EIGHT]], %[[SIXTEEN]], %[[DYNAMIC]]
+util.func public @packed_byte_aligned_sizes(%dim: index) -> (index, index, index) {
+  %fp8 = stream.tensor.sizeof tensor<8xf8E4M3FN, #iree_encoding.packed_storage> : index
+  %fp16 = stream.tensor.sizeof tensor<8xf16, #iree_encoding.packed_storage> : index
+  %fp64 = stream.tensor.sizeof tensor<?xf64, #iree_encoding.packed_storage>{%dim} : index
+  util.return %fp8, %fp16, %fp64 : index, index, index
+}
+
+// -----
+
+// Both encodings preserve byte-aligned float types and offsets.
+// CHECK-LABEL: @byte_aligned_float_access
+// CHECK: %[[LOAD:.*]] = stream.async.load %arg0[%arg1] {{.*}} -> f8E4M3FN
+// CHECK: %[[STORE:.*]] = stream.async.store %[[LOAD]], %arg0[%arg1]
+// CHECK: util.return %[[STORE]]
+util.func public @byte_aligned_float_access(%buffer: !stream.resource<staging>, %index: index) -> !stream.resource<staging> {
+  %size = arith.constant 8 : index
+  %value = stream.tensor.load %buffer[%index] : tensor<8xf8E4M3FN, #iree_encoding.packed_storage> in !stream.resource<staging>{%size} -> f8E4M3FN
+  %result = stream.tensor.store %value, %buffer[%index] : f8E4M3FN -> tensor<8xf8E4M3FN, #iree_encoding.unpacked_storage> in %buffer as !stream.resource<staging>{%size}
+  util.return %result : !stream.resource<staging>
+}
+
+// -----
+
+// Unpacked FP6 uses one byte per element despite its non-power-of-two width.
+// CHECK-LABEL: @unpacked_fp6_negate
+// CHECK: %[[LOAD:.*]] = stream.async.load %arg0[%arg1] {{.*}} -> i8
+// CHECK: %[[BITS:.*]] = arith.trunci %[[LOAD]] : i8 to i6
+// CHECK: %[[VALUE:.*]] = arith.bitcast %[[BITS]] : i6 to f6E3M2FN
+// CHECK: %[[NEG:.*]] = arith.negf %[[VALUE]] : f6E3M2FN
+// CHECK: %[[OUT_BITS:.*]] = arith.bitcast %[[NEG]] : f6E3M2FN to i6
+// CHECK: %[[BYTE:.*]] = arith.extui %[[OUT_BITS]] : i6 to i8
+// CHECK: %[[RESULT:.*]] = stream.async.store %[[BYTE]], %arg0[%arg1]
+// CHECK: util.return %[[RESULT]]
+util.func public @unpacked_fp6_negate(%buffer: !stream.resource<staging>, %index: index) -> !stream.resource<staging> {
+  %size = arith.constant 8 : index
+  %value = stream.tensor.load %buffer[%index] : tensor<8xf6E3M2FN, #iree_encoding.unpacked_storage> in !stream.resource<staging>{%size} -> f6E3M2FN
+  %neg = arith.negf %value : f6E3M2FN
+  %result = stream.tensor.store %neg, %buffer[%index] : f6E3M2FN -> tensor<8xf6E3M2FN, #iree_encoding.unpacked_storage> in %buffer as !stream.resource<staging>{%size}
+  util.return %result : !stream.resource<staging>
 }
