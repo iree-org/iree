@@ -138,6 +138,12 @@ static bool predicateApprox(StringRef name,
 // Returns true if the given function should be handled by a fast math pattern.
 static bool predicateDeviceLibImpl(StringRef name,
                                    IREE::HAL::ExecutableTargetAttr target) {
+  // WGSL has no erf builtin. Use the existing expansion, whose constants are
+  // finite, instead of the polynomial approximations disabled for WebGPU.
+  if (isWebGPUBackend(target)) {
+    return name == math::ErfOp::getOperationName();
+  }
+
   // Compute hasFastExp from target attribute.
   bool hasFastExp = isROCMBackend(target);
 
