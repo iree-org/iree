@@ -410,10 +410,12 @@ struct riscv_hwprobe {
 #define IREE_RISCV_HWPROBE_EXT_ZVFHMIN (1ULL << 31)
 #define IREE_RISCV_HWPROBE_EXT_ZVFBFWMA (1ULL << 54)
 
-// SpaceMiT K1 machine identity, used to enable the vendor IME (XSMTVDot /
-// `vmadot`) matrix extension.
+// SpaceMiT K1 and K3 machine identities, used to enable the vendor IME
+// (XSMTVDot / `vmadot`) matrix extension.
 #define IREE_RISCV_MVENDORID_SPACEMIT 0x710ULL
 #define IREE_RISCV_MARCHID_SPACEMIT_X60 0x8000000058000001ULL
+#define IREE_RISCV_MARCHID_SPACEMIT_X100 0x8000000058000002ULL
+#define IREE_RISCV_MARCHID_SPACEMIT_A100 0x8000000041000002ULL
 
 // Indices into `kv_pairs` below. hwprobe fills each pair's `value` in place, so
 // these must match the array element order.
@@ -435,8 +437,21 @@ long riscv_hwprobe(struct riscv_hwprobe* pairs, size_t pair_count,
                  flags);
 }
 
+// Runs hwprobe over the CPUs the calling thread may run on. Probing all CPUs
+// returns -1 for values that differ between them, such as marchid on SoCs
+// with mixed core types (e.g. SpaceMiT K3).
+static long iree_cpu_riscv_hwprobe_thread_cpus(struct riscv_hwprobe* pairs,
+                                               size_t pair_count) {
+  cpu_set_t cpus;
+  if (sched_getaffinity(0, sizeof(cpus), &cpus) == 0) {
+    return riscv_hwprobe(pairs, pair_count, sizeof(cpus), &cpus, 0);
+  }
+  return riscv_hwprobe(pairs, pair_count, 0, NULL, 0);
+}
+
 static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
-  long rc = riscv_hwprobe(&kv_pairs[0], IREE_ARRAYSIZE(kv_pairs), 0, NULL, 0);
+  long rc = iree_cpu_riscv_hwprobe_thread_cpus(&kv_pairs[0],
+                                               IREE_ARRAYSIZE(kv_pairs));
   if (rc != 0) {
     fprintf(stderr, "riscv_hwprobe syscall failed");
     exit(1);
@@ -453,13 +468,15 @@ static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
                  IREE_RISCV_HWPROBE_EXT_ZVFBFWMA);
 
   // XSMTVDot (SpaceMiT IME): absent from hwprobe / cpuinfo. Approximating via
-  // X60 mvendorid/marchid until a vendor hwprobe key exists. this host bit
+  // mvendorid/marchid until a vendor hwprobe key exists. this host bit
   // mainly unblocks ukernel tests/benchmarks.
   unsigned long long mvendorid =
       kv_pairs[IREE_RISCV_HWPROBE_PAIR_MVENDORID].value;
   unsigned long long marchid = kv_pairs[IREE_RISCV_HWPROBE_PAIR_MARCHID].value;
   if (mvendorid == IREE_RISCV_MVENDORID_SPACEMIT &&
-      marchid == IREE_RISCV_MARCHID_SPACEMIT_X60) {
+      (marchid == IREE_RISCV_MARCHID_SPACEMIT_X60 ||
+       marchid == IREE_RISCV_MARCHID_SPACEMIT_X100 ||
+       marchid == IREE_RISCV_MARCHID_SPACEMIT_A100)) {
     out_fields[0] |= IREE_CPU_DATA0_RISCV_64_XSMTVDOT;
   }
 
