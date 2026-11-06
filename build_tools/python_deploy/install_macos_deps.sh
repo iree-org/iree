@@ -24,7 +24,6 @@ PYTHON_SPECS=(
   3.13@67c6f0a3190851e0013214d5abd725a42ec398ff1b50eec47826820fd052d86b@https://www.python.org/ftp/python/3.13.1/python-3.13.1-macos11.pkg
   3.12@c411b5372d563532f5e6b589af7eb16e95613d61bd5af7bfe78563467130bbff@https://www.python.org/ftp/python/3.12.8/python-3.12.8-macos11.pkg
   3.11@b6cfdee2571ca56ee895043ca1e7110fb78a878cee3eb0c21accb2de34d24b55@https://www.python.org/ftp/python/3.11.9/python-3.11.9-macos11.pkg
-  # 3.10@https://www.python.org/ftp/python/3.10.5/python-3.10.5-macos11.pkg
 )
 
 # The python.org installers are signed with this Apple Developer ID.
