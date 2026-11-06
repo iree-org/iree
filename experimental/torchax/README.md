@@ -111,3 +111,9 @@ The `CI - Experimental Torchax` workflow builds IREE at the checked-out revision
 and runs this suite against the separately installed wheel. It can be invoked
 manually or called by another workflow. The JAX index follows the upstream
 [nightly installation instructions](https://docs.jax.dev/en/latest/installation.html#jax-nightly-installation).
+
+State export donates mutable buffers by default: pass every returned state value
+into the next invocation and discard the donated inputs. Use
+`exported_program_to_stablehlo(exported, donate_state=False)` when earlier state
+values must remain available. This preserves functional values across invocations
+and allows the compiler to reuse storage only where its ownership rules permit it.

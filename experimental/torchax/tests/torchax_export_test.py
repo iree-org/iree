@@ -811,6 +811,33 @@ class TorchaxExportTest(unittest.TestCase):
         for cache in state:
             np.testing.assert_array_equal(cache.to_host(), np.zeros((1, 1, 8, 2)))
 
+    @unittest.skipIf(iree_runtime is None, "iree.runtime not available")
+    def test_retained_state_remains_unchanged_without_donation(self):
+        exported = torch.export.export(
+            _Cache(), tuple(torch.from_numpy(a) for a in _CALLS[0])
+        )
+        program, artifact = torchax_export.exported_program_to_stablehlo(
+            exported, donate_state=False
+        )
+        main, device = _session(_compile(str(artifact.mlir_module())))
+        state = [
+            iree_runtime.asdevicearray(device, np.asarray(a)) for a in program.mutable
+        ]
+        constants = [np.asarray(a.detach()) for a in program.constants]
+        eager = _Cache()
+        for call in _CALLS:
+            retained = state
+            snapshots = [np.array(value.to_host(), copy=True) for value in retained]
+            *state, output = main(*constants, *state, *call)
+            with torch.no_grad():
+                expected = eager(*(torch.from_numpy(a) for a in call)).numpy()
+            np.testing.assert_array_equal(output.to_host(), expected)
+            np.testing.assert_array_equal(state[0].to_host(), eager.cache.numpy())
+            for value, before in zip(retained, snapshots, strict=True):
+                # Read storage again, independently of DeviceArray's host cache.
+                actual = iree_runtime.DeviceArray(device, value._buffer_view).to_host()
+                np.testing.assert_array_equal(actual, before)
+
     def test_no_mutation_donates_nothing(self):
         class Scale(torch.nn.Module):
             def forward(self, x, position):
