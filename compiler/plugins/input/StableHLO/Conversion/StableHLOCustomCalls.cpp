@@ -37,8 +37,8 @@
 
 #include <algorithm>
 #include <limits>
-#include <optional>
 #include <numeric>
+#include <optional>
 
 namespace mlir::iree_compiler::stablehlo {
 
