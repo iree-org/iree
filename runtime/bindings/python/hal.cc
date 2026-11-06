@@ -1386,13 +1386,6 @@ void SetupHalBindings(nanobind::module_ m) {
         py::arg("debug_sink") = py::none());
 
   // Enums.
-  //
-  // MemoryType, BufferCompatibility, BufferUsage and MemoryAccess are
-  // IntEnums, so `|` and `&` return plain ints. They are not IntFlags
-  // (py::is_flag()) because nanobind fills the enum.Flag internals the way
-  // Python 3.11.4 and later read them: on Python 3.11.0 to 3.11.3, `|` raises
-  // for members with a bit that no single-bit member has, such as
-  // MemoryType.HOST_LOCAL.
   py::enum_<enum iree_hal_memory_type_bits_t>(m, "MemoryType",
                                               py::is_arithmetic())
       .value("NONE", IREE_HAL_MEMORY_TYPE_NONE)
