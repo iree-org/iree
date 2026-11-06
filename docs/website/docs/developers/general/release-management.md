@@ -272,10 +272,37 @@ module version, and whether they changed since the previous release:
 
 ### :octicons-package-dependents-16: Promoting a candidate to stable
 
-1. (Authorized users only) Push to PyPI using
-    [pypi_deploy.sh](https://github.com/iree-org/iree/blob/main//build_tools/python_deploy/pypi_deploy.sh).
-    The script is a dry run by default. Check its output, then pass
-    `--publish` to upload. Keep the whl folder for upload to GitHub.
+1. Push to PyPI by running the
+    [Publish to PyPI](https://github.com/iree-org/iree/actions/workflows/publish_pypi.yml)
+    workflow with the candidate's tag:
+
+    ```bash
+    gh workflow run publish_pypi.yml --repo iree-org/iree \
+      -f release=iree-3.1.0rc20241119
+    ```
+
+    The `promote` job downloads, promotes, checks and attests the wheels. The
+    `publish` jobs then wait until a release maintainer approves the `pypi`
+    environment. Check the `promote` job's output before approving. Each
+    package is uploaded with
+    [trusted publishing](https://docs.pypi.org/trusted-publishers/), which
+    needs no PyPI credentials and attaches an attestation to every file.
+
+    Download the promoted wheels and their attestation bundle
+    (`iree-X.Y.Z-pypi-wheels.sigstore.json`) for the GitHub release from the
+    run's `pypi-wheels` artifact:
+
+    ```bash
+    WHEEL_DIR=/tmp/iree_pypi_wheels.XXXXX
+    gh run download <run id> --repo iree-org/iree \
+      --name pypi-wheels --dir "${WHEEL_DIR}"
+    ```
+
+    (Authorized users only) For a PyPI project that has no trusted publisher
+    yet, use
+    [pypi_deploy.sh](https://github.com/iree-org/iree/blob/main//build_tools/python_deploy/pypi_deploy.sh)
+    instead. The script is a dry run by default. Check its output, then pass
+    `--publish` to upload.
 
 2. Create a new release on GitHub:
 
@@ -318,17 +345,19 @@ module version, and whether they changed since the previous release:
 
     * Paste the release notes from the release tracking issue.
 
-    * Upload the `iree-dist-*.tar.xz` files of the release candidate and
-        `.whl` files of `pypi_deploy.sh` to the release draft.
+    * Upload the `iree-dist-*.tar.xz` files of the release candidate, and the
+        promoted `.whl` files and their attestation bundle from step 1, to the
+        release draft. The bundle lets users verify the wheels offline with
+        `gh attestation verify --bundle`.
 
         Download the `iree-dist-*.tar.xz` files from the candidate release.
 
         ```bash
-        WHEEL_DIR=/tmp/iree_pypi_wheels.XXXXX
         gh release download iree-3.1.0rc20241119 --repo iree-org/iree \
           --pattern 'iree-dist-*' --dir "${WHEEL_DIR}"
         gh release upload v3.1.0 --repo iree-org/iree \
-          "${WHEEL_DIR}"/*.whl "${WHEEL_DIR}"/iree-dist-*.tar.xz
+          "${WHEEL_DIR}"/*.whl "${WHEEL_DIR}"/*-pypi-wheels.sigstore.json \
+          "${WHEEL_DIR}"/iree-dist-*.tar.xz
         ```
 
     * Publish the release. Uncheck the option for "pre-release", and check the

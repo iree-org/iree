@@ -1,0 +1,152 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Promotes the wheels of a nightly candidate release to a stable version and
+# publishes them to PyPI with trusted publishing
+# (https://docs.pypi.org/trusted-publishers/). No PyPI credentials are stored
+# in GitHub: PyPI exchanges the job's OIDC token for a short-lived upload token
+# and attaches a PEP 740 attestation to every uploaded file.
+#
+# Setup outside this file:
+#   * Each PyPI project in the publish matrix lists this repository, this
+#     workflow (publish_pypi.yml) and the `pypi` environment as a trusted
+#     publisher.
+#   * The `pypi` environment requires approval by a release maintainer and only
+#     allows deployments from `main`.
+
+name: Publish to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Candidate release tag to promote (e.g. iree-3.14.0rc20261106)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      # Required by actions/attest to sign and store build provenance.
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      RELEASE: ${{ inputs.release }}
+    steps:
+      - name: Check release tag
+        run: |
+          if [[ ! "${RELEASE}" =~ ^iree-[0-9]+\.[0-9]+\.[0-9]+rc[0-9]{8}$ ]]; then
+            echo "'${RELEASE}' is not a candidate release tag like iree-3.14.0rc20261106."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Install requirements
+        run: pip install -r build_tools/python_deploy/pypi_deploy_requirements.txt
+
+      - name: Download wheels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${RELEASE}" --repo iree-org/iree \
+            --pattern "*.whl" --dir wheels
+          ls wheels
+
+      - name: Promote wheels
+        run: |
+          for wheel in wheels/*.whl; do
+            python build_tools/python_deploy/promote_whl_from_rc_to_final.py \
+              "${wheel}" --delete-old-wheel
+          done
+          ls wheels
+
+      - name: Check wheels
+        run: twine check --strict wheels/*.whl
+
+      # Lets users verify promoted wheels with `gh attestation verify`, including
+      # the copies uploaded to the stable GitHub release.
+      - name: Attest wheels
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: wheels/*.whl
+
+      # Saves the attestation as a Sigstore bundle, so that the stable GitHub
+      # release can carry it next to the promoted wheels.
+      - name: Save attestation bundle
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          version="${RELEASE#iree-}"
+          cp "${BUNDLE_PATH}" "wheels/iree-${version%rc*}-pypi-wheels.sigstore.json"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pypi-wheels
+          # Both patterns are in wheels/, so the files stay at the artifact's
+          # root, where the publish jobs expect the wheels.
+          path: |
+            wheels/*.whl
+            wheels/*.sigstore.json
+          if-no-files-found: error
+
+  # Publishes each package in its own job, so that a package whose PyPI project
+  # rejects the upload does not block the others.
+  publish:
+    name: "Publish ${{ matrix.package }}"
+    needs: promote
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/project/${{ matrix.project }}/
+    permissions:
+      # Required for trusted publishing and PEP 740 attestations.
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: iree_base_compiler
+            project: iree-base-compiler
+          - package: iree_base_runtime
+            project: iree-base-runtime
+          - package: iree_tools_tf
+            project: iree-tools-tf
+          - package: iree_tools_tflite
+            project: iree-tools-tflite
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pypi-wheels
+          path: wheels
+
+      - name: Select ${{ matrix.package }} wheels
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          mkdir dist
+          mv wheels/"${PACKAGE}"-*.whl dist/
+          ls dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist/
