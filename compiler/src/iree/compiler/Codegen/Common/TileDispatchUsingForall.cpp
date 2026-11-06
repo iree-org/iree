@@ -307,9 +307,7 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
   tensor::ExtractSliceOp::getCanonicalizationPatterns(cleanupPatterns, context);
   tensor::DimOp::getCanonicalizationPatterns(cleanupPatterns, context);
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(cleanupPatterns);
-  // TODO(Max191): Replace populateSwapExtractWithExpandPattern with upstream
-  // MLIR version once it is available (llvm-project/pull/126898).
-  populateSwapExtractWithExpandPattern(cleanupPatterns);
+  tensor::populateBubbleUpExtractSliceOpPatterns(cleanupPatterns);
   populateFoldExtractSliceOfBroadcastPattern(cleanupPatterns);
   // When fusing pads we do not want to generate zeroSliceGuards when doing
   // workgroup tiling. In `GPUApplyTilingLevelPass` we do have an option called
