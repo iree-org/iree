@@ -14,6 +14,7 @@
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Rewriters.h"
+#include "compiler/plugins/input/StableHLO/Conversion/StableHLOSignatureMetadata.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -286,22 +287,35 @@ static bool isValidFuncAttr(DictionaryAttr attrs) {
   return true;
 }
 
-// Adds iree.abi.encoding attributes for arguments and results when they have
-// had their type changed during conversion.
+// Adds iree.abi.encoding attributes for arguments and results whose type
+// changed during conversion, except tokens, whose fence is their ABI type.
+// Records the original type of each value converted one-to-one; values
+// converted to several, such as private futures, carry no ABI encoding.
 static void setFuncEncodings(func::FuncOp funcOp, FunctionType oldFuncType,
-                             FunctionType newFuncType) {
+                             FunctionType newFuncType,
+                             const TypeConverter::SignatureConversion &inputs,
+                             ArrayRef<unsigned> resultCounts) {
   auto encodingName = StringAttr::get(funcOp.getContext(), "iree.abi.encoding");
-  for (auto [i, oldType, newType] :
-       llvm::enumerate(oldFuncType.getInputs(), newFuncType.getInputs())) {
-    if (oldType != newType) {
-      funcOp.setArgAttr(i, encodingName, TypeAttr::get(oldType));
+  // A fence is itself the ABI type of a token.
+  auto needsEncoding = [](Type oldType, Type newType) {
+    return oldType != newType && !isa<mlir::stablehlo::TokenType>(oldType);
+  };
+  for (auto [i, oldType] : llvm::enumerate(oldFuncType.getInputs())) {
+    auto mapping = inputs.getInputMapping(i);
+    if (!mapping || mapping->size != 1) {
+      continue;
+    }
+    if (needsEncoding(oldType, newFuncType.getInput(mapping->inputNo))) {
+      funcOp.setArgAttr(mapping->inputNo, encodingName, TypeAttr::get(oldType));
     }
   }
-  for (auto [i, oldType, newType] :
-       llvm::enumerate(oldFuncType.getResults(), newFuncType.getResults())) {
-    if (oldType != newType) {
-      funcOp.setResultAttr(i, encodingName, TypeAttr::get(oldType));
+  unsigned offset = 0;
+  for (auto [oldType, count] :
+       llvm::zip_equal(oldFuncType.getResults(), resultCounts)) {
+    if (count == 1 && needsEncoding(oldType, newFuncType.getResult(offset))) {
+      funcOp.setResultAttr(offset, encodingName, TypeAttr::get(oldType));
     }
+    offset += count;
   }
 }
 
@@ -338,6 +352,32 @@ static void rewriteFuncAttrs(func::FuncOp funcOp) {
   funcOp.setAllResultAttrs(resultAttrs);
 }
 
+struct BlockSignaturePlan {
+  Block *block;
+  TypeConverter::SignatureConversion conversion;
+};
+
+// Convert every block signature before modifying a function. Applying the
+// resulting plans is non-failing; no partially changed signature is exposed
+// by a later type-conversion refusal.
+static FailureOr<SmallVector<BlockSignaturePlan, 0>>
+buildBodySignaturePlan(func::FuncOp function, const TypeConverter &converter,
+                       const TypeConverter::SignatureConversion &entry) {
+  SmallVector<BlockSignaturePlan, 0> plans;
+  for (Block &block : function.getBody()) {
+    if (&block == &function.front()) {
+      plans.push_back({&block, entry});
+      continue;
+    }
+    auto converted = converter.convertBlockSignature(&block);
+    if (!converted) {
+      return failure();
+    }
+    plans.push_back({&block, std::move(*converted)});
+  }
+  return plans;
+}
+
 // We need to convert func ops in order to convert types.
 struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
   using Base::Base;
@@ -359,9 +399,13 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
 
     // Convert function results.
     SmallVector<Type> convertedResultTypes;
-    if (failed(getTypeConverter()->convertTypes(srcFuncType.getResults(),
-                                                convertedResultTypes))) {
-      return rewriter.notifyMatchFailure(srcOp, "results failed to convert");
+    SmallVector<unsigned> resultCounts;
+    for (Type type : srcFuncType.getResults()) {
+      size_t before = convertedResultTypes.size();
+      if (failed(getTypeConverter()->convertType(type, convertedResultTypes))) {
+        return rewriter.notifyMatchFailure(srcOp, "results failed to convert");
+      }
+      resultCounts.push_back(convertedResultTypes.size() - before);
     }
 
     // Create new function with converted argument and result types.
@@ -370,20 +414,84 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
         srcOp.getContext(), signatureConversion.getConvertedTypes(),
         convertedResultTypes);
 
-    // Update the function in place.
-    rewriter.startOpModification(srcOp);
-    srcOp.setType(newFuncType);
-    rewriteFuncAttrs(srcOp);
-    setFuncEncodings(srcOp, oldFuncType, newFuncType);
-
-    // Tell the rewriter to convert the region signature.
-    const TypeConverter &typeConverter = *getTypeConverter();
-    if (failed(rewriter.convertRegionTypes(&srcOp.getBody(), typeConverter,
-                                           &signatureConversion))) {
+    auto metadata = remapSignatureMetadata(
+        srcOp, srcFuncType,
+        {srcOp.getAllArgAttrs(), srcOp.getAllResultAttrs(), {}},
+        *getTypeConverter());
+    if (failed(metadata)) {
       return failure();
     }
 
+    auto body =
+        buildBodySignaturePlan(srcOp, *getTypeConverter(), signatureConversion);
+    if (failed(body)) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "block arguments failed to convert");
+    }
+    for (BlockSignaturePlan &plan : *body) {
+      rewriter.applySignatureConversion(plan.block, plan.conversion,
+                                        getTypeConverter());
+    }
+    // Metadata follows the original values and refers to their converted slots.
+    rewriter.startOpModification(srcOp);
+    srcOp.setType(newFuncType);
+    srcOp.setArgAttrsAttr(metadata->argAttrs);
+    srcOp.setResAttrsAttr(metadata->resultAttrs);
+    rewriteFuncAttrs(srcOp);
+    setFuncEncodings(srcOp, oldFuncType, newFuncType, signatureConversion,
+                     resultCounts);
+
     rewriter.finalizeOpModification(srcOp);
+    return success();
+  }
+};
+
+// The generic func conversion rebuilds calls without retaining metadata. Keep
+// per-value attributes, no_inline, discardable attributes and remapped ties on
+// the call that produces the converted payload and completion parts.
+struct CallOpTypeConversion final : OpConversionPattern<func::CallOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(func::CallOp op, OneToNOpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Type> resultTypes;
+    SmallVector<int64_t> resultCounts;
+    for (Type type : op.getResultTypes()) {
+      int64_t before = resultTypes.size();
+      if (failed(getTypeConverter()->convertType(type, resultTypes))) {
+        return rewriter.notifyMatchFailure(op, "result type conversion failed");
+      }
+      resultCounts.push_back(resultTypes.size() - before);
+    }
+    auto metadata = remapSignatureMetadata(
+        op, op.getCalleeType(),
+        {op.getArgAttrsAttr(), op.getResAttrsAttr(),
+         op->getAttrOfType<ArrayAttr>("iree.abi.tied_operands")},
+        *getTypeConverter());
+    if (failed(metadata)) {
+      return failure();
+    }
+    SmallVector<Value> operands;
+    for (ValueRange values : adaptor.getOperands()) {
+      llvm::append_range(operands, values);
+    }
+    auto call = func::CallOp::create(rewriter, op.getLoc(), op.getCallee(),
+                                     resultTypes, operands);
+    call->setDiscardableAttrs(op->getDiscardableAttrDictionary());
+    call.setArgAttrsAttr(metadata->argAttrs);
+    call.setResAttrsAttr(metadata->resultAttrs);
+    call.setNoInline(op.getNoInline());
+    if (metadata->tiedOperands) {
+      call->setAttr("iree.abi.tied_operands", metadata->tiedOperands);
+    }
+    SmallVector<ValueRange> replacements;
+    int64_t offset = 0;
+    for (int64_t count : resultCounts) {
+      replacements.push_back(call.getResults().slice(offset, count));
+      offset += count;
+    }
+    rewriter.replaceOpWithMultiple(op, replacements);
     return success();
   }
 };
@@ -625,13 +733,13 @@ struct ConvertStableHloToIreeInputDialects final
     // TODO(*): expose patterns that do this much better from
     //          iree/compiler/Dialect/Util/Transforms/ConvertPrimitiveType.cpp
     // Structural patterns (functions, cfg, terminators).
-    patterns.add<BuiltinFuncOpPattern>(*typeConverter, context);
+    patterns.add<BuiltinFuncOpPattern, CallOpTypeConversion>(*typeConverter,
+                                                             context);
     patterns.add<GlobalOpPattern, TensorEmptyPattern>(*typeConverter, context);
 
     patterns.add<
         GenericTypeConvert<cf::CondBranchOp>, GenericTypeConvert<cf::BranchOp>,
         GenericTypeConvert<func::ReturnOp>, GenericTypeConvert<func::ReturnOp>,
-        GenericTypeConvert<func::CallOp>,
         GenericTypeConvert<ml_program::GlobalLoadOp>,
         GenericTypeConvert<ml_program::GlobalLoadConstOp>,
         GenericTypeConvert<ml_program::GlobalStoreOp>,

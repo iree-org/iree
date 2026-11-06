@@ -25,6 +25,7 @@ iree_lit_test_suite(
             "dynamic_conv_invalid.mlir",
             "dynamic_conv_unsigned_constant_padding.mlir",
             "einsum_to_dot_general.mlir",
+            "flatten_public_tuple_signatures.mlir",
             "flatten_tuples_in_cfg.mlir",
             "flatten_tuples_in_scf.mlir",
             "gather_to_torch_index_select.mlir",

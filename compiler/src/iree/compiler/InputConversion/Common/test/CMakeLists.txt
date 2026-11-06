@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "demote_i64_to_i32.mlir"
     "import_ml_program.mlir"
     "iree_import_public.mlir"
+    "iree_import_public_invalid_ties.mlir"
     "promote_bf16_to_f32.mlir"
     "promote_f16_to_f32.mlir"
     "sanitize_module_names.mlir"
