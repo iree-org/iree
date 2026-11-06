@@ -169,6 +169,15 @@ typedef struct iree_hal_vulkan_command_buffer_t {
   // Whether replay embeds binding-table-dependent descriptor dispatch state.
   bool has_descriptor_dispatches;
 
+  // Whether any recorded command resolves a binding table slot into state that
+  // is baked into the native command buffer at record time and therefore
+  // cannot be refreshed by republishing BDA binding tables (which only walks
+  // dispatch commands). Buffer transfer commands record resolved VkBuffer
+  // handles, and indirect dispatches record the resolved parameter buffer, so
+  // a command buffer with any of those may not be replayed against a different
+  // binding table.
+  bool has_binding_table_dependent_commands;
+
   // Descriptor pool capacity required to replay recorded native commands.
   iree_hal_vulkan_command_buffer_descriptor_requirements_t
       descriptor_requirements;
@@ -1105,6 +1114,16 @@ iree_status_t iree_hal_vulkan_command_buffer_append_dispatch_profile_events(
   return iree_ok_status();
 }
 
+// Marks the command buffer as unsafe for cached native replay if |buffer_ref|
+// is an indirect reference resolved from the submission binding table.
+static void iree_hal_vulkan_command_buffer_note_binding_table_dependency(
+    iree_hal_vulkan_command_buffer_t* command_buffer,
+    iree_hal_buffer_ref_t buffer_ref) {
+  if (!buffer_ref.buffer) {
+    command_buffer->has_binding_table_dependent_commands = true;
+  }
+}
+
 static iree_status_t iree_hal_vulkan_command_buffer_add_descriptor_count(
     uint32_t current_count, iree_host_size_t delta_count, uint32_t* out_count) {
   if (IREE_UNLIKELY(delta_count > UINT32_MAX - current_count)) {
@@ -1240,6 +1259,14 @@ bool iree_hal_vulkan_command_buffer_has_descriptor_dispatches(
   iree_hal_vulkan_command_buffer_t* command_buffer =
       iree_hal_vulkan_command_buffer_cast(base_command_buffer);
   return command_buffer->has_descriptor_dispatches;
+}
+
+bool iree_hal_vulkan_command_buffer_has_binding_table_dependent_commands(
+    iree_hal_command_buffer_t* base_command_buffer) {
+  IREE_ASSERT_ARGUMENT(base_command_buffer);
+  iree_hal_vulkan_command_buffer_t* command_buffer =
+      iree_hal_vulkan_command_buffer_cast(base_command_buffer);
+  return command_buffer->has_binding_table_dependent_commands;
 }
 
 iree_status_t iree_hal_vulkan_command_buffer_native_bda_publication_length(
@@ -2678,6 +2705,8 @@ static iree_status_t iree_hal_vulkan_command_buffer_fill_buffer(
   iree_hal_vulkan_command_buffer_append_command(
       command_buffer, IREE_HAL_VULKAN_COMMAND_TYPE_FILL_BUFFER, record_length,
       payload_offset, /*out_command=*/NULL, &payload);
+  iree_hal_vulkan_command_buffer_note_binding_table_dependency(command_buffer,
+                                                               target_ref);
   iree_hal_vulkan_command_fill_buffer_t* fill_buffer =
       (iree_hal_vulkan_command_fill_buffer_t*)payload;
   fill_buffer->target_ref = target_ref;
@@ -2743,6 +2772,8 @@ static iree_status_t iree_hal_vulkan_command_buffer_update_buffer(
   iree_hal_vulkan_command_buffer_append_command(
       command_buffer, IREE_HAL_VULKAN_COMMAND_TYPE_UPDATE_BUFFER, record_length,
       payload_offset, /*out_command=*/NULL, &payload);
+  iree_hal_vulkan_command_buffer_note_binding_table_dependency(command_buffer,
+                                                               target_ref);
   iree_hal_vulkan_command_update_buffer_t* update_buffer =
       (iree_hal_vulkan_command_update_buffer_t*)payload;
   void* source_data =
@@ -2791,6 +2822,10 @@ static iree_status_t iree_hal_vulkan_command_buffer_copy_buffer(
   iree_hal_vulkan_command_buffer_append_command(
       command_buffer, IREE_HAL_VULKAN_COMMAND_TYPE_COPY_BUFFER, record_length,
       payload_offset, /*out_command=*/NULL, &payload);
+  iree_hal_vulkan_command_buffer_note_binding_table_dependency(command_buffer,
+                                                               source_ref);
+  iree_hal_vulkan_command_buffer_note_binding_table_dependency(command_buffer,
+                                                               target_ref);
   iree_hal_vulkan_command_copy_buffer_t* copy_buffer =
       (iree_hal_vulkan_command_copy_buffer_t*)payload;
   copy_buffer->source_ref = source_ref;
@@ -2955,6 +2990,8 @@ static iree_status_t iree_hal_vulkan_command_buffer_dispatch(
   if (iree_hal_dispatch_uses_indirect_parameters(flags)) {
     IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_track_buffer_ref(
         command_buffer, config.workgroup_count_ref));
+    iree_hal_vulkan_command_buffer_note_binding_table_dependency(
+        command_buffer, config.workgroup_count_ref);
   }
 
   iree_host_size_t payload_length = 0;
