@@ -3820,34 +3820,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#transferstorage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        TransferStorage
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="TransferStorage">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_7" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cases:
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -7735,8 +7707,6 @@
       
         
       
-        
-      
     
     
     
@@ -7783,36 +7753,6 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-    
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../community/blog/category/community/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Community
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -9796,34 +9736,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#transferstorage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        TransferStorage
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="TransferStorage">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cases_7" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cases:
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -10133,10 +10045,6 @@ breaking execution correctness.</p>
 </li>
 <li><a href="#resourceaccessbitfield">ResourceAccessBitfield</a><ul>
 <li><a href="#cases_6">Cases:</a></li>
-</ul>
-</li>
-<li><a href="#transferstorage">TransferStorage</a><ul>
-<li><a href="#cases_7">Cases:</a></li>
 </ul>
 </li>
 </ul>
@@ -11302,7 +11210,6 @@ value.</p>
               `-&gt;`
               (`to` `(` $target_affinity^ `)`)?
               type($result) `` `{` $result_size `}`
-              (`storage` `=` $storage^)?
               attr-dict-with-keyword
 </code></pre></div>
 <p>Transfers a resource between different states (such as a <code>staging</code> lifetime
@@ -11312,9 +11219,6 @@ devices with discrete memory spaces or pools.</p>
 <p>The optional execution affinity specifies where the transfer must execute
 independently of the source and target storage affinities. When omitted an
 execution affinity is derived from the resource lifetimes and endpoints.</p>
-<p>The optional storage policy specifies the storage used by a surviving
-transfer: <code>copy</code> uses separate destination storage, while <code>reuse</code> uses the
-source storage for the result. When omitted, storage defaults to <code>copy</code>.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_AsyncPhaseOp</code></p>
 <p>Interfaces: <code>AffinityOpInterface</code>, <code>AsyncAccessOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_StreamableOp</code>, <code>Util_HoistableOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
@@ -11324,7 +11228,6 @@ source storage for the result. When omitted, storage defaults to <code>copy</cod
 <tr><td><code>source_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 <tr><td><code>target_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
 <tr><td><code>execution_affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>Defines execution context affinity.</td></tr>
-<tr><td><code>storage</code></td><td>::mlir::iree_compiler::IREE::Stream::TransferStorageAttr</td><td>transfer storage policy</td></tr>
 </table>
 
 <h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
@@ -16734,30 +16637,6 @@ B is available so too must be A.</p>
 <td style="text-align: center;">Write</td>
 <td style="text-align: center;"><code>2</code></td>
 <td>Write</td>
-</tr>
-</tbody>
-</table>
-<h3 id="transferstorage">TransferStorage<a class="headerlink" href="#transferstorage" title="Permanent link">link</a></h3>
-<p><em>Transfer storage policy</em></p>
-<h4 id="cases_7">Cases:<a class="headerlink" href="#cases_7" title="Permanent link">link</a></h4>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Symbol</th>
-<th style="text-align: center;">Value</th>
-<th>String</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">Copy</td>
-<td style="text-align: center;"><code>0</code></td>
-<td>copy</td>
-</tr>
-<tr>
-<td style="text-align: center;">Reuse</td>
-<td style="text-align: center;"><code>1</code></td>
-<td>reuse</td>
 </tr>
 </tbody>
 </table>
