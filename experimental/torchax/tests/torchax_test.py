@@ -44,20 +44,36 @@ class TorchaxImportTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_strict_export_after_an_export(self):
+    def test_child_export_preserves_parent_torch_state(self):
         result = _run_alone(
             """
+            import pathlib
+            import subprocess
             import sys
+            import tempfile
             import torch
-            import iree_torchax
 
             class Affine(torch.nn.Module):
                 def forward(self, x):
                     return x * 2 + 1
 
-            affine = torch.export.export(Affine(), (torch.ones(3),))
+            backend = torch._C._get_privateuse1_backend_name()
+            with tempfile.TemporaryDirectory() as directory:
+                output = pathlib.Path(directory) / "model.mlir"
+                child = (
+                    "import pathlib, sys, torch, iree_torchax; "
+                    "Affine = type('Affine', (torch.nn.Module,), "
+                    "{'forward': lambda self, x: x * 2 + 1}); "
+                    "exported = torch.export.export(Affine(), (torch.ones(3),)); "
+                    "_, artifact = iree_torchax.exported_program_to_stablehlo(exported); "
+                    "pathlib.Path(sys.argv[1]).write_text(str(artifact.mlir_module()))"
+                )
+                subprocess.run([sys.executable, "-c", child, str(output)], check=True)
+                assert 'func.func public @main' in output.read_text()
+
             assert "torchax" not in sys.modules
-            iree_torchax.exported_program_to_jax(affine)
+            assert "jax" not in sys.modules
+            assert torch._C._get_privateuse1_backend_name() == backend
             torch.export.export(Affine(), (torch.ones(3),), strict=True)
             """
         )
