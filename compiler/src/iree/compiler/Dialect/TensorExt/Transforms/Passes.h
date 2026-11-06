@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler::IREE::TensorExt {
 
@@ -17,6 +18,9 @@ namespace mlir::iree_compiler::IREE::TensorExt {
 #include "iree/compiler/Dialect/TensorExt/Transforms/Passes.h.inc" // IWYU pragma: keep
 
 void registerPasses();
+
+/// Populate patterns that use the SparseOpInterface to rewrite operations.
+void populateSparseInterfaceRewritePatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler::IREE::TensorExt
 
