@@ -288,8 +288,9 @@ module version, and whether they changed since the previous release:
     [trusted publishing](https://docs.pypi.org/trusted-publishers/), which
     needs no PyPI credentials and attaches an attestation to every file.
 
-    Download the promoted wheels for the GitHub release from the run's
-    `pypi-wheels` artifact:
+    Download the promoted wheels and their attestation bundle
+    (`iree-X.Y.Z-pypi-wheels.sigstore.json`) for the GitHub release from the
+    run's `pypi-wheels` artifact:
 
     ```bash
     WHEEL_DIR=/tmp/iree_pypi_wheels.XXXXX
@@ -344,8 +345,10 @@ module version, and whether they changed since the previous release:
 
     * Paste the release notes from the release tracking issue.
 
-    * Upload the `iree-dist-*.tar.xz` files of the release candidate and the
-        promoted `.whl` files from step 1 to the release draft.
+    * Upload the `iree-dist-*.tar.xz` files of the release candidate, and the
+        promoted `.whl` files and their attestation bundle from step 1, to the
+        release draft. The bundle lets users verify the wheels offline with
+        `gh attestation verify --bundle`.
 
         Download the `iree-dist-*.tar.xz` files from the candidate release.
 
@@ -353,7 +356,8 @@ module version, and whether they changed since the previous release:
         gh release download iree-3.1.0rc20241119 --repo iree-org/iree \
           --pattern 'iree-dist-*' --dir "${WHEEL_DIR}"
         gh release upload v3.1.0 --repo iree-org/iree \
-          "${WHEEL_DIR}"/*.whl "${WHEEL_DIR}"/iree-dist-*.tar.xz
+          "${WHEEL_DIR}"/*.whl "${WHEEL_DIR}"/*-pypi-wheels.sigstore.json \
+          "${WHEEL_DIR}"/iree-dist-*.tar.xz
         ```
 
     * Upload the candidate's attestation bundles for the `iree-dist-*.tar.xz`
