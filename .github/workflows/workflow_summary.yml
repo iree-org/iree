@@ -47,9 +47,11 @@ jobs:
     steps:
       - name: Getting failed jobs
         id: failed_jobs
+        env:
+          JOBS_JSON: ${{ inputs.jobs-json }}
         run: |
-          echo '${{ inputs.jobs-json }}'
-          FAILED_JOBS="$(echo '${{ inputs.jobs-json }}' \
+          echo "${JOBS_JSON}"
+          FAILED_JOBS="$(echo "${JOBS_JSON}" \
             | jq --raw-output \
             'map_values(select(.result!="success" and .result!="skipped")) | keys | join(",")' \
           )"

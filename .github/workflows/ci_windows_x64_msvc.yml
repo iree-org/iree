@@ -70,11 +70,11 @@ jobs:
       - name: "Building IREE"
         shell: bash
         run: |
-          echo "Building in ${{ env.BUILD_DIR_BASH }}"
+          echo "Building in ${BUILD_DIR_BASH}"
           source ./build_tools/cmake/setup_sccache.sh
-          bash ./build_tools/cmake/build_all.sh ${{ env.BUILD_DIR_BASH }}
+          bash ./build_tools/cmake/build_all.sh "${BUILD_DIR_BASH}"
       - name: "Testing IREE"
-        run: bash ./build_tools/cmake/ctest_all.sh ${{ env.BUILD_DIR_BASH }}
+        run: bash ./build_tools/cmake/ctest_all.sh "$env:BUILD_DIR_BASH"
       - name: "Clean up build dir"
         if: always()
         run: if (Test-Path -Path "$Env:BUILD_DIR_POWERSHELL") {Remove-Item -Path "$Env:BUILD_DIR_POWERSHELL" -Recurse -Force}

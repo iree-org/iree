@@ -79,10 +79,11 @@ jobs:
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
-            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+            --fetch-gh-workflow="${ARTIFACT_RUN_ID}"
           source ${VENV_DIR}/bin/activate
           pip install -e ${{ github.workspace }}/iree-test-suites/sharktank_models
         env:
+          ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run sharktank model tests

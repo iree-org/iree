@@ -75,10 +75,12 @@ jobs:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
       - name: Setup venv
+        env:
+          ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
-            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+            --fetch-gh-workflow="${ARTIFACT_RUN_ID}"
 
       - name: Checkout test suites repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

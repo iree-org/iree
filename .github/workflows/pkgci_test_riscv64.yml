@@ -71,8 +71,9 @@ jobs:
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
-            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+            --fetch-gh-workflow="${ARTIFACT_RUN_ID}"
         env:
+          ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Bootstrap
         env:
@@ -83,15 +84,15 @@ jobs:
           QEMU_FILE_NAME: "qemu-riscv_8.1.2_manylinux_2.28_20231026.tar.gz"
           QEMU_FILE_SHA: "dd77b39820d45b80bafab9155581578b4c625cb92fd6db9e9adbb9798fde3597"
         run: |
-          mkdir -p ${{ env.BOOTSTRAP_WORK_DIR }}
-          mkdir -p ${{ env.RISCV_TOOLCHAIN_ROOT }}
-          mkdir -p ${{ env.QEMU_PATH_PREFIX }}
+          mkdir -p "${BOOTSTRAP_WORK_DIR}"
+          mkdir -p "${RISCV_TOOLCHAIN_ROOT}"
+          mkdir -p "${QEMU_PATH_PREFIX}"
           wget --progress=bar:force:noscroll --directory-prefix="${BOOTSTRAP_WORK_DIR}" "${IREE_ARTIFACT_URL}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}"
           echo "${RISCV_CLANG_TOOLCHAIN_FILE_SHA}  ${BOOTSTRAP_WORK_DIR}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}" | sha256sum -c -
-          tar -C "${{ env.RISCV_TOOLCHAIN_ROOT }}" -xf "${BOOTSTRAP_WORK_DIR}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}" --no-same-owner --strip-components=1
+          tar -C "${RISCV_TOOLCHAIN_ROOT}" -xf "${BOOTSTRAP_WORK_DIR}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}" --no-same-owner --strip-components=1
           wget --progress=bar:force:noscroll --directory-prefix="${BOOTSTRAP_WORK_DIR}" "${IREE_ARTIFACT_URL}/${QEMU_FILE_NAME}"
           echo "${QEMU_FILE_SHA}  ${BOOTSTRAP_WORK_DIR}/${QEMU_FILE_NAME}" | sha256sum -c -
-          tar -C "${{ env.QEMU_PATH_PREFIX }}" -xf "${BOOTSTRAP_WORK_DIR}/${QEMU_FILE_NAME}" --no-same-owner --strip-components=1
+          tar -C "${QEMU_PATH_PREFIX}" -xf "${BOOTSTRAP_WORK_DIR}/${QEMU_FILE_NAME}" --no-same-owner --strip-components=1
       - name: Build riscv64
         env:
           IREE_HOST_BIN_DIR: ${{ env.VENV_DIR }}/bin
@@ -141,8 +142,9 @@ jobs:
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
-            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+            --fetch-gh-workflow="${ARTIFACT_RUN_ID}"
         env:
+          ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Restore toolchain cache
         id: restore-toolchain
