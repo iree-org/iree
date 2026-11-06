@@ -1885,8 +1885,7 @@ addTargetEncoderFunc(Location loc, const TargetPlan &targetPlan,
           Value keyValue = IREE::Util::BufferConstantOp::create(
               funcBuilder, constantOp.getLoc(),
               parameterAttr.getKey().getValue());
-          // Create zero offset for full parameter load.
-          Value zeroOffset = i64Set.get(0);
+          Value sourceOffset = i64Set.get(parameterAttr.getStorageOffset());
           // Retained parameters do not bring their size producers into the
           // encoder. Materialize the size from the parameter attribute.
           Value resultSize = indexSet.get(parameterAttr.getStorageSize());
@@ -1896,7 +1895,7 @@ addTargetEncoderFunc(Location loc, const TargetPlan &targetPlan,
               constantOp.getResult().getType(),
               funcBuilder.getType<IREE::Stream::TimepointType>(),
               /*await_timepoint=*/lastTimepoint, scopeValue, keyValue,
-              zeroOffset, resultSize, targetPlan.affinityAttr);
+              sourceOffset, resultSize, targetPlan.affinityAttr);
           // Await the result timepoint to get a resolved resource that can be
           // used by streamable ops without explicit synchronization.
           auto awaitOp = IREE::Stream::TimepointAwaitOp::create(
