@@ -48,21 +48,18 @@ config_setting(
     },
 )
 
-# Detect Android from platform OS setting.
 config_setting(
-    name = "iree_is_android_platforms_os",
-    constraint_values = [
-        "@platforms//os:android",
-    ],
+    name = "iree_is_android_platform",
+    constraint_values = ["@platforms//os:android"],
 )
 
-# Matches Android, either via the define or via the platform OS. Use this in
-# select() conditions instead of the two settings above.
+# Android, either via --define=iree_is_android=true with a user-provided
+# toolchain or via an Android platform (e.g. --config=android_arm64).
 selects.config_setting_group(
     name = "iree_is_android",
     match_any = [
         ":iree_is_android_define",
-        ":iree_is_android_platforms_os",
+        ":iree_is_android_platform",
     ],
 )
 

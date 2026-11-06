@@ -1,0 +1,17 @@
+// Copyright 2026 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+// FastRPC interface between the Hexagon HAL driver on the host (stub) and the
+// device library running on the DSP (skel). qaic generates hexagon_dsp_open()
+// and hexagon_dsp_close() for the remote_handle64 session; the DSP side
+// implements them in dsp/device.c.
+
+#include "AEEStdDef.idl"
+#include "remote.idl"
+
+const string IDL_VERSION = "0.1.0";
+
+interface hexagon_dsp : remote_handle64 {};
