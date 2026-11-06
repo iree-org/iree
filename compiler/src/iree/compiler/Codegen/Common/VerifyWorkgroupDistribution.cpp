@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -19,6 +20,29 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+static bool isWorkgroupForall(scf::ForallOp forallOp) {
+  return forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr,
+                                IREE::LinalgExt::SplitReductionMappingAttr>(
+      forallOp);
+}
+
+static bool hasAtMostOneStaticIteration(scf::ForallOp forallOp) {
+  for (auto [lb, ub, step] : llvm::zip_equal(forallOp.getMixedLowerBound(),
+                                             forallOp.getMixedUpperBound(),
+                                             forallOp.getMixedStep())) {
+    std::optional<int64_t> lbVal = getConstantIntValue(lb);
+    std::optional<int64_t> ubVal = getConstantIntValue(ub);
+    std::optional<int64_t> stepVal = getConstantIntValue(step);
+    if (!lbVal || !ubVal || !stepVal || *stepVal <= 0) {
+      return false;
+    }
+    if (*ubVal - *lbVal > *stepVal) {
+      return false;
+    }
+  }
+  return true;
+}
+
 struct VerifyWorkgroupDistributionPass final
     : impl::VerifyWorkgroupDistributionPassBase<
           VerifyWorkgroupDistributionPass> {
@@ -26,19 +50,19 @@ struct VerifyWorkgroupDistributionPass final
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
 
-    WalkResult hasForall = funcOp.walk([&](scf::ForallOp forallOp) {
-      if (forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr,
-                                 IREE::LinalgExt::SplitReductionMappingAttr>(
-              forallOp)) {
-        return WalkResult::interrupt();
-      }
-      return WalkResult::advance();
-    });
+    WalkResult hasMultiWorkgroupForall =
+        funcOp.walk([&](scf::ForallOp forallOp) {
+          if (isWorkgroupForall(forallOp) &&
+              !hasAtMostOneStaticIteration(forallOp)) {
+            return WalkResult::interrupt();
+          }
+          return WalkResult::advance();
+        });
 
-    // Without a workgroup level forall, either this is a single workgroup
+    // Without a multi-workgroup level forall, either this is a single workgroup
     // dispatch, in which case no verification is needed, or this is already
     // distributed in which case verification is no longer possible.
-    if (!hasForall.wasInterrupted()) {
+    if (!hasMultiWorkgroupForall.wasInterrupted()) {
       return;
     }
 
@@ -48,9 +72,7 @@ struct VerifyWorkgroupDistributionPass final
     WalkResult res = funcOp.walk<WalkOrder::PreOrder>([&](Operation *op) {
       if (auto forallOp = dyn_cast<scf::ForallOp>(op)) {
         // Skip ops contained within forall ops with workgroup mappings.
-        if (forallOpHasMappingType<IREE::Codegen::WorkgroupMappingAttr,
-                                   IREE::LinalgExt::SplitReductionMappingAttr>(
-                forallOp)) {
+        if (isWorkgroupForall(forallOp)) {
           return WalkResult::skip();
         }
       }
