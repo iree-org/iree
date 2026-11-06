@@ -125,6 +125,32 @@ struct FoldZeroExtentReduction : OpRewritePattern<linalg::GenericOp> {
   }
 };
 
+/// Forward the inits of a linalg op whose reduction runs zero times, such as
+/// a matmul with an empty contraction; it never writes its outputs.
+struct FoldZeroTripReductions : OpInterfaceRewritePattern<linalg::LinalgOp> {
+  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    if (!linalgOp.hasPureTensorSemantics()) {
+      return failure();
+    }
+    SmallVector<int64_t> loopRanges = linalgOp.getStaticLoopRanges();
+    SmallVector<utils::IteratorType> iterators =
+        linalgOp.getIteratorTypesArray();
+    bool emptyReduction = llvm::any_of(
+        llvm::zip_equal(loopRanges, iterators), [](auto rangeAndIterator) {
+          auto [range, iterator] = rangeAndIterator;
+          return range == 0 && iterator == utils::IteratorType::reduction;
+        });
+    if (!emptyReduction) {
+      return failure();
+    }
+    rewriter.replaceOp(linalgOp, linalgOp.getDpsInits());
+    return success();
+  }
+};
+
 namespace {
 
 struct RemoveZeroExtentTensorsPass
@@ -143,7 +169,7 @@ void RemoveZeroExtentTensorsPass::runOnOperation() {
 
   RewritePatternSet patterns(context);
   patterns.insert<FoldZeroExtentReduction, FoldZeroExtentInserts,
-                  ReplaceZeroExtentOperands>(context);
+                  FoldZeroTripReductions, ReplaceZeroExtentOperands>(context);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
     funcOp->emitOpError("failed to run canonicalizations (proxy for DCE)");

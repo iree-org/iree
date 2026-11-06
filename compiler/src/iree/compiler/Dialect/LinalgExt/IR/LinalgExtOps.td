@@ -113,6 +113,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
+  let hasFolder = 1;
   let assemblyFormat = [{
     attr-dict `dimension_map` `=` $dimension_map
               `unique_indices` `(` $unique_indices `)`
@@ -171,6 +172,47 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     MutableOperandRange getDpsInitsMutable() {
       return getOriginalMutable();
     }
+  }];
+}
+
+// A conservative general form of scatter. Unlike ScatterOp, this op retains
+// the complete StableHLO dimension mapping and permits coupled variadic
+// updates. It is serialized over its update domain.
+def IREELinalgExt_GeneralScatterOp : IREELinalgExt_Op<"general_scatter",
+    [AttrSizedOperandSegments, RecursiveMemoryEffects,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+     DeclareOpInterfaceMethods<LinalgFusionInterface,
+      ["getIndexingMapsForResults", "getIndexingMapsForOperands",
+       "getStaticLoopRanges"]>,
+     DeclareOpInterfaceMethods<TilingInterface,
+        ["generateScalarImplementation", "getIterationDomain",
+         "getLoopIteratorTypes", "getResultTilePosition",
+         "getTiledImplementation", "getIterationDomainTileFromOperandTiles",
+         "getTiledImplementationFromOperandTiles"]>]> {
+  let summary = [{General variadic scatter with full dimension-number mapping.}];
+  let arguments = (ins
+    Variadic<AnyRankedTensorOrMemRef>:$updates,
+    AnyRankedTensorOrMemRef:$indices,
+    Variadic<AnyRankedTensorOrMemRef>:$originals,
+    DenseI64ArrayAttr:$update_window_dims,
+    DenseI64ArrayAttr:$inserted_window_dims,
+    DenseI64ArrayAttr:$input_batching_dims,
+    DenseI64ArrayAttr:$scatter_indices_batching_dims,
+    DenseI64ArrayAttr:$scatter_dims_to_operand_dims,
+    I64Attr:$index_vector_dim);
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$region);
+  let hasFolder = 1;
+  let hasVerifier = 1;
+  let assemblyFormat = [{
+    prop-dict attr-dict
+    `ins` `(` $updates `:` type($updates) `)`
+    `indices` `(` $indices `:` type($indices) `)`
+    `outs` `(` $originals `:` type($originals) `)`
+    $region (`->` type($results)^)?
+  }];
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    MutableOperandRange getDpsInitsMutable() { return getOriginalsMutable(); }
   }];
 }
 

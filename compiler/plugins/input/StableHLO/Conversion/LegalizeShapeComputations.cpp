@@ -51,11 +51,17 @@ struct HloElementwiseConverter : OpRewritePattern<OpTy> {
       return failure();
     }
 
-    auto resultTy = cast<ShapedType>(op.getType());
+    // Scalar expansion requires a compile-time element count. In particular,
+    // a scalar shape predicate can select dynamically sized vectors; leave
+    // those operations for ordinary tensor lowering.
+    auto resultType = dyn_cast<RankedTensorType>(op.getType());
+    if (!resultType || !resultType.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op, "requires a static result shape");
+    }
 
     Location loc = op.getLoc();
-    SmallVector<Value> operands;
-    for (int i = 0, s = resultTy.getNumElements(); i < s; ++i) {
+    SmallVector<Value> elements;
+    for (int64_t i = 0, count = resultType.getNumElements(); i < count; ++i) {
       SmallVector<Value> extracts;
       for (Value operand : op->getOperands()) {
         ShapedType operandTy = cast<ShapedType>(operand.getType());
@@ -72,11 +78,12 @@ struct HloElementwiseConverter : OpRewritePattern<OpTy> {
       }
 
       Value scalarOp = mlir::stablehlo::StableHloOpToStdScalarOp::mapOp(
-          op, resultTy.getElementType(), extracts, &rewriter);
-      operands.push_back(scalarOp);
+          op, resultType.getElementType(), extracts, &rewriter);
+      elements.push_back(scalarOp);
     }
 
-    rewriter.replaceOpWithNewOp<tensor::FromElementsOp>(op, resultTy, operands);
+    rewriter.replaceOpWithNewOp<tensor::FromElementsOp>(op, resultType,
+                                                        elements);
     return success();
   }
 };
@@ -189,6 +196,7 @@ void populateLegalizeShapeComputationPatterns(MLIRContext *context,
                 HloElementwiseConverter<mlir::stablehlo::AddOp>,
                 HloElementwiseConverter<mlir::stablehlo::AndOp>,
                 HloElementwiseConverter<mlir::stablehlo::CeilOp>,
+                HloElementwiseConverter<mlir::stablehlo::CompareOp>,
                 HloElementwiseConverter<mlir::stablehlo::ConvertOp>,
                 HloElementwiseConverter<mlir::stablehlo::DivOp>,
                 HloElementwiseConverter<mlir::stablehlo::FloorOp>,
@@ -196,8 +204,11 @@ void populateLegalizeShapeComputationPatterns(MLIRContext *context,
                 HloElementwiseConverter<mlir::stablehlo::MinOp>,
                 HloElementwiseConverter<mlir::stablehlo::MulOp>,
                 HloElementwiseConverter<mlir::stablehlo::NegOp>,
+                HloElementwiseConverter<mlir::stablehlo::RemOp>,
                 HloElementwiseConverter<mlir::stablehlo::RoundOp>,
                 HloElementwiseConverter<mlir::stablehlo::RsqrtOp>,
+                HloElementwiseConverter<mlir::stablehlo::SelectOp>,
+                HloElementwiseConverter<mlir::stablehlo::SignOp>,
                 HloElementwiseConverter<mlir::stablehlo::SqrtOp>,
                 HloElementwiseConverter<mlir::stablehlo::SubtractOp>,
                 ConcatenateConverter, GetDimSizeConverter, ReshapeConverter>(

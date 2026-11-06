@@ -33,6 +33,7 @@ iree_check_single_backend_test_suite(
     "constant.mlir"
     "convert.mlir"
     "convolution.mlir"
+    "convolution_window.mlir"
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
@@ -57,6 +58,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "pad_dynamic.mlir"
     "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
@@ -81,7 +83,9 @@ iree_check_single_backend_test_suite(
     "three_fry.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
+    "unsigned_start_indices.mlir"
     "while.mlir"
+    "zero_extent.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
@@ -111,6 +115,7 @@ iree_check_single_backend_test_suite(
     "constant.mlir"
     "convert.mlir"
     "convolution.mlir"
+    "convolution_window.mlir"
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
@@ -135,6 +140,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "pad_dynamic.mlir"
     "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
@@ -159,7 +165,9 @@ iree_check_single_backend_test_suite(
     "three_fry.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
+    "unsigned_start_indices.mlir"
     "while.mlir"
+    "zero_extent.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
@@ -190,6 +198,7 @@ iree_check_single_backend_test_suite(
     "constant.mlir"
     "convert.mlir"
     "convolution.mlir"
+    "convolution_window.mlir"
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
@@ -211,6 +220,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "pad_dynamic.mlir"
     "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
@@ -235,6 +245,7 @@ iree_check_single_backend_test_suite(
     "three_fry.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
+    "unsigned_start_indices.mlir"
     "while.mlir"
   TARGET_BACKEND
     "vmvx"
@@ -242,6 +253,49 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_local-task_general_scatter
+  SRCS
+    "scatter_general.mlir"
+    "scatter_general_complex.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
+  LABELS
+    "nowasm"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_local-task_general_scatter
+  SRCS
+    "scatter_general.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-input-promote-f16-to-f32"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_local-task_index32_general_scatter
+  SRCS
+    "scatter_general.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-input-promote-f16-to-f32"
+    "--iree-vm-target-index-bits=32"
 )
 
 iree_check_single_backend_test_suite(
@@ -262,6 +316,7 @@ iree_check_single_backend_test_suite(
     "constant.mlir"
     "convert.mlir"
     "convolution.mlir"
+    "convolution_window.mlir"
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
@@ -283,6 +338,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "pad_dynamic.mlir"
     "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
@@ -307,6 +363,7 @@ iree_check_single_backend_test_suite(
     "three_fry.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
+    "unsigned_start_indices.mlir"
     "while.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
@@ -354,6 +411,7 @@ iree_check_single_backend_test_suite(
     "constant.mlir"
     "convert.mlir"
     "convolution.mlir"
+    "convolution_window.mlir"
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
@@ -378,6 +436,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "pad_dynamic.mlir"
     "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
@@ -402,7 +461,9 @@ iree_check_single_backend_test_suite(
     "three_fry.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
+    "unsigned_start_indices.mlir"
     "while.mlir"
+    "zero_extent.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
@@ -438,6 +499,7 @@ iree_check_single_backend_test_suite(
     "constant.mlir"
     "convert.mlir"
     "convolution.mlir"
+    "convolution_window.mlir"
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
@@ -462,6 +524,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "pad_dynamic.mlir"
     "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
@@ -486,7 +549,9 @@ iree_check_single_backend_test_suite(
     "three_fry.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
+    "unsigned_start_indices.mlir"
     "while.mlir"
+    "zero_extent.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
@@ -521,6 +586,7 @@ iree_check_single_backend_test_suite(
     "constant.mlir"
     "convert.mlir"
     "convolution.mlir"
+    "convolution_window.mlir"
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
@@ -545,6 +611,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "pad_dynamic.mlir"
     "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
@@ -569,7 +636,9 @@ iree_check_single_backend_test_suite(
     "three_fry.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
+    "unsigned_start_indices.mlir"
     "while.mlir"
+    "zero_extent.mlir"
   TARGET_BACKEND
     "rocm"
   DRIVER
@@ -596,6 +665,7 @@ iree_check_single_backend_test_suite(
     "constant.mlir"
     "convert.mlir"
     "convolution.mlir"
+    "convolution_window.mlir"
     "cosine.mlir"
     "divide.mlir"
     "dot.mlir"
@@ -620,6 +690,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "pad_dynamic.mlir"
     "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
@@ -643,6 +714,7 @@ iree_check_single_backend_test_suite(
     "three_fry.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
+    "unsigned_start_indices.mlir"
     "while.mlir"
   TARGET_BACKEND
     "metal-spirv"
