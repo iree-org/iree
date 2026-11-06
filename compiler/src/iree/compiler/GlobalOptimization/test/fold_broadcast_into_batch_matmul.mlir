@@ -219,3 +219,428 @@ util.func public @broadcast_with_other_user(%act: tensor<4x10x10xf32>, %weight: 
 //  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
 //  CHECK-SAME:     ins(%[[ACT]], %[[WEIGHT]] : tensor<4x10x10xf32>, tensor<10x10xf32>)
 //       CHECK:   util.return %{{.+}}, %[[BROADCAST]]
+
+// -----
+
+// A weight broadcast under a dequantize with a per-channel scale: the
+// dequantize is rebuilt at the weight's rank and the broadcast folds into the
+// RHS map, so the weights are dequantized once rather than once per batch.
+util.func public @dequantize_broadcast_rhs(%act: tensor<2x8x256xf32>, %weight: tensor<256x1536xi8>, %scale: tensor<1536xf32>) -> tensor<2x8x1536xf32> {
+  %init_broadcast = tensor.empty() : tensor<2x256x1536xi8>
+  %broadcast = linalg.broadcast ins(%weight : tensor<256x1536xi8>)
+                                outs(%init_broadcast : tensor<2x256x1536xi8>) dimensions = [0]
+  %init_dq = tensor.empty() : tensor<2x256x1536xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> (d2)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale : tensor<2x256x1536xi8>, tensor<1536xf32>)
+      outs(%init_dq : tensor<2x256x1536xf32>) -> tensor<2x256x1536xf32>
+  %init_out = tensor.empty() : tensor<2x8x1536xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<2x8x1536xf32>) -> tensor<2x8x1536xf32>
+  %result = linalg.batch_matmul ins(%act, %dq : tensor<2x8x256xf32>, tensor<2x256x1536xf32>)
+                                outs(%fill : tensor<2x8x1536xf32>) -> tensor<2x8x1536xf32>
+  util.return %result : tensor<2x8x1536xf32>
+}
+// CHECK-LABEL: @dequantize_broadcast_rhs(
+//  CHECK-SAME:   %[[ACT:[a-zA-Z0-9]+]]: tensor<2x8x256xf32>, %[[WEIGHT:[a-zA-Z0-9]+]]: tensor<256x1536xi8>, %[[SCALE:[a-zA-Z0-9]+]]: tensor<1536xf32>
+//   CHECK-NOT:   linalg.broadcast
+//       CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<256x1536xf32>
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>]>
+//  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<256x1536xi8>, tensor<1536xf32>)
+//  CHECK-SAME:     outs(%[[INIT]] : tensor<256x1536xf32>)
+//   CHECK-NOT:   iree_linalg_ext.dequantize_affine
+//       CHECK:   linalg.batch_matmul
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
+//  CHECK-SAME:     ins(%[[ACT]], %[[DQ]] : tensor<2x8x256xf32>, tensor<256x1536xf32>)
+
+// -----
+
+// A per-channel zero point is rebased onto the weight's dims like the scale.
+util.func public @dequantize_broadcast_rhs_asymmetric(%act: tensor<4x8x16xf32>, %weight: tensor<16x12xi8>, %scale: tensor<12xf32>, %zp: tensor<12xi8>) -> tensor<4x8x12xf32> {
+  %init_broadcast = tensor.empty() : tensor<4x16x12xi8>
+  %broadcast = linalg.broadcast ins(%weight : tensor<16x12xi8>)
+                                outs(%init_broadcast : tensor<4x16x12xi8>) dimensions = [0]
+  %init_dq = tensor.empty() : tensor<4x16x12xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> (d2)>,
+                        affine_map<(d0, d1, d2) -> (d2)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale, %zp : tensor<4x16x12xi8>, tensor<12xf32>, tensor<12xi8>)
+      outs(%init_dq : tensor<4x16x12xf32>) -> tensor<4x16x12xf32>
+  %init_out = tensor.empty() : tensor<4x8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.batch_matmul ins(%act, %dq : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+                                outs(%fill : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  util.return %result : tensor<4x8x12xf32>
+}
+// CHECK-LABEL: @dequantize_broadcast_rhs_asymmetric(
+//  CHECK-SAME:   %[[ACT:[a-zA-Z0-9]+]]: tensor<4x8x16xf32>, %[[WEIGHT:[a-zA-Z0-9]+]]: tensor<16x12xi8>, %[[SCALE:[a-zA-Z0-9]+]]: tensor<12xf32>, %[[ZP:[a-zA-Z0-9]+]]: tensor<12xi8>
+//   CHECK-NOT:   linalg.broadcast
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>]>
+//  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]], %[[ZP]] : tensor<16x12xi8>, tensor<12xf32>, tensor<12xi8>)
+//       CHECK:   linalg.batch_matmul
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
+//  CHECK-SAME:     ins(%[[ACT]], %[[DQ]] : tensor<4x8x16xf32>, tensor<16x12xf32>)
+
+// -----
+
+// Per-tensor scalar parameters, unsigned storage and zero point, and clamp
+// bounds are carried over verbatim.
+util.func public @dequantize_broadcast_rhs_per_tensor_unsigned(%act: tensor<4x8x16xf32>, %weight: tensor<16x12xi8>, %scale: f32, %zp: i8) -> tensor<4x8x12xf32> {
+  %init_broadcast = tensor.empty() : tensor<4x16x12xi8>
+  %broadcast = linalg.broadcast ins(%weight : tensor<16x12xi8>)
+                                outs(%init_broadcast : tensor<4x16x12xi8>) dimensions = [0]
+  %init_dq = tensor.empty() : tensor<4x16x12xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <input_unsigned, zp_unsigned, quant_min = 0, quant_max = 255,
+       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> ()>,
+                        affine_map<(d0, d1, d2) -> ()>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale, %zp : tensor<4x16x12xi8>, f32, i8)
+      outs(%init_dq : tensor<4x16x12xf32>) -> tensor<4x16x12xf32>
+  %init_out = tensor.empty() : tensor<4x8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.batch_matmul ins(%act, %dq : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+                                outs(%fill : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  util.return %result : tensor<4x8x12xf32>
+}
+// CHECK-LABEL: @dequantize_broadcast_rhs_per_tensor_unsigned(
+//  CHECK-SAME:   %[[ACT:[a-zA-Z0-9]+]]: tensor<4x8x16xf32>, %[[WEIGHT:[a-zA-Z0-9]+]]: tensor<16x12xi8>, %[[SCALE:[a-zA-Z0-9]+]]: f32, %[[ZP:[a-zA-Z0-9]+]]: i8
+//   CHECK-NOT:   linalg.broadcast
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> ()>, affine_map<(d0, d1) -> ()>, affine_map<(d0, d1) -> (d0, d1)>], quant_min = 0, quant_max = 255, input_unsigned, zp_unsigned>
+//  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]], %[[ZP]] : tensor<16x12xi8>, f32, i8)
+//       CHECK:   linalg.batch_matmul
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
+//  CHECK-SAME:     ins(%[[ACT]], %[[DQ]] : tensor<4x8x16xf32>, tensor<16x12xf32>)
+
+// -----
+
+// A transpose folded into the dequantize's output map composes with the
+// broadcast: the [N, K] weight is read through (d2, d3), which the named op
+// rejects for a batch-broadcast RHS, so the contraction becomes a generic.
+util.func public @dequantize_transposed_broadcast_rhs(%act: tensor<4x8x16xf32>, %weight: tensor<12x16xi8>, %scale: tensor<12xf32>) -> tensor<4x8x12xf32> {
+  %init_broadcast = tensor.empty() : tensor<4x12x16xi8>
+  %broadcast = linalg.broadcast ins(%weight : tensor<12x16xi8>)
+                                outs(%init_broadcast : tensor<4x12x16xi8>) dimensions = [0]
+  %init_dq = tensor.empty() : tensor<4x16x12xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> (d1)>,
+                        affine_map<(d0, d1, d2) -> (d0, d2, d1)>]>
+      ins(%broadcast, %scale : tensor<4x12x16xi8>, tensor<12xf32>)
+      outs(%init_dq : tensor<4x16x12xf32>) -> tensor<4x16x12xf32>
+  %init_out = tensor.empty() : tensor<4x8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.batch_matmul ins(%act, %dq : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+                                outs(%fill : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  util.return %result : tensor<4x8x12xf32>
+}
+// CHECK-LABEL: @dequantize_transposed_broadcast_rhs(
+//  CHECK-SAME:   %[[ACT:[a-zA-Z0-9]+]]: tensor<4x8x16xf32>, %[[WEIGHT:[a-zA-Z0-9]+]]: tensor<12x16xi8>, %[[SCALE:[a-zA-Z0-9]+]]: tensor<12xf32>
+//   CHECK-NOT:   linalg.broadcast
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>]>
+//  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<12x16xi8>, tensor<12xf32>)
+//  CHECK-SAME:     -> tensor<12x16xf32>
+//   CHECK-NOT:   linalg.batch_matmul
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
+//  CHECK-SAME:     ins(%[[ACT]], %[[DQ]] : tensor<4x8x16xf32>, tensor<12x16xf32>)
+
+// -----
+
+// A transposed input map composes the same way.
+util.func public @dequantize_transposed_input_broadcast_rhs(%act: tensor<4x8x16xf32>, %weight: tensor<12x16xi8>, %scale: tensor<12xf32>) -> tensor<4x8x12xf32> {
+  %init_broadcast = tensor.empty() : tensor<4x12x16xi8>
+  %broadcast = linalg.broadcast ins(%weight : tensor<12x16xi8>)
+                                outs(%init_broadcast : tensor<4x12x16xi8>) dimensions = [0]
+  %init_dq = tensor.empty() : tensor<4x16x12xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2, d1)>,
+                        affine_map<(d0, d1, d2) -> (d2)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale : tensor<4x12x16xi8>, tensor<12xf32>)
+      outs(%init_dq : tensor<4x16x12xf32>) -> tensor<4x16x12xf32>
+  %init_out = tensor.empty() : tensor<4x8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.batch_matmul ins(%act, %dq : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+                                outs(%fill : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  util.return %result : tensor<4x8x12xf32>
+}
+// CHECK-LABEL: @dequantize_transposed_input_broadcast_rhs(
+//  CHECK-SAME:   %[[ACT:[a-zA-Z0-9]+]]: tensor<4x8x16xf32>, %[[WEIGHT:[a-zA-Z0-9]+]]: tensor<12x16xi8>, %[[SCALE:[a-zA-Z0-9]+]]: tensor<12xf32>
+//   CHECK-NOT:   linalg.broadcast
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>]>
+//  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<12x16xi8>, tensor<12xf32>)
+//  CHECK-SAME:     -> tensor<12x16xf32>
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
+//  CHECK-SAME:     ins(%[[ACT]], %[[DQ]] : tensor<4x8x16xf32>, tensor<12x16xf32>)
+
+// -----
+
+// Dynamic batch and M dims: the folded dequantize has the weight's shape and
+// needs no batch extent.
+util.func public @dequantize_broadcast_rhs_dynamic(%act: tensor<?x?x16xf32>, %weight: tensor<16x12xi8>, %scale: tensor<12xf32>) -> tensor<?x?x12xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %batch = tensor.dim %act, %c0 : tensor<?x?x16xf32>
+  %m = tensor.dim %act, %c1 : tensor<?x?x16xf32>
+  %init_broadcast = tensor.empty(%batch) : tensor<?x16x12xi8>
+  %broadcast = linalg.broadcast ins(%weight : tensor<16x12xi8>)
+                                outs(%init_broadcast : tensor<?x16x12xi8>) dimensions = [0]
+  %init_dq = tensor.empty(%batch) : tensor<?x16x12xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> (d2)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale : tensor<?x16x12xi8>, tensor<12xf32>)
+      outs(%init_dq : tensor<?x16x12xf32>) -> tensor<?x16x12xf32>
+  %init_out = tensor.empty(%batch, %m) : tensor<?x?x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<?x?x12xf32>) -> tensor<?x?x12xf32>
+  %result = linalg.batch_matmul ins(%act, %dq : tensor<?x?x16xf32>, tensor<?x16x12xf32>)
+                                outs(%fill : tensor<?x?x12xf32>) -> tensor<?x?x12xf32>
+  util.return %result : tensor<?x?x12xf32>
+}
+// CHECK-LABEL: @dequantize_broadcast_rhs_dynamic(
+//  CHECK-SAME:   %[[ACT:[a-zA-Z0-9]+]]: tensor<?x?x16xf32>, %[[WEIGHT:[a-zA-Z0-9]+]]: tensor<16x12xi8>, %[[SCALE:[a-zA-Z0-9]+]]: tensor<12xf32>
+//   CHECK-NOT:   linalg.broadcast
+//       CHECK:   %[[INIT:.+]] = tensor.empty() : tensor<16x12xf32>
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<16x12xi8>, tensor<12xf32>)
+//  CHECK-SAME:     outs(%[[INIT]] : tensor<16x12xf32>)
+//       CHECK:   linalg.batch_matmul
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
+//  CHECK-SAME:     ins(%[[ACT]], %[[DQ]] : tensor<?x?x16xf32>, tensor<16x12xf32>)
+
+// -----
+
+// A dynamic weight dim: the folded dequantize takes its extent from the
+// weight itself.
+util.func public @dequantize_broadcast_rhs_dynamic_weight(%act: tensor<4x8x16xf32>, %weight: tensor<16x?xi8>, %scale: f32) -> tensor<4x8x?xf32> {
+  %c1 = arith.constant 1 : index
+  %n = tensor.dim %weight, %c1 : tensor<16x?xi8>
+  %init_broadcast = tensor.empty(%n) : tensor<4x16x?xi8>
+  %broadcast = linalg.broadcast ins(%weight : tensor<16x?xi8>)
+                                outs(%init_broadcast : tensor<4x16x?xi8>) dimensions = [0]
+  %init_dq = tensor.empty(%n) : tensor<4x16x?xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> ()>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale : tensor<4x16x?xi8>, f32)
+      outs(%init_dq : tensor<4x16x?xf32>) -> tensor<4x16x?xf32>
+  %init_out = tensor.empty(%n) : tensor<4x8x?xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x?xf32>) -> tensor<4x8x?xf32>
+  %result = linalg.batch_matmul ins(%act, %dq : tensor<4x8x16xf32>, tensor<4x16x?xf32>)
+                                outs(%fill : tensor<4x8x?xf32>) -> tensor<4x8x?xf32>
+  util.return %result : tensor<4x8x?xf32>
+}
+// CHECK-LABEL: @dequantize_broadcast_rhs_dynamic_weight(
+//  CHECK-SAME:   %[[ACT:[a-zA-Z0-9]+]]: tensor<4x8x16xf32>, %[[WEIGHT:[a-zA-Z0-9]+]]: tensor<16x?xi8>, %[[SCALE:[a-zA-Z0-9]+]]: f32
+//   CHECK-NOT:   linalg.broadcast
+//       CHECK:   %[[INIT:.+]] = tensor.empty(%{{.+}}) : tensor<16x?xf32>
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<16x?xi8>, f32)
+//  CHECK-SAME:     outs(%[[INIT]] : tensor<16x?xf32>)
+//       CHECK:   linalg.batch_matmul
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
+//  CHECK-SAME:     ins(%[[ACT]], %[[DQ]] : tensor<4x8x16xf32>, tensor<16x?xf32>)
+
+// -----
+
+// A broadcast LHS under a dequantize folds into the LHS map.
+util.func public @dequantize_broadcast_lhs(%lhs: tensor<10x8xi8>, %scale: f32, %rhs: tensor<4x8x6xf32>) -> tensor<4x10x6xf32> {
+  %init_broadcast = tensor.empty() : tensor<4x10x8xi8>
+  %broadcast = linalg.broadcast ins(%lhs : tensor<10x8xi8>)
+                                outs(%init_broadcast : tensor<4x10x8xi8>) dimensions = [0]
+  %init_dq = tensor.empty() : tensor<4x10x8xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> ()>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale : tensor<4x10x8xi8>, f32)
+      outs(%init_dq : tensor<4x10x8xf32>) -> tensor<4x10x8xf32>
+  %init_out = tensor.empty() : tensor<4x10x6xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x10x6xf32>) -> tensor<4x10x6xf32>
+  %result = linalg.batch_matmul ins(%dq, %rhs : tensor<4x10x8xf32>, tensor<4x8x6xf32>)
+                                outs(%fill : tensor<4x10x6xf32>) -> tensor<4x10x6xf32>
+  util.return %result : tensor<4x10x6xf32>
+}
+// CHECK-LABEL: @dequantize_broadcast_lhs(
+//  CHECK-SAME:   %[[LHS:[a-zA-Z0-9]+]]: tensor<10x8xi8>, %[[SCALE:[a-zA-Z0-9]+]]: f32, %[[RHS:[a-zA-Z0-9]+]]: tensor<4x8x6xf32>
+//   CHECK-NOT:   linalg.broadcast
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> ()>, affine_map<(d0, d1) -> (d0, d1)>]>
+//  CHECK-SAME:     ins(%[[LHS]], %[[SCALE]] : tensor<10x8xi8>, f32)
+//       CHECK:   linalg.batch_matmul
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
+//  CHECK-SAME:     ins(%[[DQ]], %[[RHS]] : tensor<10x8xf32>, tensor<4x8x6xf32>)
+
+// -----
+
+// A broadcasting generic under the dequantize folds the same way.
+util.func public @dequantize_generic_broadcast_rhs(%act: tensor<4x8x16xf32>, %weight: tensor<16x12xi8>, %scale: tensor<12xf32>) -> tensor<4x8x12xf32> {
+  %init_broadcast = tensor.empty() : tensor<4x16x12xi8>
+  %broadcast = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+    iterator_types = ["parallel", "parallel", "parallel"]
+  } ins(%weight : tensor<16x12xi8>) outs(%init_broadcast : tensor<4x16x12xi8>) {
+  ^bb0(%in: i8, %out: i8):
+    linalg.yield %in : i8
+  } -> tensor<4x16x12xi8>
+  %init_dq = tensor.empty() : tensor<4x16x12xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> (d2)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale : tensor<4x16x12xi8>, tensor<12xf32>)
+      outs(%init_dq : tensor<4x16x12xf32>) -> tensor<4x16x12xf32>
+  %init_out = tensor.empty() : tensor<4x8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.batch_matmul ins(%act, %dq : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+                                outs(%fill : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  util.return %result : tensor<4x8x12xf32>
+}
+// CHECK-LABEL: @dequantize_generic_broadcast_rhs(
+//  CHECK-SAME:   %[[ACT:[a-zA-Z0-9]+]]: tensor<4x8x16xf32>, %[[WEIGHT:[a-zA-Z0-9]+]]: tensor<16x12xi8>, %[[SCALE:[a-zA-Z0-9]+]]: tensor<12xf32>
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<16x12xi8>, tensor<12xf32>)
+//       CHECK:   linalg.batch_matmul
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
+//  CHECK-SAME:     ins(%[[ACT]], %[[DQ]] : tensor<4x8x16xf32>, tensor<16x12xf32>)
+
+// -----
+
+// The integer broadcast has another user, which keeps it; the contraction
+// still reads a dequantize of the unbroadcast weight.
+util.func public @dequantize_broadcast_with_other_user(%act: tensor<4x8x16xf32>, %weight: tensor<16x12xi8>, %scale: tensor<12xf32>) -> (tensor<4x8x12xf32>, tensor<4x16x12xi8>) {
+  %init_broadcast = tensor.empty() : tensor<4x16x12xi8>
+  %broadcast = linalg.broadcast ins(%weight : tensor<16x12xi8>)
+                                outs(%init_broadcast : tensor<4x16x12xi8>) dimensions = [0]
+  %init_dq = tensor.empty() : tensor<4x16x12xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> (d2)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale : tensor<4x16x12xi8>, tensor<12xf32>)
+      outs(%init_dq : tensor<4x16x12xf32>) -> tensor<4x16x12xf32>
+  %init_out = tensor.empty() : tensor<4x8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.batch_matmul ins(%act, %dq : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+                                outs(%fill : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  util.return %result, %broadcast : tensor<4x8x12xf32>, tensor<4x16x12xi8>
+}
+// CHECK-LABEL: @dequantize_broadcast_with_other_user(
+//  CHECK-SAME:   %[[ACT:[a-zA-Z0-9]+]]: tensor<4x8x16xf32>, %[[WEIGHT:[a-zA-Z0-9]+]]: tensor<16x12xi8>, %[[SCALE:[a-zA-Z0-9]+]]: tensor<12xf32>
+//       CHECK:   %[[BROADCAST:.+]] = linalg.broadcast ins(%[[WEIGHT]]
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]] : tensor<16x12xi8>, tensor<12xf32>)
+//       CHECK:   %[[RESULT:.+]] = linalg.batch_matmul
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
+//  CHECK-SAME:     ins(%[[ACT]], %[[DQ]] : tensor<4x8x16xf32>, tensor<16x12xf32>)
+//       CHECK:   util.return %[[RESULT]], %[[BROADCAST]]
+
+// -----
+
+// The dequantize has another user, so folding would add a second dequantize
+// instead of shrinking this one: nothing changes.
+util.func public @dequantize_broadcast_dequantize_other_user(%act: tensor<4x8x16xf32>, %weight: tensor<16x12xi8>, %scale: tensor<12xf32>) -> (tensor<4x8x12xf32>, tensor<4x16x12xf32>) {
+  %init_broadcast = tensor.empty() : tensor<4x16x12xi8>
+  %broadcast = linalg.broadcast ins(%weight : tensor<16x12xi8>)
+                                outs(%init_broadcast : tensor<4x16x12xi8>) dimensions = [0]
+  %init_dq = tensor.empty() : tensor<4x16x12xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> (d2)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale : tensor<4x16x12xi8>, tensor<12xf32>)
+      outs(%init_dq : tensor<4x16x12xf32>) -> tensor<4x16x12xf32>
+  %init_out = tensor.empty() : tensor<4x8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.batch_matmul ins(%act, %dq : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+                                outs(%fill : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  util.return %result, %dq : tensor<4x8x12xf32>, tensor<4x16x12xf32>
+}
+// CHECK-LABEL: @dequantize_broadcast_dequantize_other_user(
+//       CHECK:   %[[BROADCAST:.+]] = linalg.broadcast
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[BROADCAST]], %{{.+}} : tensor<4x16x12xi8>, tensor<12xf32>)
+//   CHECK-NOT:   iree_linalg_ext.dequantize_affine
+//       CHECK:   %[[RESULT:.+]] = linalg.batch_matmul ins(%{{.+}}, %[[DQ]] : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+//       CHECK:   util.return %[[RESULT]], %[[DQ]]
+
+// -----
+
+// A scale indexed by the broadcast dim varies across the batch, so the
+// dequantized weights are not a broadcast of one tensor: nothing changes.
+util.func public @dequantize_broadcast_batch_varying_scale(%act: tensor<4x8x16xf32>, %weight: tensor<16x12xi8>, %scale: tensor<4x12xf32>) -> tensor<4x8x12xf32> {
+  %init_broadcast = tensor.empty() : tensor<4x16x12xi8>
+  %broadcast = linalg.broadcast ins(%weight : tensor<16x12xi8>)
+                                outs(%init_broadcast : tensor<4x16x12xi8>) dimensions = [0]
+  %init_dq = tensor.empty() : tensor<4x16x12xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> (d0, d2)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale : tensor<4x16x12xi8>, tensor<4x12xf32>)
+      outs(%init_dq : tensor<4x16x12xf32>) -> tensor<4x16x12xf32>
+  %init_out = tensor.empty() : tensor<4x8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.batch_matmul ins(%act, %dq : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+                                outs(%fill : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  util.return %result : tensor<4x8x12xf32>
+}
+// CHECK-LABEL: @dequantize_broadcast_batch_varying_scale(
+//       CHECK:   %[[BROADCAST:.+]] = linalg.broadcast
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[BROADCAST]], %{{.+}} : tensor<4x16x12xi8>, tensor<4x12xf32>)
+//       CHECK:   linalg.batch_matmul ins(%{{.+}}, %[[DQ]] : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+
+// -----
+
+// The same holds for a zero point indexed by the broadcast dim.
+util.func public @dequantize_broadcast_batch_varying_zero_point(%act: tensor<4x8x16xf32>, %weight: tensor<16x12xi8>, %scale: f32, %zp: tensor<4xi8>) -> tensor<4x8x12xf32> {
+  %init_broadcast = tensor.empty() : tensor<4x16x12xi8>
+  %broadcast = linalg.broadcast ins(%weight : tensor<16x12xi8>)
+                                outs(%init_broadcast : tensor<4x16x12xi8>) dimensions = [0]
+  %init_dq = tensor.empty() : tensor<4x16x12xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> ()>,
+                        affine_map<(d0, d1, d2) -> (d0)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale, %zp : tensor<4x16x12xi8>, f32, tensor<4xi8>)
+      outs(%init_dq : tensor<4x16x12xf32>) -> tensor<4x16x12xf32>
+  %init_out = tensor.empty() : tensor<4x8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.batch_matmul ins(%act, %dq : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+                                outs(%fill : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  util.return %result : tensor<4x8x12xf32>
+}
+// CHECK-LABEL: @dequantize_broadcast_batch_varying_zero_point(
+//       CHECK:   %[[BROADCAST:.+]] = linalg.broadcast
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[BROADCAST]], %{{.+}}, %{{.+}} : tensor<4x16x12xi8>, f32, tensor<4xi8>)
+//       CHECK:   linalg.batch_matmul ins(%{{.+}}, %[[DQ]] : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
