@@ -57,6 +57,7 @@ MLIR_C_HEADER_FILES = [
     "Interfaces.h",
     "IR.h",
     "Pass.h",
+    "Remarks.h",
     "Rewrite.h",
     "Support.h",
     "Transforms.h",
