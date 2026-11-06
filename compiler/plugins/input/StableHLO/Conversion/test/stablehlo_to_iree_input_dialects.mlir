@@ -178,3 +178,36 @@ func.func @reduce_precision_dynamic(%arg0: tensor<?xf32>) -> tensor<?xf32> {
   %0 = stablehlo.reduce_precision %arg0, format = e5m10 : (tensor<?xf32>) -> tensor<?xf32>
   return %0 : tensor<?xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func.func @dot_bf16_accumulates_f32(
+// CHECK-SAME: %[[LHS:[^:]+]]: tensor<2x3xbf16>, %[[RHS:[^:]+]]: tensor<3x4xbf16>
+func.func @dot_bf16_accumulates_f32(%lhs: tensor<2x3xbf16>, %rhs: tensor<3x4xbf16>) -> tensor<2x4xbf16> {
+  // CHECK: %[[DOT:.+]] = linalg.matmul ins(%[[LHS]], %[[RHS]] : tensor<2x3xbf16>, tensor<3x4xbf16>) outs({{.*}} : tensor<2x4xf32>) -> tensor<2x4xf32>
+  // CHECK: arith.truncf {{.*}} : f32 to bf16
+  %0 = stablehlo.dot %lhs, %rhs : (tensor<2x3xbf16>, tensor<3x4xbf16>) -> tensor<2x4xbf16>
+  return %0 : tensor<2x4xbf16>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @dot_general_f16_accumulates_f32(
+// CHECK-SAME: %[[LHS:[^:]+]]: tensor<?x3xf16>, %[[RHS:[^:]+]]: tensor<3x4xf16>
+func.func @dot_general_f16_accumulates_f32(%lhs: tensor<?x3xf16>, %rhs: tensor<3x4xf16>) -> tensor<?x4xf16> {
+  // CHECK: %[[DOT:.+]] = linalg.matmul ins(%[[LHS]], %[[RHS]] : tensor<?x3xf16>, tensor<3x4xf16>) outs({{.*}} : tensor<?x4xf32>) -> tensor<?x4xf32>
+  // CHECK: arith.truncf {{.*}} : f32 to f16
+  %0 = stablehlo.dot_general %lhs, %rhs, contracting_dims = [1] x [0], precision = [HIGHEST, HIGHEST] : (tensor<?x3xf16>, tensor<3x4xf16>) -> tensor<?x4xf16>
+  return %0 : tensor<?x4xf16>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @batched_dot_bf16_accumulates_f32(
+// CHECK-SAME: %[[LHS:[^:]+]]: tensor<2x?x3xbf16>, %[[RHS:[^:]+]]: tensor<2x3x4xbf16>
+func.func @batched_dot_bf16_accumulates_f32(%lhs: tensor<2x?x3xbf16>, %rhs: tensor<2x3x4xbf16>) -> tensor<2x?x4xbf16> {
+  // CHECK: %[[DOT:.+]] = linalg.batch_matmul ins(%[[LHS]], %[[RHS]] : tensor<2x?x3xbf16>, tensor<2x3x4xbf16>) outs({{.*}} : tensor<2x?x4xf32>) -> tensor<2x?x4xf32>
+  // CHECK: arith.truncf {{.*}} : f32 to bf16
+  %0 = stablehlo.dot_general %lhs, %rhs, batching_dims = [0] x [0], contracting_dims = [2] x [1] : (tensor<2x?x3xbf16>, tensor<2x3x4xbf16>) -> tensor<2x?x4xbf16>
+  return %0 : tensor<2x?x4xbf16>
+}
