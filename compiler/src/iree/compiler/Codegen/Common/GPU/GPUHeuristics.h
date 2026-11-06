@@ -189,6 +189,53 @@ struct GPUMMASchedule {
   }
 };
 
+/// Pads a dimension bound to a favorable alignment for the MMA heuristic.
+/// The heuristic uses power-of-2 split factors, so odd tile counts (e.g.,
+/// ceil(1000/16) = 63) cannot distribute evenly. Padding to a multiple of
+/// |alignment| avoids this. Returns the original bound if already aligned
+/// or dynamic.
+inline int64_t padBoundForHeuristic(int64_t bound, int64_t alignment) {
+  if (ShapedType::isDynamic(bound)) {
+    return bound;
+  }
+  int64_t remainder = bound % alignment;
+  if (remainder == 0) {
+    return bound;
+  }
+  return bound + alignment - remainder;
+}
+
+/// Pads M and N sizes in a GPUMatmulShapeType so that the MMA heuristic sees
+/// power-of-2-friendly tile counts. This matches the padding applied by the
+/// TileAndFuse config path in ConfigUtils.cpp.
+///
+/// Thresholds: <=32 left as-is (single or few tiles, padding unnecessary);
+/// (32,128] padded to 32; >128 padded to 128. These correspond to the
+/// workgroup tile sizes the TileAndFuse config path typically selects.
+///
+/// K dimensions are not padded because the heuristic's K split factors are
+/// less alignment-sensitive than M/N workgroup distribution.
+inline void padProblemForHeuristic(GPUMatmulShapeType &problem) {
+  auto padDim = [](int64_t bound) -> int64_t {
+    if (ShapedType::isDynamic(bound)) {
+      return bound;
+    }
+    if (bound > 128) {
+      return padBoundForHeuristic(bound, 128);
+    }
+    if (bound > 32) {
+      return padBoundForHeuristic(bound, 32);
+    }
+    return bound;
+  };
+  for (int64_t &m : problem.mSizes) {
+    m = padDim(m);
+  }
+  for (int64_t &n : problem.nSizes) {
+    n = padDim(n);
+  }
+}
+
 /// Returns a schedule for using one of the given MMA |intrinsics| to target the
 /// input |problem|. Returns std::nullopt if we cannot find such a schedule.
 /// When |target| is provided, architecture-specific seed adjustments (e.g.,
