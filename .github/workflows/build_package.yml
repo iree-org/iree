@@ -183,7 +183,7 @@ jobs:
     env:
       # These are also set in: build_tools/python_deploy/build_linux_packages.sh
       MANYLINUX_X86_64_IMAGE: ghcr.io/iree-org/manylinux_x86_64@sha256:2e0246137819cf10ed84240a971f9dd75cc3eb62dc6907dfd2080ee966b3c9f4
-      MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
+      MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64:2026.11.01-2@sha256:54b271d9562a3686298880df05367909e949ed317e7b1b79b59c696d75f78676
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
