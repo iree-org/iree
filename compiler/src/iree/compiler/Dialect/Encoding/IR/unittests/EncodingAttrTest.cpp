@@ -105,25 +105,56 @@ TEST_F(EncodingAttrsTest, PackedAndUnpackedOffsets) {
   Builder builder(getContext());
   auto packed = PackedStorageAttr::get(getContext());
   auto unpacked = UnpackedStorageAttr::get(getContext());
-  for (int64_t bits : {1, 2, 4}) {
+  for (int64_t bits : {1, 2, 4, 8, 16, 32, 64}) {
     Type elementType = builder.getIntegerType(bits);
     auto type = RankedTensorType::get({2, 16}, elementType);
     AffineMap packedMap = packed.getStorageElementOffsetMap(type);
     AffineMap unpackedMap = unpacked.getStorageElementOffsetMap(type);
     EXPECT_EQ(packed.getStorageElementType(elementType), elementType);
-    EXPECT_EQ(unpacked.getStorageElementType(elementType), builder.getI8Type());
+    EXPECT_EQ(unpacked.getStorageElementType(elementType),
+              bits < 8 ? builder.getI8Type() : elementType);
     for (int64_t column : {0, 1, 7, 8, 15}) {
       EXPECT_EQ(evaluateOffset(packedMap, {1, column}),
                 (16 + column) * bits / 8);
-      EXPECT_EQ(evaluateOffset(unpackedMap, {1, column}), 16 + column);
+      EXPECT_EQ(evaluateOffset(unpackedMap, {1, column}),
+                (16 + column) * (bits < 8 ? 1 : bits / 8));
     }
   }
+  EXPECT_EQ(unpacked.getStorageElementType(builder.getIntegerType(3)),
+            builder.getI8Type());
   EXPECT_EQ(unpacked.getStorageElementType(builder.getIntegerType(9)),
             builder.getI16Type());
+  EXPECT_EQ(unpacked.getStorageElementType(builder.getIntegerType(24)),
+            builder.getI32Type());
   EXPECT_EQ(unpacked.getStorageElementType(builder.getIntegerType(33)),
             builder.getI64Type());
   auto scalar = RankedTensorType::get({}, builder.getIntegerType(5));
   EXPECT_EQ(evaluateOffset(unpacked.getStorageElementOffsetMap(scalar), {}), 0);
+}
+
+TEST_F(EncodingAttrsTest, FloatingPointStorageOffsets) {
+  Builder builder(getContext());
+  auto packed = PackedStorageAttr::get(getContext());
+  auto unpacked = UnpackedStorageAttr::get(getContext());
+  SmallVector<Type> types = {
+      Float4E2M1FNType::get(getContext()), Float8E4M3FNType::get(getContext()),
+      builder.getF16Type(), builder.getF32Type(), builder.getF64Type()};
+  for (Type elementType : types) {
+    auto type = RankedTensorType::get({2, 4}, elementType);
+    int64_t bits = elementType.getIntOrFloatBitWidth();
+    EXPECT_EQ(packed.getStorageElementType(elementType), elementType);
+    EXPECT_EQ(unpacked.getStorageElementType(elementType),
+              bits < 8 ? builder.getI8Type() : elementType);
+    EXPECT_EQ(evaluateOffset(packed.getStorageElementOffsetMap(type), {1, 1}),
+              5 * bits / 8);
+    EXPECT_EQ(evaluateOffset(unpacked.getStorageElementOffsetMap(type), {1, 1}),
+              5 * (bits < 8 ? 1 : bits / 8));
+  }
+  auto fp6Type = Float6E3M2FNType::get(getContext());
+  EXPECT_EQ(unpacked.getStorageElementType(fp6Type), builder.getI8Type());
+  auto type = RankedTensorType::get({2, 4}, fp6Type);
+  EXPECT_EQ(evaluateOffset(unpacked.getStorageElementOffsetMap(type), {1, 1}),
+            5);
 }
 
 TEST_F(EncodingAttrsTest, PaddingOffsetUsesPhysicalStrides) {

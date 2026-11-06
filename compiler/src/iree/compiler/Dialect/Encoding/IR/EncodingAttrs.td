@@ -108,8 +108,10 @@ def PackedStorageAttr :
   let description = [{
     This attribute indicates this is a back-to-back packed storage in memory.
     This attribute takes no arguments.
-    The element type of the encoded tensors must be sub-byte (i.e., <8 bits)
-    types with power-of-two bitwidth.
+    Elements must be signless integers or floating-point types with a
+    power-of-two bit-width of at most 64. Sub-byte elements share bytes; a final
+    partial byte is rounded up. Byte-aligned elements retain their natural width.
+    No padding is inserted between elements.
   }];
   let genVerifyDecl = 0;
 }
@@ -133,13 +135,15 @@ def UnpackedStorageAttr :
       DeclareAttrInterfaceMethods<VerifiableTensorEncoding>
     ]> {
   let mnemonic = "unpacked_storage";
-  let summary = [{Stores each integer element in a separate byte-aligned container.}];
+  let summary = [{Stores each element in a separate byte-aligned container.}];
   let description = [{
-    Stores signless integers of 1 to 64 bits in row-major order.
-    Each element occupies the smallest power-of-two number of bytes that can
-    hold it. For example, i1, i4 and i5 use one byte, i9 uses two, and i33 uses
-    eight. Stores zero the unused high bits; loads ignore them. Arithmetic
-    retains the logical element width.
+    Stores signless integers and floating-point types of 1 to 64 bits in
+    row-major order. Each element occupies the smallest power-of-two number of
+    bytes that can hold it: i5 and f6E3M2FN use one byte, i9 uses two, and i33
+    uses eight. Elements already matching their container width retain their
+    logical type. Floating-point elements use their bit patterns, without
+    numerical conversion. Stores zero unused high bits; loads ignore them.
+    Arithmetic retains the logical element type.
 
     No additional row or allocation alignment is specified. External storage
     requires raw buffers; buffer-view import/export is unsupported.

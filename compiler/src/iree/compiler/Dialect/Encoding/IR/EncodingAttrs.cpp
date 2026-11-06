@@ -161,6 +161,24 @@ LogicalResult LayoutAttr::verifyEncoding(
   return success();
 }
 
+// Arithmetic lowering uses signless integers; signedness belongs to the
+// consuming operation. Both encodings use containers of at most 64 bits.
+static LogicalResult
+verifyStorageElementType(Type elementType, StringRef encodingName,
+                         function_ref<InFlightDiagnostic()> emitError) {
+  if (!elementType.isSignlessInteger() && !isa<FloatType>(elementType)) {
+    return emitError()
+           << encodingName
+           << " requires signless integer or floating-point elements";
+  }
+  unsigned widthInBits = elementType.getIntOrFloatBitWidth();
+  if (widthInBits == 0 || widthInBits > 64) {
+    return emitError() << encodingName
+                       << " requires an element bit-width between 1 and 64";
+  }
+  return success();
+}
+
 //===---------------------------------------------------------------------===//
 // iree_encoding.packed_storage
 //===---------------------------------------------------------------------===//
@@ -200,9 +218,6 @@ Value PackedStorageAttr::calculateStorageSizeInBytes(
     Location loc, OpBuilder &builder, RankedTensorType type,
     ValueRange dynamicDims) const {
   unsigned elementBits = getTypeBitWidth(type.getElementType());
-  assert(elementBits <= 8 && "packed_storage only allowed for sub-byte types");
-  assert(llvm::isPowerOf2_32(elementBits) &&
-         "packed_storage only allowed for power-of-two types");
 
   // Calculate static dimensions if there are any.
   int64_t staticCount = 1;
@@ -220,8 +235,13 @@ Value PackedStorageAttr::calculateStorageSizeInBytes(
         loc, value, dim, arith::IntegerOverflowFlags::nsw);
   }
 
-  // For sub-byte element types we need to divide by the number of elements that
-  // can be packed into one byte.
+  if (elementBits >= 8) {
+    auto bytesPerElement =
+        arith::ConstantIndexOp::create(builder, loc, elementBits / 8);
+    return builder.createOrFold<arith::MulIOp>(loc, value, bytesPerElement);
+  }
+
+  // Round up the final partial byte for sub-byte elements.
   unsigned elementsPerByte = 8 / elementBits;
   auto divisor = arith::ConstantIndexOp::create(builder, loc, elementsPerByte);
   value = builder.createOrFold<arith::CeilDivUIOp>(loc, value, divisor);
@@ -231,17 +251,13 @@ Value PackedStorageAttr::calculateStorageSizeInBytes(
 LogicalResult PackedStorageAttr::verifyEncoding(
     llvm::ArrayRef<int64_t> shape, mlir::Type elementType,
     llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
-  unsigned elementBitWidth = getTypeBitWidth(elementType);
-  if (elementBitWidth > 7) {
-    return emitError() << "bit-width of the element type is " << elementBitWidth
-                       << " but packed_storage is currently only supported for "
-                       << "sub-byte types";
+  if (failed(
+          verifyStorageElementType(elementType, "packed_storage", emitError))) {
+    return failure();
   }
-  if (!llvm::isPowerOf2_32(elementBitWidth)) {
+  if (!llvm::isPowerOf2_32(elementType.getIntOrFloatBitWidth())) {
     return emitError()
-           << "bit-width of the element type is " << elementBitWidth
-           << " but packed_storage currently only supports types with "
-           << "power-of-two bitwidth";
+           << "packed_storage requires a power-of-two element bit-width";
   }
   return success();
 }
@@ -258,8 +274,11 @@ Attribute PackedStorageAttr::getCollapsedEncoding(ArrayRef<int64_t>,
 bool UnpackedStorageAttr::isSerialized() const { return true; }
 
 Type UnpackedStorageAttr::getStorageElementType(Type elementType) const {
-  return IntegerType::get(getContext(),
-                          getRoundedElementByteWidth(elementType) * 8);
+  int64_t storageWidthInBits = getRoundedElementByteWidth(elementType) * 8;
+  if (elementType.getIntOrFloatBitWidth() == storageWidthInBits) {
+    return elementType;
+  }
+  return IntegerType::get(getContext(), storageWidthInBits);
 }
 
 AffineMap
@@ -299,13 +318,7 @@ UnpackedStorageAttr::convertForBitcast(ArrayRef<int64_t> shape,
 LogicalResult UnpackedStorageAttr::verifyEncoding(
     ArrayRef<int64_t>, Type elementType,
     function_ref<InFlightDiagnostic()> emitError) const {
-  auto integerType = dyn_cast<IntegerType>(elementType);
-  if (!integerType || !integerType.isSignless() ||
-      integerType.getWidth() > 64) {
-    return emitError() << "unpacked_storage requires signless integer elements "
-                          "with bit-width at most 64";
-  }
-  return success();
+  return verifyStorageElementType(elementType, "unpacked_storage", emitError);
 }
 
 //===---------------------------------------------------------------------===//

@@ -47,6 +47,18 @@ util.func public @vmvx_tiled_load(%buffer: !stream.resource<staging>) -> i32 {
 // Inner index [1, 1] expands to [1, 0, 1] and permutes to [1, 1, 0], giving
 // offset 6 within the tile. The byte offset is (24 + 6) * 4 = 120.
 #layout = #iree_gpu.gpu_encoding_resolver<configuration = {encoding_info = {innerDimsPos = [0, 1], innerTileSizes = [2, 4], outerDimsPerm = [1, 0], swizzle = {expandShape = [[["Internal", 2]], [["Internal", 2], ["Internal", 2]]], permutation = [0, 2, 1]}}}>
+// CHECK-LABEL: @swizzled_load
+// CHECK: %[[OFFSET:.*]] = arith.constant 120 : index
+// CHECK: %[[VALUE:.*]] = stream.async.load %arg0[%[[OFFSET]]] {{.*}} -> i32
+// CHECK: util.return %[[VALUE]] : i32
+util.func public @swizzled_load(%buffer: !stream.resource<staging>) -> i32 {
+  %size = arith.constant 192 : index
+  %row = arith.constant 3 : index
+  %col = arith.constant 5 : index
+  %value = stream.tensor.load %buffer[%row, %col] : tensor<4x12xi32, #layout> in !stream.resource<staging>{%size} -> i32
+  util.return %value : i32
+}
+
 // CHECK-LABEL: @swizzled_store
 // CHECK: %[[OFFSET:.*]] = arith.constant 120 : index
 // CHECK: stream.async.store %arg1, {{.*}}[%[[OFFSET]]]

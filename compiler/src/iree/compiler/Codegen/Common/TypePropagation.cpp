@@ -63,25 +63,6 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_TYPEPROPAGATIONPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
-/// Insert instructions to convert from one element type to another.
-static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
-                                Value source) {
-  Type sourceType = source.getType();
-  if (sourceType == targetType) {
-    return source;
-  }
-  if (isa<IntegerType>(sourceType) && isa<IntegerType>(targetType)) {
-    unsigned sourceBitWidth = sourceType.getIntOrFloatBitWidth();
-    unsigned destBitWidth = targetType.getIntOrFloatBitWidth();
-    if (sourceBitWidth > destBitWidth) {
-      return arith::TruncIOp::create(b, loc, targetType, source);
-    } else {
-      return arith::ExtUIOp::create(b, loc, targetType, source);
-    }
-  }
-  return nullptr;
-}
-
 /// Legalizes the given type. If the type is already legal, returns
 /// std::nullopt.
 static std::optional<Type> getLegalizedType(Type t) {
@@ -115,7 +96,7 @@ namespace {
 Value materializeAsConvertElementType(OpBuilder &builder, Type type,
                                       ValueRange inputs, Location loc) {
   assert(inputs.size() == 1 && "expected exactly one input");
-  return convertElementType(builder, loc, type, inputs[0]);
+  return convertStorageElementType(loc, inputs[0], type, builder);
 }
 
 /// Type converter to use for type propagation.
@@ -181,10 +162,14 @@ struct ConstantOpTypeConversion final
     TypedAttr newAttr;
     if (auto dense = dyn_cast<DenseElementsAttr>(attr)) {
       if (attrType.getElementType() != elementType) {
-        if (!isa<IntegerType>(attrType.getElementType()) ||
-            !isa<IntegerType>(elementType)) {
+        if (!isa<IntegerType, FloatType>(attrType.getElementType()) ||
+            !elementType.isSignlessInteger()) {
           return rewriter.notifyMatchFailure(constantOp,
-                                             "expected integer widening");
+                                             "expected integer storage");
+        }
+        if (isa<FloatType>(attrType.getElementType())) {
+          dense = dense.bitcast(
+              rewriter.getIntegerType(attrType.getElementTypeBitWidth()));
         }
         int64_t widthInBits = elementType.getIntOrFloatBitWidth();
         dense = dense.mapValues(elementType, [widthInBits](const APInt &value) {
@@ -339,8 +324,9 @@ struct GenericOpTypePropagation : TypePropagationPattern<linalg::GenericOp> {
           auto tensorOpTy =
               dyn_cast<RankedTensorType>(modifiedOpOperand->get().getType());
           Type legalizedType = legalizeStorageElementType(tensorOpTy);
-          yieldOperands[yieldOperand->getOperandNumber()] = convertElementType(
-              rewriter, yieldOp->getLoc(), legalizedType, yieldOperand->get());
+          yieldOperands[yieldOperand->getOperandNumber()] =
+              convertStorageElementType(yieldOp->getLoc(), yieldOperand->get(),
+                                        legalizedType, rewriter);
         }
       }
       if (modifyYield) {
@@ -370,8 +356,8 @@ struct LinalgFillTypePropagation : TypePropagationPattern<linalg::FillOp> {
     if (!legalizedElementType) {
       return fillOp.emitOpError("failed to get legalized type for value");
     }
-    Value legalizedValue = convertElementType(rewriter, fillOp->getLoc(),
-                                              legalizedElementType, value);
+    Value legalizedValue = convertStorageElementType(
+        fillOp->getLoc(), value, legalizedElementType, rewriter);
     rewriter.replaceOpWithNewOp<linalg::FillOp>(
         fillOp, ValueRange{legalizedValue}, ValueRange{adaptor.getOutputs()});
     return success();
@@ -389,8 +375,8 @@ struct TensorExtractTypePropagation
     Location loc = extractOp.getLoc();
     Value newExtract = tensor::ExtractOp::create(
         rewriter, loc, adaptor.getTensor(), adaptor.getIndices());
-    Value replacement = convertElementType(
-        rewriter, loc, extractOp.getResult().getType(), newExtract);
+    Value replacement = convertStorageElementType(
+        loc, newExtract, extractOp.getResult().getType(), rewriter);
     rewriter.replaceOp(extractOp, replacement);
     return success();
   }
@@ -460,8 +446,8 @@ struct IREELinalgExtScatterTypePropagation
       OpOperand *modifiedOpOperand = &yieldOp->getOpOperand(0);
 
       auto yieldOperand =
-          convertElementType(rewriter, yieldOp->getLoc(), legalizedArgType,
-                             modifiedOpOperand->get());
+          convertStorageElementType(yieldOp->getLoc(), modifiedOpOperand->get(),
+                                    legalizedArgType, rewriter);
 
       rewriter.replaceOpWithNewOp<IREE::LinalgExt::YieldOp>(yieldOp,
                                                             yieldOperand);

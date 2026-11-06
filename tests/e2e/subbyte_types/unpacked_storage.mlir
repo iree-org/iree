@@ -59,3 +59,45 @@ func.func @unpacked_signed_dot() {
   check.expect_eq_const(%result, dense<27> : tensor<i32>) : tensor<i32>
   return
 }
+
+// Exercise every FP4 bit pattern, including both zeros. Loads ignore the high
+// nibble; negation flips the sign bit, and stores clear the high nibble.
+func.func @unpacked_fp4_negate() {
+  %bytes = util.unfoldable_constant dense<[-16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1]> : tensor<16xi8>
+  %buffer = hal.tensor.export %bytes : tensor<16xi8> -> !hal.buffer
+  %input = hal.tensor.import %buffer : !hal.buffer -> tensor<16xf4E2M1FN, #iree_encoding.unpacked_storage>
+  %empty = tensor.empty() : tensor<16xf4E2M1FN, #iree_encoding.unpacked_storage>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%input : tensor<16xf4E2M1FN, #iree_encoding.unpacked_storage>)
+      outs(%empty : tensor<16xf4E2M1FN, #iree_encoding.unpacked_storage>) {
+    ^bb0(%in: f4E2M1FN, %out: f4E2M1FN):
+      %neg = arith.negf %in : f4E2M1FN
+      linalg.yield %neg : f4E2M1FN
+  } -> tensor<16xf4E2M1FN, #iree_encoding.unpacked_storage>
+  %stored = util.optimization_barrier %result : tensor<16xf4E2M1FN, #iree_encoding.unpacked_storage>
+  %output_buffer = hal.tensor.export %stored : tensor<16xf4E2M1FN, #iree_encoding.unpacked_storage> -> !hal.buffer
+  %output = hal.tensor.import %output_buffer : !hal.buffer -> tensor<16xi8>
+  check.expect_eq_const(%output, dense<[8, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7]> : tensor<16xi8>) : tensor<16xi8>
+  return
+}
+
+// Byte-aligned packed and unpacked storage share the ordinary float layout.
+func.func @byte_aligned_float_storage() {
+  %input = util.unfoldable_constant dense<[1.0, -2.0]> : tensor<2xf16, #iree_encoding.packed_storage>
+  %empty = tensor.empty() : tensor<2xf16, #iree_encoding.unpacked_storage>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      ins(%input : tensor<2xf16, #iree_encoding.packed_storage>)
+      outs(%empty : tensor<2xf16, #iree_encoding.unpacked_storage>) {
+    ^bb0(%in: f16, %out: f16):
+      %neg = arith.negf %in : f16
+      linalg.yield %neg : f16
+  } -> tensor<2xf16, #iree_encoding.unpacked_storage>
+  %buffer = hal.tensor.export %result : tensor<2xf16, #iree_encoding.unpacked_storage> -> !hal.buffer
+  %output = hal.tensor.import %buffer : !hal.buffer -> tensor<2xf16>
+  check.expect_eq_const(%output, dense<[-1.0, 2.0]> : tensor<2xf16>) : tensor<2xf16>
+  return
+}

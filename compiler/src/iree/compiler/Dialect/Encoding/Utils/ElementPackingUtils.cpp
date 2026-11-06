@@ -14,6 +14,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/TypeUtilities.h"
 
 namespace mlir::iree_compiler {
 
@@ -35,7 +36,7 @@ Type legalizeStorageElementType(RankedTensorType tensorType) {
       return storageType;
     }
   }
-  // Only handle integers; floats in MLIR all have aligned widths (today).
+  // Floats retain their logical type unless an encoding specifies a container.
   auto intType = dyn_cast<IntegerType>(elementType);
   if (!intType) {
     return elementType;
@@ -55,6 +56,49 @@ Type legalizeStorageElementType(RankedTensorType tensorType) {
   }
   return IntegerType::get(elementType.getContext(), alignedBitWidth,
                           intType.getSignedness());
+}
+
+Value convertStorageElementType(Location loc, Value source, Type targetType,
+                                OpBuilder &builder) {
+  Type sourceType = source.getType();
+  if (sourceType == targetType) {
+    return source;
+  }
+  Type sourceElementType = getElementTypeOrSelf(sourceType);
+  Type targetElementType = getElementTypeOrSelf(targetType);
+  if (!(sourceElementType.isSignlessInteger() &&
+        (targetElementType.isSignlessInteger() ||
+         isa<FloatType>(targetElementType))) &&
+      !(isa<FloatType>(sourceElementType) &&
+        targetElementType.isSignlessInteger())) {
+    return {};
+  }
+
+  // Keep shape and encoding when expressing a float's bits as integers.
+  auto getBitsType = [&builder](Type type) -> Type {
+    Type bitsType = builder.getIntegerType(
+        getElementTypeOrSelf(type).getIntOrFloatBitWidth());
+    if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
+      return tensorType.clone(bitsType);
+    }
+    return bitsType;
+  };
+  if (isa<FloatType>(sourceElementType)) {
+    source =
+        arith::BitcastOp::create(builder, loc, getBitsType(sourceType), source);
+  }
+  Type targetBitsType = getBitsType(targetType);
+  int64_t sourceWidthInBits = sourceElementType.getIntOrFloatBitWidth();
+  int64_t targetWidthInBits = targetElementType.getIntOrFloatBitWidth();
+  if (sourceWidthInBits > targetWidthInBits) {
+    source = arith::TruncIOp::create(builder, loc, targetBitsType, source);
+  } else if (sourceWidthInBits < targetWidthInBits) {
+    source = arith::ExtUIOp::create(builder, loc, targetBitsType, source);
+  }
+  if (isa<FloatType>(targetElementType)) {
+    source = arith::BitcastOp::create(builder, loc, targetType, source);
+  }
+  return source;
 }
 
 Value calculateStorageElementCountInBytes(Location loc,
