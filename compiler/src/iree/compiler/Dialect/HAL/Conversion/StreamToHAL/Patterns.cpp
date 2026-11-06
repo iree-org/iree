@@ -624,8 +624,13 @@ struct CmdFlushOpPattern : StreamConversionPattern<IREE::Stream::CmdFlushOp> {
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdFlushOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO(benvanik): HAL command buffer op for flush.
-    rewriter.eraseOp(op);
+    auto commandBufferMapping = mapping->lookupCommandBufferFor(op);
+    auto targetBinding = commandBufferMapping.resolveBinding(
+        op.getLoc(), op.getTarget(), adaptor.getTarget(),
+        adaptor.getTargetOffset(), adaptor.getTargetLength(), rewriter);
+    rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferFlushBufferOp>(
+        op, commandBufferMapping.getHandle(), targetBinding.buffer,
+        targetBinding.byteOffset, targetBinding.byteLength);
     return success();
   }
 };
@@ -636,8 +641,13 @@ struct CmdInvalidateOpPattern
   LogicalResult
   matchAndRewrite(IREE::Stream::CmdInvalidateOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    // TODO(benvanik): HAL command buffer op for invalidate.
-    rewriter.eraseOp(op);
+    auto commandBufferMapping = mapping->lookupCommandBufferFor(op);
+    auto targetBinding = commandBufferMapping.resolveBinding(
+        op.getLoc(), op.getTarget(), adaptor.getTarget(),
+        adaptor.getTargetOffset(), adaptor.getTargetLength(), rewriter);
+    rewriter.replaceOpWithNewOp<IREE::HAL::CommandBufferInvalidateBufferOp>(
+        op, commandBufferMapping.getHandle(), targetBinding.buffer,
+        targetBinding.byteOffset, targetBinding.byteLength);
     return success();
   }
 };
