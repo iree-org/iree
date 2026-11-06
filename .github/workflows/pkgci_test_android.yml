@@ -32,6 +32,9 @@ permissions:
 
 jobs:
   android_arm64:
+    permissions:
+      contents: read
+      actions: read  # setup_venv.py --fetch-gh-workflow (dispatch with artifact_run_id).
     runs-on: ubuntu-24.04
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages

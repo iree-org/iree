@@ -8,6 +8,9 @@ name: PkgCI Build Packages
 on:
   workflow_call:
 
+permissions:
+  contents: read
+
 jobs:
   linux_x86_64_release_packages:
     name: Linux Release (x86_64)

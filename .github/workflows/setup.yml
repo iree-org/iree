@@ -35,6 +35,9 @@ permissions:
 jobs:
   setup:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read  # Fetch the PR description and labels.
     env:
       # The commit being checked out is the merge commit for the PR. Its first
       # parent will be the tip of main.
