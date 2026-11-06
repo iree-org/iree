@@ -13,3 +13,14 @@ func.func @f32() {
   check.expect_almost_eq_const(%result, dense<[4.0, 2.0, -4.0, -2.0]> : tensor<4xf32>) : tensor<4xf32>
   return
 }
+
+// 0 - (+0) is +0, whereas negating +0 changes its sign. Check the bits so
+// unsafe arithmetic simplification cannot hide behind floating-point equality.
+func.func @positive_zero_subtraction() {
+  %zero = stablehlo.constant dense<0.0> : tensor<2xf32>
+  %input = util.unfoldable_constant dense<[0.0, -0.0]> : tensor<2xf32>
+  %result = stablehlo.subtract %zero, %input : tensor<2xf32>
+  %bits = stablehlo.bitcast_convert %result : (tensor<2xf32>) -> tensor<2xi32>
+  check.expect_eq_const(%bits, dense<[0, 0]> : tensor<2xi32>) : tensor<2xi32>
+  return
+}
