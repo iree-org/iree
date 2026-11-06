@@ -1,5 +1,57 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-math-transform))' --split-input-file %s | FileCheck %s
 
+// CHECK-LABEL: @cbrt_cpu_vector
+func.func @cbrt_cpu_vector(%arg0: vector<4xf32>) -> vector<4xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz"}>
+} {
+  // Vector types alone do not load the Vector dialect. The pass must load it
+  // before the approximation creates vector.broadcast operations.
+  // CHECK: math.absf
+  // CHECK: arith.bitcast
+  // CHECK: math.copysign
+  // CHECK-NOT: math.cbrt
+  // CHECK: return
+  %0 = math.cbrt %arg0 : vector<4xf32>
+  return %0 : vector<4xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @cbrt_webgpu_scalar
+func.func @cbrt_webgpu_scalar(%arg0: f32) -> f32 attributes {
+  hal.executable.target = #hal.executable.target<"webgpu-spirv", "webgpu-wgsl-fb", {}>
+} {
+  // WebGPU has no native cbrt. Use the bit estimate and Newton refinement.
+  // CHECK: math.absf
+  // CHECK: arith.bitcast
+  // CHECK: arith.divf
+  // CHECK: arith.select
+  // CHECK: math.copysign
+  // CHECK-NOT: math.cbrt
+  // CHECK: return
+  %0 = math.cbrt %arg0 : f32
+  return %0 : f32
+}
+
+// -----
+
+// CHECK-LABEL: @cbrt_webgpu_vector
+func.func @cbrt_webgpu_vector(%arg0: vector<4xf32>) -> vector<4xf32> attributes {
+  hal.executable.target = #hal.executable.target<"webgpu-spirv", "webgpu-wgsl-fb", {}>
+} {
+  // CHECK: math.absf {{.*}} : vector<4xf32>
+  // CHECK: arith.bitcast {{.*}} : vector<4xf32> to vector<4xi32>
+  // CHECK: arith.divf {{.*}} : vector<4xf32>
+  // CHECK: arith.select
+  // CHECK: math.copysign {{.*}} : vector<4xf32>
+  // CHECK-NOT: math.cbrt
+  // CHECK: return
+  %0 = math.cbrt %arg0 : vector<4xf32>
+  return %0 : vector<4xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @rewrite_tan
 func.func @rewrite_tan(%arg0: f16) -> f16 attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {target_triple = "x86_64-xyz-xyz"}>
