@@ -46,6 +46,10 @@ public:
       ArrayRef<IntegerDivisibilityLattice *> argLattices) override;
 };
 
+// Returns true when |value| is a constant multiple of |divisor| or |solver|'s
+// IntegerDivisibilityAnalysis proves it one.
+bool isProvenMultipleOf(Value value, int64_t divisor, DataFlowSolver &solver);
+
 } // namespace mlir::iree_compiler::IREE::Util
 
 #endif // IREE_COMPILER_DIALECT_UTIL_INTEGER_DIVISIBILITY_ANALYSIS_H_

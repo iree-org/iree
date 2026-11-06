@@ -672,8 +672,8 @@ static inline iree_status_t iree_hal_cmd_execute_dispatch_tile(
     int ret = dispatch->function(&dispatch->executable->environment,
                                  dispatch_state, workgroup_state);
     if (IREE_UNLIKELY(ret != 0)) {
-      return iree_make_status(IREE_STATUS_INTERNAL,
-                              "dispatch kernel returned non-zero (%d)", ret);
+      return iree_hal_local_executable_status_from_ret(
+          dispatch->executable, dispatch->export_ordinal, ret);
     }
     return iree_ok_status();
   }

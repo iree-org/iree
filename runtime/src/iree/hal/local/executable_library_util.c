@@ -6,6 +6,20 @@
 
 #include "iree/hal/local/executable_library_util.h"
 
+iree_status_t iree_hal_executable_library_check_version(
+    const iree_hal_executable_library_header_t* header) {
+  if (header->version < IREE_HAL_EXECUTABLE_LIBRARY_VERSION_OLDEST ||
+      header->version > IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "executable library version %08X is outside the versions this "
+        "runtime loads (%08X to %08X); rebuild the executable",
+        header->version, IREE_HAL_EXECUTABLE_LIBRARY_VERSION_OLDEST,
+        IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST);
+  }
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_executable_library_verify(
     const iree_hal_executable_params_t* executable_params,
     const iree_hal_executable_library_v0_t* library) {

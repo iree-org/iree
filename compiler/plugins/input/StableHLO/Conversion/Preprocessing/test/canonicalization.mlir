@@ -795,3 +795,55 @@ func.func @generic_op(%arg0: tensor<2xf32>, %arg1: tensor<2xf32>) -> tensor<2xf3
 // CHECK-LABEL: func.func @generic_op
 // CHECK-NEXT:    "test_dialect.op"
 // CHECK-NEXT:    return
+
+// -----
+
+// A single-use inner concatenate on the same axis is absorbed.
+// CHECK-LABEL: func.func @concatenate_flatten
+// CHECK-SAME:    (%[[X:.+]]: tensor<2x5xf32>, %[[Y:.+]]: tensor<3x5xf32>, %[[Z:.+]]: tensor<4x5xf32>)
+// CHECK:         %[[R:.+]] = stablehlo.concatenate %[[X]], %[[Y]], %[[Z]], dim = 0 : (tensor<2x5xf32>, tensor<3x5xf32>, tensor<4x5xf32>) -> tensor<9x5xf32>
+// CHECK:         return %[[R]]
+func.func @concatenate_flatten(%x: tensor<2x5xf32>, %y: tensor<3x5xf32>, %z: tensor<4x5xf32>) -> tensor<9x5xf32> {
+  %0 = stablehlo.concatenate %x, %y, dim = 0 : (tensor<2x5xf32>, tensor<3x5xf32>) -> tensor<5x5xf32>
+  %1 = stablehlo.concatenate %0, %z, dim = 0 : (tensor<5x5xf32>, tensor<4x5xf32>) -> tensor<9x5xf32>
+  return %1 : tensor<9x5xf32>
+}
+
+
+// -----
+
+// CHECK-LABEL: func.func @concatenate_flatten_dynamic
+// CHECK-SAME:    (%[[X:.+]]: tensor<3x?xi32>, %[[Y:.+]]: tensor<3x2xi32>, %[[Z:.+]]: tensor<3x7xi32>)
+// CHECK:         stablehlo.concatenate %[[Z]], %[[X]], %[[Y]], dim = 1 : (tensor<3x7xi32>, tensor<3x?xi32>, tensor<3x2xi32>) -> tensor<3x?xi32>
+func.func @concatenate_flatten_dynamic(%x: tensor<3x?xi32>, %y: tensor<3x2xi32>, %z: tensor<3x7xi32>) -> tensor<3x?xi32> {
+  %0 = stablehlo.concatenate %x, %y, dim = 1 : (tensor<3x?xi32>, tensor<3x2xi32>) -> tensor<3x?xi32>
+  %1 = stablehlo.concatenate %z, %0, dim = 1 : (tensor<3x7xi32>, tensor<3x?xi32>) -> tensor<3x?xi32>
+  return %1 : tensor<3x?xi32>
+}
+
+
+// -----
+
+// An inner concatenate on another axis stays.
+// CHECK-LABEL: func.func @concatenate_flatten_other_axis
+// CHECK:         %[[INNER:.+]] = stablehlo.concatenate %{{.+}}, %{{.+}}, dim = 1
+// CHECK:         stablehlo.concatenate %[[INNER]], %{{.+}}, dim = 0
+func.func @concatenate_flatten_other_axis(%x: tensor<2x3xf32>, %y: tensor<2x4xf32>, %z: tensor<5x7xf32>) -> tensor<7x7xf32> {
+  %0 = stablehlo.concatenate %x, %y, dim = 1 : (tensor<2x3xf32>, tensor<2x4xf32>) -> tensor<2x7xf32>
+  %1 = stablehlo.concatenate %0, %z, dim = 0 : (tensor<2x7xf32>, tensor<5x7xf32>) -> tensor<7x7xf32>
+  return %1 : tensor<7x7xf32>
+}
+
+
+// -----
+
+// A shared inner concatenate stays, so its tensor is not built twice.
+// CHECK-LABEL: func.func @concatenate_flatten_shared
+// CHECK:         %[[INNER:.+]] = stablehlo.concatenate %{{.+}}, %{{.+}}, dim = 0
+// CHECK:         %[[OUTER:.+]] = stablehlo.concatenate %[[INNER]], %{{.+}}, dim = 0
+// CHECK:         return %[[INNER]], %[[OUTER]]
+func.func @concatenate_flatten_shared(%x: tensor<2x5xf32>, %y: tensor<3x5xf32>, %z: tensor<4x5xf32>) -> (tensor<5x5xf32>, tensor<9x5xf32>) {
+  %0 = stablehlo.concatenate %x, %y, dim = 0 : (tensor<2x5xf32>, tensor<3x5xf32>) -> tensor<5x5xf32>
+  %1 = stablehlo.concatenate %0, %z, dim = 0 : (tensor<5x5xf32>, tensor<4x5xf32>) -> tensor<9x5xf32>
+  return %0, %1 : tensor<5x5xf32>, tensor<9x5xf32>
+}

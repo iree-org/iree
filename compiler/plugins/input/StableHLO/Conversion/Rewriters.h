@@ -39,6 +39,12 @@ void populateStableHloCollectivesConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns);
 
+/// Populates patterns for the StableHLO ops whose shapes are known only at
+/// runtime.
+void populateDynamicShapeConversionPatterns(MLIRContext *context,
+                                            TypeConverter &typeConverter,
+                                            RewritePatternSet *patterns);
+
 } // namespace mlir::iree_compiler::stablehlo
 
 #endif // IREE_COMPILER_PLUGINS_INPUT_STABLEHLO_CONVERSION_REWRITERS_H_

@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
@@ -244,6 +245,18 @@ void GenericVectorizationPass::runOnOperation() {
           continue;
         }
       }
+    }
+    // Upstream masks only 1-D depthwise convolutions and asserts on any other
+    // masked one; the other convolution vectorizers ignore vector sizes.
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+        linalgOp && !vectorSizes.empty() &&
+        linalg::isaConvolutionOpInterface(linalgOp) &&
+        !linalg::isaConvolutionOpOfType<linalg::DepthwiseConv1DNwcWcOp>(
+            linalgOp) &&
+        !linalg::isaConvolutionOpOfType<linalg::DepthwiseConv1DNcwCwOp>(
+            linalgOp)) {
+      vectorSizes.clear();
+      scalableVecDims.clear();
     }
     // Pad scalable dims with `false` to match the vector sizes.
     scalableVecDims.resize(vectorSizes.size());

@@ -29,6 +29,7 @@ ALL_SRCS = enforce_glob(
         "constant.mlir",
         "convert.mlir",
         "convolution.mlir",
+        "convolution_window.mlir",
         "cosine.mlir",
         "divide.mlir",
         "dot.mlir",
@@ -53,6 +54,7 @@ ALL_SRCS = enforce_glob(
         "multiply.mlir",
         "negate.mlir",
         "pad.mlir",
+        "pad_dynamic.mlir",
         "philox.mlir",
         "pow.mlir",
         "reduce.mlir",
@@ -77,10 +79,15 @@ ALL_SRCS = enforce_glob(
         "three_fry.mlir",
         "torch_index_select.mlir",
         "transpose.mlir",
+        "unsigned_start_indices.mlir",
+        "zero_extent.mlir",
         "while.mlir",
     ],
     include = ["*.mlir"],
-    exclude = [],
+    exclude = [
+        "scatter_general.mlir",
+        "scatter_general_complex.mlir",
+    ],
 )
 
 iree_check_single_backend_test_suite(
@@ -136,6 +143,7 @@ iree_check_single_backend_test_suite(
             "constant.mlir",
             "convert.mlir",
             "convolution.mlir",
+            "convolution_window.mlir",
             "cosine.mlir",
             "divide.mlir",
             "dot.mlir",
@@ -157,6 +165,7 @@ iree_check_single_backend_test_suite(
             "multiply.mlir",
             "negate.mlir",
             "pad.mlir",
+            "pad_dynamic.mlir",
             "philox.mlir",
             "pow.mlir",
             "reduce.mlir",
@@ -181,6 +190,7 @@ iree_check_single_backend_test_suite(
             "three_fry.mlir",
             "torch_index_select.mlir",
             "transpose.mlir",
+            "unsigned_start_indices.mlir",
             "while.mlir",
         ],
         include = ["*.mlir"],
@@ -188,10 +198,43 @@ iree_check_single_backend_test_suite(
             "dot_bf16.mlir",
             "exponential_fp16.mlir",
             "fft_complex.mlir",
+            "scatter_general.mlir",
+            "scatter_general_complex.mlir",
         ],
     ),
     compiler_flags = [
         "--iree-input-demote-f64-to-f32",
+    ],
+    driver = "local-task",
+    target_backend = "vmvx",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_local-task_general_scatter",
+    srcs = [
+        "scatter_general.mlir",
+        "scatter_general_complex.mlir",
+    ],
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
+    driver = "local-task",
+    tags = ["nowasm"],
+    target_backend = "llvm-cpu",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vmvx_local-task_general_scatter",
+    srcs = ["scatter_general.mlir"],
+    compiler_flags = ["--iree-input-promote-f16-to-f32"],
+    driver = "local-task",
+    target_backend = "vmvx",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vmvx_local-task_index32_general_scatter",
+    srcs = ["scatter_general.mlir"],
+    compiler_flags = [
+        "--iree-input-promote-f16-to-f32",
+        "--iree-vm-target-index-bits=32",
     ],
     driver = "local-task",
     target_backend = "vmvx",
@@ -216,6 +259,7 @@ iree_check_single_backend_test_suite(
             "constant.mlir",
             "convert.mlir",
             "convolution.mlir",
+            "convolution_window.mlir",
             "cosine.mlir",
             "divide.mlir",
             "dot.mlir",
@@ -237,6 +281,7 @@ iree_check_single_backend_test_suite(
             "multiply.mlir",
             "negate.mlir",
             "pad.mlir",
+            "pad_dynamic.mlir",
             "philox.mlir",
             "pow.mlir",
             "reduce.mlir",
@@ -261,6 +306,7 @@ iree_check_single_backend_test_suite(
             "three_fry.mlir",
             "torch_index_select.mlir",
             "transpose.mlir",
+            "unsigned_start_indices.mlir",
             "while.mlir",
         ],
         include = ["*.mlir"],
@@ -268,6 +314,8 @@ iree_check_single_backend_test_suite(
             "exponential_fp16.mlir",
             "fft.mlir",  # TODO(#9583)
             "fft_complex.mlir",
+            "scatter_general.mlir",
+            "scatter_general_complex.mlir",
         ],
     ),
     compiler_flags = [
@@ -367,6 +415,7 @@ iree_check_single_backend_test_suite(
             "constant.mlir",
             "convert.mlir",
             "convolution.mlir",
+            "convolution_window.mlir",
             "cosine.mlir",
             "divide.mlir",
             "dot.mlir",
@@ -391,6 +440,7 @@ iree_check_single_backend_test_suite(
             "multiply.mlir",
             "negate.mlir",
             "pad.mlir",
+            "pad_dynamic.mlir",
             "philox.mlir",
             "pow.mlir",
             "reduce.mlir",
@@ -414,11 +464,14 @@ iree_check_single_backend_test_suite(
             "three_fry.mlir",
             "torch_index_select.mlir",
             "transpose.mlir",
+            "unsigned_start_indices.mlir",
             "while.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
             "reduce_window.mlir",  # TODO(#15012): fix test crash
+            "scatter_general.mlir",
+            "scatter_general_complex.mlir",
         ],
     ),
     driver = "metal",

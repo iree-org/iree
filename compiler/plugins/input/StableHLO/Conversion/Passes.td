@@ -32,6 +32,12 @@ def ConvertStableHloToLinalgExt :
 // General passes
 //===----------------------------------------------------------------------===//
 
+def LegalizeDynamicReduceWindow :
+    Pass<"iree-stablehlo-legalize-dynamic-reduce-window", "ModuleOp"> {
+  let summary =
+      "Lowers stablehlo.dynamic_reduce_window custom calls that compute scans";
+}
+
 def LegalizeControlFlow :
     InterfacePass<"iree-stablehlo-legalize-control-flow", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes from StableHLO control flow to SCF control flow";
@@ -61,3 +67,10 @@ def CheckVHLOStableHloMixUsage :
 
 
 #endif // IREE_COMPILER_PLUGINS_INPUT_STABLEHLO_CONVERSION_PASSES
+
+def InlineShapeAssertionHelpers :
+    Pass<"iree-stablehlo-inline-shape-assertion-helpers", "ModuleOp"> {
+  let summary =
+      "Inlines the private scalar helpers computing shape_assertion operands";
+  let dependentDialects = ["mlir::func::FuncDialect"];
+}

@@ -53,8 +53,9 @@ public:
     V_0_6 = 0x0000'0006u, // v0.6 - ~2025-08-15
 
     // Pinned to the latest version.
-    // Requires that the runtime be compiled with the same version.
-    LATEST = V_0_6,
+    // Runtimes load libraries from V_0_6 through this version.
+    V_0_7 = 0x0000'0007u, // v0.7 - ~2026-10-09
+    LATEST = V_0_7,
   };
 
   // iree_hal_executable_library_features_t
@@ -84,6 +85,8 @@ public:
   enum class DispatchFlags : uint64_t {
     // IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_NONE
     NONE = 0ull,
+    // IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_RETURNS_STATUS
+    RETURNS_STATUS = 1ull << 3,
   };
 
   // iree_hal_executable_dispatch_attrs_v0_t
@@ -181,6 +184,9 @@ public:
   llvm::Function *build(StringRef queryFuncName);
 
 private:
+  // Returns the oldest version whose dispatch semantics cover every export.
+  Version getRequiredVersion() const;
+
   // Builds and returns an iree_hal_executable_library_v0_t global constant.
   llvm::Constant *buildLibraryV0(std::string libraryName);
   llvm::Constant *buildLibraryV0ImportTable(std::string libraryName);

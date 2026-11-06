@@ -21,6 +21,8 @@ void iree_hal_local_executable_initialize(
 
   // Function attributes and pointers are populated by the parent type.
   out_base_executable->dispatch_attrs = NULL;
+  out_base_executable->library_version =
+      IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST;
   out_base_executable->dispatch_ptrs = NULL;
   out_base_executable->export_count = 0;
   out_base_executable->export_names = NULL;
@@ -59,6 +61,24 @@ iree_string_view_t iree_hal_local_executable_export_name(
   }
   const uint32_t function_index = iree_hal_executable_function_index(function);
   return iree_make_cstring_view(executable->export_names[function_index]);
+}
+
+iree_status_t iree_hal_local_executable_status_from_ret(
+    const iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
+    int ret) {
+  if (ret == 0) return iree_ok_status();
+
+  iree_status_code_t status_code = IREE_STATUS_INTERNAL;
+  if (executable->library_version >= IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_7 &&
+      ordinal < executable->export_count && executable->dispatch_attrs &&
+      (executable->dispatch_attrs[ordinal].flags &
+       IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_RETURNS_STATUS) &&
+      ((ret >= IREE_STATUS_CANCELLED && ret <= IREE_STATUS_UNAUTHENTICATED) ||
+       ret == IREE_STATUS_INCOMPATIBLE)) {
+    status_code = (iree_status_code_t)ret;
+  }
+  return iree_make_status(status_code,
+                          "executable entry point returned non-zero (%d)", ret);
 }
 
 iree_status_t iree_hal_local_executable_issue_call(

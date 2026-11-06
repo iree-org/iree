@@ -12,6 +12,10 @@
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/executable_loader.h"
 
+// Returns FAILED_PRECONDITION unless |header| has a version this runtime loads.
+iree_status_t iree_hal_executable_library_check_version(
+    const iree_hal_executable_library_header_t* header);
+
 // Verifies the |library| matches the |executable_params|.
 iree_status_t iree_hal_executable_library_verify(
     const iree_hal_executable_params_t* executable_params,

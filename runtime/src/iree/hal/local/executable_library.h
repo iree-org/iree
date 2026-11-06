@@ -78,9 +78,11 @@ typedef enum iree_hal_executable_library_sanitizer_kind_e {
 typedef struct iree_hal_executable_environment_v0_t
     iree_hal_executable_environment_v0_t;
 
-// Version code indicating the minimum required runtime structures.
-// Runtimes cannot load executables with newer versions but may be able to load
-// older versions if backward compatibility is enabled.
+// Version code indicating the runtime structures and dispatch semantics an
+// executable was built for. Libraries carry the oldest version their exports
+// need, and runtimes load every version from
+// IREE_HAL_EXECUTABLE_LIBRARY_VERSION_OLDEST through
+// IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST.
 //
 // NOTE: until we hit v1 the versioning scheme here is not set in stone.
 // We may want to make this major release number, date codes (0x20220307),
@@ -88,11 +90,17 @@ typedef struct iree_hal_executable_environment_v0_t
 typedef uint32_t iree_hal_executable_library_version_t;
 
 #define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_6 0x00000006u
+// v0.7 adds semantic status returns.
+#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_7 0x00000007u
+
+// The oldest version of the library API that runtimes load.
+#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_OLDEST \
+  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_6
 
 // The latest version of the library API; can be used to populate the
 // iree_hal_executable_library_header_t::version when building libraries.
 #define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST \
-  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_6
+  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_7
 
 // A header present at the top of all versions of the library API used by the
 // runtime to ensure version compatibility.
@@ -390,6 +398,10 @@ enum iree_hal_executable_dispatch_flag_v0_bits_e {
   // The workgroup size specified on the dispatch info is the minimum size and
   // granularity and any dynamic workgroup size chosen must be a multiple.
   IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_WORKGROUP_SIZE_DYNAMIC = 1ull << 1,
+  // Bit 2 is reserved.
+  // Dispatch return values are IREE status codes. Deferred execution is not
+  // supported for executable dispatches.
+  IREE_HAL_EXECUTABLE_DISPATCH_FLAG_V0_RETURNS_STATUS = 1ull << 3,
 };
 typedef uint64_t iree_hal_executable_dispatch_flags_v0_t;
 

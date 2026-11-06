@@ -70,6 +70,7 @@ static iree_status_t iree_hal_static_executable_create(
   executable->library.header = library_header;
   executable->identifier = iree_make_cstring_view((*library_header)->name);
   executable->base.dispatch_attrs = executable->library.v0->exports.attrs;
+  executable->base.library_version = (*library_header)->version;
   executable->base.dispatch_ptrs = executable->library.v0->exports.ptrs;
   executable->base.export_count = executable->library.v0->exports.count;
   executable->base.export_names = executable->library.v0->exports.names;
@@ -151,11 +152,8 @@ static iree_status_t iree_hal_static_executable_issue_call(
                                             ordinal);
   IREE_TRACE_ZONE_END(z0);
 
-  return ret == 0 ? iree_ok_status()
-                  : iree_make_status(
-                        IREE_STATUS_INTERNAL,
-                        "executable entry point returned catastrophic error %d",
-                        ret);
+  return iree_hal_local_executable_status_from_ret(base_executable, ordinal,
+                                                   ret);
 }
 
 static iree_host_size_t iree_hal_static_executable_export_count(
@@ -272,6 +270,11 @@ iree_status_t iree_hal_static_library_loader_create(
       const iree_hal_executable_library_header_t* const* header_ptr =
           library_query_fns[i](IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
                                &environment);
+      // Libraries built for exactly v0.6 answer only a v0.6 query.
+      if (!header_ptr) {
+        header_ptr = library_query_fns[i](
+            IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_6, &environment);
+      }
       if (!header_ptr) {
         status = iree_make_status(
             IREE_STATUS_UNAVAILABLE,
@@ -281,14 +284,8 @@ iree_status_t iree_hal_static_library_loader_create(
       }
       const iree_hal_executable_library_header_t* header = *header_ptr;
       IREE_TRACE_ZONE_APPEND_TEXT(z0, header->name);
-      if (header->version > IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST) {
-        status = iree_make_status(
-            IREE_STATUS_FAILED_PRECONDITION,
-            "executable does not support this version of the "
-            "runtime (executable: %d, runtime: %d)",
-            header->version, IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST);
-        break;
-      }
+      status = iree_hal_executable_library_check_version(header);
+      if (!iree_status_is_ok(status)) break;
       memcpy((void*)&executable_loader->libraries[i], &header_ptr,
              sizeof(header_ptr));
     }
