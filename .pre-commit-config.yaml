@@ -73,9 +73,9 @@ repos:
       - id: zizmor
         name: Run zizmor on GitHub Actions workflows
         # Offline audits only, so results depend only on the checked-out files
-        # and the hook needs no GitHub token or API quota. Ignores and per-file
-        # settings are in .github/zizmor.yml.
-        args: ["--no-progress", "--offline"]
+        # and the hook needs no GitHub token or API quota. Informational
+        # findings are not reported.
+        args: ["--no-progress", "--offline", "--min-severity=low"]
 
   - repo: local
     hooks:

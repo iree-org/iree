@@ -366,7 +366,8 @@ common GitHub Actions security problems, for example:
 * `actions/checkout` steps that leave the token on disk. Set
   `persist-credentials: false` unless a later step needs the stored token.
 
-To check the workflows you changed locally:
+The hook fails on findings of low severity or higher. To check the workflows you
+changed locally:
 
 ```shell
 pre-commit run zizmor --files .github/workflows/my_workflow.yml
@@ -374,9 +375,7 @@ pre-commit run zizmor --files .github/workflows/my_workflow.yml
 
 If a finding is a false positive or an accepted risk, add an ignore comment
 with a short reason to the flagged step, for example
-`# zizmor: ignore[template-injection] <reason>`. Ignores that cover whole files
-live in
-[`.github/zizmor.yml`](https://github.com/iree-org/iree/blob/main/.github/zizmor.yml).
+`# zizmor: ignore[template-injection] <reason>`.
 
 ## :material-book-open-outline: Maintenance tips
 
