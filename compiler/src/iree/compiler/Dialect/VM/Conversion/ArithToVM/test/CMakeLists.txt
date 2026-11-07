@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "comparison_ops.mlir"
     "constant_ops.mlir"
     "conversion_ops.mlir"
+    "reject_narrow_float_arithmetic.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -25,7 +25,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct ConstantOpConversion : OpConversionPattern<arith::ConstantOp> {
+struct ConstantOpConversion final : OpConversionPattern<arith::ConstantOp> {
   TypeConverter &typeConverter;
   ConstantOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
@@ -39,6 +39,12 @@ struct ConstantOpConversion : OpConversionPattern<arith::ConstantOp> {
     }
     if (isa<IntegerType>(targetType)) {
       auto integerAttr = dyn_cast<IntegerAttr>(srcOp.getValue());
+      if (auto floatAttr = dyn_cast<FloatAttr>(srcOp.getValue())) {
+        // Narrow floats use their storage bits in VM integer registers.
+        integerAttr = rewriter.getIntegerAttr(
+            targetType, floatAttr.getValue().bitcastToAPInt().zextOrTrunc(
+                            targetType.getIntOrFloatBitWidth()));
+      }
       if (!integerAttr) {
         return srcOp.emitRemark() << "unsupported const type for dialect";
       }
@@ -72,14 +78,14 @@ struct ConstantOpConversion : OpConversionPattern<arith::ConstantOp> {
       }
       switch (targetType.getIntOrFloatBitWidth()) {
       case 32:
-        if (floatAttr.getValue().isZero()) {
+        if (floatAttr.getValue().isPosZero()) {
           rewriter.replaceOpWithNewOp<IREE::VM::ConstF32ZeroOp>(srcOp);
         } else {
           rewriter.replaceOpWithNewOp<IREE::VM::ConstF32Op>(srcOp, floatAttr);
         }
         break;
       case 64:
-        if (floatAttr.getValue().isZero()) {
+        if (floatAttr.getValue().isPosZero()) {
           rewriter.replaceOpWithNewOp<IREE::VM::ConstF64ZeroOp>(srcOp);
         } else {
           rewriter.replaceOpWithNewOp<IREE::VM::ConstF64Op>(srcOp, floatAttr);
@@ -391,11 +397,17 @@ struct CmpF64OpConversion : OpConversionPattern<arith::CmpFOp> {
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-struct UnaryArithmeticOpConversion : OpConversionPattern<SrcOpTy> {
+struct UnaryArithmeticOpConversion final : OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    Type convertedType = adaptor.getOperand().getType();
+    if (!isa<IntegerType, FloatType>(convertedType) ||
+        (isa<FloatType>(srcOp.getType()) && !isa<FloatType>(convertedType))) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "unsupported scalar arithmetic type");
+    }
     switch (adaptor.getOperand().getType().getIntOrFloatBitWidth()) {
     case 32:
       rewriter.replaceOpWithNewOp<Dst32OpTy>(
@@ -413,11 +425,17 @@ struct UnaryArithmeticOpConversion : OpConversionPattern<SrcOpTy> {
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-struct BinaryArithmeticOpConversion : OpConversionPattern<SrcOpTy> {
+struct BinaryArithmeticOpConversion final : OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    Type convertedType = adaptor.getLhs().getType();
+    if (!isa<IntegerType, FloatType>(convertedType) ||
+        (isa<FloatType>(srcOp.getType()) && !isa<FloatType>(convertedType))) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "unsupported scalar arithmetic type");
+    }
     switch (adaptor.getLhs().getType().getIntOrFloatBitWidth()) {
     case 32:
       rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, adaptor.getLhs().getType(),

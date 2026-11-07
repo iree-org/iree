@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "half_arithmetic.mlir"
     "materialize_constants.mlir"
     "resolve_buffer_descriptors.mlir"
   TOOLS

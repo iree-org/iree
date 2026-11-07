@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -99,13 +100,13 @@ struct F32Fields {
 /// parameters.
 class FloatEmulationHelper {
 public:
-  /// Constructor for use with small float types (fp4, fp8).
+  /// Constructor for use with small float types (fp4, fp8, f16).
   /// The smallFloatBitWidth parameter determines the packed integer type.
   FloatEmulationHelper(RewriterBase &rewriter, Location loc, Type type,
                        unsigned smallFloatBitWidth)
       : rewriter(rewriter), loc(loc), vecType(dyn_cast<VectorType>(type)),
         sem(cast<FloatType>(getElementTypeOrSelf(type)).getFloatSemantics()) {
-    // Setup scalar and vector types for i32, small int (i4/i8), f32.
+    // Setup scalar and vector types for i32, narrow storage, and f32.
     Type i32Scalar = rewriter.getI32Type();
     Type smallIntScalar = rewriter.getIntegerType(smallFloatBitWidth);
     Type f32Scalar = rewriter.getF32Type();
@@ -345,8 +346,8 @@ private:
 // TruncF to small float emulation pattern
 //===----------------------------------------------------------------------===//
 
-/// Emulates arith.truncf from f32 to small floats (fp4, fp8) using integer bit
-/// manipulation. This implementation follows IREE's
+/// Emulates arith.truncf from f32 to small floats (fp4, fp8, f16) using integer
+/// bit manipulation. This implementation follows IREE's
 /// runtime/src/iree/base/internal/math.h
 /// (specifically iree_math_truncate_f32_to_bits_rounding_to_nearest_even).
 ///
@@ -379,13 +380,17 @@ struct TruncFToSmallFloat final : OpRewritePattern<arith::TruncFOp> {
 
     unsigned resultBitWidth = resultElemType.getIntOrFloatBitWidth();
     if (!isa<Float32Type>(inputElemType) ||
-        (resultBitWidth != 4 && resultBitWidth != 8)) {
+        (resultBitWidth != 4 && resultBitWidth != 8 && resultBitWidth != 16)) {
       return failure();
     }
 
     // Only match types that are in our source types list.
     if (!llvm::is_contained(sourceTypes, resultElemType)) {
       return failure();
+    }
+    if (op.getRoundingmodeAttr()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "requires the default rounding mode");
     }
 
     Location loc = op.getLoc();
@@ -492,15 +497,17 @@ struct TruncFToSmallFloat final : OpRewritePattern<arith::TruncFOp> {
     Value effectiveMant =
         arith::OrIOp::create(rewriter, loc, f32Fields.mantissa, cImplicitBit);
 
-    // Compute round-to-nearest-even for subnormal.
+    // Both branches are evaluated in SSA. Keep every speculative shift in
+    // range, even when the source is normal or overflows the destination.
+    Value safeShift = arith::MaxSIOp::create(rewriter, loc, shiftAmount, c1);
+    safeShift = arith::MinSIOp::create(rewriter, loc, safeShift,
+                                       helper.createI32Const(31));
     Value subnormalMantRounded =
-        helper.biasForRoundToNearestEven(effectiveMant, shiftAmount);
-
-    // Shift to get subnormal mantissa.
-    Value subnormalMant = arith::ShRUIOp::create(
-        rewriter, loc, subnormalMantRounded, shiftAmount);
-    subnormalMant =
-        arith::AndIOp::create(rewriter, loc, subnormalMant, cDstMantMask);
+        helper.biasForRoundToNearestEven(effectiveMant, safeShift);
+    Value subnormalMant =
+        arith::ShRUIOp::create(rewriter, loc, subnormalMantRounded, safeShift);
+    // A rounding carry becomes the smallest normal value. Masking to the
+    // mantissa width would incorrectly turn this boundary into zero.
 
     // Subnormal result has exp=0.
     Value subnormalResult =
@@ -589,8 +596,8 @@ private:
 // ExtF from small float emulation pattern
 //===----------------------------------------------------------------------===//
 
-/// Emulates arith.extf from small floats (fp4, fp8) to f32 using integer bit
-/// manipulation. This implementation follows IREE's
+/// Emulates arith.extf from small floats (fp4, fp8, f16) to f32 using integer
+/// bit manipulation. This implementation follows IREE's
 /// runtime/src/iree/base/internal/math.h
 /// (specifically iree_math_make_f32_from_bits).
 ///
@@ -612,7 +619,7 @@ struct ExtFFromSmallFloat final : OpRewritePattern<arith::ExtFOp> {
     Type inputElemType = getElementTypeOrSelf(inputType);
 
     unsigned inputBitWidth = inputElemType.getIntOrFloatBitWidth();
-    if ((inputBitWidth != 4 && inputBitWidth != 8) ||
+    if ((inputBitWidth != 4 && inputBitWidth != 8 && inputBitWidth != 16) ||
         !isa<Float32Type>(resultElemType)) {
       return failure();
     }
@@ -755,9 +762,91 @@ private:
   SmallVector<Type> sourceTypes;
 };
 
+// Widening may canonicalise NaNs and discard their sign or payload. CopySign
+// observes those bits directly, so use integer operations for formats with a
+// signed zero. Formats with unsigned zero need their numeric conversion path.
+struct CopySignFloatBits final : OpRewritePattern<math::CopySignOp> {
+  CopySignFloatBits(MLIRContext *context, ArrayRef<Type> selectedTypes)
+      : OpRewritePattern(context, /*benefit=*/2), selectedTypes(selectedTypes) {
+  }
+
+  LogicalResult matchAndRewrite(math::CopySignOp op,
+                                PatternRewriter &rewriter) const override {
+    auto elementType = cast<FloatType>(getElementTypeOrSelf(op.getType()));
+    if (!llvm::is_contained(selectedTypes, elementType)) {
+      return failure();
+    }
+    const llvm::fltSemantics &semantics = elementType.getFloatSemantics();
+    if (!APFloat::semanticsHasZero(semantics)) {
+      return failure();
+    }
+    APFloat negativeZero = APFloat::getZero(semantics, /*Negative=*/true);
+    if (!negativeZero.isZero() || !negativeZero.isNegative()) {
+      return failure();
+    }
+    int64_t width = elementType.getWidth();
+    Type bitsType = rewriter.getIntegerType(width);
+    if (auto shaped = dyn_cast<ShapedType>(op.getType())) {
+      bitsType = shaped.clone(bitsType);
+    }
+    Location loc = op.getLoc();
+    auto createBitsConstant = [&rewriter, loc, bitsType,
+                               width](APInt bits) -> Value {
+      TypedAttr value =
+          rewriter.getIntegerAttr(rewriter.getIntegerType(width), bits);
+      if (auto shaped = dyn_cast<ShapedType>(bitsType)) {
+        value = SplatElementsAttr::get(shaped, value);
+      }
+      return arith::ConstantOp::create(rewriter, loc, bitsType, value);
+    };
+    APInt signMask = APInt::getSignMask(width);
+    Value magnitude =
+        arith::BitcastOp::create(rewriter, loc, bitsType, op.getLhs());
+    magnitude = arith::AndIOp::create(rewriter, loc, magnitude,
+                                      createBitsConstant(~signMask));
+    Value sign = arith::BitcastOp::create(rewriter, loc, bitsType, op.getRhs());
+    sign = arith::AndIOp::create(rewriter, loc, sign,
+                                 createBitsConstant(signMask));
+    Value result = arith::OrIOp::create(rewriter, loc, magnitude, sign);
+    rewriter.replaceOpWithNewOp<arith::BitcastOp>(op, op.getType(), result);
+    return success();
+  }
+
+private:
+  SmallVector<Type> selectedTypes;
+};
+
+// Validate restrictions before any arithmetic or type conversion mutates IR.
+static LogicalResult validateNarrowMathEmulation(FunctionOpInterface function,
+                                                 ArrayRef<Type> selectedTypes) {
+  WalkResult supported = function.walk([selectedTypes](Operation *op) {
+    if (!isa<math::FmaOp, math::CopySignOp>(op) ||
+        !llvm::is_contained(selectedTypes,
+                            getElementTypeOrSelf(op->getResult(0).getType()))) {
+      return WalkResult::advance();
+    }
+    if (isa<math::CopySignOp>(op)) {
+      auto shaped = dyn_cast<ShapedType>(op->getResult(0).getType());
+      if (!shaped || shaped.hasStaticShape()) {
+        return WalkResult::advance();
+      }
+      op->emitOpError("requires statically shaped narrow copysign emulation");
+      return WalkResult::interrupt();
+    }
+    // Rounding a wider FMA can double-round a narrow halfway result. A
+    // separate exact implementation is required before admitting this op.
+    op->emitOpError("cannot preserve exact narrow FMA semantics");
+    return WalkResult::interrupt();
+  });
+  return failure(supported.wasInterrupted());
+}
+
 struct ConvertUnsupportedFloatArithPass final
     : impl::ConvertUnsupportedFloatArithPassBase<
           ConvertUnsupportedFloatArithPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<arith::ArithDialect, math::MathDialect>();
+  }
   void runOnOperation() override;
   using Base::Base;
 };
@@ -806,7 +895,7 @@ void ConvertUnsupportedFloatArithPass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
   Type targetType = Float32Type::get(context);
 
-  // All small float types (fp4, fp8) need arithmetic emulation unless the
+  // Selected narrow float types need arithmetic emulation unless the
   // hardware has native arithmetic instructions for these types. Operations
   // like addf/mulf usually have to be wrapped with extf/truncf to compute in
   // f32.
@@ -816,16 +905,44 @@ void ConvertUnsupportedFloatArithPass::runOnOperation() {
 #include "mlir/IR/BuiltinTypes.cpp.inc"
       >(context, allSmallFloatTypes);
 
+  if (includeF16) {
+    allSmallFloatTypes.push_back(Float16Type::get(context));
+  }
+  if (includeBf16) {
+    allSmallFloatTypes.push_back(BFloat16Type::get(context));
+  }
+
+  if (includeMath &&
+      failed(validateNarrowMathEmulation(funcOp, allSmallFloatTypes))) {
+    return signalPassFailure();
+  }
+
   // Apply the standard float emulation patterns. This inserts extf/truncf pairs
   // around unsupported float operations.
   {
     TypeConverter converter;
     arith::populateEmulateUnsupportedFloatsConversions(
         converter, allSmallFloatTypes, targetType);
+    // The upstream materialisation marks both casts as contractible, which
+    // permits extf(truncf(x)) to discard an observable intermediate rounding.
+    // Override it with an extension that retains the rounding boundary.
+    converter.addTargetMaterialization([](OpBuilder &builder, Type type,
+                                          ValueRange inputs,
+                                          Location loc) -> Value {
+      return arith::ExtFOp::create(builder, loc, TypeRange{type}, inputs,
+                                   arith::ExtFOp::Properties{});
+    });
     RewritePatternSet patterns(context);
     arith::populateEmulateUnsupportedFloatsPatterns(patterns, converter);
+    if (includeMath) {
+      patterns.add<CopySignFloatBits>(context, allSmallFloatTypes);
+    }
     ConversionTarget target(*context);
     arith::populateEmulateUnsupportedFloatsLegality(target, converter);
+    if (includeMath) {
+      target.addDynamicallyLegalDialect<math::MathDialect>(
+          [&converter](Operation *op) { return converter.isLegal(op); });
+    }
 
     // Mark scaling ops as legal - they have their own expansion patterns in
     // arith::populateExpandScalingExtTruncPatterns that run in later passes.
@@ -844,13 +961,23 @@ void ConvertUnsupportedFloatArithPass::runOnOperation() {
   if (IREE::GPU::TargetAttr gpuAttr = getGPUTargetAttr(funcOp)) {
     typesNeedingConversionEmulation =
         getTypesNeedingConversionEmulationForGPU(context, gpuAttr);
+    if (includeF16) {
+      typesNeedingConversionEmulation.push_back(Float16Type::get(context));
+    }
   }
+
+  // BF16 has f32's exponent range. Use its established expansion to retain
+  // f32 subnormal values instead of treating them as underflow to zero.
+  llvm::erase(typesNeedingConversionEmulation, BFloat16Type::get(context));
 
   // Emulate extf/truncf to/from small float types using integer bit
   // manipulation. Only for types without hardware conversion support.
   // This is gated by the enableExtTruncEmulation flag.
   if (enableExtTruncEmulation && !typesNeedingConversionEmulation.empty()) {
     RewritePatternSet emulationPatterns(context);
+    if (includeBf16) {
+      arith::populateExpandBFloat16Patterns(emulationPatterns);
+    }
     emulationPatterns.add<TruncFToSmallFloat, ExtFFromSmallFloat>(
         context, typesNeedingConversionEmulation);
     walkAndApplyPatterns(funcOp, std::move(emulationPatterns));
