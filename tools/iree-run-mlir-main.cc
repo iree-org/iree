@@ -28,7 +28,9 @@
 // $ iree-run-mlir --device=cuda://0 file.mlir
 // or to compile with the LLVM CPU backend and run with the local-task driver:
 // $ iree-run-mlir file.mlir \
-//       --Xcompiler,iree-hal-target-device=hip --device=hip:0
+//       --Xcompiler,iree-hal-target-device=local \
+//       --Xcompiler,iree-hal-local-target-device-backends=llvm-cpu \
+//       --device=local-task
 //
 // Example usage in a lit test:
 //   // RUN: iree-run-mlir --device= %s --function=foo --input=2xf32=2,3 | \
@@ -81,154 +83,140 @@ bool starts_with(std::string_view prefix, std::string_view in_str) {
          in_str.compare(0, prefix.size(), prefix) == 0;
 }
 
-// Tries to guess a default device name from the |target_backend| when possible.
-// Users are still able to override this by passing in --device= flags.
-std::string InferDefaultDeviceFromTargetBackend(
-    std::string_view target_backend) {
-  if (target_backend == "" || target_backend == "vmvx-inline") {
-    // Plain VM or vmvx-inline targets do not need a HAL device.
+// Tries to guess a default runtime device from the |target_device| when
+// possible. Users are still able to override this by passing --device= flags.
+std::string InferDefaultDeviceFromTargetDevice(
+    std::string_view target_device) {
+  if (target_device.empty()) {
     return "";
-  } else if (target_backend == "llvm-cpu" || target_backend == "vmvx") {
-    // Locally-executable targets default to the multithreaded task system
-    // driver; users can override by specifying --device=local-sync instead.
+  } else if (target_device == "local") {
+    // Local targets default to the multithreaded task system driver.
     return "local-task";
   }
-  // Many other backends use the `driver-pipeline` naming like `vulkan-spirv`
-  // and we try that; device creation will fail if it's a bad guess.
-  size_t dash = target_backend.find('-');
-  if (dash == std::string::npos) {
-    return std::string(target_backend);
-  } else {
-    return std::string(target_backend.substr(0, dash));
-  }
+
+  // Most target device names correspond directly to runtime driver names.
+  return std::string(target_device);
 }
 
-// Tries to guess a target backend from the given |device_uri| when possible.
-// Returns empty string if no backend is required or one could not be inferred.
-std::string InferTargetBackendFromDevice(iree_string_view_t device_uri) {
-  // Get the driver name from URIs in the `driver://...` form.
+// Tries to guess a compiler target device from the given runtime |device_uri|.
+// Returns an empty string if no target device can be inferred.
+std::string InferTargetDeviceFromDevice(iree_string_view_t device_uri) {
   iree_string_view_t driver = iree_string_view_empty();
   iree_string_view_split(device_uri, ':', &driver, nullptr);
+
   if (iree_string_view_is_empty(driver)) {
-    // Plain VM or vmvx-inline targets do not need a HAL device.
     return "";
   } else if (iree_string_view_starts_with(driver, IREE_SV("local-"))) {
-    // Locally-executable devices default to the llvm-cpu target as that's
-    // usually what people want for CPU execution; users can override by
-    // specifying --iree-hal-local-target-device-backends=vmvx instead.
-    return "llvm-cpu";
+    return "local";
   }
-  // Many other backends have aliases that allow using the driver name. If there
-  // are multiple pipelines available whatever the compiler defaults to is
-  // chosen.
+
   return std::string(driver.data, driver.size);
 }
 
-// Tries to guess a set of target backends from the |device_flag_values| when
-// possible. Since multiple target backends can be used for a particular device
-// (such as llvm-cpu or vmvx for local-sync and local-task) this is just
-// guesswork. If we can't produce a target backend flag value we bail.
-// Returns a comma-delimited list of target backends.
-StatusOr<std::string> InferTargetBackendsFromDevices(
+// Tries to infer compiler target devices from the runtime device configuration.
+// Returns a comma-delimited list of target devices.
+StatusOr<std::string> InferTargetDevicesFromDevices(
     iree_string_view_list_t device_uris) {
-  // No-op when no devices specified (probably no HAL).
   if (device_uris.count == 0) return "";
-  // If multiple devices were provided we need to target all of them.
-  std::set<std::string> target_backends;
+
+  std::set<std::string> target_devices;
   for (iree_host_size_t i = 0; i < device_uris.count; ++i) {
-    auto target_backend = InferTargetBackendFromDevice(device_uris.values[i]);
-    if (!target_backend.empty()) {
-      target_backends.insert(std::move(target_backend));
+    auto target_device = InferTargetDeviceFromDevice(device_uris.values[i]);
+    if (!target_device.empty()) {
+      target_devices.insert(std::move(target_device));
     }
   }
-  // Join all target backends together.
+
   std::string result;
-  for (auto& target_backend : target_backends) {
+  for (auto& target_device : target_devices) {
     if (!result.empty()) result.append(",");
-    result.append(target_backend);
+    result.append(target_device);
   }
+
   return result;
 }
 
-// Configures the --iree-hal-target-backends= flag based on the --device= flags
-// set by the user. Ignored if any target backends are explicitly specified.
-// Online compilers would want to do some more intelligent device selection on
-// their own.
-Status ConfigureTargetBackends(iree_compiler_session_t* session,
-                               std::string* out_default_device_uri) {
-  // Query the session for the currently set --iree-hal-target-backends= flag.
-  // It may be empty string.
-  std::string target_backends_flag;
+// Configures compiler target device flags based on the --device= flags set by
+// the user, or infers a default runtime device from an explicitly specified
+// compiler target device. Online compilers may want to perform more
+// sophisticated device selection and target configuration.
+Status ConfigureTargetDevices(iree_compiler_session_t* session,
+                              std::string* out_default_device_uri) {
+  // Query explicitly specified compiler target devices.
+  std::string target_devices_flag;
   ireeCompilerSessionGetFlags(
       session, /*nonDefaultOnly=*/true,
       [](const char* flag_str, size_t length, void* user_data) {
-        // NOTE: flag_str has the full `--flag=value` string.
-        std::string_view prefix = "--iree-hal-target-backends=";
+        std::string_view prefix = "--iree-hal-target-device=";
         std::string_view flag = std::string_view(flag_str, length);
         if (starts_with(prefix, flag)) {
           flag.remove_prefix(prefix.size());
-          if (flag.empty()) return;  // ignore empty
+          if (flag.empty()) return;
           auto* result = static_cast<std::string*>(user_data);
           *result = std::string(flag);
         }
       },
-      static_cast<void*>(&target_backends_flag));
+      static_cast<void*>(&target_devices_flag));
 
-  // Query the tooling utils for the --device= flag values. Note that zero or
-  // more devices may be specified.
   iree_string_view_list_t device_uris = iree_hal_device_flag_list();
 
-  // No-op if no target backends or devices are specified - this can be an
-  // intentional decision as the user may be running a program that doesn't use
-  // the HAL.
-  if (target_backends_flag.empty() && device_uris.count == 0) {
+  // Nothing was explicitly configured.
+  if (target_devices_flag.empty() && device_uris.count == 0) {
     return OkStatus();
   }
 
-  // No-op if both target backends and devices are set as the user has
-  // explicitly specified a configuration.
-  if (!target_backends_flag.empty() && device_uris.count > 0) {
+  // Both sides were explicitly configured.
+  if (!target_devices_flag.empty() && device_uris.count > 0) {
     return OkStatus();
   }
 
-  // If target backends are specified then we can infer the runtime devices from
-  // the compiler configuration. This only works if there's a single backend
-  // specified; if the user wants multiple target backends then they must
-  // specify the device(s) to use.
+  // Compiler target device specified but no runtime device: infer one when
+  // there is a single simple target device.
   if (device_uris.count == 0) {
-    if (target_backends_flag.find(',') != std::string::npos) {
+    if (target_devices_flag.find(',') != std::string::npos) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "if multiple target backends are specified the device to use must "
-          "also be specified with --device= (have "
-          "`--iree-hal-target-backends=%.*s`)",
-          (int)target_backends_flag.size(), target_backends_flag.data());
+          "if multiple target devices are specified the runtime device to use "
+          "must also be specified with --device= (have "
+          "`--iree-hal-target-device=%.*s`)",
+          (int)target_devices_flag.size(), target_devices_flag.data());
     }
+
     *out_default_device_uri =
-        InferDefaultDeviceFromTargetBackend(target_backends_flag);
+        InferDefaultDeviceFromTargetDevice(target_devices_flag);
     return OkStatus();
   }
 
-  // Infer target backends from the runtime device configuration.
-  // This can get arbitrarily complex but for now this simple runner just
-  // guesses. In the future we'll have more ways of configuring the compiler
-  // from available runtime devices (not just the target backend but also
-  // target-specific settings).
-  IREE_ASSIGN_OR_RETURN(auto target_backends,
-                        InferTargetBackendsFromDevices(device_uris));
-  if (!target_backends.empty()) {
-    auto target_backends_flag =
-        std::string("--iree-hal-target-backends=") + target_backends;
-    const char* compiler_argv[1] = {
-        target_backends_flag.c_str(),
-    };
+  // Runtime devices were specified but compiler target devices were not.
+  IREE_ASSIGN_OR_RETURN(auto target_devices,
+                        InferTargetDevicesFromDevices(device_uris));
+
+  if (!target_devices.empty()) {
+    std::vector<std::string> compiler_flags;
+    compiler_flags.push_back(
+        std::string("--iree-hal-target-device=") + target_devices);
+
+    // Preserve the historical default for local runtime devices: compile with
+    // llvm-cpu unless the user explicitly configured compiler flags.
+    if (target_devices == "local" ||
+        target_devices.find("local,") != std::string::npos ||
+        target_devices.find(",local") != std::string::npos) {
+      compiler_flags.push_back(
+          "--iree-hal-local-target-device-backends=llvm-cpu");
+    }
+
+    std::vector<const char*> compiler_argv;
+    compiler_argv.reserve(compiler_flags.size());
+    for (const auto& flag : compiler_flags) {
+      compiler_argv.push_back(flag.c_str());
+    }
+
     auto error = ireeCompilerSessionSetFlags(
-        session, IREE_ARRAYSIZE(compiler_argv), compiler_argv);
+        session, compiler_argv.size(), compiler_argv.data());
     if (error) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "unable to set inferred target backend flag to `%.*s`",
-          (int)target_backends_flag.size(), target_backends_flag.data());
+          "unable to set inferred target device configuration");
     }
   }
 
@@ -240,14 +228,14 @@ StatusOr<int> CompileAndRunFile(iree_compiler_session_t* session,
                                 const char* mlir_filename) {
   IREE_TRACE_SCOPE_NAMED("CompileAndRunFile");
 
-  // Configure the --iree-hal-target-backends= flag and/or get the default
-  // device to use at runtime if either are not explicitly specified.
-  // Note that target backends and the runtime devices aren't 1:1 and this is
-  // an imperfect guess. In this simple online compiler we assume homogenous
-  // device sets and only a single global target backend but library/hosting
-  // layers can configure heterogenous and per-invocation target configurations.
+  // Configure compiler target devices and/or get the default runtime device if
+  // either side was not explicitly specified.
+  // Note that compiler target devices and runtime devices aren't necessarily
+  // 1:1 and this is an imperfect guess. In this simple online compiler we assume
+  // homogeneous device sets, while library/hosting layers can configure more
+  // complex target and runtime device configurations.
   std::string default_device_uri;
-  IREE_RETURN_IF_ERROR(ConfigureTargetBackends(session, &default_device_uri));
+  IREE_RETURN_IF_ERROR(ConfigureTargetDevices(session, &default_device_uri));
 
   // RAII container for the compiler invocation.
   struct InvocationState {

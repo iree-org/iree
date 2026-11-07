@@ -32,10 +32,13 @@ Compiler target backends are used to generate executable code for hardware APIs
 and device architectures. Compiler targets may implement special optimizations
 or generate distinct code for certain device/architecture/performance profiles.
 
-When compiling programs, a list of target backends can be specified via
+When compiling programs, target devices are specified on the command line with
+`--iree-hal-target-device=...`. Some devices also accept backend-specific
+configuration flags, such as
+`--iree-hal-local-target-device-backends=...` for local devices.
 
-* `--iree-hal-target-backends=` (command-line)
-* `target_backends=[...]` (Python)
+The Python compiler tools continue to accept `target_backends=[...]` and map
+backend names to the corresponding target device configuration.
 
 | Target backend | Description | Compatible HAL devices |
 | -------------- | ----------- | ---------------------- |

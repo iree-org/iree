@@ -163,6 +163,23 @@ class CompilerOptions:
         self.input_type = InputType.parse(self.input_type)
         self.output_format = OutputFormat.parse(self.output_format)
 
+def _target_backend_to_compiler_flags(target_backend: str) -> List[str]:
+    if target_backend in ("llvm-cpu", "vmvx", "vmvx-inline"):
+        return [
+            "--iree-hal-target-device=local",
+            f"--iree-hal-local-target-device-backends={target_backend}",
+        ]
+    if target_backend == "vulkan-spirv":
+        return ["--iree-hal-target-device=vulkan"]
+    if target_backend == "rocm":
+        return ["--iree-hal-target-device=hip"]
+    if target_backend == "cuda":
+        return ["--iree-hal-target-device=cuda"]
+    if target_backend == "metal-spirv":
+        return ["--iree-hal-target-device=metal"]
+    if target_backend == "webgpu-spirv":
+        return ["--iree-hal-target-device=webgpu"]
+    raise ValueError(f"Unsupported target backend: {target_backend}")
 
 def build_compile_command_line(
     input_file: str, tfs: TempFileSaver, options: CompilerOptions
@@ -186,7 +203,7 @@ def build_compile_command_line(
     ]
     if options.target_backends is not None:
         for target_backend in options.target_backends:
-            cl.append(f"--iree-hal-target-backends={target_backend}")
+            cl.extend(_target_backend_to_compiler_flags(target_backend))
 
     # Output file.
     if options.output_file:
