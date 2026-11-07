@@ -130,6 +130,7 @@ iree_lit_test_suite(
         "//tools:iree-compile",
         "//tools:iree-run-mlir",
         "//tools:iree-run-module",
+        "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],
 )
