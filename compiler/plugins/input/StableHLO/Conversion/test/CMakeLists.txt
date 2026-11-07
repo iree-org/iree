@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "dynamic_convolution.mlir"
     "dynamic_reshape.mlir"
     "dynamic_shape_ops.mlir"
+    "einsum.mlir"
     "inline_shape_assertion_helpers.mlir"
     "legalize_chlo_decomposition.mlir"
     "legalize_chlo_no_broadcast.mlir"
