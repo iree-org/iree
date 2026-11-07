@@ -51,6 +51,21 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    PaddingUtils
+  HDRS
+    "StableHLOPaddingUtils.h"
+  SRCS
+    "StableHLOPaddingUtils.cpp"
+  DEPS
+    ::StatusCheck
+    LLVMSupport
+    MLIRArithDialect
+    MLIRIR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     StableHLOLegalization
   SRCS
     "CheckVHLOStableHloMixUsage.cpp"
@@ -67,6 +82,7 @@ iree_cc_library(
     "StableHLOToLinalgExt.cpp"
     "VerifyCompilerInputLegality.cpp"
   DEPS
+    ::PaddingUtils
     ::PassHeaders
     ::StatusCheck
     ChloOps

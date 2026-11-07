@@ -55,6 +55,18 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
+    name = "PaddingUtils",
+    srcs = ["StableHLOPaddingUtils.cpp"],
+    hdrs = ["StableHLOPaddingUtils.h"],
+    deps = [
+        ":StatusCheck",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "StableHLOLegalization",
     srcs = [
         "CheckVHLOStableHloMixUsage.cpp",
@@ -72,6 +84,7 @@ iree_compiler_cc_library(
         "VerifyCompilerInputLegality.cpp",
     ],
     deps = [
+        ":PaddingUtils",
         ":PassHeaders",
         ":StatusCheck",
         "//compiler/plugins/input/StableHLO/Conversion/Preprocessing",
