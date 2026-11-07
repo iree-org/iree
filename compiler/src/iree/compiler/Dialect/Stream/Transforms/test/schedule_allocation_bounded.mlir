@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-stream-schedule-allocation{bound-transients=true})" %s | FileCheck %s
 // RUN: iree-opt --split-input-file --iree-stream-schedule-allocation %s | FileCheck %s --check-prefix=DEFAULT
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-stream-schedule-allocation{bound-transients=true},util.func(iree-stream-layout-slices))" %s | FileCheck %s --check-prefix=LAYOUT
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-stream-schedule-allocation{bound-transients=true},iree-stream-layout-slices)" %s | FileCheck %s --check-prefix=LAYOUT
 
 // A transient whose size has a proven upper bound packs at that bound, aligned
 // to the 64-byte default range alignment; the fills keep the exact sizes.

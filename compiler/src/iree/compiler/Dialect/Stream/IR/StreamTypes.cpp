@@ -167,7 +167,37 @@ void printParameterReference(AsmPrinter &p, StringAttr scopeAttr,
 //===----------------------------------------------------------------------===//
 
 // static
+LogicalResult ResourceConfigAttr::verify(
+    function_ref<InFlightDiagnostic()> emitError, int64_t maxAllocationSize,
+    int64_t minBufferOffsetAlignment, int64_t maxBufferRange,
+    int64_t minBufferRangeAlignment, int64_t indexBits,
+    bool aliasMutableBindings, IREE::Stream::MemoryModel memoryModel,
+    int64_t minAccessGranularity, int64_t minFillGranularity,
+    int64_t minCopyGranularity) {
+  // Rounding to a unit and packing slices both assume power-of-two units that
+  // divide the buffer alignments.
+  for (int64_t granularity :
+       {minAccessGranularity, minFillGranularity, minCopyGranularity}) {
+    if (granularity < 1 || !llvm::isPowerOf2_64(granularity)) {
+      return emitError() << "granularity " << granularity
+                         << " is not a power of two";
+    }
+    for (auto [name, alignment] :
+         {std::pair<StringRef, int64_t>{"min_buffer_offset_alignment",
+                                        minBufferOffsetAlignment},
+          {"min_buffer_range_alignment", minBufferRangeAlignment}}) {
+      if (alignment > 0 && alignment % granularity != 0) {
+        return emitError() << name << " " << alignment
+                           << " is not a multiple of granularity "
+                           << granularity;
+      }
+    }
+  }
+  return success();
+}
+
 Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
+  SMLoc loc = p.getCurrentLocation();
   if (failed(p.parseLess()) || failed(p.parseLBrace())) {
     return {};
   }
@@ -179,6 +209,9 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
   int64_t indexBits = 32;
   bool aliasMutableBindings = false;
   auto memoryModel = IREE::Stream::MemoryModel::Discrete;
+  int64_t minAccessGranularity = 1;
+  int64_t minFillGranularity = 1;
+  int64_t minCopyGranularity = 1;
   while (failed(p.parseOptionalRBrace())) {
     StringRef key;
     if (failed(p.parseKeyword(&key)) || failed(p.parseEqual())) {
@@ -226,6 +259,18 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
         return {};
       }
       memoryModel = enumValue.value();
+    } else if (key == "min_access_granularity") {
+      if (failed(p.parseInteger(minAccessGranularity))) {
+        return {};
+      }
+    } else if (key == "min_fill_granularity") {
+      if (failed(p.parseInteger(minFillGranularity))) {
+        return {};
+      }
+    } else if (key == "min_copy_granularity") {
+      if (failed(p.parseInteger(minCopyGranularity))) {
+        return {};
+      }
     }
     (void)p.parseOptionalComma();
   }
@@ -233,10 +278,11 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
     return {};
   }
 
-  return ResourceConfigAttr::get(p.getContext(), maxAllocationSize,
-                                 minBufferOffsetAlignment, maxBufferRange,
-                                 minBufferRangeAlignment, indexBits,
-                                 aliasMutableBindings, memoryModel);
+  return p.getChecked<ResourceConfigAttr>(
+      loc, p.getContext(), maxAllocationSize, minBufferOffsetAlignment,
+      maxBufferRange, minBufferRangeAlignment, indexBits, aliasMutableBindings,
+      memoryModel, minAccessGranularity, minFillGranularity,
+      minCopyGranularity);
 }
 
 void ResourceConfigAttr::print(AsmPrinter &p) const {
@@ -251,6 +297,15 @@ void ResourceConfigAttr::print(AsmPrinter &p) const {
   os << "alias_mutable_bindings = "
      << (getAliasMutableBindings() ? "true" : "false") << ", ";
   os << "memory_model = " << stringifyMemoryModel(getMemoryModel());
+  if (getMinAccessGranularity() != 1) {
+    os << ", min_access_granularity = " << getMinAccessGranularity();
+  }
+  if (getMinFillGranularity() != 1) {
+    os << ", min_fill_granularity = " << getMinFillGranularity();
+  }
+  if (getMinCopyGranularity() != 1) {
+    os << ", min_copy_granularity = " << getMinCopyGranularity();
+  }
   os << "}>";
 }
 
@@ -278,7 +333,10 @@ ResourceConfigAttr::intersectBufferConstraints(ResourceConfigAttr lhs,
       (lhs.getMemoryModel() == IREE::Stream::MemoryModel::Unified &&
        rhs.getMemoryModel() == IREE::Stream::MemoryModel::Unified)
           ? IREE::Stream::MemoryModel::Unified
-          : IREE::Stream::MemoryModel::Discrete);
+          : IREE::Stream::MemoryModel::Discrete,
+      std::max(lhs.getMinAccessGranularity(), rhs.getMinAccessGranularity()),
+      std::max(lhs.getMinFillGranularity(), rhs.getMinFillGranularity()),
+      std::max(lhs.getMinCopyGranularity(), rhs.getMinCopyGranularity()));
 }
 
 // static
@@ -295,28 +353,21 @@ ResourceConfigAttr::getDefaultHostConstraints(MLIRContext *context) {
 
 // static
 ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
-  auto *context = op->getContext();
-  auto attrId = StringAttr::get(context, "stream.resources");
-  while (op) {
-    // Use an override if specified.
-    auto attr = op->getAttrOfType<ResourceConfigAttr>(attrId);
-    if (attr) {
-      return attr;
-    }
-    // See if the affinity specified provides a resource configuration.
-    if (auto affinityOp = dyn_cast<AffinityOpInterface>(op)) {
-      auto affinityAttr = affinityOp.getAffinityAttr();
-      if (affinityAttr) {
-        auto attr = affinityAttr.getResourceConfigAttr();
-        if (attr) {
-          return attr;
-        }
-      }
-    }
-    op = op->getParentOp();
+  auto attrId = StringAttr::get(op->getContext(), "stream.resources");
+  ResourceConfigAttr scopeConfig;
+  for (Operation *scope = op; scope && !scopeConfig;
+       scope = scope->getParentOp()) {
+    scopeConfig = scope->getAttrOfType<ResourceConfigAttr>(attrId);
   }
-  // No config found; use conservative host config.
-  return getDefaultHostConstraints(context);
+  // Resolve placement independently: a scope override cannot weaken a device's
+  // physical constraints, including when the placement is inherited.
+  if (auto affinity = AffinityAttr::lookup(op)) {
+    if (auto affinityConfig = affinity.lookupResourceConfigAttr(op)) {
+      return intersectBufferConstraints(scopeConfig, affinityConfig);
+    }
+  }
+  return scopeConfig ? scopeConfig
+                     : getDefaultHostConstraints(op->getContext());
 }
 
 //===----------------------------------------------------------------------===//

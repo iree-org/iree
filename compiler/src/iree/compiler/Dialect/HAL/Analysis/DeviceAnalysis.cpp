@@ -129,80 +129,18 @@ DeviceAnalysis::lookupDeviceTargets(Value deviceValue) {
   return DeviceSet(valuePVS->getAssumedSet());
 }
 
-// Returns a set of target devices that may be active for the given
-// operation. This will recursively walk parent operations until one with
-// the `hal.device.targets` attribute is found.
-//
-// This is a legacy mechanism for performing the search. Newer code should use
-// affinities or !hal.device analysis instead.
-static void gatherLegacyDeviceTargetAttrs(
-    Operation *op, SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
-  auto attrId = StringAttr::get(op->getContext(), "hal.device.targets");
-  while (op) {
-    auto targetsAttr = op->getAttrOfType<ArrayAttr>(attrId);
-    if (targetsAttr) {
-      for (auto elementAttr : targetsAttr) {
-        if (auto targetAttr =
-                dyn_cast<IREE::HAL::DeviceTargetAttr>(elementAttr)) {
-          resultSet.insert(targetAttr);
-        } else {
-          // HACK: this legacy approach is deprecated and only preserved for
-          // existing behavior. It's ok to get angry here as users should not be
-          // trying to use this pass prior to device materialization.
-          assert(false &&
-                 "legacy hal.device.targets only support hal.device.targets");
-        }
-      }
-      return;
-    }
-    op = op->getParentOp();
-  }
-  // No devices found; let caller decide what to do.
-}
-
 // Recursively resolves the referenced device into targets.
 void DeviceAnalysis::gatherDeviceTargets(
     Attribute rootAttr, Operation *fromOp,
     SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
-  SetVector<Attribute> worklist;
-  worklist.insert(rootAttr);
-  do {
-    auto attr = worklist.pop_back_val();
-    if (!TypeSwitch<Attribute, bool>(attr)
-             .Case([&](SymbolRefAttr symRefAttr) {
-               auto globalOp =
-                   explorer.getSymbolTables()
-                       .lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
-                           fromOp, symRefAttr);
-               assert(globalOp && "global reference must be valid");
-               if (auto initialValueAttr = globalOp.getGlobalInitialValue()) {
-                 // Global with a device initialization value we can analyze.
-                 worklist.insert(initialValueAttr);
-                 return true;
-               } else {
-                 return false;
-               }
-             })
-             .Case([&](IREE::HAL::DeviceTargetAttr targetAttr) {
-               resultSet.insert(targetAttr);
-               return true;
-             })
-             .Case([&](IREE::HAL::DeviceFallbackAttr fallbackAttr) {
-               worklist.insert(fallbackAttr.getName());
-               return true;
-             })
-             .Case([&](IREE::HAL::DeviceSelectAttr selectAttr) {
-               worklist.insert(selectAttr.getDevices().begin(),
-                               selectAttr.getDevices().end());
-               return true;
-             })
-             .Default(false)) {
-      // No initial value means fall back to defaults. We do that by
-      // inserting all knowable targets.
-      gatherLegacyDeviceTargetAttrs(fromOp, resultSet);
-      return;
-    }
-  } while (!worklist.empty());
+  IREE::HAL::gatherDeviceTargetAttrs(
+      rootAttr, fromOp,
+      [&](SymbolRefAttr symRefAttr) {
+        return explorer.getSymbolTables()
+            .lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(fromOp,
+                                                                    symRefAttr);
+      },
+      resultSet);
 }
 
 void DeviceAnalysis::gatherAllDeviceTargets(
@@ -222,7 +160,7 @@ void DeviceAnalysis::gatherDeviceAffinityTargets(
   auto deviceAffinityAttr =
       dyn_cast_if_present<IREE::HAL::DeviceAffinityAttr>(affinityAttr);
   if (!deviceAffinityAttr) {
-    gatherLegacyDeviceTargetAttrs(fromOp, resultSet);
+    IREE::HAL::gatherLegacyDeviceTargetAttrs(fromOp, resultSet);
     return;
   }
 

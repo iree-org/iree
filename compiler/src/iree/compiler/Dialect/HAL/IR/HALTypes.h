@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -198,6 +199,20 @@ struct StaticRange {
 //===----------------------------------------------------------------------===//
 
 namespace mlir::iree_compiler::IREE::HAL {
+
+// Gathers the `hal.device.targets` of |op| or its nearest ancestor with them.
+// This is a legacy mechanism; newer code resolves device globals.
+void gatherLegacyDeviceTargetAttrs(Operation *op,
+                                   SetVector<DeviceTargetAttr> &resultSet);
+
+// Gathers the device targets |rootAttr|, a device global reference or a device
+// value, may resolve to; |lookupGlobal| resolves global references. A global
+// without an initial value it can resolve falls back to the legacy targets of
+// |fromOp|.
+void gatherDeviceTargetAttrs(
+    Attribute rootAttr, Operation *fromOp,
+    function_ref<IREE::Util::GlobalOpInterface(SymbolRefAttr)> lookupGlobal,
+    SetVector<DeviceTargetAttr> &resultSet);
 
 } // namespace mlir::iree_compiler::IREE::HAL
 
