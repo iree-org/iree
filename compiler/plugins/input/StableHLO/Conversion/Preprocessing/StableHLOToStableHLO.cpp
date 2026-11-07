@@ -526,6 +526,12 @@ struct DynamicConvToPaddedConv final
     int64_t rank = lhsType.getRank();
     int64_t numSpatial = spatialDims.size();
     Type paddingElementType = paddingType.getElementType();
+    // Dilation attributes and the clamped high padding can exceed the source
+    // padding width. Widen scalar extracts so this stays shape arithmetic.
+    if (paddingElementType.isSignlessInteger() &&
+        paddingElementType.getIntOrFloatBitWidth() < 64) {
+      paddingElementType = rewriter.getI64Type();
+    }
     unsigned paddingBitWidth = paddingElementType.getIntOrFloatBitWidth();
 
     Value zeroIndex = arith::ConstantIndexOp::create(rewriter, loc, 0);
@@ -543,6 +549,12 @@ struct DynamicConvToPaddedConv final
           rewriter, loc, op.getPadding(), ValueRange{row, zeroIndex});
       Value highElement = tensor::ExtractOp::create(
           rewriter, loc, op.getPadding(), ValueRange{row, oneIndex});
+      if (lowElement.getType() != paddingElementType) {
+        lowElement = arith::ExtSIOp::create(rewriter, loc, paddingElementType,
+                                            lowElement);
+        highElement = arith::ExtSIOp::create(rewriter, loc, paddingElementType,
+                                             highElement);
+      }
       lows[d] = lowElement;
 
       // Base dilation is applied by the pad, so the convolution must not

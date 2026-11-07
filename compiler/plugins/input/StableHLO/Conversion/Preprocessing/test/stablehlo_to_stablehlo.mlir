@@ -177,10 +177,10 @@ func.func @dynamic_conv_attrs_kept(%a: tensor<2x8x6x3xf32>, %k: tensor<3x2x1x6xf
 
 // -----
 
-// The dynamic_pad operands must all share the padding operand's element type.
+// All dynamic_pad coordinates use the widened scalar padding type.
 // CHECK-LABEL: @dynamic_conv_i32_padding
 // CHECK: stablehlo.dynamic_pad
-// CHECK-SAME: (tensor<1x8x8x1xf32>, tensor<f32>, tensor<4xi32>, tensor<4xi32>, tensor<4xi32>) -> tensor<1x?x?x1xf32>
+// CHECK-SAME: (tensor<1x8x8x1xf32>, tensor<f32>, tensor<4xi64>, tensor<4xi64>, tensor<4xi64>) -> tensor<1x?x?x1xf32>
 func.func @dynamic_conv_i32_padding(%a: tensor<1x8x8x1xf32>, %k: tensor<3x3x1x1xf32>, %p: tensor<2x2xi32>) -> tensor<1x8x8x1xf32> {
   %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
     dimension_numbers = #stablehlo.conv<[b, 0, 1, f]x[0, 1, i, o]->[b, 0, 1, f]>,
@@ -188,6 +188,25 @@ func.func @dynamic_conv_i32_padding(%a: tensor<1x8x8x1xf32>, %k: tensor<3x3x1x1x
     window_strides = array<i64: 1, 1>, lhs_dilation = array<i64: 1, 1>, rhs_dilation = array<i64: 1, 1>
   } : (tensor<1x8x8x1xf32>, tensor<3x3x1x1xf32>, tensor<2x2xi32>) -> tensor<1x8x8x1xf32>
   return %r : tensor<1x8x8x1xf32>
+}
+
+// -----
+
+// Dilation is an i64 attribute, independent of the padding element width.
+// CHECK-LABEL: @dynamic_conv_i8_padding_large_dilation
+// CHECK-DAG: %[[INTERIOR:.+]] = stablehlo.constant dense<[0, 256, 0]> : tensor<3xi64>
+// CHECK: %[[LOW:.+]] = tensor.extract %arg2[%{{.+}}, %{{.+}}] : tensor<1x2xi8>
+// CHECK: arith.extsi %[[LOW]] : i8 to i64
+// CHECK: stablehlo.dynamic_pad {{.*}}, %[[INTERIOR]] : (tensor<1x2x1xf32>, tensor<f32>, tensor<3xi64>, tensor<3xi64>, tensor<3xi64>)
+// CHECK: stablehlo.convolution
+// CHECK-SAME: lhs_dilate = [1]
+func.func @dynamic_conv_i8_padding_large_dilation(%a: tensor<1x2x1xf32>, %k: tensor<1x1x1xf32>, %p: tensor<1x2xi8>) -> tensor<1x?x1xf32> {
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, lhs_dilation = array<i64: 257>, rhs_dilation = array<i64: 1>
+  } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xi8>) -> tensor<1x?x1xf32>
+  return %r : tensor<1x?x1xf32>
 }
 
 // -----
