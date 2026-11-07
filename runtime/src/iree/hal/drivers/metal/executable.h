@@ -77,6 +77,9 @@ typedef struct iree_hal_metal_pipeline_t {
   uint32_t constant_count;
   // Total number of bindings.
   uint32_t binding_count;
+  // One bit per binding present in the compiled argument buffer. Optimisation
+  // can remove bindings while preserving the dispatch interface's ordinals.
+  uint64_t binding_used_bits;
   // One bit per binding indicating whether it is read-only.
   uint64_t binding_read_only_bits;
 
