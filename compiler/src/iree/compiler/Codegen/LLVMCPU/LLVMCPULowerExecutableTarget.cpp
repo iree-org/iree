@@ -146,10 +146,10 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       isX86(targetConfig) || isRISCV(targetConfig) ||
       (isAArch64(targetConfig) &&
        (hasAnySVEFeature(targetConfig) || hasSMEFeature(targetConfig)));
-  // TODO(#16956): The decomposition of attention op leads to complex control
-  // flow, which leads to non-trivial stack allocation. Enforcing masking for
-  // targets that do not support native vector masking enables the
-  // functionality, though the performance may be suboptimal.
+  // Dynamic attention tiles must be vectorized before bufferization: the
+  // running-maximum update needs both the old and new values, so its tensor
+  // loop result cannot always alias the corresponding iter_arg. Targets
+  // without native masking emulate masks during vector lowering.
   auto hasAttentionOp = [](FunctionOpInterface funcOp) {
     bool hasAttention = false;
     funcOp.walk([&](IREE::LinalgExt::OnlineAttentionOp) {
@@ -158,7 +158,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     });
     return hasAttention;
   };
-  if (isAArch64(targetConfig) && hasAttentionOp(funcOp)) {
+  if (hasAttentionOp(funcOp)) {
     pipelineOpts.enableVectorMasking = true;
   }
 

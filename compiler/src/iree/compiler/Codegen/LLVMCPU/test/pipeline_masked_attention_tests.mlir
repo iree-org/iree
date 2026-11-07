@@ -52,3 +52,50 @@ func.func @masked_attention() attributes {hal.executable.target = #executable_ta
 //       CHECK:       memref.store
 //  CHECK-NEXT:     }
 //  CHECK-NEXT:   }
+
+// -----
+
+// A partial query/key tile needs masked vectorization even on targets without
+// native vector masks. Leaving its running maximum as a tensor prevents the
+// key loop from bufferizing because the update also reads the old maximum.
+// CHECK-LABEL: func.func @dynamic_attention_wasm
+// CHECK-NOT: tensor<
+// CHECK-NOT: iree_linalg_ext.
+// CHECK: return
+#layout = #hal.pipeline.layout<constants = 1, bindings = [
+  #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#wasm = #hal.executable.target<"llvm-cpu", "static", {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-i128:128-n32:64-S128-ni:1:10:20", native_vector_size = 8 : index, target_triple = "wasm32-unknown-unknown"}>
+func.func @dynamic_attention_wasm() attributes {hal.executable.target = #wasm} {
+  %c0 = arith.constant 0 : index
+  %length = hal.interface.constant.load layout(#layout) ordinal(0) : i32
+  %n_cast = arith.index_castui %length : i32 to index
+  %n = iree_tensor_ext.dispatch.workload.ordinal %n_cast, 0 : index
+  %scale = arith.constant 0.125 : f32
+  %q_binding = hal.interface.binding.subspan layout(#layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x?x64xf32>>{%n}
+  %k_binding = hal.interface.binding.subspan layout(#layout) binding(1) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x?x64xf32>>{%n}
+  %v_binding = hal.interface.binding.subspan layout(#layout) binding(2) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x?x64xf32>>{%n}
+  %mask_binding = hal.interface.binding.subspan layout(#layout) binding(3) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x?x?xi8>>{%n, %n}
+  %out_binding = hal.interface.binding.subspan layout(#layout) binding(4) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x?x64xf32>>{%n}
+  %q = iree_tensor_ext.dispatch.tensor.load %q_binding, offsets = [0, 0, 0], sizes = [1, %n, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x?x64xf32>>{%n} -> tensor<1x?x64xf32>
+  %k = iree_tensor_ext.dispatch.tensor.load %k_binding, offsets = [0, 0, 0], sizes = [1, %n, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x?x64xf32>>{%n} -> tensor<1x?x64xf32>
+  %v = iree_tensor_ext.dispatch.tensor.load %v_binding, offsets = [0, 0, 0], sizes = [1, %n, 64], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x?x64xf32>>{%n} -> tensor<1x?x64xf32>
+  %mask = iree_tensor_ext.dispatch.tensor.load %mask_binding, offsets = [0, 0, 0], sizes = [1, %n, %n], strides = [1, 1, 1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<1x?x?xi8>>{%n, %n} -> tensor<1x?x?xi8>
+  %empty = tensor.empty(%n) : tensor<1x?x64xf32>
+  %result = iree_linalg_ext.attention
+      <indexing_maps = [affine_map<(b, m, k1, k2, n) -> (b, m, k1)>,
+                        affine_map<(b, m, k1, k2, n) -> (b, k2, k1)>,
+                        affine_map<(b, m, k1, k2, n) -> (b, k2, n)>,
+                        affine_map<(b, m, k1, k2, n) -> ()>,
+                        affine_map<(b, m, k1, k2, n) -> (b, m, k2)>,
+                        affine_map<(b, m, k1, k2, n) -> (b, m, n)>]>
+      ins(%q, %k, %v, %scale, %mask : tensor<1x?x64xf32>, tensor<1x?x64xf32>, tensor<1x?x64xf32>, f32, tensor<1x?x?xi8>)
+      outs(%empty : tensor<1x?x64xf32>) {
+    ^bb0(%score: f32):
+      iree_linalg_ext.yield %score : f32
+  } -> tensor<1x?x64xf32>
+  iree_tensor_ext.dispatch.tensor.store %result, %out_binding, offsets = [0, 0, 0], sizes = [1, %n, 64], strides = [1, 1, 1] : tensor<1x?x64xf32> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<1x?x64xf32>>{%n}
+  return
+}
