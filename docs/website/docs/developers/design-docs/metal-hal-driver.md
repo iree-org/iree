@@ -274,12 +274,20 @@ with the current active `MTLComputeCommandEncoder`:
 1. For each bound descriptor set at set #`S`:
    1. Create a [`MTLArgumentEncoder`][mtl-argument-encoder] for encoding an
       associated argument `MTLBuffer`.
-   1. For each bound resource buffer at binding #`B` in this descriptor set,
+   1. For each bound resource buffer at binding #`B` that is present in the
+      compiled argument buffer,
       encode it to the argument buffer index #`B` with
       `setBuffer::offset::atIndex:` and inform the `MTLComputeCommandEncoder`
       that the dispatch will use this resource with `useResource:usage:`.
    1. Set the argument `MTLBuffer` to buffer index #`S`.
 1. Dispatch with `dispatchThreadgroups:threadsPerThreadgroup:`.
+
+Pipeline creation reflects the compiled argument buffer and caches its used
+binding indices. Optimisation can remove a binding without renumbering later
+bindings. Dispatch recording must skip these absent indices: passing an absent
+index to Metal's argument encoder can overwrite an active argument. Reflection
+does not change the dispatch interface or the executable format and runs only
+when the pipeline is created.
 
 [metal-feature-set]: https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
 [macos-version-share]: https://gs.statcounter.com/macos-version-market-share/desktop/worldwide

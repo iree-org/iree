@@ -446,6 +446,7 @@ iree_check_single_backend_test_suite(
             "philox.mlir",
             "pow.mlir",
             "reduce.mlir",
+            "reduce_window.mlir",
             "remainder.mlir",
             "reshape.mlir",
             "reverse.mlir",
@@ -472,7 +473,6 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "reduce_window.mlir",  # TODO(#15012): fix test crash
             "scatter_general.mlir",
             "scatter_general_complex.mlir",
         ],

@@ -57,6 +57,22 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
+    executable_test
+  SRCS
+    "executable_test.mm"
+  DEPS
+    ::metal
+    iree::base::internal::flatcc::building
+    iree::base::internal::flatcc::parsing
+    iree::schemas::metal_executable_def_c_fbs
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=metal"
+)
+
+iree_cc_test(
+  NAME
     metal_device_test
   SRCS
     "metal_device_test.cc"
