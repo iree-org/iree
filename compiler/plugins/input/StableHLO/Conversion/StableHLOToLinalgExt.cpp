@@ -630,52 +630,108 @@ static bool checkUnary(const ArrayRef<int64_t> &values) {
   return true;
 }
 
-// Returns true when `init` is the identity of the reducer `body`, one
-// elementwise operation on its two arguments; an inclusive scan never combines
-// the init.
-static bool isReducerIdentity(Block &body, Value init) {
+enum class ScanInitHandling { Unsupported, Identity, SeedFirstElement };
+
+// Classifies the initial value of a supported scalar reducer. Inclusive scans
+// skip their initial value, so +0 must be combined with the first element:
+// unlike -0, it is not an identity for addition of a negative zero.
+static ScanInitHandling getScanInitHandling(Block &body, Value init) {
   Operation *reduceOp = body.getTerminator()->getOperand(0).getDefiningOp();
-  if (!reduceOp || reduceOp->getBlock() != &body || &body.front() != reduceOp ||
+  if (!reduceOp || !llvm::hasSingleElement(body.without_terminator()) ||
+      reduceOp->getBlock() != &body || &body.front() != reduceOp ||
       reduceOp->getNumOperands() != 2 ||
       !llvm::is_contained(body.getArguments(), reduceOp->getOperand(0)) ||
       !llvm::is_contained(body.getArguments(), reduceOp->getOperand(1)) ||
       reduceOp->getOperand(0) == reduceOp->getOperand(1)) {
-    return false;
+    return ScanInitHandling::Unsupported;
   }
   DenseElementsAttr value;
   if (!matchPattern(init, m_Constant(&value)) || !value.isSplat()) {
-    return false;
+    return ScanInitHandling::Unsupported;
   }
   if (isa<FloatType>(value.getElementType())) {
     APFloat x = value.getSplatValue<APFloat>();
-    return TypeSwitch<Operation *, bool>(reduceOp)
-        .Case([&](mlir::stablehlo::AddOp) { return x.isZero(); })
-        .Case([&](mlir::stablehlo::MulOp) { return x.isExactlyValue(1.0); })
-        .Case([&](mlir::stablehlo::MaxOp) {
-          return x.isInfinity() && x.isNegative();
-        })
-        .Case([&](mlir::stablehlo::MinOp) {
-          return x.isInfinity() && !x.isNegative();
-        })
-        .Default(false);
+    if (isa<mlir::stablehlo::AddOp>(reduceOp) && x.isZero() &&
+        !x.isNegative()) {
+      return ScanInitHandling::SeedFirstElement;
+    }
+    bool isIdentity =
+        TypeSwitch<Operation *, bool>(reduceOp)
+            .Case([&](mlir::stablehlo::AddOp) { return x.isZero(); })
+            .Case([&](mlir::stablehlo::MulOp) { return x.isExactlyValue(1.0); })
+            .Case([&](mlir::stablehlo::MaxOp) {
+              return x.isInfinity() && x.isNegative();
+            })
+            .Case([&](mlir::stablehlo::MinOp) {
+              return x.isInfinity() && !x.isNegative();
+            })
+            .Default(false);
+    return isIdentity ? ScanInitHandling::Identity
+                      : ScanInitHandling::Unsupported;
   }
   if (!value.getElementType().isIntOrIndex()) {
-    return false;
+    return ScanInitHandling::Unsupported;
   }
   APInt x = value.getSplatValue<APInt>();
   bool isUnsigned = value.getElementType().isUnsignedInteger();
-  return TypeSwitch<Operation *, bool>(reduceOp)
-      .Case<mlir::stablehlo::AddOp, mlir::stablehlo::OrOp,
-            mlir::stablehlo::XorOp>([&](auto) { return x.isZero(); })
-      .Case([&](mlir::stablehlo::MulOp) { return x.isOne(); })
-      .Case([&](mlir::stablehlo::AndOp) { return x.isAllOnes(); })
-      .Case([&](mlir::stablehlo::MaxOp) {
-        return isUnsigned ? x.isZero() : x.isMinSignedValue();
-      })
-      .Case([&](mlir::stablehlo::MinOp) {
-        return isUnsigned ? x.isAllOnes() : x.isMaxSignedValue();
-      })
-      .Default(false);
+  bool isIdentity =
+      TypeSwitch<Operation *, bool>(reduceOp)
+          .Case<mlir::stablehlo::AddOp, mlir::stablehlo::OrOp,
+                mlir::stablehlo::XorOp>([&](auto) { return x.isZero(); })
+          .Case([&](mlir::stablehlo::MulOp) { return x.isOne(); })
+          .Case([&](mlir::stablehlo::AndOp) { return x.isAllOnes(); })
+          .Case([&](mlir::stablehlo::MaxOp) {
+            return isUnsigned ? x.isZero() : x.isMinSignedValue();
+          })
+          .Case([&](mlir::stablehlo::MinOp) {
+            return isUnsigned ? x.isAllOnes() : x.isMaxSignedValue();
+          })
+          .Default(false);
+  return isIdentity ? ScanInitHandling::Identity
+                    : ScanInitHandling::Unsupported;
+}
+
+// Combines a +0 initializer with the first slice along the scan axis. Limiting
+// the slice extent to at most one also preserves empty axes. Tensor insertion
+// leaves the original input immutable and avoids interpreting a conditional
+// for every element on VMVX. Seeding after reversal also handles suffix scans.
+static Value createSeededScanInput(ConversionPatternRewriter &rewriter,
+                                   Location loc, Value input, Value init,
+                                   int64_t axis) {
+  auto inputType = cast<RankedTensorType>(input.getType());
+  int64_t rank = inputType.getRank();
+  SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
+  SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
+  SmallVector<OpFoldResult> sizes = tensor::getMixedSizes(rewriter, loc, input);
+  if (std::optional<int64_t> size = getConstantIntValue(sizes[axis])) {
+    sizes[axis] = rewriter.getIndexAttr(std::min(*size, int64_t{1}));
+  } else {
+    Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
+    sizes[axis] = rewriter.createOrFold<arith::MinUIOp>(
+        loc, cast<Value>(sizes[axis]), one);
+  }
+  Value first = tensor::ExtractSliceOp::create(rewriter, loc, input, offsets,
+                                               sizes, strides);
+  auto firstType = cast<RankedTensorType>(first.getType());
+  Value empty =
+      tensor::EmptyOp::create(rewriter, loc, sizes, inputType.getElementType());
+  SmallVector<AffineMap> maps{
+      rewriter.getMultiDimIdentityMap(rank),
+      AffineMap::get(rank, 0, {}, rewriter.getContext()),
+      rewriter.getMultiDimIdentityMap(rank)};
+  SmallVector<utils::IteratorType> iterators(rank,
+                                             utils::IteratorType::parallel);
+  Value seeded =
+      linalg::GenericOp::create(
+          rewriter, loc, firstType, ValueRange{first, init}, ValueRange{empty},
+          maps, iterators,
+          [](OpBuilder &builder, Location loc, ValueRange args) {
+            Value sum = arith::AddFOp::create(builder, loc, args[1], args[0]);
+            linalg::YieldOp::create(builder, loc, sum);
+          })
+          .getResult(0);
+  return tensor::InsertSliceOp::create(rewriter, loc, seeded, input, offsets,
+                                       sizes, strides);
 }
 
 // Builds an inclusive scan of `input` along `reduceAxis` seeded with `init`;
@@ -684,7 +740,7 @@ static bool isReducerIdentity(Block &body, Value init) {
 static Value
 createReduceWindowScan(ConversionPatternRewriter &rewriter, Location loc,
                        Value input, Value init, int64_t reduceAxis,
-                       bool isPostfix,
+                       bool isPostfix, ScanInitHandling initHandling,
                        llvm::function_ref<void(Region &)> fillReducer) {
   auto inputTy = cast<ShapedType>(input.getType());
   auto initTy = cast<ShapedType>(init.getType());
@@ -749,6 +805,10 @@ createReduceWindowScan(ConversionPatternRewriter &rewriter, Location loc,
         rewriter, loc, valTy, val, rewriter.getDenseI64ArrayAttr(dimensions));
   };
   Value scanInput = isPostfix ? createReverse(input, reduceAxis) : input;
+  if (initHandling == ScanInitHandling::SeedFirstElement) {
+    scanInput =
+        createSeededScanInput(rewriter, loc, scanInput, init, reduceAxis);
+  }
 
   auto scanOp = IREE::LinalgExt::ScanOp::create(
       rewriter, loc, outputTys, scanInput, outputs[0], outputs[1],
@@ -796,8 +856,11 @@ struct ScanOpConversion final
     auto input0 = inputs.front();
     auto input0Ty = cast<ShapedType>(input0.getType());
     auto init0 = op.getInitValues().front();
-    if (!isReducerIdentity(op.getBody().front(), init0)) {
-      return rewriter.notifyMatchFailure(op, "init is not the identity");
+    ScanInitHandling initHandling =
+        getScanInitHandling(op.getBody().front(), init0);
+    if (initHandling == ScanInitHandling::Unsupported) {
+      return rewriter.notifyMatchFailure(op,
+                                         "unsupported scan reducer or init");
     }
 
     auto window = llvm::to_vector(op.getWindowDimensions());
@@ -852,7 +915,7 @@ struct ScanOpConversion final
 
     Value result = createReduceWindowScan(
         rewriter, op.getLoc(), input0, init0, reduceAxis, isPostfix,
-        [&](Region &region) {
+        initHandling, [&](Region &region) {
           rewriter.inlineRegionBefore(op.getRegion(), region, region.begin());
         });
     rewriter.replaceOp(op, result);
@@ -992,6 +1055,7 @@ struct DynamicReduceWindowScan {
   int64_t axis;
   bool isPostfix;
   func::FuncOp reducer;
+  ScanInitHandling initHandling;
 };
 
 // Matches one input with unit strides and dilations, a window spanning one
@@ -1027,10 +1091,12 @@ matchDynamicReduceWindowScan(mlir::stablehlo::CustomCallOp op) {
     return type && type.getShape() == shape &&
            type.getElementType().isSignlessInteger();
   };
+  ScanInitHandling initHandling =
+      getScanInitHandling(reducer.getBody().front(), op.getOperand(1));
   if (!llvm::all_of(op->getOperands().slice(2, 4),
                     [&](Value value) { return hasShape(value, {rank}); }) ||
       !hasShape(op.getOperand(6), {rank, 2}) ||
-      !isReducerIdentity(reducer.getBody().front(), op.getOperand(1))) {
+      initHandling == ScanInitHandling::Unsupported) {
     return std::nullopt;
   }
   auto isConstant = [](std::optional<ShapeElement> element, int64_t value) {
@@ -1070,10 +1136,12 @@ matchDynamicReduceWindowScan(mlir::stablehlo::CustomCallOp op) {
     return std::nullopt;
   }
   if (isDimSizeMinusOne(*low, input, *axis) && isConstant(high, 0)) {
-    return DynamicReduceWindowScan{*axis, /*isPostfix=*/false, reducer};
+    return DynamicReduceWindowScan{*axis, /*isPostfix=*/false, reducer,
+                                   initHandling};
   }
   if (isConstant(low, 0) && isDimSizeMinusOne(*high, input, *axis)) {
-    return DynamicReduceWindowScan{*axis, /*isPostfix=*/true, reducer};
+    return DynamicReduceWindowScan{*axis, /*isPostfix=*/true, reducer,
+                                   initHandling};
   }
   return std::nullopt;
 }
@@ -1091,7 +1159,7 @@ struct DynamicReduceWindowScanConversion final
     }
     Value result = createReduceWindowScan(
         rewriter, op.getLoc(), op.getOperand(0), op.getOperand(1), scan->axis,
-        scan->isPostfix, [&](Region &region) {
+        scan->isPostfix, scan->initHandling, [&](Region &region) {
           OpBuilder::InsertionGuard guard(rewriter);
           rewriter.cloneRegionBefore(scan->reducer.getBody(), region,
                                      region.end());

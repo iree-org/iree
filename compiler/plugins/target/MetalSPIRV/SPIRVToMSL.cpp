@@ -45,6 +45,31 @@ public:
         });
   }
 
+  // Metal can fold x + +0 to x, changing the result for x = -0. Mark only
+  // these additions for SPIRV-Cross's invariant-add helper. The global
+  // invariant-math option also rewrites multiplication using an added +0.
+  void preservePositiveZeroAdditions() {
+    auto isPositiveZero = [this](uint32_t id) {
+      auto *constant = maybe_get<SPIRV_CROSS_NAMESPACE::SPIRConstant>(id);
+      // FAdd operands are floating point. A null constant has all-zero bits;
+      // negative zero is non-null, and specialization constants are declined.
+      return constant && constant->constant_is_null();
+    };
+    ir.for_each_typed_id<SPIRV_CROSS_NAMESPACE::SPIRBlock>(
+        [this, &isPositiveZero](uint32_t,
+                                SPIRV_CROSS_NAMESPACE::SPIRBlock &block) {
+          for (const auto &instruction : block.ops) {
+            if (instruction.op != spv::OpFAdd) {
+              continue;
+            }
+            const uint32_t *operands = stream(instruction);
+            if (isPositiveZero(operands[2]) || isPositiveZero(operands[3])) {
+              set_decoration(operands[1], spv::DecorationNoContraction);
+            }
+          }
+        });
+  }
+
   MetalShader::ThreadGroupSize
   getWorkgroupSizeForEntryPoint(StringRef entryName) {
     const auto &entryPoint = get_entry_point(
@@ -144,6 +169,7 @@ crossCompileSPIRVToMSL(IREE::HAL::MetalTargetPlatform targetPlatform,
   spvCrossCompiler.set_entry_point(
       entryPoint.str(), spv::ExecutionModel::ExecutionModelGLCompute);
   spvCrossCompiler.preserveLoopBufferUpdates(loopMemory.volatileBuffers);
+  spvCrossCompiler.preservePositiveZeroAdditions();
 
   SmallVector<SPIRVToMSLCompiler::Descriptor> descriptors;
   bool hasPushConstant = false;
