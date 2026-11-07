@@ -7,7 +7,7 @@
 
 """Bundles JS companion modules for a wasm binary.
 
-Reads a modules manifest (one "module:path" entry per line), optionally parses
+Reads a modules manifest (JSON or one "module:path" entry per line), parses
 the .wasm binary's import section for dead code elimination, transforms each
 companion for inlining, and concatenates everything into a single .mjs file
 with the entry point.
@@ -312,6 +312,22 @@ def _resolve_local_imports_recursive(source, source_dir, inlined):
     return "".join(deps_parts), "\n".join(cleaned_lines)
 
 
+def parse_module_manifest(contents):
+    """Reads the JSON Bazel format or the line-based CMake format in order."""
+    if contents.lstrip().startswith("["):
+        return json.loads(contents)
+
+    entries = []
+    for line in contents.splitlines():
+        if not line.strip():
+            continue
+        module, separator, path = line.partition(":")
+        if not separator or not module or not path:
+            raise ValueError("Expected a module:path manifest entry: %r" % line)
+        entries.append({"module": module, "path": path})
+    return entries
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Bundle JS companion modules for a wasm binary."
@@ -329,7 +345,7 @@ def main():
     parser.add_argument(
         "--modules",
         required=True,
-        help="Path to the modules manifest file (one 'module:path' per line).",
+        help="Path to a JSON modules manifest or one 'module:path' per line.",
     )
     parser.add_argument(
         "--output",
@@ -344,9 +360,9 @@ def main():
     )
     args = parser.parse_args()
 
-    # Read the modules manifest (JSON array of {module, path} objects).
+    # Bazel writes JSON objects; CMake writes one module:path entry per line.
     with open(args.modules) as f:
-        manifest_entries = json.loads(f.read())
+        manifest_entries = parse_module_manifest(f.read())
 
     # Parse wasm imports for dead code elimination.
     wasm_import_modules = parse_wasm_import_modules(args.wasm)

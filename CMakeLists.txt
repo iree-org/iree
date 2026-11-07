@@ -716,6 +716,12 @@ include(iree_plugin_register)
 include(iree_genrule)
 include(iree_wasm_library)
 
+if(IREE_BUILD_TESTS)
+  # Wasm build tools and the runtime link smoke sample register tests before
+  # the main compiler/runtime subdirectories are added.
+  include(iree_configure_testing)
+endif()
+
 # Default any sub-tree which doesn't provide its own package namespacing
 # to derive it relative to this directory and prefixed with iree/.
 set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
@@ -1159,10 +1165,6 @@ endif()
 
 if(IREE_BUILD_COMPILER)
   add_subdirectory(build_tools/third_party/stablehlo EXCLUDE_FROM_ALL)
-endif()
-
-if(IREE_BUILD_TESTS)
-  include(iree_configure_testing)
 endif()
 
 if(IREE_TARGET_BACKEND_METAL_SPIRV)

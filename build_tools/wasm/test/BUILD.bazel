@@ -7,6 +7,7 @@
 load("@rules_cc//cc:cc_binary.bzl", "cc_binary")
 load(
     "//build_tools/bazel:iree_wasm_library.bzl",
+    "iree_wasm_cc_binary",
     "iree_wasm_cc_test",
 )
 
@@ -33,4 +34,27 @@ iree_wasm_cc_test(
     deps = [
         "//build_tools/wasm/libc:syscall_imports",
     ],
+)
+
+# The controller checks the exit status of each fixture invocation.
+iree_wasm_cc_binary(
+    name = "wasi_exit_code_fixture",
+    testonly = True,
+    srcs = ["wasi_exit_code_fixture.c"],
+    main = "//build_tools/wasm:wasm_test_main.mjs",
+    target_compatible_with = ["//build_tools/bazel/wasm:wasi"],
+)
+
+sh_test(
+    name = "wasi_exit_code_test",
+    srcs = ["//build_tools/wasm:wasm_node_test_runner.sh"],
+    args = [
+        "$(location wasi_exit_code_test.mjs)",
+        "$(rootpath :wasi_exit_code_fixture_bundle)",
+    ],
+    data = [
+        "wasi_exit_code_test.mjs",
+        ":wasi_exit_code_fixture_bundle",
+    ],
+    target_compatible_with = ["//build_tools/bazel/wasm:wasi"],
 )

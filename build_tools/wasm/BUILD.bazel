@@ -27,3 +27,12 @@ py_binary(
     srcs = ["wasm_binary_bundler.py"],
     visibility = ["//visibility:public"],
 )
+
+py_test(
+    name = "wasm_binary_bundler_test",
+    srcs = [
+        "wasm_binary_bundler.py",
+        "wasm_binary_bundler_test.py",
+    ],
+    imports = ["."],
+)

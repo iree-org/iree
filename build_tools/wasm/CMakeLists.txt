@@ -10,6 +10,16 @@ if(IREE_WASM_BUILD_IREE_LIBC)
   add_subdirectory(libc)
 endif()
 
-if(IREE_BUILD_TESTS AND IREE_WASM_BUILD_IREE_LIBC)
+if(IREE_BUILD_TESTS)
+  add_test(
+    NAME build_tools_wasm_binary_bundler_test
+    COMMAND "${Python3_EXECUTABLE}"
+      "${CMAKE_CURRENT_SOURCE_DIR}/wasm_binary_bundler_test.py"
+  )
+  iree_configure_test(build_tools_wasm_binary_bundler_test)
+endif()
+
+if(IREE_BUILD_TESTS AND
+   (IREE_WASM_BUILD_IREE_LIBC OR CMAKE_SYSTEM_NAME STREQUAL "WASI"))
   add_subdirectory(test)
 endif()

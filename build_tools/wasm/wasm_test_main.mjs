@@ -40,6 +40,7 @@ const wasi = new WASI({
   args: [__IREE_WASM_BINARY, ...process.argv.slice(2)],
   env: process.env,
   preopens,
+  returnOnExit: true,
 });
 
 // Start with WASI imports and merge companion imports on top.
@@ -66,16 +67,6 @@ const {instance} = await WebAssembly.instantiate(wasmBytes, imports);
 // wasm linear memory for ring drain operations).
 context.memory = instance.exports.memory;
 
-// WASI.start() calls _start() on the wasm instance. The WASI runtime handles
-// proc_exit internally and sets process.exitCode.
-try {
-  wasi.start(instance);
-} catch (error) {
-  // WASI proc_exit throws to unwind the wasm call stack. process.exitCode is
-  // already set by the WASI runtime. If it was not set, this is a genuine
-  // error (not a proc_exit).
-  if (!process.exitCode) {
-    console.error(error);
-    process.exitCode = 1;
-  }
-}
+// With returnOnExit, start() returns the WASI exit code without terminating
+// Node. Unhandled WebAssembly traps still fail the host process.
+process.exitCode = wasi.start(instance);
