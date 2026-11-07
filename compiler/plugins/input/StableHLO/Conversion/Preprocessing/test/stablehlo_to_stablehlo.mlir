@@ -1472,3 +1472,88 @@ func.func @scatter_multiple_dynamic_batch(%operand: tensor<?x3x5xi32>, %indices:
   } : (tensor<?x3x5xi32>, tensor<?x3x?x1xi32, #stablehlo.bounds<4, ?, ?, ?>>, tensor<?x3x?xi32>) -> tensor<?x3x5xi32>
   return %result : tensor<?x3x5xi32>
 }
+
+// -----
+
+// Boolean conversion must not prove the out-of-bounds start to be zero.
+// The private function has one caller, so the range query sees its constant.
+// CHECK-LABEL: func.func private @scatter_bool_range_overwrite(
+// CHECK: scf.if
+// CHECK: stablehlo.dynamic_update_slice
+func.func private @scatter_bool_range_overwrite(%flag: tensor<i1>, %operand: tensor<2xi32>, %updates: tensor<2xi32>) -> tensor<2xi32> {
+  %one = stablehlo.constant dense<1> : tensor<i32>
+  %converted = stablehlo.convert %flag : (tensor<i1>) -> tensor<i32>
+  %start = stablehlo.add %converted, %one : tensor<i32>
+  %indices = stablehlo.reshape %start : (tensor<i32>) -> tensor<1xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    stablehlo.return %update : tensor<i32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 0>, indices_are_sorted = false, unique_indices = true} : (tensor<2xi32>, tensor<1xi32>, tensor<2xi32>) -> tensor<2xi32>
+  return %result : tensor<2xi32>
+}
+func.func @call_scatter_bool_range_overwrite(%operand: tensor<2xi32>, %updates: tensor<2xi32>) -> tensor<2xi32> {
+  %flag = stablehlo.constant dense<true> : tensor<i1>
+  %result = call @scatter_bool_range_overwrite(%flag, %operand, %updates) : (tensor<i1>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
+  return %result : tensor<2xi32>
+}
+
+// -----
+
+// Boolean conversion must not prove the out-of-bounds start to be zero.
+// The private function has one caller, so the range query sees its constant.
+// CHECK-LABEL: func.func private @scatter_int_bool_range_overwrite(
+// CHECK: scf.if
+// CHECK: stablehlo.dynamic_update_slice
+func.func private @scatter_int_bool_range_overwrite(%flag: tensor<i32>, %operand: tensor<2xi32>, %updates: tensor<2xi32>) -> tensor<2xi32> {
+  %one = stablehlo.constant dense<1> : tensor<i32>
+  %predicate = stablehlo.convert %flag : (tensor<i32>) -> tensor<i1>
+  %converted = stablehlo.convert %predicate : (tensor<i1>) -> tensor<i32>
+  %start = stablehlo.add %converted, %one : tensor<i32>
+  %indices = stablehlo.reshape %start : (tensor<i32>) -> tensor<1xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    stablehlo.return %update : tensor<i32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 0>, indices_are_sorted = false, unique_indices = true} : (tensor<2xi32>, tensor<1xi32>, tensor<2xi32>) -> tensor<2xi32>
+  return %result : tensor<2xi32>
+}
+func.func @call_scatter_int_bool_range_overwrite(%operand: tensor<2xi32>, %updates: tensor<2xi32>) -> tensor<2xi32> {
+  %flag = stablehlo.constant dense<-1> : tensor<i32>
+  %result = call @scatter_int_bool_range_overwrite(%flag, %operand, %updates) : (tensor<i32>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
+  return %result : tensor<2xi32>
+}
+
+// -----
+
+// The optional guarded DUS cannot represent its padded window. Keep the
+// general scatter without creating overflowing pad or slice coordinates.
+// CHECK-LABEL: func.func @scatter_window_slice_limit_overflow(
+// CHECK-NOT: stablehlo.dynamic_update_slice
+// CHECK-NOT: stablehlo.pad
+// CHECK: "stablehlo.scatter"
+// CHECK-NOT: stablehlo.dynamic_update_slice
+// CHECK-NOT: stablehlo.pad
+func.func @scatter_window_slice_limit_overflow(%operand: tensor<4611686018427387904xi8>, %updates: tensor<4611686018427387904xi8>, %indices: tensor<1xi64>) -> tensor<4611686018427387904xi8> {
+  %r = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<i8>, %update: tensor<i8>):
+    stablehlo.return %update : tensor<i8>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 0>, indices_are_sorted = false, unique_indices = true} : (tensor<4611686018427387904xi8>, tensor<1xi64>, tensor<4611686018427387904xi8>) -> tensor<4611686018427387904xi8>
+  return %r : tensor<4611686018427387904xi8>
+}
+
+// -----
+
+// The optional guarded DUS cannot represent its padded window. Keep the
+// general scatter without creating overflowing pad or slice coordinates.
+// CHECK-LABEL: func.func @scatter_window_padded_extent_overflow(
+// CHECK-NOT: stablehlo.dynamic_update_slice
+// CHECK-NOT: stablehlo.pad
+// CHECK: "stablehlo.scatter"
+// CHECK-NOT: stablehlo.dynamic_update_slice
+// CHECK-NOT: stablehlo.pad
+func.func @scatter_window_padded_extent_overflow(%operand: tensor<4611686018427387904xi8>, %updates: tensor<2305843009213693952xi8>, %indices: tensor<1xi64>) -> tensor<4611686018427387904xi8> {
+  %r = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<i8>, %update: tensor<i8>):
+    stablehlo.return %update : tensor<i8>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 0>, indices_are_sorted = false, unique_indices = true} : (tensor<4611686018427387904xi8>, tensor<1xi64>, tensor<2305843009213693952xi8>) -> tensor<4611686018427387904xi8>
+  return %r : tensor<4611686018427387904xi8>
+}

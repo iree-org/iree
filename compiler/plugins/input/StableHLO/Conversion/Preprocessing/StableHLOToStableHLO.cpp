@@ -1116,10 +1116,13 @@ struct IntRange {
   int64_t max;
 };
 
-// Returns whether `range` holds only values of `type`, so no step through
-// that type wraps.
+// Returns whether conversion through `type` preserves every value in `range`.
 static bool fitsIn(IntRange range, IntegerType type) {
   unsigned width = type.getWidth();
+  // StableHLO i1 is boolean; only 0 and 1 keep their value through conversion.
+  if (width == 1) {
+    return range.min >= 0 && range.max <= 1;
+  }
   if (width >= 64) {
     return !type.isUnsigned() || range.min >= 0;
   }
@@ -1146,12 +1149,15 @@ static std::optional<IntRange> getElementRange(Value value, int depth = 0) {
   DenseIntElementsAttr constant;
   if (matchPattern(value, m_Constant(&constant))) {
     std::optional<IntRange> range;
+    // Boolean true converts to integer 1 rather than signed i1's -1.
+    bool isUnsignedOrBool =
+        elementType.isUnsigned() || elementType.getWidth() == 1;
     for (const APInt &element : constant.getValues<APInt>()) {
-      if (elementType.isUnsigned() && element.getActiveBits() > 63) {
+      if (isUnsignedOrBool && element.getActiveBits() > 63) {
         return std::nullopt;
       }
-      int64_t v = elementType.isUnsigned() ? element.getZExtValue()
-                                           : element.getSExtValue();
+      int64_t v =
+          isUnsignedOrBool ? element.getZExtValue() : element.getSExtValue();
       range = range ? IntRange{std::min(range->min, v), std::max(range->max, v)}
                     : IntRange{v, v};
     }
@@ -1361,6 +1367,30 @@ struct ScatterToDynamicUpdateSlice final
       }
     }
 
+    // The guarded fallback pads each indexed dimension by its window extent.
+    // Prove those shapes representable before creating either branch's IR.
+    SmallVector<int64_t> padding, paddedShape, limits;
+    if (runtimeStarts) {
+      padding.assign(rank, 0);
+      paddedShape.assign(operandTy.getShape().begin(),
+                         operandTy.getShape().end());
+      limits = paddedShape;
+      for (int64_t dim : scatterDims) {
+        int64_t extent = updateTy.getDimSize(dim);
+        std::optional<int64_t> sliceLimit =
+            llvm::checkedAdd(operandTy.getDimSize(dim), extent);
+        std::optional<int64_t> paddedSize =
+            sliceLimit ? llvm::checkedAdd(*sliceLimit, extent) : std::nullopt;
+        if (!paddedSize) {
+          return rewriter.notifyMatchFailure(
+              op, "padded scatter window exceeds the shape representation");
+        }
+        padding[dim] = extent;
+        paddedShape[dim] = *paddedSize;
+        limits[dim] = *sliceLimit;
+      }
+    }
+
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
     Type indexElemTy = indicesTy.getElementType();
     auto scalarTy = RankedTensorType::get({}, indexElemTy);
@@ -1401,7 +1431,6 @@ struct ScatterToDynamicUpdateSlice final
     Value zero64 = i64Constant(0);
     SmallVector<Value> starts(rank, zero64);
     SmallVector<Value> extents(rank, zero64);
-    SmallVector<int64_t> padding(rank, 0);
     Value inBounds;
     for (int64_t operandDim : scatterDims) {
       Value start = mlir::stablehlo::ConvertOp::create(
@@ -1419,18 +1448,11 @@ struct ScatterToDynamicUpdateSlice final
       inBounds = inBounds
                      ? mlir::stablehlo::AndOp::create(b, inBounds, dimInBounds)
                      : dimInBounds;
-      padding[operandDim] = extent;
       extents[operandDim] = i64Constant(extent);
     }
 
     // Padding each indexed dim by the window extent leaves a clamped start's
     // window wholly in the padding, which the slice drops.
-    SmallVector<int64_t> paddedShape(operandTy.getShape());
-    SmallVector<int64_t> limits(operandTy.getShape());
-    for (int64_t dim = 0; dim < rank; ++dim) {
-      paddedShape[dim] += 2 * padding[dim];
-      limits[dim] += padding[dim];
-    }
     Type elementTy = operandTy.getElementType();
     Value padValue = mlir::stablehlo::ConstantOp::create(
         b, cast<ElementsAttr>(
