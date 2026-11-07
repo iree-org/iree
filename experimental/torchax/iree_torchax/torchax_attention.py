@@ -12,17 +12,17 @@ environment. It emits a `stablehlo.composite` named
 grouped-query attention over run-time or indivisible head counts, causal
 attention with a mask,
 masks shaped other than (L, S) or (B..., L, S) with each batch dimension equal
-or 1, a run-time head size without a scale, and element types wider than 32
-bits. Those, and other consumers, take
+or 1, a run-time head size without a scale, and element types other than f16,
+bf16 and f32. Those, and other consumers, take
 the decomposition, which is torchax's reference arithmetic.
 Dropout keeps torchax's own lowering.
 
 Exports through `iree_torchax` apply the override in their own
 environment; `install(env)` applies it to an eager environment.
 
-Known limitation: IREE's lowering zeroes a row only when the mask hides it,
-whereas the decomposition zeroes a row whose scores are all -inf. The two differ
-for an unmasked -inf score row and for NaN scores under an all-false mask.
+IREE preserves the decomposition's additive masking and safe softmax. Rows
+whose scores are all -inf have zero probabilities; NaN scores and zero times
+non-finite values retain ordinary floating-point arithmetic.
 """
 
 import inspect

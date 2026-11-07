@@ -55,7 +55,7 @@ func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x
   %scale = arith.constant 0.125 : f16
   %acc = tensor.empty() : tensor<2x10x4096x128xf16>
   %out = iree_linalg_ext.attention
-         <indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5]>
+         <additive_mask, indexing_maps = [#map, #map1, #map2, #map3, #map4, #map5], safe_softmax>
          ins(%q, %k, %v, %scale, %mask :
              tensor<2x10x4096x128xf16>, tensor<2x10x4096x128xf16>,
              tensor<2x10x4096x128xf16>, f16, tensor<2x10x4096x4096xf16>)
@@ -70,7 +70,12 @@ func.func @masked_attention(%q: tensor<2x10x4096x128xf16>, %k: tensor<2x10x4096x
 // CHECK-SAME: %[[Q:.+]]: tensor<2x10x4096x128xf16>, %[[K:.+]]: tensor<2x10x4096x128xf16>, %[[V:.+]]: tensor<2x10x4096x128xf16>, %[[MASK:.+]]: tensor<2x10x4096x4096xf16>
 // CHECK-DAG: %[[SCALE:.+]] = arith.constant {{.*}} : f16
 // CHECK: %[[OUT:.+]]:3 = iree_linalg_ext.online_attention
+// CHECK-SAME: additive_mask
 // Scale and mask must be in the correct ODS positions (scale before mask).
 // CHECK-SAME:         ins(%[[Q]], %[[K]], %[[V]], %[[SCALE]], %[[MASK]]
 // CHECK-SAME:             f16, tensor<2x10x4096x4096xf16>
 // CHECK: linalg.generic
+
+// CHECK: %[[IS_EMPTY:.+]] = arith.cmpf oeq, %{{.+}}, %{{.+}} : f32
+// CHECK: %[[DIVISOR:.+]] = arith.select %[[IS_EMPTY]], %{{.+}}, %{{.+}} : f32
+// CHECK: arith.divf %{{.+}}, %[[DIVISOR]] : f32

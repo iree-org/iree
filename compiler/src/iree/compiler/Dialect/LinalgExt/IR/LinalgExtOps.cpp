@@ -2600,7 +2600,7 @@ void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                         std::optional<Value> mask) {
   Value maskIn = mask.value_or(Value());
   build(odsBuilder, odsState, results, query, key, value, scale, maskIn, output,
-        indexingMaps, DictionaryAttr());
+        indexingMaps, DictionaryAttr(), UnitAttr(), UnitAttr());
 }
 
 void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
@@ -2611,7 +2611,7 @@ void AttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   Value mask = inputOperands.size() > 4 ? inputOperands[4] : Value();
   build(odsBuilder, odsState, results, inputOperands[0], inputOperands[1],
         inputOperands[2], inputOperands[3], mask, initOperands[0], indexingMaps,
-        DictionaryAttr());
+        DictionaryAttr(), UnitAttr(), UnitAttr());
 }
 
 LogicalResult AttentionOp::verify() {
@@ -2799,7 +2799,7 @@ void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
                               std::optional<Value> mask) {
   Value maskIn = mask.value_or(Value());
   build(odsBuilder, odsState, results, query, key, value, scale, maskIn, output,
-        max, sum, indexingMaps, DictionaryAttr());
+        max, sum, indexingMaps, DictionaryAttr(), UnitAttr());
 }
 
 void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
@@ -2810,7 +2810,8 @@ void OnlineAttentionOp::build(OpBuilder &odsBuilder, OperationState &odsState,
   Value mask = inputOperands.size() > 4 ? inputOperands[4] : Value();
   build(odsBuilder, odsState, results, inputOperands[0], inputOperands[1],
         inputOperands[2], inputOperands[3], mask, initOperands[0],
-        initOperands[1], initOperands[2], indexingMaps, DictionaryAttr());
+        initOperands[1], initOperands[2], indexingMaps, DictionaryAttr(),
+        UnitAttr());
 }
 
 LogicalResult OnlineAttentionOp::verify() {

@@ -1220,6 +1220,10 @@ static Operation *createCollapsedOp(AttentionOpTy origOp,
   auto collapsedOp = AttentionOpTy::create(
       rewriter, origOp.getLoc(), resultTypes, inputOperands, outputOperands,
       rewriter.getAffineMapArrayAttr(indexingMaps));
+  collapsedOp.setAdditiveMask(origOp.getAdditiveMask());
+  if constexpr (std::is_same_v<AttentionOpTy, AttentionOp>) {
+    collapsedOp.setSafeSoftmax(origOp.getSafeSoftmax());
+  }
   collapsedOp.setDecompositionConfigAttr(origOp.getDecompositionConfigAttr());
   collapsedOp->setDiscardableAttrs(origOp->getDiscardableAttrDictionary());
   rewriter.inlineRegionBefore(origOp.getRegion(), collapsedOp.getRegion(),

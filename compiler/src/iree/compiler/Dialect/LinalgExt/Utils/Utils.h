@@ -329,6 +329,10 @@ Value elementwiseValueInPlace(OpBuilder &builder, Location loc,
   return genericOp.getResult(0);
 }
 
+/// Builds the divisor for safe softmax from a scalar floating-point row sum.
+/// Returns one for a zero sum and the original sum otherwise, preserving NaN.
+Value buildSafeSoftmaxDenominator(OpBuilder &builder, Location loc, Value sum);
+
 /// Computes `output = exp2(output - input)`, or `exp(output - input)` if
 /// `useExp2` is false, elementwise with a linalg.generic. `input` is broadcast
 /// according to `inputMap` and converted to the element type of `output`.

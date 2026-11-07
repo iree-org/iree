@@ -202,3 +202,41 @@ func.func @no_mask(%q: tensor<2x3x4xf32>, %k: tensor<2x5x4xf32>, %v: tensor<2x5x
 // CHECK-LABEL: func.func @no_mask
 //   CHECK-NOT:   scf.if
 //       CHECK:   return
+
+// -----
+
+
+#mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
+#mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
+#mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
+#mapS = affine_map<(batch, m, k1, k2, n) -> ()>
+#mapM = affine_map<(batch, m, k1, k2, n) -> (batch, m, k2)>
+#mapB = affine_map<(batch, m, k1, k2, n) -> (batch, k2)>
+#mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
+#mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
+
+func.func @additive_boolean_mask_keeps_score_arithmetic(%q: tensor<2x3x4xf32>, %k: tensor<2x5x4xf32>, %v: tensor<2x5x6xf32>,
+    %mask: tensor<2x3x5xi1>,
+    %acc: tensor<2x3x6xf32>, %max: tensor<2x3xf32>, %sum: tensor<2x3xf32>)
+    -> (tensor<2x3x6xf32>, tensor<2x3xf32>, tensor<2x3xf32>) {
+  %scale = arith.constant 0.5 : f32
+  %out:3 = iree_linalg_ext.online_attention
+      <additive_mask, indexing_maps = [#mapQ, #mapK, #mapV, #mapS, #mapM, #mapO, #mapR, #mapR]>
+      ins(%q, %k, %v, %scale, %mask : tensor<2x3x4xf32>, tensor<2x5x4xf32>, tensor<2x5x6xf32>, f32, tensor<2x3x5xi1>)
+      outs(%acc, %max, %sum : tensor<2x3x6xf32>, tensor<2x3xf32>, tensor<2x3xf32>) {
+    ^bb0(%s: f32):
+      iree_linalg_ext.yield %s : f32
+  } -> tensor<2x3x6xf32>, tensor<2x3xf32>, tensor<2x3xf32>
+  return %out#0, %out#1, %out#2 : tensor<2x3x6xf32>, tensor<2x3xf32>, tensor<2x3xf32>
+}
+
+
+// CHECK-LABEL: func.func @additive_boolean_mask_keeps_score_arithmetic
+//   CHECK-NOT: scf.if
+//       CHECK: ^bb0(%[[ENTRY:.+]]: i1, %[[SCORE:.+]]: f32):
+//       CHECK: %[[BIAS:.+]] = arith.select %[[ENTRY]], %{{.+}}, %{{.+}} : f32
+//       CHECK: arith.addf %[[SCORE]], %[[BIAS]] : f32
+//   CHECK-NOT: scf.if
+//       CHECK: return
+// DEFAULT-LABEL: func.func @additive_boolean_mask_keeps_score_arithmetic
+//   DEFAULT-NOT: scf.if

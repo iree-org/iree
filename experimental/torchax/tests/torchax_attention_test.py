@@ -249,29 +249,87 @@ class TorchaxAttentionTest(unittest.TestCase):
         )
         self.assertNotIn("torch.scaled_dot_product_attention", module)
 
-    # Known limitation: the attention lowering gives NaN for an unmasked -inf row.
-    @unittest.expectedFailure
+    def _check_exceptional_attention(self, fn, args, expected, *, exact=True):
+        module, _, _ = _export(fn, args)
+        declined = module.replace("version = 1 : i32", "version = 999 : i32", 1)
+        self.assertNotEqual(module, declined)
+        for profile, ir in (("specialized", module), ("decomposed", declined)):
+            with self.subTest(profile=profile):
+                result = _execute(ir, args)
+                if exact:
+                    np.testing.assert_array_equal(result, expected)
+                else:
+                    np.testing.assert_allclose(
+                        result, expected, rtol=1e-5, atol=1e-6, equal_nan=True
+                    )
+
     @unittest.skipIf(iree_runtime is None, "iree.runtime not available")
     def test_unmasked_negative_infinity_row_is_zero(self):
         # The producer zeroes a row whose scores are all -inf.
         one = np.ones((1, 1, 1, 1), np.float32)
-        module, _, _ = _export(lambda q, k, v: _sdpa(q, k, v, scale=1.0), (one,) * 3)
-        result = _execute(module, (np.full_like(one, -np.inf), one, one))
-        np.testing.assert_array_equal(result, np.zeros_like(one))
+        self._check_exceptional_attention(
+            lambda q, k, v: _sdpa(q, k, v, scale=1.0),
+            (np.full_like(one, -np.inf), one, one),
+            np.zeros_like(one),
+        )
 
-    # Known limitation: the attention lowering zeroes a fully masked NaN row.
-    @unittest.expectedFailure
     @unittest.skipIf(iree_runtime is None, "iree.runtime not available")
     def test_all_false_mask_with_nan_query_is_nan(self):
         # A NaN score row is not all -inf, so it stays NaN under a full mask.
         one = np.ones((1, 1, 1, 1), np.float32)
         hidden = np.zeros((1, 1), np.bool_)
-        module, _, _ = _export(
+        self._check_exceptional_attention(
             lambda q, k, v, m: _sdpa(q, k, v, attn_mask=m, scale=1.0),
-            (one, one, one, hidden),
+            (np.full_like(one, np.nan), one, one, hidden),
+            np.full_like(one, np.nan),
         )
-        result = _execute(module, (np.full_like(one, np.nan), one, one, hidden))
-        self.assertTrue(np.isnan(result).all())
+
+    @unittest.skipIf(iree_runtime is None, "iree.runtime not available")
+    def test_additive_masks_preserve_non_finite_arithmetic(self):
+        for dtype in (np.float16, np.float32):
+            one = np.ones((1, 1, 1, 1), dtype)
+            for mask in (np.zeros((1, 1), np.bool_), np.full((1, 1), -np.inf, dtype)):
+                for query, value in ((np.nan, 1.0), (np.inf, 1.0), (1.0, np.nan)):
+                    with self.subTest(
+                        dtype=dtype, mask_dtype=mask.dtype, query=query, value=value
+                    ):
+                        self._check_exceptional_attention(
+                            lambda q, k, v, m: _sdpa(q, k, v, attn_mask=m, scale=1.0),
+                            (
+                                np.full_like(one, query),
+                                one,
+                                np.full_like(one, value),
+                                mask,
+                            ),
+                            np.full_like(one, np.nan),
+                        )
+
+    @unittest.skipIf(iree_runtime is None, "iree.runtime not available")
+    def test_hidden_nan_row_across_key_tiles(self):
+        query = np.array([[[[np.nan], [1.0]]]], np.float32)
+        key = np.ones((1, 1, 24, 1), np.float32)
+        value = np.ones_like(key)
+        mask = np.ones((2, 24), np.bool_)
+        mask[0] = False
+        expected = np.array([[[[np.nan], [1.0]]]], np.float32)
+        self._check_exceptional_attention(
+            lambda q, k, v, m: _sdpa(q, k, v, attn_mask=m, scale=1.0),
+            (query, key, value, mask),
+            expected,
+            # Finite values in this 24-key reduction use the existing attention
+            # comparison policy; the original zero and NaN tests remain exact.
+            exact=False,
+        )
+
+    @unittest.skipIf(iree_runtime is None, "iree.runtime not available")
+    def test_causal_nan_scores_preserve_addition(self):
+        query = np.array([[[[np.nan], [1.0]]]], np.float32)
+        key = np.ones_like(query)
+        self._check_exceptional_attention(
+            lambda q, k, v: _sdpa(q, k, v, is_causal=True, scale=1.0),
+            (query, key, key),
+            query,
+        )
 
 
 def _add_case(name, fn, args):

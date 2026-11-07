@@ -83,7 +83,8 @@ void DecomposeAttentionPass::runOnOperation() {
 
     Value mask = onlineAtt.getMask();
     scf::IfOp ifOp;
-    if (skipMaskedTiles && mask) {
+    // Additive masks preserve NaN/Inf arithmetic even for an all-false tile.
+    if (skipMaskedTiles && mask && !onlineAtt.getAdditiveMask()) {
       Location loc = onlineAtt.getLoc();
       Value visible = anyVisible(rewriter, loc, mask);
       ifOp = scf::IfOp::create(rewriter, loc, onlineAtt->getResultTypes(),

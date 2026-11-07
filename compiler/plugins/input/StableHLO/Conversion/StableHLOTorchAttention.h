@@ -15,9 +15,8 @@ class TargetRegistry;
 // Registers the version-1 torch.scaled_dot_product_attention composite, lowered
 // to iree_linalg_ext.attention.
 //
-// Known limitation: the lowering zeroes a row only when the mask hides it,
-// whereas the producer zeroes a row whose scores are all -inf. The two differ
-// for an unmasked -inf score row and for NaN scores under an all-false mask.
+// The lowering preserves the producer's additive masking and safe softmax:
+// all -inf score rows have zero probabilities; NaN score rows propagate NaN.
 //
 // Operands are query (B..., L, E), key (B..., S, E), value (B..., S, Ev) and an
 // optional mask, boolean (true attends) or additive in the query type, shaped
@@ -25,9 +24,9 @@ class TargetRegistry;
 // and scale, a float that is absent for 1 / sqrt(E). Without explicit scale E
 // must be static. Grouped-query attention requires statically provable head
 // grouping. Causal attention supports dynamic sequence extents for f16, bf16
-// and f32, with score exclusion after scaling, including zero/negative scales.
-// Causal inputs of at most 8 bits and causal mode with an explicit mask keep
-// their decomposition. Unsupported versions, types or profiles also decline
+// and f32, with mask bias after scaling, including zero/negative scales.
+// Other element types and causal mode with an explicit mask keep their
+// decomposition. Unsupported versions or profiles also decline
 // without modifying IR.
 LogicalResult populateTorchAttentionTargetRegistry(TargetRegistry &registry);
 

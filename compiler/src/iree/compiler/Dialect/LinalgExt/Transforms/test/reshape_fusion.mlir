@@ -8,7 +8,7 @@
 
 util.func public @attention_static(%arg0: tensor<20x4096x16xf16>, %arg1: tensor<20x1024x16xf16>, %arg2: tensor<20x1024x64xf16>, %arg3: f16) -> tensor<2x10x4096x64xf16> {
   %0 = tensor.empty() : tensor<20x4096x64xf16>
-  %1 = iree_linalg_ext.attention <indexing_maps = [#map, #map1, #map2, #map3, #map4]> ins(%arg0, %arg1, %arg2, %arg3 : tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16) outs(%0 : tensor<20x4096x64xf16>) {
+  %1 = iree_linalg_ext.attention <indexing_maps = [#map, #map1, #map2, #map3, #map4], safe_softmax> ins(%arg0, %arg1, %arg2, %arg3 : tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16) outs(%0 : tensor<20x4096x64xf16>) {
     ^bb0(%score: f16):
       iree_linalg_ext.yield %score: f16
   } -> tensor<20x4096x64xf16>
@@ -31,6 +31,7 @@ util.func public @attention_static(%arg0: tensor<20x4096x16xf16>, %arg1: tensor<
 // CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>
 // CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
 // CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+// CHECK-SAME:       safe_softmax
 // CHECK-SAME:       ins(%[[QUERY]], %[[KEY]], %[[CACHE]], %[[ARG3]] :
 // CHECK-SAME:       outs(%[[EMPTY]] :
 //      CHECK:   util.return %[[ATTENTION]]
