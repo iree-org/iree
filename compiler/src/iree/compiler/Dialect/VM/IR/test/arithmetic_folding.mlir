@@ -631,3 +631,119 @@ vm.module @fma_i32_folds {
     vm.return %d : i32
   }
 }
+
+// -----
+
+// Positive zero changes -0 to +0; negative zero remains an identity.
+// CHECK-LABEL: @add_f32_zero_identity
+vm.module @add_f32_zero_identity {
+  // CHECK-LABEL: @positive_zero
+  vm.func @positive_zero(%arg0: f32) -> f32 {
+    %zero = vm.const.f32 0.0
+    // CHECK: %[[SUM:.+]] = vm.add.f32 %arg0, %{{.+}} : f32
+    %sum = vm.add.f32 %arg0, %zero : f32
+    // CHECK: vm.return %[[SUM]] : f32
+    vm.return %sum : f32
+  }
+  // CHECK-LABEL: @negative_zero
+  vm.func @negative_zero(%arg0: f32) -> f32 {
+    %zero = vm.const.f32 -0.0
+    %sum = vm.add.f32 %arg0, %zero : f32
+    // CHECK-NOT: vm.add.f32
+    // CHECK: vm.return %arg0 : f32
+    vm.return %sum : f32
+  }
+  // CHECK-LABEL: @no_cancellation
+  vm.func @no_cancellation(%arg0: f32, %arg1: f32) -> f32 {
+    // (inf - inf) + inf must remain NaN rather than becoming inf.
+    // CHECK: %[[DIFF:.+]] = vm.sub.f32 %arg0, %arg1 : f32
+    %diff = vm.sub.f32 %arg0, %arg1 : f32
+    // CHECK: %[[SUM:.+]] = vm.add.f32 %[[DIFF]], %arg1 : f32
+    %sum = vm.add.f32 %diff, %arg1 : f32
+    // CHECK: vm.return %[[SUM]] : f32
+    vm.return %sum : f32
+  }
+  // CHECK-LABEL: @no_cancellation_rhs
+  vm.func @no_cancellation_rhs(%arg0: f32, %arg1: f32) -> f32 {
+    // Operand order must not make the same invalid cancellation available.
+    // CHECK: %[[DIFF:.+]] = vm.sub.f32 %arg0, %arg1 : f32
+    %diff = vm.sub.f32 %arg0, %arg1 : f32
+    // CHECK: %[[SUM:.+]] = vm.add.f32 %arg1, %[[DIFF]] : f32
+    %sum = vm.add.f32 %arg1, %diff : f32
+    // CHECK: vm.return %[[SUM]] : f32
+    vm.return %sum : f32
+  }
+}
+
+// -----
+
+// Positive zero changes -0 to +0; negative zero remains an identity.
+// CHECK-LABEL: @add_f64_zero_identity
+vm.module @add_f64_zero_identity {
+  // CHECK-LABEL: @positive_zero
+  vm.func @positive_zero(%arg0: f64) -> f64 {
+    %zero = vm.const.f64 0.0
+    // CHECK: %[[SUM:.+]] = vm.add.f64 %arg0, %{{.+}} : f64
+    %sum = vm.add.f64 %arg0, %zero : f64
+    // CHECK: vm.return %[[SUM]] : f64
+    vm.return %sum : f64
+  }
+  // CHECK-LABEL: @negative_zero
+  vm.func @negative_zero(%arg0: f64) -> f64 {
+    %zero = vm.const.f64 -0.0
+    %sum = vm.add.f64 %arg0, %zero : f64
+    // CHECK-NOT: vm.add.f64
+    // CHECK: vm.return %arg0 : f64
+    vm.return %sum : f64
+  }
+  // CHECK-LABEL: @no_cancellation
+  vm.func @no_cancellation(%arg0: f64, %arg1: f64) -> f64 {
+    // (inf - inf) + inf must remain NaN rather than becoming inf.
+    // CHECK: %[[DIFF:.+]] = vm.sub.f64 %arg0, %arg1 : f64
+    %diff = vm.sub.f64 %arg0, %arg1 : f64
+    // CHECK: %[[SUM:.+]] = vm.add.f64 %[[DIFF]], %arg1 : f64
+    %sum = vm.add.f64 %diff, %arg1 : f64
+    // CHECK: vm.return %[[SUM]] : f64
+    vm.return %sum : f64
+  }
+  // CHECK-LABEL: @no_cancellation_rhs
+  vm.func @no_cancellation_rhs(%arg0: f64, %arg1: f64) -> f64 {
+    // Operand order must not make the same invalid cancellation available.
+    // CHECK: %[[DIFF:.+]] = vm.sub.f64 %arg0, %arg1 : f64
+    %diff = vm.sub.f64 %arg0, %arg1 : f64
+    // CHECK: %[[SUM:.+]] = vm.add.f64 %arg1, %[[DIFF]] : f64
+    %sum = vm.add.f64 %arg1, %diff : f64
+    // CHECK: vm.return %[[SUM]] : f64
+    vm.return %sum : f64
+  }
+}
+
+// -----
+
+// The compact zero opcode cannot replace a negative-zero constant.
+// CHECK-LABEL: @const_f32_zero_signs
+vm.module @const_f32_zero_signs {
+  vm.func @preserve_sign() -> (f32, f32) {
+    // CHECK: %[[NEG:.+]] = vm.const.f32 {{-0\.0+e\+0+}}
+    %negative = vm.const.f32 -0.0
+    // CHECK: %[[POS:.+]] = vm.const.f32.zero
+    %positive = vm.const.f32 0.0
+    // CHECK: vm.return %[[NEG]], %[[POS]] : f32, f32
+    vm.return %negative, %positive : f32, f32
+  }
+}
+
+// -----
+
+// The compact zero opcode cannot replace a negative-zero constant.
+// CHECK-LABEL: @const_f64_zero_signs
+vm.module @const_f64_zero_signs {
+  vm.func @preserve_sign() -> (f64, f64) {
+    // CHECK: %[[NEG:.+]] = vm.const.f64 {{-0\.0+e\+0+}}
+    %negative = vm.const.f64 -0.0
+    // CHECK: %[[POS:.+]] = vm.const.f64.zero
+    %positive = vm.const.f64 0.0
+    // CHECK: vm.return %[[NEG]], %[[POS]] : f64, f64
+    vm.return %negative, %positive : f64, f64
+  }
+}
