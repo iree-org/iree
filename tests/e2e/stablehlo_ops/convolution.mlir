@@ -893,3 +893,24 @@ func.func @conv_static_window_reversal() {
   check.expect_eq(%rs, %expected) : tensor<1x4x1xf32>
   return
 }
+
+// Keep all 256 interior zeros when the padding values themselves are i8.
+func.func @dynamic_conv_i8_padding_dilated() {
+  %a = util.unfoldable_constant dense<[[[1.0], [2.0]]]> : tensor<1x2x1xf32>
+  %k = util.unfoldable_constant dense<1.0> : tensor<1x1x1xf32>
+  %p = util.unfoldable_constant dense<0> : tensor<1x2xi8>
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, lhs_dilation = array<i64: 257>, rhs_dilation = array<i64: 1>
+  } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xi8>) -> tensor<1x?x1xf32>
+  %first = arith.constant dense<1.0> : tensor<1x1x1xf32>
+  %gap = arith.constant dense<0.0> : tensor<1x256x1xf32>
+  %last = arith.constant dense<2.0> : tensor<1x1x1xf32>
+  %expected = stablehlo.concatenate %first, %gap, %last, dim = 1 : (tensor<1x1x1xf32>, tensor<1x256x1xf32>, tensor<1x1x1xf32>) -> tensor<1x258x1xf32>
+  %size = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%size, dense<258> : tensor<i32>) : tensor<i32>
+  %fixed = tensor.cast %r : tensor<1x?x1xf32> to tensor<1x258x1xf32>
+  check.expect_eq(%fixed, %expected) : tensor<1x258x1xf32>
+  return
+}
