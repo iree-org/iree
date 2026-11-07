@@ -1162,6 +1162,185 @@ func.func @suffix(%arg0: tensor<7x5xi32>) -> tensor<7x5xi32> {
 
 // -----
 
+// Padding on the opposite edge changes the output extent and must keep
+// the general window reduction.
+// CHECK-LABEL: func.func @negative_scan_prefix_high_padding(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_prefix_high_padding(%input: tensor<5xi32>) -> tensor<6xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, 1]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<6xi32>
+  return %result : tensor<6xi32>
+}
+
+// -----
+
+// Padding on the opposite edge changes the output extent and must keep
+// the general window reduction.
+// CHECK-LABEL: func.func @negative_scan_prefix_high_crop(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_prefix_high_crop(%input: tensor<5xi32>) -> tensor<4xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, -1]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}
+
+// -----
+
+// Padding on the opposite edge changes the output extent and must keep
+// the general window reduction.
+// CHECK-LABEL: func.func @negative_scan_suffix_low_padding(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_suffix_low_padding(%input: tensor<5xi32>) -> tensor<6xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[1, 4]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<6xi32>
+  return %result : tensor<6xi32>
+}
+
+// -----
+
+// Padding on the opposite edge changes the output extent and must keep
+// the general window reduction.
+// CHECK-LABEL: func.func @negative_scan_suffix_low_crop(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_suffix_low_crop(%input: tensor<5xi32>) -> tensor<4xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[-1, 4]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}
+
+// -----
+
+// A shape-preserving scan still returns the declared tensor type.
+// CHECK-LABEL: func.func @prefix_relaxed_result(
+// CHECK: %[[SCAN:.+]]:2 = iree_linalg_ext.scan
+// CHECK: %[[CAST:.+]] = tensor.cast %[[SCAN]]#0 : tensor<5xi32> to tensor<?xi32>
+// CHECK: return %[[CAST]] : tensor<?xi32>
+func.func @prefix_relaxed_result(%input: tensor<5xi32>) -> tensor<?xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, 0]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<?xi32>
+  return %result : tensor<?xi32>
+}
+
+// -----
+
+// A shape-preserving scan still returns the declared tensor type.
+// CHECK-LABEL: func.func @suffix_relaxed_result(
+// CHECK: %[[SCAN:.+]]:2 = iree_linalg_ext.scan
+// CHECK: %[[REVERSED:.+]] = linalg.generic
+// CHECK: tensor.extract %[[SCAN]]#0
+// CHECK: %[[CAST:.+]] = tensor.cast %[[REVERSED]] : tensor<5xi32> to tensor<?xi32>
+// CHECK: return %[[CAST]] : tensor<?xi32>
+func.func @suffix_relaxed_result(%input: tensor<5xi32>) -> tensor<?xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[0, 4]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<?xi32>
+  return %result : tensor<?xi32>
+}
+
+// -----
+
+// The declared result may also refine a dynamic non-reduction dimension.
+// CHECK-LABEL: func.func @prefix_refined_batch_result(
+// CHECK: %[[SCAN:.+]]:2 = iree_linalg_ext.scan
+// CHECK: %[[CAST:.+]] = tensor.cast %[[SCAN]]#0 : tensor<?x5xi32> to tensor<7x5xi32>
+// CHECK: return %[[CAST]] : tensor<7x5xi32>
+func.func @prefix_refined_batch_result(%input: tensor<?x5xi32>) -> tensor<7x5xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 1, 5>, padding = dense<[[0, 0], [4, 0]]> : tensor<2x2xi64>} : (tensor<?x5xi32>, tensor<i32>) -> tensor<7x5xi32>
+  return %result : tensor<7x5xi32>
+}
+
+// -----
+
+// Scalar scan construction cannot represent this reducer/input type contract.
+// Keep the window for the general lowering before mutating the reducer.
+// CHECK-LABEL: func.func @negative_scan_promoted_input(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_promoted_input(%input: tensor<5xf16>) -> tensor<5xf32> {
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<f32>, %rhs: tensor<f32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<f32>
+    stablehlo.return %sum : tensor<f32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, 0]]> : tensor<1x2xi64>} : (tensor<5xf16>, tensor<f32>) -> tensor<5xf32>
+  return %result : tensor<5xf32>
+}
+
+// -----
+
+// Scalar scan construction cannot represent this reducer/input type contract.
+// Keep the window for the general lowering before mutating the reducer.
+// CHECK-LABEL: func.func @negative_scan_promoted_init(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_promoted_init(%input: tensor<5xf32>) -> tensor<5xf32> {
+  %init = stablehlo.constant dense<0.0> : tensor<f16>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<f32>, %rhs: tensor<f32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<f32>
+    stablehlo.return %sum : tensor<f32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, 0]]> : tensor<1x2xi64>} : (tensor<5xf32>, tensor<f16>) -> tensor<5xf32>
+  return %result : tensor<5xf32>
+}
+
+// -----
+
+// Scalar scan construction cannot represent this reducer/input type contract.
+// Keep the window for the general lowering before mutating the reducer.
+// CHECK-LABEL: func.func @negative_scan_nonscalar_init(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_nonscalar_init(%input: tensor<5xi32>) -> tensor<5xi32> {
+  %init = stablehlo.constant dense<0> : tensor<5xi32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<5xi32>, %rhs: tensor<5xi32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<5xi32>
+    stablehlo.return %sum : tensor<5xi32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, 0]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<5xi32>) -> tensor<5xi32>
+  return %result : tensor<5xi32>
+}
+
+// -----
+
 // CHECK-LABEL: func.func @scatter_rank_zero_indices
 func.func @scatter_rank_zero_indices(%input: tensor<4xi32>,
     %index: tensor<i64>, %update: tensor<i32>) -> tensor<4xi32> {

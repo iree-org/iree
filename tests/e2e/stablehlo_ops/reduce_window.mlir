@@ -402,3 +402,51 @@ func.func @scan_empty_batch_f32() {
   check.expect_eq_const(%fixed, dense<> : tensor<0x4xi32>) : tensor<0x4xi32>
   return
 }
+
+func.func @window_prefix_high_padding() {
+  %input = util.unfoldable_constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, 1]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<6xi32>
+  check.expect_eq_const(%result, dense<[1, 3, 6, 10, 15, 14]> : tensor<6xi32>) : tensor<6xi32>
+  return
+}
+
+func.func @window_prefix_high_crop() {
+  %input = util.unfoldable_constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, -1]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<4xi32>
+  check.expect_eq_const(%result, dense<[1, 3, 6, 10]> : tensor<4xi32>) : tensor<4xi32>
+  return
+}
+
+func.func @window_suffix_low_padding() {
+  %input = util.unfoldable_constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[1, 4]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<6xi32>
+  check.expect_eq_const(%result, dense<[10, 15, 14, 12, 9, 5]> : tensor<6xi32>) : tensor<6xi32>
+  return
+}
+
+func.func @window_suffix_low_crop() {
+  %input = util.unfoldable_constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[-1, 4]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<4xi32>
+  check.expect_eq_const(%result, dense<[14, 12, 9, 5]> : tensor<4xi32>) : tensor<4xi32>
+  return
+}
