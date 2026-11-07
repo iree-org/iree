@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "loop_buffer_updates.mlir"
     "smoketest.mlir"
   TOOLS
     FileCheck

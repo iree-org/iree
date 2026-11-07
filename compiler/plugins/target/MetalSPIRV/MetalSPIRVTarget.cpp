@@ -19,6 +19,7 @@
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/schemas/metal_executable_def_builder.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/Triple.h"
@@ -26,10 +27,132 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
 namespace {
+
+// Resolves the direct buffer access chains emitted by SPIR-V lowering without
+// recursing through their use-def depth.
+static spirv::GlobalVariableOp findStorageBuffer(Value pointer) {
+  while (Operation *op = pointer.getDefiningOp()) {
+    if (auto address = dyn_cast<spirv::AddressOfOp>(op)) {
+      auto variable =
+          SymbolTable::lookupNearestSymbolFrom<spirv::GlobalVariableOp>(
+              address, address.getVariableAttr());
+      if (variable &&
+          (variable.storageClass() == spirv::StorageClass::StorageBuffer ||
+           variable.storageClass() == spirv::StorageClass::Uniform)) {
+        return variable;
+      }
+      return {};
+    }
+    if (!isa<spirv::AccessChainOp, spirv::PtrAccessChainOp,
+             spirv::InBoundsPtrAccessChainOp>(op)) {
+      return {};
+    }
+    pointer = op->getOperand(0);
+  }
+  return {};
+}
+
+struct LoopBufferAccesses {
+  llvm::DenseSet<Operation *> readBuffers;
+  llvm::DenseSet<Operation *> writtenBuffers;
+  llvm::DenseSet<Operation *> buffersWithCompositeAccesses;
+  bool hasUnresolvedAccess = false;
+
+  void collectBuffer(Value pointer, llvm::DenseSet<Operation *> &buffers) {
+    auto pointerType = cast<spirv::PointerType>(pointer.getType());
+    if (pointerType.getStorageClass() != spirv::StorageClass::StorageBuffer &&
+        pointerType.getStorageClass() != spirv::StorageClass::Uniform) {
+      return;
+    }
+    if (auto buffer = findStorageBuffer(pointer)) {
+      buffers.insert(buffer);
+      if (!isa<IntegerType, FloatType, VectorType>(
+              pointerType.getPointeeType())) {
+        buffersWithCompositeAccesses.insert(buffer);
+      }
+    } else {
+      hasUnresolvedAccess = true;
+    }
+  }
+};
+
+// Collects direct buffer uses and records when calls or pointer expressions
+// prevent resolving their storage within a loop.
+static LoopBufferAccesses collectLoopBufferAccesses(spirv::ModuleOp module) {
+  LoopBufferAccesses accesses;
+  module.walk([&accesses](spirv::LoadOp load) {
+    if (load->getParentOfType<spirv::LoopOp>()) {
+      accesses.collectBuffer(load.getPtr(), accesses.readBuffers);
+    }
+  });
+  module.walk([&accesses](spirv::StoreOp store) {
+    if (store->getParentOfType<spirv::LoopOp>()) {
+      accesses.collectBuffer(store.getPtr(), accesses.writtenBuffers);
+    }
+  });
+  module.walk([&accesses](spirv::CopyMemoryOp copy) {
+    if (copy->getParentOfType<spirv::LoopOp>()) {
+      accesses.collectBuffer(copy.getSource(), accesses.readBuffers);
+      accesses.collectBuffer(copy.getTarget(), accesses.writtenBuffers);
+    }
+  });
+  module.walk([&accesses](spirv::FunctionCallOp call) {
+    if (!call->getParentOfType<spirv::LoopOp>()) {
+      return;
+    }
+    auto callee = SymbolTable::lookupNearestSymbolFrom<spirv::FuncOp>(
+        call, call.getCalleeAttr());
+    // Pure scalar helpers cannot hide device-memory accesses. Unknown or
+    // external bodies, including nested calls without effect information,
+    // still require the conservative fallback.
+    bool hasNoMemoryEffects =
+        callee && !callee.getBody().empty() &&
+        llvm::all_of(callee.getBody().getOps(),
+                     [](Operation &op) { return isMemoryEffectFree(&op); });
+    if (!hasNoMemoryEffects) {
+      accesses.hasUnresolvedAccess = true;
+    }
+  });
+  return accesses;
+}
+
+// Metal can lose a previous iteration's device-memory update when a loop loads
+// and stores the same buffer. Keep these accesses observable to its optimiser.
+// Direct access chains let us exclude read-only and write-only buffers. Calls
+// and unresolved buffer pointers require unoptimised code because SPIRV-Cross
+// does not propagate volatile qualifiers through all pointer expressions.
+// Composite copies also need this fallback because their generated assignment
+// operators do not accept volatile objects.
+static MetalLoopMemoryRequirements
+getLoopMemoryRequirements(spirv::ModuleOp module) {
+  auto accesses = collectLoopBufferAccesses(module);
+  MetalLoopMemoryRequirements requirements;
+  bool hasCompositeUpdates = llvm::any_of(
+      accesses.buffersWithCompositeAccesses, [&accesses](Operation *buffer) {
+        return accesses.readBuffers.contains(buffer) &&
+               accesses.writtenBuffers.contains(buffer);
+      });
+  if (accesses.hasUnresolvedAccess || hasCompositeUpdates) {
+    requirements.disableOptimization = true;
+    return requirements;
+  }
+  for (auto buffer : module.getOps<spirv::GlobalVariableOp>()) {
+    if (accesses.readBuffers.contains(buffer) &&
+        accesses.writtenBuffers.contains(buffer) && buffer.getDescriptorSet() &&
+        buffer.getBinding()) {
+      requirements.volatileBuffers.emplace_back(*buffer.getDescriptorSet(),
+                                                *buffer.getBinding());
+    }
+  }
+  return requirements;
+}
+
 struct MetalSPIRVOptions {
   MetalTargetPlatform targetPlatform = MetalTargetPlatform::macOS;
   bool compileToMetalLib = true;
@@ -188,11 +311,13 @@ public:
     SmallVector<std::string, 2> mslEntryPointNames;
     mslShaders.reserve(spirvEntryPointNames.size());
     mslEntryPointNames.reserve(spirvEntryPointNames.size());
+    auto loopMemory = getLoopMemoryRequirements(spvModuleOp);
     for (const auto &entryPoint : spirvEntryPointNames) {
       // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
       ArrayRef spvData(spvBinary.data(), spvBinary.size());
       std::optional<std::pair<MetalShader, std::string>> msl =
-          crossCompileSPIRVToMSL(options.targetPlatform, spvData, entryPoint);
+          crossCompileSPIRVToMSL(options.targetPlatform, spvData, entryPoint,
+                                 loopMemory);
       if (!msl) {
         return variantOp.emitError()
                << "failed to cross compile SPIR-V to Metal shader";

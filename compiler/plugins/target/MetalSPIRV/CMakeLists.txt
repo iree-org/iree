@@ -30,9 +30,11 @@ iree_cc_library(
     LLVMTargetParser
     MLIRAffineDialect
     MLIRGPUDialect
+    MLIRIR
     MLIRLinalgDialect
     MLIRSPIRVDialect
     MLIRSPIRVSerialization
+    MLIRSideEffectInterfaces
     MLIRVectorDialect
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
