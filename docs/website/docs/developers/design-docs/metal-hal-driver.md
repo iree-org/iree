@@ -244,6 +244,17 @@ For the Metal HAL driver, it means we need to embed the MSL kernels inside the
 module FlatBuffer. Right now we can either encode the MSL source strings and
 compile them at Metal run-time, or directly encoding the library instead.
 
+Device-buffer updates inside loops need an additional Metal compiler workaround.
+Some optimised shaders lose an earlier iteration's update when the loop reads
+and writes the same buffer. During serialization, the backend marks directly
+resolved scalar and vector buffer accesses as volatile before generating MSL.
+Read-only and write-only buffers retain ordinary access. Calls with unknown
+memory effects, unresolved device pointers, and composite read/write accesses
+instead disable MSL optimisation for the shader: SPIRV-Cross cannot propagate
+volatile qualifiers through every pointer expression or composite assignment.
+Helpers proven free of memory effects do not require this fallback. Both embedded
+MSL source and precompiled Metal libraries carry these requirements.
+
 ### Workgroup/threadgroup size
 
 When dispatching a compute kernel in Metal, we need to specify the number of
