@@ -166,3 +166,53 @@ func.func @select_empty_vector(%predicate: i1, %lhs: tensor<0xi32>, %rhs: tensor
   %result = stablehlo.select %pred, %lhs, %rhs : tensor<i1>, tensor<0xi32>
   return %result : tensor<0xi32>
 }
+
+// -----
+
+// Explicit unsigned integers need the tensor conversion's type normalisation.
+// CHECK-LABEL: func @compare_unsigned_shape_scalar
+// CHECK: %[[TENSOR:.+]] = tensor.from_elements %arg0 : tensor<ui32>
+// CHECK: %[[RESULT:.+]] = stablehlo.compare GT, %[[TENSOR]],
+// CHECK: return %[[RESULT]] : tensor<i1>
+// INPUT-LABEL: util.func public @compare_unsigned_shape_scalar
+// INPUT: arith.cmpi ugt,
+// INPUT-NOT: stablehlo.
+// INPUT: util.return
+func.func @compare_unsigned_shape_scalar(%value: ui32) -> tensor<i1> {
+  %lhs = tensor.from_elements %value : tensor<ui32>
+  %rhs = stablehlo.constant dense<0> : tensor<ui32>
+  %result = stablehlo.compare GT, %lhs, %rhs : (tensor<ui32>, tensor<ui32>) -> tensor<i1>
+  return %result : tensor<i1>
+}
+
+// -----
+
+// The result type also retains unsigned semantics until tensor conversion.
+// CHECK-LABEL: func @remainder_unsigned_shape_scalar
+// CHECK: %[[TENSOR:.+]] = tensor.from_elements %arg0 : tensor<ui32>
+// CHECK: %[[RESULT:.+]] = stablehlo.remainder %[[TENSOR]],
+// CHECK: return %[[RESULT]] : tensor<ui32>
+// INPUT-LABEL: util.func public @remainder_unsigned_shape_scalar
+// INPUT: arith.remui
+// INPUT-NOT: stablehlo.
+// INPUT: util.return
+func.func @remainder_unsigned_shape_scalar(%value: ui32) -> tensor<ui32> {
+  %lhs = tensor.from_elements %value : tensor<ui32>
+  %rhs = stablehlo.constant dense<2> : tensor<ui32>
+  %result = stablehlo.remainder %lhs, %rhs : tensor<ui32>
+  return %result : tensor<ui32>
+}
+
+// -----
+
+// Unsigned tensor extracts crossing a helper boundary need type conversion too.
+// CHECK-LABEL: func @extract_unsigned_shape_scalar
+// CHECK: %[[VALUE:.+]] = tensor.extract %arg0[] : tensor<ui32>
+// CHECK: return %[[VALUE]] : ui32
+// INPUT-LABEL: util.func public @extract_unsigned_shape_scalar
+// INPUT: %[[VALUE:.+]] = tensor.extract %arg0[] : tensor<i32>
+// INPUT: util.return %[[VALUE]] : i32
+func.func @extract_unsigned_shape_scalar(%input: tensor<ui32>) -> ui32 {
+  %value = tensor.extract %input[] : tensor<ui32>
+  return %value : ui32
+}
