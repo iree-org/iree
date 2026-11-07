@@ -43,6 +43,18 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
+    name = "StatusCheck",
+    srcs = ["StableHLOStatusCheck.cpp"],
+    hdrs = ["StableHLOStatusCheck.h"],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "StableHLOLegalization",
     srcs = [
         "CheckVHLOStableHloMixUsage.cpp",
@@ -55,14 +67,13 @@ iree_compiler_cc_library(
         "LegalizeToLinalgUtils.h",
         "MapStableHLOToScalarOp.h",
         "StableHLOCustomCalls.cpp",
-        "StableHLOStatusCheck.cpp",
-        "StableHLOStatusCheck.h",
         "StableHLOToIREEInputDialects.cpp",
         "StableHLOToLinalgExt.cpp",
         "VerifyCompilerInputLegality.cpp",
     ],
     deps = [
         ":PassHeaders",
+        ":StatusCheck",
         "//compiler/plugins/input/StableHLO/Conversion/Preprocessing",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",

@@ -84,6 +84,7 @@ iree_cc_library(
     StablehloOps
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
+    iree::compiler::plugins::input::StableHLO::Conversion::StatusCheck
   PUBLIC
 )
 
