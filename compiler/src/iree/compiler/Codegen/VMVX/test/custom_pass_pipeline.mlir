@@ -30,3 +30,15 @@ func.func @transform_dialect_pipeline_leaks() attributes {
 } {
   return
 }
+
+// -----
+
+#executable_target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb", {reassociate_fp_reductions = "yes"}>
+
+// expected-error@+1 {{VMVX reassociate_fp_reductions must be a boolean}}
+func.func @invalid_reassociation_policy() attributes {
+  hal.executable.target = #executable_target,
+  translation_info = #iree_codegen.translation_info<pipeline = #iree_codegen.vmvx_pipeline>
+} {
+  return
+}

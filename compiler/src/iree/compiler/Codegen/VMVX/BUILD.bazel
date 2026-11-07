@@ -60,6 +60,7 @@ iree_compiler_cc_library(
         "VMVXLowerExecutableTarget.cpp",
         "VMVXLowerLinalgMicrokernels.cpp",
         "VMVXSelectLoweringStrategy.cpp",
+        "VMVXSplitReduction.cpp",
     ],
     hdrs = [
         "KernelDispatch.h",
@@ -84,6 +85,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VMVX/IR:VMVXDialect",
         "//compiler/src/iree/compiler/Utils",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:FuncDialect",
@@ -95,6 +97,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TransformUtils",

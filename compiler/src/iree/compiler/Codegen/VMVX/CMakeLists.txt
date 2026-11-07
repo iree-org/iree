@@ -53,10 +53,12 @@ iree_cc_library(
     "VMVXLowerExecutableTarget.cpp"
     "VMVXLowerLinalgMicrokernels.cpp"
     "VMVXSelectLoweringStrategy.cpp"
+    "VMVXSplitReduction.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
     LLVMSupport
+    MLIRAnalysis
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRFuncDialect
@@ -68,6 +70,7 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCFDialect
+    MLIRSideEffectInterfaces
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTransformUtils

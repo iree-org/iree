@@ -14,9 +14,11 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "reassociate_reductions.mlir"
     "smoketest.mlir"
   TOOLS
     FileCheck
+    iree-compile
     iree-opt
 )
 

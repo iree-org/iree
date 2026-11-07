@@ -46,4 +46,24 @@ def VMVXLowerLinalgMicrokernelsPass :
   ];
 }
 
+def VMVXSplitReductionPass :
+    InterfacePass<"iree-vmvx-split-reduction", "mlir::FunctionOpInterface"> {
+  let summary = "Group single-precision sums into partial reductions";
+  let description = [{
+    With floating-point reassociation enabled, split single-input f32 sums
+    with a static, divisible innermost reduction extent into contiguous chunks
+    and combine their partial sums. The original initial value is used once.
+    Dynamic parallel extents are preserved. Unsupported sums are left intact.
+    This changes floating-point association and may change rounded results.
+  }];
+  let options = [
+    Option<"reassociateFpReductions", "reassociate-fp-reductions", "bool", "false",
+           "Allow reassociation of floating-point sum reductions.">,
+    Option<"reductionChunkSize", "reduction-chunk-size", "int64_t", "64",
+           "Chunk size for divisible reductions; must be at least two.">
+  ];
+  let dependentDialects = ["mlir::arith::ArithDialect", "mlir::linalg::LinalgDialect",
+                           "mlir::tensor::TensorDialect"];
+}
+
 #endif // IREE_CODEGEN_VMVX_PASSES

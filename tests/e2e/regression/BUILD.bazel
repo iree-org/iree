@@ -133,6 +133,26 @@ iree_check_single_backend_test_suite(
     target_backend = "vmvx",
 )
 
+# Reassociation is an explicit numerical policy; exercise both VMVX paths.
+iree_check_single_backend_test_suite(
+    name = "check_regression_reassociate_vmvx",
+    srcs = ["vmvx_reassociate_sum.mlir"],
+    compiler_flags = ["--iree-vmvx-reassociate-fp-reductions"],
+    driver = "local-task",
+    target_backend = "vmvx",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_regression_reassociate_ukernel_vmvx",
+    srcs = ["vmvx_reassociate_sum.mlir"],
+    compiler_flags = [
+        "--iree-vmvx-enable-microkernels",
+        "--iree-vmvx-reassociate-fp-reductions",
+    ],
+    driver = "local-task",
+    target_backend = "vmvx",
+)
+
 iree_check_single_backend_test_suite(
     name = "check_regression_vulkan-spirv",
     # TODO(#10024): Fix layernorm.mlir on Pixel 6 and put in BACKEND_TESTS.
