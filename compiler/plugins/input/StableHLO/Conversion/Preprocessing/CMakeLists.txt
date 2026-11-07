@@ -67,6 +67,7 @@ iree_cc_library(
     LLVMSupport
     MLIRArithDialect
     MLIRControlFlowDialect
+    MLIRDataLayoutInterfaces
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
@@ -84,6 +85,7 @@ iree_cc_library(
     StablehloOps
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
+    iree::compiler::plugins::input::StableHLO::Conversion::PaddingUtils
     iree::compiler::plugins::input::StableHLO::Conversion::StatusCheck
   PUBLIC
 )

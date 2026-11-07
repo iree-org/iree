@@ -146,4 +146,20 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_test(
+  NAME
+    StableHLOPaddingUtilsTest
+  SRCS
+    "StableHLOPaddingUtilsTest.cpp"
+  DEPS
+    LLVMSupport
+    MLIRArithDialect
+    MLIRIR
+    gmock
+    gtest
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::plugins::input::StableHLO::Conversion::PaddingUtils
+    iree::testing::gtest_main
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
