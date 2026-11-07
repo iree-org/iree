@@ -46,6 +46,7 @@ void buildStableHLOInputConversionPassPipelineImpl(
   // If the input is StableHLO, this pass is considered a NOP.
   passManager.addPass(stablehlo::createCheckVHLOStableHloMixUsage());
   ::mlir::stablehlo::createStablehloDeserializePipeline(passManager);
+  passManager.addPass(createLegalizeDeprecatedOpsPass());
   // Composite ops carry a symbol reference to a function implementing their
   // decomposition. Replace them with a call to that function so that the
   // conversions below only have to handle the decomposed form; the inliner

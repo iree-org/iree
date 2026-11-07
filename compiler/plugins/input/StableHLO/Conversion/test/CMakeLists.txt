@@ -28,6 +28,8 @@ iree_lit_test_suite(
     "legalize_chlo_with_broadcast.mlir"
     "legalize_composite.mlir"
     "legalize_control_flow.mlir"
+    "legalize_deprecated_ops.mlir"
+    "legalize_deprecated_ops_invalid.mlir"
     "legalize_dynamic_reduce_window.mlir"
     "legalize_shape_computations.mlir"
     "lower_bounds_pipeline.mlir"

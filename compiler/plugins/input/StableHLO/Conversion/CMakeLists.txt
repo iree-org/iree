@@ -137,6 +137,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "LegalizeDeprecatedOps.cpp"
     "Passes.cpp"
   DEPS
     ::PassHeaders
@@ -144,6 +145,7 @@ iree_cc_library(
     LLVMSupport
     MLIRFuncDialect
     MLIRFunctionInterfaces
+    MLIRIR
     MLIRLinalgTransforms
     MLIRMLProgramDialect
     MLIRPass
@@ -153,6 +155,7 @@ iree_cc_library(
     MLIRShapeOpsTransforms
     MLIRShapeToStandard
     MLIRTransforms
+    StablehloOps
     StablehloPasses
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR

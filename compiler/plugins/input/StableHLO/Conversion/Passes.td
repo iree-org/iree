@@ -32,6 +32,17 @@ def ConvertStableHloToLinalgExt :
 // General passes
 //===----------------------------------------------------------------------===//
 
+def LegalizeDeprecatedOpsPass :
+    Pass<"iree-stablehlo-legalize-deprecated-ops", "ModuleOp"> {
+  let summary = "Normalizes deprecated StableHLO operations";
+  let description = [{
+    Replaces deprecated operation spellings in module functions with their
+    supported equivalents.
+    Leaves map and rng operations unchanged. Rejects quantized unary einsums.
+  }];
+  let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
+}
+
 def LegalizeDynamicReduceWindow :
     Pass<"iree-stablehlo-legalize-dynamic-reduce-window", "ModuleOp"> {
   let summary =
