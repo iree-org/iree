@@ -166,13 +166,49 @@ unsupported scalar bodies keep their original lowering. Reassociation is
 otherwise disabled by default; the setting is retained in executable target
 configuration when compilation is resumed from a checkpoint.
 
+For the f32 Metal comparison, use the supplied projection configuration with a
+Metal-enabled runtime and compiler tools from this checkout. A CMake runtime
+build must enable `IREE_HAL_DRIVER_METAL` and `IREE_BUILD_PYTHON_BINDINGS`; the
+Bazel staging runner above currently provides a runtime without the Metal driver.
+
+```sh
+python experimental/torchax/examples/smollm2_cpu.py \
+  --output-dir /tmp/smollm2-metal --target-backend=metal-spirv --device=metal \
+  --retain-state \
+  --compiler-arg=--iree-metal-compile-to-metallib=false \
+  --compiler-arg=--iree-codegen-transform-dialect-library=experimental/torchax/examples/smollm2_spirv_f32.mlir
+```
+
+This explicit profile uses the existing SPIR-V vectorisation pipeline with
+serial FMA accumulation for the model's transposed-weight f32 projections.
+It covers reduction widths 576 and 1536 with column counts divisible by 32,
+including symbolic row counts. It preserves existing user configurations and
+leaves other operations, including batched attention contractions, unchanged.
+The accumulation order agrees with the pinned Torch reference in the recorded
+validation environment. Parallel accumulation can be closer to a float64 oracle
+while differing more from that f32 reference; this profile makes no general
+accuracy or speed claim and does not change compiler defaults. Other hosts and
+Torch builds still require validation. The profile and its configuration
+checkpoint are checked by `tests/smollm2_tuning_test.py` in the separate Torchax
+suite. `--iree-codegen-tuning-spec-path` alone does not apply a profile through
+the current SPIR-V pipeline; use the transform-library option shown above.
+
+The recorded Apple M5 validation passed both attention modes, prefill and two
+decodes, every cache and predicted token at the unchanged `1e-4` comparison
+policy. It covered retained and donated state and three prompt lengths.
+For the five-token prefill, 21 alternating measurements after three warmups gave
+median times of 27.1 ms without the profile and 23.0 ms with it, including logit
+readback but excluding compilation and parameter loading. These measurements
+describe this workload and device.
+
 Backend and device failures propagate; the harness does not skip unavailable
 or failing targets. WASM deployment requires
 its own runtime runner and is not exercised by this Python harness.
-It does not establish BF16 or GPU conformance: the broader suite currently has
-a BF16 mixed-matmul discrepancy also present when weights are ordinary arguments.
+These f32 runs do not establish BF16 or complete GPU conformance: the broader
+suite has a BF16 mixed-matmul discrepancy also present when weights are ordinary
+arguments.
 Graduation still requires maintained dependency compatibility and a settled
-export/environment contract beyond this initial pretrained CPU checkpoint.
+export/environment contract beyond these pretrained f32 checkpoints.
 
 Use a separate output directory with `--retain-state` to disable cache donation
 and check that every old input cache remains unchanged after each invocation.
