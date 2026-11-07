@@ -1446,6 +1446,55 @@ func.func @scatter_signed_dynamic_batch(%operand: tensor<6x4xi32>, %indices: ten
 
 // -----
 
+// Boolean true is index one rather than the signed i1 value minus one.
+// CHECK-LABEL: @scatter_bool_dynamic_batch
+// CHECK-NOT: arith.extsi
+// CHECK: linalg.generic
+// CHECK: scf.if
+// CHECK: %[[INDEX:.+]] = tensor.extract %arg1
+// CHECK: %[[WIDE:.+]] = arith.extui %[[INDEX]] : i1 to i64
+// CHECK: scf.yield %[[WIDE]] : i64
+func.func @scatter_bool_dynamic_batch(%operand: tensor<?x4xi32>, %indices: tensor<?x3x1xi1>, %updates: tensor<?x3xi32>) -> tensor<?x4xi32> {
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    %sum = stablehlo.add %current, %update : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      inserted_window_dims = [1], input_batching_dims = [0],
+      scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1],
+      index_vector_dim = 2>
+  } : (tensor<?x4xi32>, tensor<?x3x1xi1>, tensor<?x3xi32>) -> tensor<?x4xi32>
+  return %result : tensor<?x4xi32>
+}
+
+// -----
+
+// Boolean true is index one rather than the signed i1 value minus one.
+// CHECK-LABEL: @scatter_widened_bool_dynamic_batch
+// CHECK-NOT: arith.extsi
+// CHECK: linalg.generic
+// CHECK: scf.if
+// CHECK: %[[INDEX:.+]] = tensor.extract %arg1
+// CHECK: %[[WIDE:.+]] = arith.extui %[[INDEX]] : i1 to i64
+// CHECK: scf.yield %[[WIDE]] : i64
+func.func @scatter_widened_bool_dynamic_batch(%operand: tensor<?x4xi32>, %indices: tensor<?x3x1xi1>, %updates: tensor<?x3xi32>) -> tensor<?x4xi32> {
+  %wide = stablehlo.convert %indices : (tensor<?x3x1xi1>) -> tensor<?x3x1xi32>
+  %result = "stablehlo.scatter"(%operand, %wide, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    %sum = stablehlo.add %current, %update : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      inserted_window_dims = [1], input_batching_dims = [0],
+      scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1],
+      index_vector_dim = 2>
+  } : (tensor<?x4xi32>, tensor<?x3x1xi32>, tensor<?x3xi32>) -> tensor<?x4xi32>
+  return %result : tensor<?x4xi32>
+}
+
+// -----
+
 // CHECK-LABEL: @scatter_multiple_dynamic_batch
 // CHECK: linalg.generic
 // CHECK: scf.if

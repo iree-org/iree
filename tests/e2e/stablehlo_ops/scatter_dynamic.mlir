@@ -46,6 +46,49 @@ func.func @scatter_dynamic_batch_i32_indices() {
   return
 }
 
+// Boolean true remains index one when dynamic batching generates coordinates.
+func.func @scatter_dynamic_batch_bool_indices() {
+  %operand = flow.tensor.dynamic_constant dense<0> : tensor<2x4xi32> -> tensor<?x4xi32>
+  %indices = flow.tensor.dynamic_constant dense<[[[true], [false], [true]], [[false], [true], [false]]]> : tensor<2x3x1xi1> -> tensor<?x3x1xi1>
+  %updates = flow.tensor.dynamic_constant dense<[[1, 2, 4], [8, 16, 32]]> : tensor<2x3xi32> -> tensor<?x3xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+    ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+      %sum = stablehlo.add %current, %update : tensor<i32>
+      stablehlo.return %sum : tensor<i32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      inserted_window_dims = [1], input_batching_dims = [0],
+      scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1],
+      index_vector_dim = 2>
+  } : (tensor<?x4xi32>, tensor<?x3x1xi1>, tensor<?x3xi32>) -> tensor<?x4xi32>
+  %expected = arith.constant dense<[[2, 5, 0, 0], [40, 16, 0, 0]]> : tensor<2x4xi32>
+  %expected_dynamic = tensor.cast %expected : tensor<2x4xi32> to tensor<?x4xi32>
+  check.expect_eq(%result, %expected_dynamic) : tensor<?x4xi32>
+  return
+}
+
+// The fused generator may read through a widening Boolean conversion.
+func.func @scatter_dynamic_batch_widened_bool_indices() {
+  %operand = flow.tensor.dynamic_constant dense<0> : tensor<2x4xi32> -> tensor<?x4xi32>
+  %indices = flow.tensor.dynamic_constant dense<[[[true], [false], [true]], [[false], [true], [false]]]> : tensor<2x3x1xi1> -> tensor<?x3x1xi1>
+  %updates = flow.tensor.dynamic_constant dense<[[1, 2, 4], [8, 16, 32]]> : tensor<2x3xi32> -> tensor<?x3xi32>
+  %wide = stablehlo.convert %indices : (tensor<?x3x1xi1>) -> tensor<?x3x1xi32>
+  %result = "stablehlo.scatter"(%operand, %wide, %updates) ({
+    ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+      %sum = stablehlo.add %current, %update : tensor<i32>
+      stablehlo.return %sum : tensor<i32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      inserted_window_dims = [1], input_batching_dims = [0],
+      scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1],
+      index_vector_dim = 2>
+  } : (tensor<?x4xi32>, tensor<?x3x1xi32>, tensor<?x3xi32>) -> tensor<?x4xi32>
+  %expected = arith.constant dense<[[2, 5, 0, 0], [40, 16, 0, 0]]> : tensor<2x4xi32>
+  %expected_dynamic = tensor.cast %expected : tensor<2x4xi32> to tensor<?x4xi32>
+  check.expect_eq(%result, %expected_dynamic) : tensor<?x4xi32>
+  return
+}
+
 // The implicit trailing index-vector dimension is expanded dynamically too.
 func.func @scatter_dynamic_batch_implicit_index_vector() {
   %operand = flow.tensor.dynamic_constant dense<0> : tensor<2x4xi32> -> tensor<?x4xi32>
