@@ -130,6 +130,7 @@ iree_lit_test_suite(
     "dynamic_cumsum_custom_call.mlir"
     "globals_ml_program.mlir"
   TOOLS
+    ${IREE_LLD_TARGET}
     FileCheck
     iree-compile
     iree-run-mlir
