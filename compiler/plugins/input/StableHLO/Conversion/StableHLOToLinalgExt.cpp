@@ -636,6 +636,11 @@ enum class ScanInitHandling { Unsupported, Identity, SeedFirstElement };
 // skip their initial value, so +0 must be combined with the first element:
 // unlike -0, it is not an identity for addition of a negative zero.
 static ScanInitHandling getScanInitHandling(Block &body, Value init) {
+  auto initType = cast<RankedTensorType>(init.getType());
+  if (initType.getRank() != 0 || body.getArgument(0).getType() != initType ||
+      body.getArgument(1).getType() != initType) {
+    return ScanInitHandling::Unsupported;
+  }
   Operation *reduceOp = body.getTerminator()->getOperand(0).getDefiningOp();
   if (!reduceOp || !llvm::hasSingleElement(body.without_terminator()) ||
       reduceOp->getBlock() != &body || &body.front() != reduceOp ||
@@ -856,6 +861,12 @@ struct ScanOpConversion final
     auto input0 = inputs.front();
     auto input0Ty = cast<ShapedType>(input0.getType());
     auto init0 = op.getInitValues().front();
+    Type elementType = input0Ty.getElementType();
+    if (getElementTypeOrSelf(init0.getType()) != elementType ||
+        getElementTypeOrSelf(op.getResult(0).getType()) != elementType) {
+      return rewriter.notifyMatchFailure(
+          op, "scan requires matching element types");
+    }
     ScanInitHandling initHandling =
         getScanInitHandling(op.getBody().front(), init0);
     if (initHandling == ScanInitHandling::Unsupported) {
@@ -905,8 +916,10 @@ struct ScanOpConversion final
     }
 
     bool isPrefix =
-        padding[reduceAxis * 2] == (input0Ty.getDimSize(reduceAxis) - 1);
+        padding[reduceAxis * 2] == (input0Ty.getDimSize(reduceAxis) - 1) &&
+        padding[reduceAxis * 2 + 1] == 0;
     bool isPostfix =
+        padding[reduceAxis * 2] == 0 &&
         padding[reduceAxis * 2 + 1] == (input0Ty.getDimSize(reduceAxis) - 1);
 
     if (isPrefix == isPostfix) {
@@ -918,6 +931,10 @@ struct ScanOpConversion final
         initHandling, [&](Region &region) {
           rewriter.inlineRegionBefore(op.getRegion(), region, region.begin());
         });
+    // The result can have less or more static shape information than the
+    // input, even though a pure scan preserves its runtime extents.
+    result = rewriter.createOrFold<tensor::CastOp>(
+        op.getLoc(), op.getResult(0).getType(), result);
     rewriter.replaceOp(op, result);
     return success();
   }
