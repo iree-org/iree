@@ -934,50 +934,61 @@ struct ShapeElement {
 };
 
 // Returns element `index` of the integer tensor `tensor` when only constants
-// and data movement build it.
+// and data movement build it. Follow the producer chain iteratively because
+// its length is independent of the IR's region nesting depth.
 static std::optional<ShapeElement> getShapeElement(Value tensor,
-                                                   SmallVector<int64_t> index) {
-  auto type = dyn_cast<RankedTensorType>(tensor.getType());
-  if (!type || !type.hasStaticShape()) {
-    return std::nullopt;
-  }
-  int64_t linear = linearize(index, computeStrides(type.getShape()));
-  DenseIntElementsAttr constant;
-  if (matchPattern(tensor, m_Constant(&constant))) {
-    return ShapeElement{constant.getValues<APInt>()[linear].getSExtValue(), {}};
-  }
-  if (auto fromElements = tensor.getDefiningOp<tensor::FromElementsOp>()) {
-    Value scalar = fromElements.getElements()[linear];
-    APInt value;
-    if (matchPattern(scalar, m_ConstantInt(&value))) {
-      return ShapeElement{value.getSExtValue(), {}};
-    }
-    return ShapeElement{std::nullopt, scalar};
-  }
-  if (auto concat = tensor.getDefiningOp<mlir::stablehlo::ConcatenateOp>()) {
-    int64_t dim = concat.getDimension();
-    for (Value input : concat.getInputs()) {
-      int64_t size = cast<ShapedType>(input.getType()).getDimSize(dim);
-      if (ShapedType::isDynamic(size)) {
-        return std::nullopt;
-      }
-      if (index[dim] < size) {
-        return getShapeElement(input, index);
-      }
-      index[dim] -= size;
-    }
-    return std::nullopt;
-  }
-  if (auto reshape = tensor.getDefiningOp<mlir::stablehlo::ReshapeOp>()) {
-    auto operandType = cast<RankedTensorType>(reshape.getOperand().getType());
-    if (!operandType.hasStaticShape()) {
+                                                   ArrayRef<int64_t> indices) {
+  SmallVector<int64_t> index(indices);
+  while (true) {
+    auto type = dyn_cast<RankedTensorType>(tensor.getType());
+    if (!type || !type.hasStaticShape()) {
       return std::nullopt;
     }
-    return getShapeElement(
-        reshape.getOperand(),
-        delinearize(linear, computeStrides(operandType.getShape())));
+    int64_t linear = linearize(index, computeStrides(type.getShape()));
+    DenseIntElementsAttr constant;
+    if (matchPattern(tensor, m_Constant(&constant))) {
+      return ShapeElement{constant.getValues<APInt>()[linear].getSExtValue(),
+                          {}};
+    }
+    if (auto fromElements = tensor.getDefiningOp<tensor::FromElementsOp>()) {
+      Value scalar = fromElements.getElements()[linear];
+      APInt value;
+      if (matchPattern(scalar, m_ConstantInt(&value))) {
+        return ShapeElement{value.getSExtValue(), {}};
+      }
+      return ShapeElement{std::nullopt, scalar};
+    }
+    if (auto concat = tensor.getDefiningOp<mlir::stablehlo::ConcatenateOp>()) {
+      int64_t dim = concat.getDimension();
+      Value source;
+      for (Value input : concat.getInputs()) {
+        int64_t size = cast<ShapedType>(input.getType()).getDimSize(dim);
+        if (ShapedType::isDynamic(size)) {
+          return std::nullopt;
+        }
+        if (index[dim] < size) {
+          source = input;
+          break;
+        }
+        index[dim] -= size;
+      }
+      if (!source) {
+        return std::nullopt;
+      }
+      tensor = source;
+      continue;
+    }
+    if (auto reshape = tensor.getDefiningOp<mlir::stablehlo::ReshapeOp>()) {
+      tensor = reshape.getOperand();
+      auto operandType = cast<RankedTensorType>(tensor.getType());
+      if (!operandType.hasStaticShape()) {
+        return std::nullopt;
+      }
+      index = delinearize(linear, computeStrides(operandType.getShape()));
+      continue;
+    }
+    return std::nullopt;
   }
-  return std::nullopt;
 }
 
 // Strips casts and assumptions under which an i32 dimension size is exact.
@@ -1032,7 +1043,7 @@ static bool isDimSizeMinusOne(const ShapeElement &element, Value tensor,
   auto isConstant = [](Value value, int64_t expected) {
     APInt constant;
     return matchPattern(value, m_ConstantInt(&constant)) &&
-           constant.getSExtValue() == expected;
+           constant.trySExtValue() == expected;
   };
   Value value = stripExactSizeCasts(element.value);
   if (auto add = value.getDefiningOp<arith::AddIOp>()) {
