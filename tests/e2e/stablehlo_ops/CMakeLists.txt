@@ -265,6 +265,19 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_vmvx_local-task_attention_ukernels
+  SRCS
+    "torch_attention_composites.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_llvm-cpu_local-task_general_scatter
   SRCS
     "scatter_general.mlir"
