@@ -18,6 +18,11 @@
 //   - Inline mode: wasm runs on the main thread. poll() is non-blocking.
 //     Completions are delivered via JS calling proactor_drain() directly.
 //
+// Local notifications support direct signaling and asynchronous waits on this
+// thread. Blocking waits cannot service JavaScript callbacks; use async waits
+// when progress depends on the event loop. Shared notifications and migrating
+// the proactor to another thread are unsupported.
+//
 // External users should use the public proactor API (iree/async/proactor.h).
 
 #ifndef IREE_ASYNC_PLATFORM_JS_PROACTOR_H_
@@ -51,11 +56,16 @@ typedef struct iree_async_proactor_js_t {
   // Token table mapping tokens to in-flight operations.
   iree_async_js_token_table_t token_table;
 
-  // Ready queue for operations that complete immediately (NOPs, expired
-  // timers). Intrusive singly-linked list via operation->next. Drained during
+  // Ready queue for NOPs, expired timers, and satisfied notification waits.
+  // Intrusive singly-linked list via operation->next. Drained during
   // poll before checking the ring.
   iree_async_operation_t* ready_head;
   iree_async_operation_t* ready_tail;
+
+  // Pending notification waits. Operations retain their notifications until
+  // completion. Signaling only moves satisfied waits to the ready queue;
+  // callbacks run during poll, after the pending list is no longer traversed.
+  iree_async_operation_t* notification_waits;
 
   // Buffer for ring_drain results. Points into trailing allocation data.
   iree_async_js_completion_entry_t* completion_buffer;

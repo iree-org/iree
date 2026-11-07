@@ -54,6 +54,10 @@ typedef enum iree_async_notification_mode_e {
   // Event fd: eventfd (Linux) or pipe (macOS/BSD) with poll-based waits.
   // Used by POSIX backend and io_uring fallback on older kernels.
   IREE_ASYNC_NOTIFICATION_MODE_EVENT = 1,
+
+  // Local epoch with waiters managed by the proactor, without an OS wait
+  // primitive. Used by the single-threaded JS backend.
+  IREE_ASYNC_NOTIFICATION_MODE_EMULATED = 2,
 } iree_async_notification_mode_t;
 
 // Creation flags for notifications.
