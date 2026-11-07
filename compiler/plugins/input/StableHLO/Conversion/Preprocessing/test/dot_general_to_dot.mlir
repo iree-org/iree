@@ -224,3 +224,59 @@ func.func @vecdot(%arg0 : tensor<1x32xf64>, %arg1 : tensor<32x1xf64>) -> tensor<
   // CHECK: %[[R2]]
   return %0 : tensor<1x1xf64>
 }
+
+// -----
+
+// A static reshape cannot preserve this dynamic dimension.
+// CHECK-LABEL: func.func @dynamic_contracting_lhs(
+// CHECK-SAME: %[[LHS:.+]]: tensor<1x?xf32>, %[[RHS:.+]]: tensor<?x4xf32>
+// CHECK-NOT: stablehlo.reshape
+// CHECK: %[[RESULT:.+]] = stablehlo.dot %[[LHS]], %[[RHS]]
+// CHECK-NOT: stablehlo.reshape
+// CHECK: return %[[RESULT]]
+func.func @dynamic_contracting_lhs(%lhs: tensor<1x?xf32>, %rhs: tensor<?x4xf32>) -> tensor<1x4xf32> {
+  %result = stablehlo.dot %lhs, %rhs : (tensor<1x?xf32>, tensor<?x4xf32>) -> tensor<1x4xf32>
+  return %result : tensor<1x4xf32>
+}
+
+// -----
+
+// A static reshape cannot preserve this dynamic dimension.
+// CHECK-LABEL: func.func @dynamic_contracting_rhs(
+// CHECK-SAME: %[[LHS:.+]]: tensor<4x?xf32>, %[[RHS:.+]]: tensor<?x1xf32>
+// CHECK-NOT: stablehlo.reshape
+// CHECK: %[[RESULT:.+]] = stablehlo.dot %[[LHS]], %[[RHS]]
+// CHECK-NOT: stablehlo.reshape
+// CHECK: return %[[RESULT]]
+func.func @dynamic_contracting_rhs(%lhs: tensor<4x?xf32>, %rhs: tensor<?x1xf32>) -> tensor<4x1xf32> {
+  %result = stablehlo.dot %lhs, %rhs : (tensor<4x?xf32>, tensor<?x1xf32>) -> tensor<4x1xf32>
+  return %result : tensor<4x1xf32>
+}
+
+// -----
+
+// A static reshape cannot preserve this dynamic dimension.
+// CHECK-LABEL: func.func @dynamic_result_lhs_unit(
+// CHECK-SAME: %[[LHS:.+]]: tensor<1x4xf32>, %[[RHS:.+]]: tensor<4x?xf32>
+// CHECK-NOT: stablehlo.reshape
+// CHECK: %[[RESULT:.+]] = stablehlo.dot %[[LHS]], %[[RHS]]
+// CHECK-NOT: stablehlo.reshape
+// CHECK: return %[[RESULT]]
+func.func @dynamic_result_lhs_unit(%lhs: tensor<1x4xf32>, %rhs: tensor<4x?xf32>) -> tensor<1x?xf32> {
+  %result = stablehlo.dot %lhs, %rhs : (tensor<1x4xf32>, tensor<4x?xf32>) -> tensor<1x?xf32>
+  return %result : tensor<1x?xf32>
+}
+
+// -----
+
+// A static reshape cannot preserve this dynamic dimension.
+// CHECK-LABEL: func.func @dynamic_result_rhs_unit(
+// CHECK-SAME: %[[LHS:.+]]: tensor<?x4xf32>, %[[RHS:.+]]: tensor<4x1xf32>
+// CHECK-NOT: stablehlo.reshape
+// CHECK: %[[RESULT:.+]] = stablehlo.dot %[[LHS]], %[[RHS]]
+// CHECK-NOT: stablehlo.reshape
+// CHECK: return %[[RESULT]]
+func.func @dynamic_result_rhs_unit(%lhs: tensor<?x4xf32>, %rhs: tensor<4x1xf32>) -> tensor<?x1xf32> {
+  %result = stablehlo.dot %lhs, %rhs : (tensor<?x4xf32>, tensor<4x1xf32>) -> tensor<?x1xf32>
+  return %result : tensor<?x1xf32>
+}
