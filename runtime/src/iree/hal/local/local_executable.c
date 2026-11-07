@@ -117,8 +117,6 @@ iree_status_t iree_hal_local_executable_issue_dispatch_inline(
   });
 #endif  // IREE_HAL_VERBOSE_TRACING_ENABLE
 
-  iree_status_t status = iree_ok_status();
-
   iree_alignas(64) iree_hal_executable_workgroup_state_v0_t workgroup_state = {
       .workgroup_id_x = 0,
       .workgroup_id_y = 0,
@@ -133,14 +131,14 @@ iree_status_t iree_hal_local_executable_issue_dispatch_inline(
       workgroup_state.workgroup_id_y = y;
       for (uint32_t x = 0; x < workgroup_count_x; ++x) {
         workgroup_state.workgroup_id_x = x;
-        status = iree_hal_local_executable_issue_call(
-            executable, ordinal, dispatch_state, &workgroup_state,
-            /*worker_id=*/0);
-        if (!iree_status_is_ok(status)) break;
+        IREE_RETURN_AND_END_ZONE_IF_ERROR(
+            z0, iree_hal_local_executable_issue_call(
+                    executable, ordinal, dispatch_state, &workgroup_state,
+                    /*worker_id=*/0));
       }
     }
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
