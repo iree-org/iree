@@ -65,7 +65,12 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &modulePassManager) {
         options.includeMinMaxF = true;
         return arith::createArithExpandOpsPass(options);
       })
-      .addPass(createConvertUnsupportedFloatArithPass)
+      .addPass([]() {
+        ConvertUnsupportedFloatArithPassOptions options;
+        options.includeF16 = true;
+        options.includeMath = true;
+        return createConvertUnsupportedFloatArithPass(options);
+      })
       .addPass([]() {
         return createEmulateNarrowTypePass(
             EmulateNarrowTypePassOptions{/*disableAtomicRMW=*/true});

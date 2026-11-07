@@ -251,7 +251,6 @@ static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
       .addPass(createSPIRVMapMemRefStorageClassPass)
-      .addPass(createSPIRVEmulateI64Pass)
       .addPass(createConvertBf16ArithToF32Pass)
       .addPass([]() {
         // Convert unsupported float buffer types to integer types.
@@ -267,6 +266,11 @@ static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
                 /*includeF8E8M0FNU=*/true,
             });
       })
+      // Binding byte offsets have been folded into access indices. Pack narrow
+      // storage only now, retaining subword offsets and unaligned accesses.
+      .addPass(createSPIRVEmulateF16StoragePass)
+      .addPass(createIREELowerAffinePass)
+      .addPass(createSPIRVEmulateI64Pass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
 

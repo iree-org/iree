@@ -26,7 +26,7 @@ namespace IREE::GPU {
 class TargetAttr;
 }
 
-/// Returns whether f16 arithmetic, storage and integer bitcasts are native.
+/// Returns whether f16 arithmetic and storage are native.
 /// A missing target does not establish native support.
 bool supportsNativeSPIRVF16(IREE::GPU::TargetAttr target);
 

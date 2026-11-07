@@ -85,7 +85,8 @@ private:
   /// Returns the integer type to use for the given float type, or nullptr if
   /// the float type should not be converted.
   IntegerType getIntTypeForFloat(FloatType ty) const {
-    if (options.includeBf16 && ty.isBF16()) {
+    if ((options.includeBf16 && ty.isBF16()) ||
+        (options.includeF16 && ty.isF16())) {
       return IntegerType::get(ty.getContext(), 16);
     }
     IntegerType i8Type = IntegerType::get(ty.getContext(), 8);
@@ -350,6 +351,7 @@ struct ConvertUnsupportedFloatToIntBuffersPass final
 
     ConvertUnsupportedFloatToIntBuffersPassOptions opts;
     opts.includeBf16 = includeBf16;
+    opts.includeF16 = includeF16;
     opts.includeF8E5M2 = includeF8E5M2;
     opts.includeF8E4M3FN = includeF8E4M3FN;
     opts.includeF8E5M2FNUZ = includeF8E5M2FNUZ;
@@ -387,15 +389,16 @@ struct ConvertUnsupportedFloatToIntBuffersPass final
           vector::TransferWriteOp, vector::LoadOp, vector::StoreOp,
           vector::MaskedLoadOp, vector::MaskedStoreOp, vector::GatherOp,
           vector::ScatterOp, vector::ExpandLoadOp, vector::CompressStoreOp,
-          vector::ShapeCastOp, vector::ConstantMaskOp, vector::CreateMaskOp,
-          vector::MaskOp, vector::TransposeOp, vector::YieldOp,
-          vector::FromElementsOp, vector::ToElementsOp>([&typeConverter](
-                                                            Operation *op) {
-        bool legal = typeConverter.isLegal(op);
-        LLVM_DEBUG(if (!legal) llvm::dbgs()
-                   << "UnsupportedFloatEmulation: illegal op: " << *op << "\n");
-        return legal;
-      });
+          vector::ShapeCastOp, vector::BitCastOp, vector::ConstantMaskOp,
+          vector::CreateMaskOp, vector::MaskOp, vector::TransposeOp,
+          vector::YieldOp, vector::FromElementsOp, vector::ToElementsOp>(
+          [&typeConverter](Operation *op) {
+            bool legal = typeConverter.isLegal(op);
+            LLVM_DEBUG(if (!legal) llvm::dbgs()
+                       << "UnsupportedFloatEmulation: illegal op: " << *op
+                       << "\n");
+            return legal;
+          });
 
       RewritePatternSet patterns(ctx);
       populateIreeUnsupportedFloatEmulationPatterns(patterns, typeConverter);

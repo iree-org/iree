@@ -326,7 +326,7 @@ func.func @scaling_truncf_preserved(%arg0 : tensor<16xf32>, %scale : tensor<16xf
 // CHECK-LABEL: func.func @gpu_fnuz_gfx942_hw_conversion
 // CHECK-SAME:    (%[[ARG0:.*]]: f8E4M3FNUZ)
 // Arithmetic emulation: wrap with extf/truncf
-// CHECK:         %[[EXT:.*]] = arith.extf %[[ARG0]] {{.*}} : f8E4M3FNUZ to f32
+// CHECK:         %[[EXT:.*]] = arith.extf %[[ARG0]] : f8E4M3FNUZ to f32
 // CHECK:         %[[NEG:.*]] = arith.negf %[[EXT]] : f32
 // CHECK:         %[[TRUNC:.*]] = arith.truncf %[[NEG]] {{.*}} : f32 to f8E4M3FNUZ
 // No bit manipulation (no arith.bitcast) - conversions use hardware
@@ -356,7 +356,7 @@ func.func @gpu_fnuz_gfx942_hw_conversion(%arg0 : f8E4M3FNUZ) -> f8E4M3FNUZ attri
 // With emulation disabled, extf/truncf remain unconverted (no bitcast).
 // NOEMU-LABEL: func.func @gpu_ocp_gfx942_emulated
 // NOEMU-SAME:    (%[[ARG0:.*]]: f8E4M3FN)
-// NOEMU:         %[[EXT:.*]] = arith.extf %[[ARG0]] {{.*}} : f8E4M3FN to f32
+// NOEMU:         %[[EXT:.*]] = arith.extf %[[ARG0]] : f8E4M3FN to f32
 // NOEMU:         %[[NEG:.*]] = arith.negf %[[EXT]] : f32
 // NOEMU:         %[[TRUNC:.*]] = arith.truncf %[[NEG]] {{.*}} : f32 to f8E4M3FN
 // NOEMU-NOT:     arith.bitcast
@@ -380,7 +380,7 @@ func.func @gpu_ocp_gfx942_emulated(%arg0 : f8E4M3FN) -> f8E4M3FN attributes {
 // CHECK-LABEL: func.func @gpu_ocp_gfx950_hw_conversion
 // CHECK-SAME:    (%[[ARG0:.*]]: f8E4M3FN)
 // Arithmetic emulation: wrap with extf/truncf
-// CHECK:         %[[EXT:.*]] = arith.extf %[[ARG0]] {{.*}} : f8E4M3FN to f32
+// CHECK:         %[[EXT:.*]] = arith.extf %[[ARG0]] : f8E4M3FN to f32
 // CHECK:         %[[NEG:.*]] = arith.negf %[[EXT]] : f32
 // CHECK:         %[[TRUNC:.*]] = arith.truncf %[[NEG]] {{.*}} : f32 to f8E4M3FN
 // No bit manipulation (no arith.bitcast) - conversions use hardware
@@ -410,7 +410,7 @@ func.func @gpu_ocp_gfx950_hw_conversion(%arg0 : f8E4M3FN) -> f8E4M3FN attributes
 // With emulation disabled, extf/truncf remain unconverted (no bitcast).
 // NOEMU-LABEL: func.func @gpu_fnuz_gfx950_emulated
 // NOEMU-SAME:    (%[[ARG0:.*]]: f8E4M3FNUZ)
-// NOEMU:         %[[EXT:.*]] = arith.extf %[[ARG0]] {{.*}} : f8E4M3FNUZ to f32
+// NOEMU:         %[[EXT:.*]] = arith.extf %[[ARG0]] : f8E4M3FNUZ to f32
 // NOEMU:         %[[NEG:.*]] = arith.negf %[[EXT]] : f32
 // NOEMU:         %[[TRUNC:.*]] = arith.truncf %[[NEG]] {{.*}} : f32 to f8E4M3FNUZ
 // NOEMU-NOT:     arith.bitcast

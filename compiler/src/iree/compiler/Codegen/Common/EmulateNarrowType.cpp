@@ -29,6 +29,10 @@ namespace mlir::iree_compiler {
 #define GEN_PASS_DEF_EMULATENARROWTYPEPASS
 #include "iree/compiler/Codegen/Common/Passes.h.inc"
 
+static LogicalResult emulateNarrowTypeForStorage(
+    Operation *root, bool disableAtomicRMW, unsigned loadStoreBitwidth,
+    std::optional<NarrowTypeConversionPopulationFn> populateCallback);
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -112,21 +116,45 @@ struct EmulateNarrowTypePass final
   }
 
   void runOnOperation() override {
-    if (failed(emulateNarrowType(getOperation(), disableAtomicRMW))) {
+    if (loadStoreBitwidth != 8 && loadStoreBitwidth != 32) {
+      getOperation()->emitOpError("requires an 8-bit or 32-bit storage unit");
+      return signalPassFailure();
+    }
+    if (loadStoreBitwidth == 32) {
+      WalkResult aligned =
+          getOperation()->walk([](IREE::HAL::InterfaceBindingSubspanOp op) {
+            auto type = dyn_cast<MemRefType>(op.getType());
+            if (!type || !type.getElementType().isIntOrFloat() ||
+                type.getElementTypeBitWidth() >= 32 || !op.getByteOffset()) {
+              return WalkResult::advance();
+            }
+            auto offsetAlignment =
+                IREE::HAL::lookupOffsetOrAlignment(op.getByteOffset());
+            if (offsetAlignment && *offsetAlignment % 4 == 0) {
+              return WalkResult::advance();
+            }
+            op.emitOpError("requires word-aligned binding offsets for 32-bit "
+                           "storage emulation");
+            return WalkResult::interrupt();
+          });
+      if (aligned.wasInterrupted()) {
+        return signalPassFailure();
+      }
+    }
+    if (failed(emulateNarrowTypeForStorage(
+            getOperation(), disableAtomicRMW,
+            static_cast<unsigned>(loadStoreBitwidth), std::nullopt))) {
       return signalPassFailure();
     }
   }
 };
 } // namespace
 
-LogicalResult emulateNarrowType(
-    Operation *root, bool disableAtomicRMW,
+static LogicalResult emulateNarrowTypeForStorage(
+    Operation *root, bool disableAtomicRMW, unsigned loadStoreBitwidth,
     std::optional<NarrowTypeConversionPopulationFn> populateCallback) {
-  // The number of bits used in a load/store op.
-  constexpr unsigned kLoadStoreEmulateBitwidth = 8;
-  static_assert(
-      llvm::isPowerOf2_32(kLoadStoreEmulateBitwidth) &&
-      "only power of 2 is supported for narrow type load/store emulation");
+  assert((loadStoreBitwidth == 8 || loadStoreBitwidth == 32) &&
+         "storage width must be checked before emulation");
 
   MLIRContext *ctx = root->getContext();
 
@@ -144,7 +172,7 @@ LogicalResult emulateNarrowType(
     }
   }
 
-  arith::NarrowTypeEmulationConverter typeConverter(kLoadStoreEmulateBitwidth);
+  arith::NarrowTypeEmulationConverter typeConverter(loadStoreBitwidth);
   memref::populateMemRefNarrowTypeEmulationConversions(typeConverter);
 
   ConversionTarget target(*ctx);
@@ -169,9 +197,9 @@ LogicalResult emulateNarrowType(
   memref::populateMemRefNarrowTypeEmulationPatterns(typeConverter, patterns,
                                                     disableAtomicRMW);
   populateIREEResolveExtractStridedMetadataPatterns(patterns);
-  vector::populateVectorNarrowTypeEmulationPatterns(typeConverter, patterns,
-                                                    disableAtomicRMW,
-                                                    /*assumeAligned=*/true);
+  vector::populateVectorNarrowTypeEmulationPatterns(
+      typeConverter, patterns, disableAtomicRMW,
+      /*assumeAligned=*/loadStoreBitwidth == 8);
   populateIreeNarrowTypeEmulationPatterns(typeConverter, patterns);
   if (populateCallback) {
     populateCallback.value()(typeConverter, patterns, target);
@@ -197,6 +225,14 @@ LogicalResult emulateNarrowType(
     return failure();
   }
   return success();
+}
+
+// Preserve the established byte-storage API for target-specific callbacks.
+LogicalResult emulateNarrowType(
+    Operation *root, bool disableAtomicRMW,
+    std::optional<NarrowTypeConversionPopulationFn> populateCallback) {
+  return emulateNarrowTypeForStorage(root, disableAtomicRMW,
+                                     /*loadStoreBitwidth=*/8, populateCallback);
 }
 
 } // namespace mlir::iree_compiler

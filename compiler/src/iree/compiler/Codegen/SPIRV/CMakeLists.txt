@@ -57,6 +57,7 @@ iree_cc_library(
     "SPIRVAnnotateWinogradLoops.cpp"
     "SPIRVBreakDownLargeVector.cpp"
     "SPIRVConvertGPUTarget.cpp"
+    "SPIRVEmulateF16Storage.cpp"
     "SPIRVEmulateI64.cpp"
     "SPIRVEraseStorageBufferStaticShape.cpp"
     "SPIRVFinalVectorLowering.cpp"

@@ -17,6 +17,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "half_arithmetic.mlir",
             "materialize_constants.mlir",
             "resolve_buffer_descriptors.mlir",
         ],

@@ -71,6 +71,53 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+// Packed subword stores require word atomics on physical buffer pointers.
+// UniformMemory covers physical storage buffers as well as descriptor buffers.
+struct ConvertPhysicalWordAtomic final
+    : OpConversionPattern<memref::AtomicRMWOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(memref::AtomicRMWOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto memrefType = op.getMemRefType();
+    auto storage = dyn_cast_if_present<spirv::StorageClassAttr>(
+        memrefType.getMemorySpace());
+    if (!storage ||
+        storage.getValue() != spirv::StorageClass::PhysicalStorageBuffer ||
+        !memrefType.getElementType().isInteger(32) ||
+        (op.getKind() != arith::AtomicRMWKind::andi &&
+         op.getKind() != arith::AtomicRMWKind::ori)) {
+      return rewriter.notifyMatchFailure(
+          op, "requires a physical i32 bitwise atomic");
+    }
+    auto &converter = *getTypeConverter<SPIRVTypeConverter>();
+    Type resultType = converter.convertType(op.getType());
+    if (!resultType || resultType != adaptor.getValue().getType()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "requires unchanged word arithmetic");
+    }
+    Value pointer =
+        spirv::getElementPtr(converter, memrefType, adaptor.getMemref(),
+                             adaptor.getIndices(), op.getLoc(), rewriter);
+    if (!pointer) {
+      return failure();
+    }
+    auto semantics = spirv::MemorySemantics::AcquireRelease |
+                     spirv::MemorySemantics::UniformMemory;
+    if (op.getKind() == arith::AtomicRMWKind::andi) {
+      rewriter.replaceOpWithNewOp<spirv::AtomicAndOp>(
+          op, resultType, pointer, spirv::Scope::Device, semantics,
+          adaptor.getValue());
+    } else {
+      rewriter.replaceOpWithNewOp<spirv::AtomicOrOp>(
+          op, resultType, pointer, spirv::Scope::Device, semantics,
+          adaptor.getValue());
+    }
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Resource utilities
 //===----------------------------------------------------------------------===//
@@ -861,6 +908,7 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   // Pull in MemRef patterns to convert load/store ops.
   populateMemRefToSPIRVPatterns(typeConverter, patterns);
+  patterns.add<ConvertPhysicalWordAtomic>(typeConverter, context);
 
   // Pull in standard/math patterns to convert arithmetic ops and others.
   arith::populateCeilFloorDivExpandOpsPatterns(patterns);

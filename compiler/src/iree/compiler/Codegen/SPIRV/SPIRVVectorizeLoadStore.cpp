@@ -13,6 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -159,17 +161,41 @@ calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
   return minBits;
 }
 
-/// If the memref is vectorizable return the vector bit count we want to use,
-/// otherwise return 0. If it returns a value greater than 0 it also returns the
-/// memref uses.
-static unsigned isMemRefVectorizable(Value value,
-                                     SmallVectorImpl<Operation *> &uses) {
+// Unconfigured targets retain the existing vectorization policy. Configured
+// 16-bit storage must support the element arithmetic before vectorization.
+static bool needs16BitStorageEmulation(MemRefType memrefType,
+                                       IREE::GPU::TargetAttr target) {
+  if (memrefType.getElementTypeBitWidth() != 16 || !target) {
+    return false;
+  }
+  if (isa<FloatType>(memrefType.getElementType())) {
+    return !supportsNativeSPIRVF16(target);
+  }
+  auto wgp = target.getWgp();
+  return !IREE::GPU::bitEnumContainsAll(wgp.getStorage().getValue(),
+                                        IREE::GPU::StorageBitwidths::B16) ||
+         !IREE::GPU::bitEnumContainsAll(wgp.getCompute().getValue(),
+                                        IREE::GPU::ComputeBitwidths::Int16);
+}
+
+/// Collects memref uses for vectorization and returns the vector width in bits.
+/// Returns zero when vectorization is unsupported. The uses may contain partial
+/// analysis in that case and must be ignored.
+static unsigned
+collectVectorizableMemRefUses(Value value, SmallVectorImpl<Operation *> &uses) {
   auto memrefType = dyn_cast<MemRefType>(value.getType());
 
   // Require scalar element type
   if (!memrefType || (!isa<IntegerType>(memrefType.getElementType()) &&
                       !isa<FloatType>(memrefType.getElementType()))) {
     LLVM_DEBUG(llvm::dbgs() << "failed: not (scalar) memref\n");
+    return 0;
+  }
+
+  // Defer unsupported narrow storage until binding offsets become indices.
+  if (needs16BitStorageEmulation(
+          memrefType,
+          getGPUTargetAttr(value.getParentBlock()->getParentOp()))) {
     return 0;
   }
 
@@ -287,7 +313,7 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
 void MemRefUsageAnalysis::analyzeMemRefValue(Value value) {
   SmallVector<Operation *> vectorUses;
   LLVM_DEBUG(llvm::dbgs() << "analyzing value: " << value << "\n");
-  if (unsigned vectorSize = isMemRefVectorizable(value, vectorUses)) {
+  if (unsigned vectorSize = collectVectorizableMemRefUses(value, vectorUses)) {
     valueToVectorBitsMap.insert(std::make_pair(value, vectorSize));
     transferOps.insert(vectorUses.begin(), vectorUses.end());
   }
