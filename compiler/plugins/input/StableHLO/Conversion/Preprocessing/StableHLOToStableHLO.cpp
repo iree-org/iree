@@ -873,7 +873,10 @@ Value buildGeneratedIndexElement(const DynamicBatchedIndexPlan &plan,
       tensor::ExtractOp::create(builder, loc, source, sourceCoordinates);
   if (plan.source.elementType.getWidth() <
       cast<IntegerType>(elementType).getWidth()) {
-    if (plan.source.elementType.isUnsigned()) {
+    // StableHLO Boolean conversion maps true to one, including when a widening
+    // convert was bypassed while selecting the source tensor.
+    if (plan.source.elementType.isUnsigned() ||
+        plan.source.elementType.getWidth() == 1) {
       sourceValue =
           arith::ExtUIOp::create(builder, loc, elementType, sourceValue);
     } else {
