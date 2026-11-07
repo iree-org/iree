@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -30,6 +31,9 @@ struct BdaBindingRequirementOptions {
 
   // Minimum length value emitted into the binding metadata.
   uint64_t minimum_length = 0;
+
+  // Physical access unit emitted into the binding metadata.
+  uint32_t minimum_access_bytes = 1;
 };
 
 struct WrappedVulkanExecutableOptions {
@@ -83,6 +87,9 @@ struct WrappedVulkanExecutableOptions {
   // Whether the executable contains an empty descriptor set layout at ordinal
   // 0.
   bool include_descriptor_set_layout = false;
+
+  // Adds one binding when present, including invalid units for validation.
+  std::optional<uint32_t> descriptor_access_bytes;
 };
 
 static WrappedVulkanExecutableOptions MakeWrappedBdaExecutableOptions() {
@@ -129,7 +136,8 @@ static iree_status_t MakeWrappedVulkanExecutable(
       iree_hal_vulkan_BdaBindingDef_ref_t binding_requirement_ref =
           iree_hal_vulkan_BdaBindingDef_create(
               &builder, binding_requirement.minimum_alignment,
-              binding_requirement.minimum_length);
+              binding_requirement.minimum_length,
+              binding_requirement.minimum_access_bytes);
       if (!binding_requirement_ref) {
         status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                                   "failed to create BDA binding requirement");
@@ -272,9 +280,22 @@ static iree_status_t MakeWrappedVulkanExecutable(
   iree_hal_vulkan_DescriptorSetLayoutDef_vec_ref_t descriptor_set_layouts_ref =
       0;
   if (iree_status_is_ok(status) && options.include_descriptor_set_layout) {
+    iree_hal_vulkan_DescriptorSetLayoutBindingDef_vec_ref_t bindings_ref = 0;
+    if (options.descriptor_access_bytes) {
+      auto binding_ref = iree_hal_vulkan_DescriptorSetLayoutBindingDef_create(
+          &builder, /*binding=*/0,
+          iree_hal_vulkan_VkDescriptorType_STORAGE_BUFFER,
+          /*descriptor_count=*/1, VK_SHADER_STAGE_COMPUTE_BIT,
+          *options.descriptor_access_bytes);
+      bindings_ref = iree_hal_vulkan_DescriptorSetLayoutBindingDef_vec_create(
+          &builder, &binding_ref, 1);
+    }
     iree_hal_vulkan_DescriptorSetLayoutDef_ref_t descriptor_set_layout_ref = 0;
     if (flatbuffers_failed(
             iree_hal_vulkan_DescriptorSetLayoutDef_start(&builder)) ||
+        (bindings_ref &&
+         flatbuffers_failed(iree_hal_vulkan_DescriptorSetLayoutDef_bindings_add(
+             &builder, bindings_ref))) ||
         !(descriptor_set_layout_ref =
               iree_hal_vulkan_DescriptorSetLayoutDef_end(&builder))) {
       status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
@@ -584,6 +605,26 @@ TEST(ExecutableTest, RejectsBdaBindingRequirementWithNonPowerOfTwoAlignment) {
 
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
                         CreateWrappedVulkanExecutableForValidation(options));
+}
+
+TEST(ExecutableTest, RejectsDescriptorAccessUnitBeforeNativeObjectCreation) {
+  for (uint32_t unit : {0u, 3u, 8u}) {
+    WrappedVulkanExecutableOptions options;
+    options.include_descriptor_set_layout = true;
+    options.descriptor_access_bytes = unit;
+    // The empty Vulkan function table ensures validation precedes GPU calls.
+    IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                          CreateWrappedVulkanExecutableForValidation(options));
+  }
+}
+
+TEST(ExecutableTest, RejectsBdaBindingRequirementWithInvalidAccessUnit) {
+  for (uint32_t unit : {0u, 3u, 8u}) {
+    WrappedVulkanExecutableOptions options = MakeWrappedBdaExecutableOptions();
+    options.binding_requirements = {{1, 0, 1}, {1, 0, unit}, {1, 0, 1}};
+    IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                          CreateWrappedVulkanExecutableForValidation(options));
+  }
 }
 
 TEST(ExecutableTest, RejectsBdaPipelineWithDescriptorSetLayoutOrdinals) {

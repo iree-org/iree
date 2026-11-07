@@ -11,6 +11,7 @@
 #include <string>
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/HAL/Target/ResourceAccess.h"
 #include "mlir/IR/Dialect.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
@@ -21,6 +22,15 @@ class TargetRegistry;
 class TargetDevice {
 public:
   virtual ~TargetDevice() = default;
+
+  /// Returns additional physical access requirements for this configuration.
+  /// Absence means this provider does not model extra requirements; it does
+  /// not establish that arbitrary resource layouts are legal. Implementations
+  /// that widen storage accesses or transfer edges must report their units.
+  virtual std::optional<ResourceAccessRequirements>
+  getResourceAccessRequirements(DeviceTargetAttr) const {
+    return std::nullopt;
+  }
 
   // Returns the default device this backend targets. This may involve setting
   // defaults from flags and other environmental sources, and it may be

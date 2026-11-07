@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <utility>
+
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -34,6 +36,27 @@ static void printAvailable(InFlightDiagnostic &diagnostic,
   llvm::interleaveComma(targetRegistry.getRegisteredTargetBackends(),
                         diagnostic);
   diagnostic << "]";
+}
+
+static LogicalResult
+verifyResourceAccessRequirements(Operation *deviceOp, DeviceTargetAttr target,
+                                 const TargetRegistry &registry) {
+  auto required = getRequiredResourceAccess(target, registry);
+  auto config = target.getConfiguration();
+  for (auto [name, minimum] :
+       {std::pair<StringRef, int64_t>{"stream.min_access_granularity",
+                                      required.storageInBytes},
+        {"stream.min_fill_granularity", required.fillInBytes},
+        {"stream.min_copy_granularity", required.copyInBytes}}) {
+    auto attr = config ? config.getAs<IntegerAttr>(name) : IntegerAttr{};
+    int64_t provided = attr ? attr.getInt() : 1;
+    if (provided < minimum) {
+      return deviceOp->emitError()
+             << "device target requires " << name << " of at least " << minimum
+             << " bytes; got " << provided;
+    }
+  }
+  return success();
 }
 
 static LogicalResult
@@ -71,7 +94,8 @@ verifyDeviceTargetAttr(Operation *deviceOp,
     }
   }
 
-  return success();
+  return verifyResourceAccessRequirements(deviceOp, deviceTargetAttr,
+                                          targetRegistry);
 }
 
 static LogicalResult verifyAttr(Operation *deviceOp, Attribute attr,
@@ -94,7 +118,7 @@ static LogicalResult verifyAttr(Operation *deviceOp, Attribute attr,
       });
 }
 
-struct VerifyDevicesPass
+struct VerifyDevicesPass final
     : IREE::HAL::impl::VerifyDevicesPassBase<VerifyDevicesPass> {
   using IREE::HAL::impl::VerifyDevicesPassBase<
       VerifyDevicesPass>::VerifyDevicesPassBase;

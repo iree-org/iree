@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/Target/ResourceAccess.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/IR/Dialect.h"
@@ -81,6 +82,15 @@ namespace mlir::iree_compiler::IREE::HAL {
 class TargetBackend {
 public:
   virtual ~TargetBackend() = default;
+
+  /// Returns additional physical access requirements for this configuration.
+  /// Absence means this provider does not model extra requirements; it does
+  /// not establish that arbitrary resource layouts are legal. Implementations
+  /// that widen storage accesses or transfer edges must report their units.
+  virtual std::optional<ResourceAccessRequirements>
+  getResourceAccessRequirements(ExecutableTargetAttr) const {
+    return std::nullopt;
+  }
 
   // Returns the ID of a DeviceTarget that can execute files produced by this
   // backend. This is used to support the `--iree-hal-target-backends=` flag

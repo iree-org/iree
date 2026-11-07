@@ -29,6 +29,7 @@ iree_runtime_cc_library(
     name = "headers",
     hdrs = [
         "api.h",
+        "buffer.h",
         "command_buffer.h",
         "debug_utils.h",
         "device_options.h",
@@ -71,6 +72,7 @@ iree_runtime_cc_test(
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:arena",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/local:transient_buffer",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
@@ -160,6 +162,16 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
+    name = "descriptor_range",
+    srcs = ["descriptor_range.c"],
+    hdrs = ["descriptor_range.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "vulkan",
     srcs = [
         "allocator.c",
@@ -203,6 +215,7 @@ iree_runtime_cc_library(
     ],
     deps = [
         ":api",
+        ":descriptor_range",
         "//runtime/src/iree/async",
         "//runtime/src/iree/async/util:proactor_pool",
         "//runtime/src/iree/base",

@@ -33,6 +33,9 @@ typedef struct iree_hal_vulkan_descriptor_binding_t {
 
   // Vulkan descriptor type expected at the slot.
   VkDescriptorType descriptor_type;
+
+  // Bytes the shader accesses at a time: 1, 2 or 4.
+  uint32_t minimum_access_bytes;
 } iree_hal_vulkan_descriptor_binding_t;
 
 // Hidden push-constant root for BDA dispatch ABI version 1.
@@ -63,6 +66,9 @@ typedef struct iree_hal_vulkan_bda_binding_requirement_t {
 
   // Minimum buffer range byte length required by the shader.
   uint64_t minimum_length;
+
+  // Physical access unit, including accesses to emulated narrow storage.
+  uint32_t minimum_access_bytes;
 } iree_hal_vulkan_bda_binding_requirement_t;
 
 // Prepared Vulkan compute pipeline and HAL export metadata.

@@ -14,14 +14,23 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Reads a iree_flatbuffer_file_header_t from |executable_data| and returns the
-// contained flatbuffer data range in |out_flatbuffer_data|. If the total size
-// of the executable data is unavailable the |unsafe_infer_size| flag allows for
-// parsing without validation of file extents and the returned flatbuffer data
-// will be sized to the range of valid bytes.
+// Reads an iree_flatbuffer_file_header_t from |executable_data| and returns the
+// contained flatbuffer data range in |out_flatbuffer_data|. The result borrows
+// |executable_data|'s storage. Accepts only payload version 0.
+//
+// If the total executable size is unavailable, |unsafe_infer_size| permits
+// parsing without validating file extents. The caller must ensure that the
+// header and its declared content are readable.
 iree_status_t iree_hal_read_executable_flatbuffer_header(
     iree_const_byte_span_t executable_data, bool unsafe_infer_size,
     const char file_identifier[4], iree_const_byte_span_t* out_flatbuffer_data);
+
+// As above, accepting payload versions from 0 through |max_supported_version|.
+// Callers must implement every accepted version's payload contracts.
+iree_status_t iree_hal_read_executable_flatbuffer_header_versioned(
+    iree_const_byte_span_t executable_data, bool unsafe_infer_size,
+    const char file_identifier[4], uint32_t max_supported_version,
+    iree_const_byte_span_t* out_flatbuffer_data);
 
 #ifdef __cplusplus
 }  // extern "C"
