@@ -9,6 +9,7 @@
 #include "compiler/plugins/input/StableHLO/Conversion/MapStableHLOToScalarOp.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Rewriters.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -23,6 +24,11 @@ namespace mlir::iree_compiler::stablehlo {
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h.inc"
 
 namespace {
+
+static bool hasExplicitIntegerSignedness(Type type) {
+  auto integerType = dyn_cast<IntegerType>(getElementTypeOrSelf(type));
+  return integerType && !integerType.isSignless();
+}
 
 // We assume that if one of the operands is a FromElements operation that means
 // it is a shape computation.
@@ -57,6 +63,12 @@ struct HloElementwiseConverter : OpRewritePattern<OpTy> {
     auto resultType = dyn_cast<RankedTensorType>(op.getType());
     if (!resultType || !resultType.hasStaticShape()) {
       return rewriter.notifyMatchFailure(op, "requires a static result shape");
+    }
+    // Arith scalar operations require signless integers. The ordinary tensor
+    // conversion also converts types, so let it handle explicit signedness.
+    if (hasExplicitIntegerSignedness(resultType) ||
+        llvm::any_of(op->getOperandTypes(), hasExplicitIntegerSignedness)) {
+      return rewriter.notifyMatchFailure(op, "requires signless integers");
     }
 
     Location loc = op.getLoc();
