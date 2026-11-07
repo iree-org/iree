@@ -288,3 +288,68 @@ func.func @collapse_wrapping_product_of_possibly_empty(%a: tensor<?x?x?xf32>, %b
   %r = stablehlo.dynamic_reshape %a, %shape : (tensor<?x?x?xf32>, tensor<2xi32>) -> tensor<?x?xf32>
   return %r : tensor<?x?xf32>
 }
+
+// -----
+
+// Shape expressions may use wider integer intermediates before narrowing to
+// i64. A constant outside the proof's signed 64-bit domain must leave the generic
+// reshape intact, including when compiler assertions are enabled.
+// CHECK-LABEL: @negative_collapse_wide_constant
+// CHECK: tensor.reshape
+// CHECK-NOT: tensor.collapse_shape
+// FLOW-LABEL: util.func public @negative_collapse_wide_constant
+func.func @negative_collapse_wide_constant(%a: tensor<?x?x?xf32>, %wide: i128) -> tensor<?x?xf32> {
+  %c2 = arith.constant 2 : index
+  %large = arith.constant 1267650600228229401496703205377 : i128
+  %sum = arith.addi %wide, %large : i128
+  %size = arith.trunci %sum : i128 to i64
+  %d = tensor.dim %a, %c2 : tensor<?x?x?xf32>
+  %di = arith.index_cast %d : index to i64
+  %shape = tensor.from_elements %size, %di : tensor<2xi64>
+  %result = stablehlo.dynamic_reshape %a, %shape : (tensor<?x?x?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  return %result : tensor<?x?xf32>
+}
+
+// -----
+
+// A wide-typed constant that fits in the proof domain still permits grouping.
+// CHECK-LABEL: @collapse_wide_typed_factor
+// CHECK: tensor.collapse_shape %{{.+}} {{\[}}[0, 1, 2], [3]]
+// CHECK-NOT: tensor.reshape
+// FLOW-LABEL: util.func public @collapse_wide_typed_factor
+func.func @collapse_wide_typed_factor(%a: tensor<2x?x?x?xf32>) -> tensor<?x?xf32> {
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %two = arith.constant 2 : i128
+  %d1 = tensor.dim %a, %c1 : tensor<2x?x?x?xf32>
+  %d2 = tensor.dim %a, %c2 : tensor<2x?x?x?xf32>
+  %d3 = tensor.dim %a, %c3 : tensor<2x?x?x?xf32>
+  %product = arith.muli %d1, %d2 : index
+  %wide = arith.index_cast %product : index to i128
+  %scaled = arith.muli %wide, %two : i128
+  %size = arith.trunci %scaled : i128 to i64
+  %last = arith.index_cast %d3 : index to i64
+  %shape = tensor.from_elements %size, %last : tensor<2xi64>
+  %result = stablehlo.dynamic_reshape %a, %shape : (tensor<2x?x?x?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  return %result : tensor<?x?xf32>
+}
+
+// -----
+
+// An out-of-bounds tensor.extract has undefined behaviour when executed, but is
+// verifier-valid. The optional proof must leave it and the generic reshape
+// intact instead of indexing the tensor.from_elements operands out of bounds.
+// CHECK-LABEL: @negative_collapse_extract_index
+// CHECK: tensor.extract
+// CHECK: tensor.reshape
+// CHECK-NOT: tensor.collapse_shape
+// FLOW-LABEL: util.func public @negative_collapse_extract_index
+func.func @negative_collapse_extract_index(%a: tensor<?x?x?xf32>, %s0: i64, %s1: i64) -> tensor<?x?xf32> {
+  %negative = arith.constant -1 : index
+  %sizes = tensor.from_elements %s0, %s1 : tensor<2xi64>
+  %bad = tensor.extract %sizes[%negative] : tensor<2xi64>
+  %shape = tensor.from_elements %bad, %s1 : tensor<2xi64>
+  %result = stablehlo.dynamic_reshape %a, %shape : (tensor<?x?x?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  return %result : tensor<?x?xf32>
+}
