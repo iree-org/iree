@@ -170,7 +170,7 @@ util.func public @denseTensorFillF32(%arg0: f32, %arg1: !stream.resource<*>, %ar
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 0 : index
-  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 20 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 4 : index
   // CHECK-DAG: %[[PATTERN:.+]] = arith.bitcast %arg0 : f32 to i32
   // CHECK: %[[RESULT:.+]] = stream.async.fill %[[PATTERN]], %arg1[%[[OFFSET]] to %[[LENGTH]] for %[[LENGTH]]] : i32 -> %arg1 as !stream.resource<*>{%arg3}
   %result = stream.tensor.fill %arg0, %arg1[%c0, %c0 for %c1, %c1] : f32 -> tensor<?x4xf32>{%arg2} in %arg1 as !stream.resource<*>{%arg3}
@@ -185,7 +185,7 @@ util.func public @denseTensorFillI64(%arg0: i64, %arg1: !stream.resource<*>, %ar
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 0 : index
-  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 40 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 8 : index
   // CHECK: %[[RESULT:.+]] = stream.async.fill %arg0, %arg1[%[[OFFSET]] to %[[LENGTH]] for %[[LENGTH]]] : i64 -> %arg1 as !stream.resource<*>{%arg3}
   %result = stream.tensor.fill %arg0, %arg1[%c0, %c0 for %c1, %c1] : i64 -> tensor<?x4xi64>{%arg2} in %arg1 as !stream.resource<*>{%arg3}
   // CHECK: util.return %[[RESULT]]
@@ -199,10 +199,73 @@ util.func public @denseTensorFillF64(%arg0: f64, %arg1: !stream.resource<*>, %ar
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 0 : index
-  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 40 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 8 : index
   // CHECK-DAG: %[[PATTERN:.+]] = arith.bitcast %arg0 : f64 to i64
   // CHECK: %[[RESULT:.+]] = stream.async.fill %[[PATTERN]], %arg1[%[[OFFSET]] to %[[LENGTH]] for %[[LENGTH]]] : i64 -> %arg1 as !stream.resource<*>{%arg3}
   %result = stream.tensor.fill %arg0, %arg1[%c0, %c0 for %c1, %c1] : f64 -> tensor<?x4xi64>{%arg2} in %arg1 as !stream.resource<*>{%arg3}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// The last scalar occupies four bytes regardless of the target strides.
+// CHECK-LABEL: @denseTensorFillLastElement
+util.func public @denseTensorFillLastElement(%arg0: !stream.resource<*>, %arg1: i32) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c257 = arith.constant 257 : index
+  %c1032 = arith.constant 1032 : index
+  // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 1028 : index
+  // CHECK-DAG: %[[END:.+]] = arith.constant 1032 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 4 : index
+  // CHECK: %[[RESULT:.+]] = stream.async.fill %arg1, %arg0[%[[OFFSET]] to %[[END]] for %[[LENGTH]]] : i32 -> %arg0 as !stream.resource<*>{%[[END]]}
+  %result = stream.tensor.fill %arg1, %arg0[%c0, %c257, %c0 for %c1, %c1, %c1] : i32 -> tensor<1x258x1xi32> in %arg0 as !stream.resource<*>{%c1032}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// A contiguous row range has the product of its lengths, including dynamic ones.
+// CHECK-LABEL: @denseTensorFillDynamicRows
+util.func public @denseTensorFillDynamicRows(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %arg3: index, %arg4: i32) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  // CHECK-DAG: %[[ZERO:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[ELEMENT_BYTES:.+]] = arith.constant 4 : index
+  // CHECK: %[[ROW_ELEMENTS:.+]] = arith.muli %arg3, %[[ELEMENT_BYTES]] : index
+  // CHECK: %[[LENGTH:.+]] = arith.muli %[[ROW_ELEMENTS]], %[[ELEMENT_BYTES]] : index
+  // CHECK: %[[RESULT:.+]] = stream.async.fill %arg4, %arg0[%[[ZERO]] to %[[LENGTH]] for %[[LENGTH]]]
+  %result = stream.tensor.fill %arg4, %arg0[%c0, %c0 for %arg3, %c4] : i32 -> tensor<?x4xi32>{%arg2} in %arg0 as !stream.resource<*>{%arg1}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// A zero extent fills no bytes, even when other lengths are nonzero.
+// CHECK-LABEL: @denseTensorFillEmpty
+util.func public @denseTensorFillEmpty(%arg0: !stream.resource<*>, %arg1: i32) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c32 = arith.constant 32 : index
+  // CHECK: %[[ZERO:.+]] = arith.constant 0 : index
+  // CHECK: %[[RESULT:.+]] = stream.async.fill %arg1, %arg0[%[[ZERO]] to %[[ZERO]] for %[[ZERO]]]
+  // CHECK: util.return %[[RESULT]]
+  %result = stream.tensor.fill %arg1, %arg0[%c0, %c0 for %c0, %c4] : i32 -> tensor<2x4xi32> in %arg0 as !stream.resource<*>{%c32}
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// A rank-zero tensor contains one element.
+// CHECK-LABEL: @denseTensorFillScalar
+util.func public @denseTensorFillScalar(%arg0: !stream.resource<*>, %arg1: index, %arg2: i32) -> !stream.resource<*> {
+  // CHECK-DAG: %[[ZERO:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 4 : index
+  // CHECK: %[[RESULT:.+]] = stream.async.fill %arg2, %arg0[%[[ZERO]] to %[[LENGTH]] for %[[LENGTH]]]
+  %result = stream.tensor.fill %arg2, %arg0 : i32 -> tensor<i32> in %arg0 as !stream.resource<*>{%arg1}
   // CHECK: util.return %[[RESULT]]
   util.return %result : !stream.resource<*>
 }
