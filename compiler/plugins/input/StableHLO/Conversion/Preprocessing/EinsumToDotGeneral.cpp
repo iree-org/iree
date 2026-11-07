@@ -6,8 +6,13 @@
 
 // Implements logic for lowering StableHLO einsum op to dot_general ops.
 
+#include <optional>
+
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/StringExtras.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/StablehloOps.h"
@@ -19,138 +24,146 @@ namespace mlir::iree_compiler::stablehlo {
 
 namespace {
 
+struct EinsumLabels {
+  StringRef lhs;
+  StringRef rhs;
+  StringRef result;
+};
+
+// DotGeneral represents each label once per operand. Diagonals and ellipses
+// remain einsums for the generic lowering.
+static bool hasUniqueEinsumLabels(StringRef labels) {
+  llvm::SmallSet<char, 8> seen;
+  return llvm::all_of(labels, [&seen](char label) {
+    return llvm::isAlpha(label) && seen.insert(label).second;
+  });
+}
+
+static std::optional<EinsumLabels> getEinsumLabels(StringRef equation) {
+  auto arrow = equation.find("->");
+  if (arrow == StringRef::npos ||
+      equation.drop_front(arrow + 2).contains("->")) {
+    return std::nullopt;
+  }
+  StringRef operands = equation.take_front(arrow);
+  if (operands.count(',') != 1) {
+    return std::nullopt;
+  }
+  auto [lhs, rhs] = operands.split(',');
+  StringRef result = equation.drop_front(arrow + 2);
+  if (!hasUniqueEinsumLabels(lhs) || !hasUniqueEinsumLabels(rhs) ||
+      !hasUniqueEinsumLabels(result)) {
+    return std::nullopt;
+  }
+  return EinsumLabels{lhs, rhs, result};
+}
+
+struct EinsumDotDimensions {
+  SmallVector<int64_t> lhsContracting, rhsContracting;
+  SmallVector<int64_t> lhsBatching, rhsBatching;
+  SmallVector<char> resultLabels;
+};
+
+// Pair shared labels by name, preserving the lhs order on both operands.
+// Independent reductions cannot be represented by DotGeneral.
+static std::optional<EinsumDotDimensions>
+getEinsumDotDimensions(const EinsumLabels &labels) {
+  EinsumDotDimensions dimensions;
+  SmallVector<char> lhsFreeLabels;
+  for (auto [lhsDim, label] : llvm::enumerate(labels.lhs)) {
+    size_t rhsDim = labels.rhs.find(label);
+    bool inResult = labels.result.contains(label);
+    if (rhsDim == StringRef::npos) {
+      if (!inResult) {
+        return std::nullopt;
+      }
+      lhsFreeLabels.push_back(label);
+    } else if (inResult) {
+      dimensions.lhsBatching.push_back(lhsDim);
+      dimensions.rhsBatching.push_back(rhsDim);
+      dimensions.resultLabels.push_back(label);
+    } else {
+      dimensions.lhsContracting.push_back(lhsDim);
+      dimensions.rhsContracting.push_back(rhsDim);
+    }
+  }
+  llvm::append_range(dimensions.resultLabels, lhsFreeLabels);
+  for (char label : labels.rhs) {
+    if (labels.lhs.contains(label)) {
+      continue;
+    }
+    if (!labels.result.contains(label)) {
+      return std::nullopt;
+    }
+    dimensions.resultLabels.push_back(label);
+  }
+  return dimensions;
+}
+
 struct EinsumToDotGeneralPattern final
     : OpRewritePattern<mlir::stablehlo::EinsumOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::EinsumOp einsum,
                                 PatternRewriter &rewriter) const override {
-    StringRef equation = einsum.getEinsumConfig();
-    SmallVector<char> lhsTokens, rhsTokens;
-    SmallVector<char> resultTokens;
-    size_t index = 0;
-    enum EquationVariable { kIsLhs, kIsRhs, kIsResult };
-    EquationVariable currentVariable = kIsLhs;
-    while (index < equation.size()) {
-      if (std::isalpha(equation[index])) {
-        if (currentVariable == kIsLhs) {
-          lhsTokens.push_back(equation[index]);
-        } else if (currentVariable == kIsRhs) {
-          rhsTokens.push_back(equation[index]);
-        } else {
-          resultTokens.push_back(equation[index]);
-        }
-      } else if (equation.substr(index, 1).contains(",")) {
-        currentVariable = kIsRhs;
-      } else if ((index < (equation.size() - 1)) &&
-                 (equation.substr(index, 2).contains("->"))) {
-        currentVariable = kIsResult;
-        ++index;
-      } else {
-        return einsum.emitError("unexpected character ")
-               << equation.substr(index, 1) << " encountered";
-      }
-      ++index;
-    }
-
-    auto lhsType = cast<RankedTensorType>(einsum.getLhs().getType());
-    auto rhsType = cast<RankedTensorType>(einsum.getRhs().getType());
-    assert(static_cast<int64_t>(lhsTokens.size()) == lhsType.getRank());
-    assert(static_cast<int64_t>(rhsTokens.size()) == rhsType.getRank());
-
-    auto collectOperandDims =
-        [resultTokens](
-            RankedTensorType operandType, SmallVector<char> operandTokens,
-            SmallVector<char> others, SmallVectorImpl<int64_t> &contractingDims,
-            SmallVectorImpl<int64_t> &batchingDims,
-            SmallVector<char> &dotResultTokens,
-            SmallVector<int64_t> &dotResultShape) {
-          llvm::SmallDenseSet<char> othersSet(others.begin(), others.end());
-          llvm::SmallDenseSet<char> resultTokensSet(resultTokens.begin(),
-                                                    resultTokens.end());
-          for (auto [idx, token] : llvm::enumerate(operandTokens)) {
-            bool isResultToken = resultTokensSet.contains(token);
-            bool isOtherToken = othersSet.contains(token);
-
-            if (!isResultToken) {
-              contractingDims.push_back(idx);
-            } else if (isOtherToken) {
-              batchingDims.push_back(idx);
-            } else {
-              dotResultTokens.push_back(token);
-              dotResultShape.push_back(operandType.getShape()[idx]);
-            }
-          }
-        };
-    // Indices of batch and contracting dims, relative to each operand's
-    // dimensions.
-    SmallVector<int64_t> lhsContractingDims, lhsBatchingDims,
-        rhsContractingDims, rhsBatchingDims;
-    // Tokens representing the natural order of the dot_general op (i.e.
-    // the lhs non-contracting followed by rhs non-contracting tokens).
-    SmallVector<char> dotResultTokens;
-    SmallVector<int64_t> dotResultShape;
-
-    collectOperandDims(lhsType, lhsTokens, rhsTokens, lhsContractingDims,
-                       lhsBatchingDims, dotResultTokens, dotResultShape);
-    collectOperandDims(rhsType, rhsTokens, lhsTokens, rhsContractingDims,
-                       rhsBatchingDims, dotResultTokens, dotResultShape);
-
-    // Prepend batch tokens.
-    for (auto [idx, dim] : llvm::enumerate(lhsBatchingDims)) {
-      char batchingToken = lhsTokens[dim];
-      int64_t batchingShapeDim = lhsType.getShape()[dim];
-      dotResultTokens.insert(dotResultTokens.begin() + idx, batchingToken);
-      dotResultShape.insert(dotResultShape.begin() + idx, batchingShapeDim);
-    }
-
-    // Lowering to dot_general does not support a mismatch between the number
-    // of result dims and the number of non-contracting dims.
-    if (dotResultTokens.size() != resultTokens.size()) {
+    auto labels = getEinsumLabels(einsum.getEinsumConfig());
+    if (!labels) {
       return rewriter.notifyMatchFailure(einsum,
-                                         "rank reducing einsum not supported");
+                                         "requires unique explicit labels");
+    }
+    auto lhsType = dyn_cast<RankedTensorType>(einsum.getLhs().getType());
+    auto rhsType = dyn_cast<RankedTensorType>(einsum.getRhs().getType());
+    auto resultType = dyn_cast<RankedTensorType>(einsum.getType());
+    if (!lhsType || !rhsType || !resultType ||
+        static_cast<int64_t>(labels->lhs.size()) != lhsType.getRank() ||
+        static_cast<int64_t>(labels->rhs.size()) != rhsType.getRank() ||
+        static_cast<int64_t>(labels->result.size()) != resultType.getRank()) {
+      return rewriter.notifyMatchFailure(
+          einsum, "label counts must match tensor ranks");
+    }
+    // Bounds are removed before pipeline preprocessing. A standalone rewrite
+    // must not permute an encoding without updating its per-axis information.
+    if (lhsType.getEncoding() || rhsType.getEncoding() ||
+        resultType.getEncoding()) {
+      return rewriter.notifyMatchFailure(einsum,
+                                         "requires tensors without encodings");
+    }
+    auto dimensions = getEinsumDotDimensions(*labels);
+    if (!dimensions ||
+        dimensions->resultLabels.size() != labels->result.size()) {
+      return rewriter.notifyMatchFailure(einsum,
+                                         "independent reduction unsupported");
     }
 
-    // Generate a permutation sequence based on result tokens.
     SmallVector<int64_t> resultPerms;
-    bool isNaturalOrder = true;
-    for (char resultToken : resultTokens) {
-      auto foundIt = std::find(dotResultTokens.begin(), dotResultTokens.end(),
-                               resultToken);
-      if (foundIt == dotResultTokens.end()) {
+    SmallVector<int64_t> dotResultShape(resultType.getRank());
+    for (auto [resultDim, label] : llvm::enumerate(labels->result)) {
+      auto position = llvm::find(dimensions->resultLabels, label);
+      if (position == dimensions->resultLabels.end()) {
         return rewriter.notifyMatchFailure(
-            einsum, "result token not found in operands");
+            einsum, "result label not found in operands");
       }
-      auto resultIndex = std::distance(dotResultTokens.begin(), foundIt);
-      if (resultPerms.empty()) {
-        if (resultIndex != 0) {
-          isNaturalOrder = false;
-        }
-      } else if (resultIndex != (resultPerms.back() + 1)) {
-        isNaturalOrder = false;
-      }
-      resultPerms.push_back(resultIndex);
+      int64_t dotDim =
+          std::distance(dimensions->resultLabels.begin(), position);
+      resultPerms.push_back(dotDim);
+      // Preserve the declared result precision, including dynamic dimensions.
+      dotResultShape[dotDim] = resultType.getDimSize(resultDim);
     }
-
-    // Emit the dot_general, using its native result ordering.
-    auto dotGeneralResultType = RankedTensorType::get(
-        ArrayRef<int64_t>(dotResultShape), lhsType.getElementType());
+    auto dotResultType =
+        RankedTensorType::get(dotResultShape, resultType.getElementType());
     auto dimNumbers = mlir::stablehlo::DotDimensionNumbersAttr::get(
-        rewriter.getContext(), lhsBatchingDims, rhsBatchingDims,
-        lhsContractingDims, rhsContractingDims);
-    auto dotGeneralOp = mlir::stablehlo::DotGeneralOp::create(
-        rewriter, einsum.getLoc(), dotGeneralResultType, einsum.getLhs(),
-        einsum.getRhs(), dimNumbers,
-        /*precision_config=*/ArrayAttr{}, mlir::stablehlo::DotAlgorithmAttr{});
-
-    if (isNaturalOrder) {
-      // The dot_general is already in an appropriate result order.
-      rewriter.replaceOp(einsum, ValueRange{dotGeneralOp});
-    } else {
-      // Generate a transpose.
-      rewriter.replaceOpWithNewOp<mlir::stablehlo::TransposeOp>(
-          einsum, dotGeneralOp, rewriter.getDenseI64ArrayAttr(resultPerms));
+        rewriter.getContext(), dimensions->lhsBatching, dimensions->rhsBatching,
+        dimensions->lhsContracting, dimensions->rhsContracting);
+    auto dotGeneral = mlir::stablehlo::DotGeneralOp::create(
+        rewriter, einsum.getLoc(), dotResultType, einsum.getLhs(),
+        einsum.getRhs(), dimNumbers, /*precision_config=*/ArrayAttr{},
+        mlir::stablehlo::DotAlgorithmAttr{});
+    if (llvm::equal(resultPerms, llvm::seq<int64_t>(resultType.getRank()))) {
+      rewriter.replaceOp(einsum, dotGeneral.getResult());
+      return success();
     }
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::TransposeOp>(
+        einsum, dotGeneral, rewriter.getDenseI64ArrayAttr(resultPerms));
     return success();
   }
 };
