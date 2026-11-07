@@ -212,6 +212,48 @@ func.func @scatter_i64_out_of_range_index() {
   return
 }
 
+// Preserve this private-call boundary until the preprocessing range proof.
+func.func private @scatter_bool_range_overwrite(%flag: tensor<i1>, %operand: tensor<2xi32>, %updates: tensor<2xi32>) -> tensor<2xi32> {
+  %one = stablehlo.constant dense<1> : tensor<i32>
+  %converted = stablehlo.convert %flag : (tensor<i1>) -> tensor<i32>
+  %start = stablehlo.add %converted, %one : tensor<i32>
+  %indices = stablehlo.reshape %start : (tensor<i32>) -> tensor<1xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    stablehlo.return %update : tensor<i32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 0>, indices_are_sorted = false, unique_indices = true} : (tensor<2xi32>, tensor<1xi32>, tensor<2xi32>) -> tensor<2xi32>
+  return %result : tensor<2xi32>
+}
+func.func @scatter_bool_range_overwrite_out_of_bounds() {
+  %flag = stablehlo.constant dense<true> : tensor<i1>
+  %operand = util.unfoldable_constant dense<[1, 2]> : tensor<2xi32>
+  %updates = util.unfoldable_constant dense<[9, 9]> : tensor<2xi32>
+  %result = call @scatter_bool_range_overwrite(%flag, %operand, %updates) : (tensor<i1>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
+  check.expect_eq_const(%result, dense<[1, 2]> : tensor<2xi32>) : tensor<2xi32>
+  return
+}
+
+func.func private @scatter_int_bool_range_overwrite(%flag: tensor<i32>, %operand: tensor<2xi32>, %updates: tensor<2xi32>) -> tensor<2xi32> {
+  %one = stablehlo.constant dense<1> : tensor<i32>
+  %predicate = stablehlo.convert %flag : (tensor<i32>) -> tensor<i1>
+  %converted = stablehlo.convert %predicate : (tensor<i1>) -> tensor<i32>
+  %start = stablehlo.add %converted, %one : tensor<i32>
+  %indices = stablehlo.reshape %start : (tensor<i32>) -> tensor<1xi32>
+  %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    stablehlo.return %update : tensor<i32>
+  }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 0>, indices_are_sorted = false, unique_indices = true} : (tensor<2xi32>, tensor<1xi32>, tensor<2xi32>) -> tensor<2xi32>
+  return %result : tensor<2xi32>
+}
+func.func @scatter_int_bool_range_overwrite_out_of_bounds() {
+  %flag = stablehlo.constant dense<-1> : tensor<i32>
+  %operand = util.unfoldable_constant dense<[1, 2]> : tensor<2xi32>
+  %updates = util.unfoldable_constant dense<[9, 9]> : tensor<2xi32>
+  %result = call @scatter_int_bool_range_overwrite(%flag, %operand, %updates) : (tensor<i32>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
+  check.expect_eq_const(%result, dense<[1, 2]> : tensor<2xi32>) : tensor<2xi32>
+  return
+}
+
 func.func @scatter_window_runtime_start_in_bounds() {
   %operand = util.unfoldable_constant dense<0> : tensor<4x6xi32>
   %indices = util.unfoldable_constant dense<[2]> : tensor<1xi32>
