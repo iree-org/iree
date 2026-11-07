@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/WGSL/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -46,6 +47,11 @@ class WebGPUTargetDevice final : public TargetDevice {
 public:
   WebGPUTargetDevice(const WebGPUSPIRVOptions & /*options*/) {}
 
+  std::optional<ResourceAccessRequirements>
+  getResourceAccessRequirements(DeviceTargetAttr) const final {
+    return ResourceAccessRequirements{1, 4, 4};
+  }
+
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const final {
@@ -59,8 +65,10 @@ public:
         ->getDefaultExecutableTargets(context, "webgpu", configAttr,
                                       executableTargetAttrs);
 
-    return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("webgpu"),
-                                            configAttr, executableTargetAttrs);
+    return buildDeviceTargetWithRequiredResourceAccess(
+        IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("webgpu"),
+                                         configAttr, executableTargetAttrs),
+        targetRegistry);
   }
 };
 
@@ -70,6 +78,14 @@ public:
       : options(options) {}
 
   std::string getLegacyDefaultDeviceID() const final { return "webgpu"; }
+
+  std::optional<ResourceAccessRequirements>
+  getResourceAccessRequirements(ExecutableTargetAttr target) const final {
+    return ResourceAccessRequirements{
+        getSPIRVNarrowStorageAccessGranularity(
+            getGPUTargetAttr(target.getContext(), target)),
+        1, 1};
+  }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,

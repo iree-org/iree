@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // Vulkan BDA-specific validation coverage. These cases assert failures at the
-// HAL boundary before malformed pointer tables can reach the device.
+// HAL boundary, and that unused empty ranges can reach a no-op shader safely.
 
 #include <cstdint>
 #include <cstring>
@@ -27,8 +27,8 @@ static constexpr uint32_t kBdaDispatchRootLength = 32;
 static constexpr uint32_t kComputeShaderStageFlag = 0x00000020u;
 
 // Descriptor-free BDA-environment no-op shader. The shader does not need to
-// consume bindings because these tests fail while publishing the host-validated
-// BDA table.
+// consume bindings. It exercises host-side range requirements and unused empty
+// bindings without accessing the published addresses.
 static const uint32_t kBdaNoopSpirv[] = {
     0x07230203u,
     0x00010600u,
@@ -107,9 +107,11 @@ static iree_status_t MakeBdaRequirementExecutableData(
   if (iree_status_is_ok(status)) {
     iree_hal_vulkan_BdaBindingDef_ref_t binding_requirements[2] = {
         iree_hal_vulkan_BdaBindingDef_create(&builder, /*minimum_alignment=*/1,
-                                             kRequiredBindingLength),
+                                             kRequiredBindingLength,
+                                             /*minimum_access_bytes=*/1),
         iree_hal_vulkan_BdaBindingDef_create(
-            &builder, kRequiredBindingAlignment, /*minimum_length=*/0),
+            &builder, kRequiredBindingAlignment, /*minimum_length=*/0,
+            /*minimum_access_bytes=*/1),
     };
     bda_bindings_ref = iree_hal_vulkan_BdaBindingDef_vec_create(
         &builder, binding_requirements, IREE_ARRAYSIZE(binding_requirements));
@@ -382,72 +384,52 @@ TEST_P(BdaDispatchValidationTest,
   iree_hal_buffer_release(input_buffer);
 }
 
-TEST_P(BdaDispatchValidationTest, QueueDispatchRejectsEmptyBindingRange) {
-  iree_hal_buffer_t* input_buffer = nullptr;
-  iree_hal_buffer_t* output_buffer = nullptr;
-  IREE_ASSERT_OK(CreateInputOutputBuffers(&input_buffer, &output_buffer));
-
-  iree_hal_buffer_ref_t binding_refs[2] = {
-      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
-                               iree_hal_buffer_byte_length(input_buffer)),
-      iree_hal_make_buffer_ref(output_buffer, /*offset=*/0, /*length=*/0),
+// A no-op may bind an empty range. The input still satisfies its declared
+// nonzero minimum length; the empty output is never dereferenced by the shader.
+TEST_P(BdaDispatchValidationTest, QueueDispatchAcceptsUnusedEmptyBindingRange) {
+  Ref<iree_hal_buffer_t> input;
+  Ref<iree_hal_buffer_t> output;
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kRequiredBindingLength, input.out()));
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(4, output.out()));
+  iree_hal_buffer_ref_t refs[] = {
+      iree_hal_make_buffer_ref(input, 0, kRequiredBindingLength),
+      iree_hal_make_buffer_ref(output, 0, 0),
   };
-  const iree_hal_buffer_ref_list_t bindings = {
-      /*.count=*/IREE_ARRAYSIZE(binding_refs),
-      /*.values=*/binding_refs,
-  };
-
-  EXPECT_THAT(
-      Status(iree_hal_device_queue_dispatch(
-          device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
-          iree_hal_semaphore_list_empty(), executable_,
-          iree_hal_executable_function_from_index(0),
-          iree_hal_make_static_dispatch_config(1, 1, 1), constants(), bindings,
-          IREE_HAL_DISPATCH_FLAG_NONE)),
-      StatusIs(StatusCode::kInvalidArgument));
-
-  iree_hal_buffer_release(output_buffer);
-  iree_hal_buffer_release(input_buffer);
+  iree_hal_buffer_ref_list_t bindings = {IREE_ARRAYSIZE(refs), refs};
+  SemaphoreList signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
+      signal, requirement_executable_,
+      iree_hal_executable_function_from_index(0),
+      iree_hal_make_static_dispatch_config(1, 1, 1),
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(signal, iree_infinite_timeout(),
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
 }
 
-TEST_P(BdaDispatchValidationTest,
-       CommandBufferExecuteRejectsEmptyBindingRange) {
-  iree_hal_buffer_t* input_buffer = nullptr;
-  iree_hal_buffer_t* output_buffer = nullptr;
-  IREE_ASSERT_OK(CreateInputOutputBuffers(&input_buffer, &output_buffer));
-
-  iree_hal_command_buffer_t* command_buffer = nullptr;
+TEST_P(BdaDispatchValidationTest, CommandBufferAcceptsUnusedEmptyBindingRange) {
+  Ref<iree_hal_buffer_t> input;
+  Ref<iree_hal_buffer_t> output;
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(kRequiredBindingLength, input.out()));
+  IREE_ASSERT_OK(CreateZeroedDeviceBuffer(4, output.out()));
+  Ref<iree_hal_command_buffer_t> commands;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-
-  iree_hal_buffer_ref_t binding_refs[2] = {
-      iree_hal_make_buffer_ref(input_buffer, /*offset=*/0,
-                               iree_hal_buffer_byte_length(input_buffer)),
-      iree_hal_make_buffer_ref(output_buffer, /*offset=*/0, /*length=*/0),
+      /*binding_capacity=*/0, commands.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(commands));
+  iree_hal_buffer_ref_t refs[] = {
+      iree_hal_make_buffer_ref(input, 0, kRequiredBindingLength),
+      iree_hal_make_buffer_ref(output, 0, 0),
   };
-  const iree_hal_buffer_ref_list_t bindings = {
-      /*.count=*/IREE_ARRAYSIZE(binding_refs),
-      /*.values=*/binding_refs,
-  };
+  iree_hal_buffer_ref_list_t bindings = {IREE_ARRAYSIZE(refs), refs};
   IREE_ASSERT_OK(iree_hal_command_buffer_dispatch(
-      command_buffer, executable_, iree_hal_executable_function_from_index(0),
-      iree_hal_make_static_dispatch_config(1, 1, 1), constants(), bindings,
-      IREE_HAL_DISPATCH_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
-
-  EXPECT_THAT(
-      Status(iree_hal_device_queue_execute(
-          device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
-          iree_hal_semaphore_list_empty(), command_buffer,
-          iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE)),
-      StatusIs(StatusCode::kInvalidArgument));
-
-  iree_hal_command_buffer_release(command_buffer);
-  iree_hal_buffer_release(output_buffer);
-  iree_hal_buffer_release(input_buffer);
+      commands, requirement_executable_,
+      iree_hal_executable_function_from_index(0),
+      iree_hal_make_static_dispatch_config(1, 1, 1),
+      iree_const_byte_span_empty(), bindings, IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(commands));
+  IREE_ASSERT_OK(SubmitCommandBufferAndWait(commands));
 }
 
 TEST_P(BdaDispatchValidationTest, QueueDispatchRejectsMinimumBindingLength) {

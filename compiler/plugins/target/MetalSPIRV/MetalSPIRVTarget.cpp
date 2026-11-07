@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -57,6 +58,11 @@ class MetalTargetDevice final : public TargetDevice {
 public:
   MetalTargetDevice(const MetalSPIRVOptions & /*options*/) {}
 
+  std::optional<ResourceAccessRequirements>
+  getResourceAccessRequirements(DeviceTargetAttr) const final {
+    return ResourceAccessRequirements{1, 4, 1};
+  }
+
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const final {
@@ -70,8 +76,10 @@ public:
         ->getDefaultExecutableTargets(context, "metal", configAttr,
                                       executableTargetAttrs);
 
-    return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("metal"),
-                                            configAttr, executableTargetAttrs);
+    return buildDeviceTargetWithRequiredResourceAccess(
+        IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("metal"),
+                                         configAttr, executableTargetAttrs),
+        targetRegistry);
   }
 };
 
@@ -81,6 +89,14 @@ public:
       : options(options) {}
 
   std::string getLegacyDefaultDeviceID() const final { return "metal"; }
+
+  std::optional<ResourceAccessRequirements>
+  getResourceAccessRequirements(ExecutableTargetAttr target) const final {
+    return ResourceAccessRequirements{
+        getSPIRVNarrowStorageAccessGranularity(
+            getGPUTargetAttr(target.getContext(), target)),
+        1, 1};
+  }
 
   void getDefaultExecutableTargets(
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,

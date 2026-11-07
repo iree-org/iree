@@ -1859,9 +1859,17 @@ static iree_status_t iree_hal_vulkan_allocator_allocate_buffer(
           iree_hal_buffer_byte_length(buffer) != byte_length) {
         iree_hal_buffer_t* allocation_buffer = buffer;
         buffer = NULL;
-        status = iree_hal_buffer_subspan(allocation_buffer, /*byte_offset=*/0,
-                                         byte_length, allocator->host_allocator,
-                                         &buffer);
+        // A Vulkan wrapper keeps the padding owned so descriptors can bind
+        // whole access units; sparse reservations stay generic subspans.
+        if (iree_hal_vulkan_buffer_isa(allocation_buffer)) {
+          status = iree_hal_vulkan_buffer_create_from_reservation(
+              allocation_buffer, byte_length, allocator->host_allocator,
+              &buffer);
+        } else {
+          status = iree_hal_buffer_subspan(allocation_buffer, /*byte_offset=*/0,
+                                           byte_length,
+                                           allocator->host_allocator, &buffer);
+        }
         iree_hal_buffer_release(allocation_buffer);
       }
     } else {

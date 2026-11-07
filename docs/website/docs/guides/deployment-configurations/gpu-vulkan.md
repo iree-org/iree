@@ -44,6 +44,18 @@ runtime default accepts all supported executable ABI variants and prefers BDA
 when available; descriptor executables remain the fallback for devices without
 BDA.
 
+Vulkan executables use a version 1 file header to carry physical storage access
+requirements. The runtime accepts versions 0 and 1; older runtimes that only
+accept version 0 reject new executables. Update the runtime when deploying
+newly compiled Vulkan executables.
+
+HAL integrations that bind buffers directly must reserve complete access units
+for emulated narrow storage. A whole allocation can use its reserved tail
+padding; a borrowed view or a binding inside a larger buffer owns only its
+declared range. Declare any padding in that range instead of relying on adjacent
+storage. An empty range is valid when the shader does not access it and its
+declared minimum length is zero.
+
 Other Vulkan features are enabled opportunistically when the implementation
 reports them:
 

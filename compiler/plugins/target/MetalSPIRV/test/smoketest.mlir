@@ -2,7 +2,7 @@
 
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"metal", [
+    #hal.device.target<"metal", {stream.min_access_granularity = 4 : i64, stream.min_fill_granularity = 4 : i64}, [
       #hal.executable.target<"metal-spirv", "metal-msl-fb", {
         iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.3,cap:Shader", wgp = <
           compute = fp32|int32, storage = b32, subgroup = none, subgroup_size_choices = [32],

@@ -2,7 +2,7 @@
 
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"vulkan", [
+    #hal.device.target<"vulkan", {stream.min_access_granularity = 4 : i64, stream.min_fill_granularity = 4 : i64}, [
       #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
         iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.3,cap:Shader", wgp = <
           compute = fp32|int32, storage = b32, subgroup = none, subgroup_size_choices = [32, 32],
@@ -46,7 +46,7 @@ stream.executable public @reduce_dispatch {
 
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"vulkan", [
+    #hal.device.target<"vulkan", {stream.min_access_granularity = 4 : i64, stream.min_fill_granularity = 4 : i64}, [
       #hal.executable.target<"vulkan-spirv", "vulkan-spirv-bda-v1", {
         iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.3,cap:Shader,cap:Int64,cap:PhysicalStorageBufferAddresses,ext:SPV_KHR_physical_storage_buffer", wgp = <
           compute = fp32|int64|int32, storage = b32, subgroup = none, subgroup_size_choices = [64, 64],

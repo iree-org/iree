@@ -25,8 +25,9 @@ flatbuffers_vec_ref_t createSourceFilesVec(int debugLevel,
                                            DictionaryAttr sourcesAttr,
                                            FlatbufferBuilder &fbb);
 
-// Creates one `iree.hal.debug.ExportDef` for every export and returns them in
-// the same order.
+// Creates one `iree.hal.debug.ExportDef` for every export, indexed by ordinal.
+// Ordinals must be unique and in [0, exportOps.size()). A single export may
+// omit its ordinal, in which case it is zero.
 //
 // |debugLevel| generally corresponds to the gcc-style levels 0-3:
 //   0: no debug information

@@ -123,6 +123,19 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    executable_header_test
+  SRCS
+    "executable_header_test.cc"
+  DEPS
+    ::executable_header
+    iree::base
+    iree::base::internal::flatcc::parsing
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 iree_cc_library(
   NAME
     elf_format

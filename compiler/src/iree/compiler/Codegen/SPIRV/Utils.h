@@ -22,6 +22,18 @@
 
 namespace mlir::iree_compiler {
 
+namespace IREE::GPU {
+class TargetAttr;
+}
+
+/// Returns whether f16 arithmetic, storage and integer bitcasts are native.
+/// A missing target does not establish native support.
+bool supportsNativeSPIRVF16(IREE::GPU::TargetAttr target);
+
+/// Returns the conservative byte unit for narrow storage in this pipeline.
+/// Software half values and unavailable byte storage can require whole words.
+int64_t getSPIRVNarrowStorageAccessGranularity(IREE::GPU::TargetAttr target);
+
 // Returns true if the given variant op uses SPIR-V CodeGen.
 bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp);
 

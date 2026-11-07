@@ -26,6 +26,7 @@ iree_cc_library(
     headers
   HDRS
     "api.h"
+    "buffer.h"
     "command_buffer.h"
     "debug_utils.h"
     "device_options.h"
@@ -70,6 +71,7 @@ iree_cc_test(
     iree::base
     iree::base::internal::arena
     iree::hal
+    iree::hal::local::transient_buffer
     iree::testing::gtest
     iree::testing::gtest_main
   GROUP
@@ -173,6 +175,19 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    descriptor_range
+  HDRS
+    "descriptor_range.h"
+  SRCS
+    "descriptor_range.c"
+  DEPS
+    iree::base
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     vulkan
   SRCS
     "allocator.c"
@@ -215,6 +230,7 @@ iree_cc_library(
     "syms.h"
   DEPS
     ::api
+    ::descriptor_range
     Vulkan::Headers
     iree::async
     iree::async::util::proactor_pool
