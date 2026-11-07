@@ -650,3 +650,71 @@ func.func @reinterpret_cast_lowering_dynamic_zero_offset() -> f32 {
 // CHECK-LABEL: func @reinterpret_cast_lowering_dynamic_zero_offset()
 //       CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:   memref.reinterpret_cast %{{.+}} to offset: [0], sizes: [], strides: [] : memref<?xf32> to memref<f32, strided<[]>>
+
+// -----
+
+#layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>
+// A rank-one identity layout still needs its binding offset carried into every
+// access. Offset 2 selects the second half; offset 4 selects the third.
+// CHECK-DAG: #[[$INPUT_MAP:.+]] = affine_map<()[s0] -> (s0 + 1)>
+// CHECK-DAG: #[[$OUTPUT_MAP:.+]] = affine_map<()[s0] -> (s0 + 2)>
+// CHECK-LABEL: func.func @rank_one_identity_binding_offsets
+// CHECK-SAME: (%[[INDEX:.+]]: index)
+// CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan {{.+}} binding(0) offset(%{{.+}}) : memref<17xf16>
+// CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan {{.+}} binding(1) offset(%{{.+}}) : memref<18xf16>
+// CHECK: %[[INPUT_INDEX:.+]] = affine.apply #[[$INPUT_MAP]]()[%[[INDEX]]]
+// CHECK: %[[VALUE:.+]] = memref.load %[[INPUT]][%[[INPUT_INDEX]]] : memref<17xf16>
+// CHECK: %[[OUTPUT_INDEX:.+]] = affine.apply #[[$OUTPUT_MAP]]()[%[[INDEX]]]
+// CHECK: memref.store %[[VALUE]], %[[OUTPUT]][%[[OUTPUT_INDEX]]] : memref<18xf16>
+// CHECK-NOT: unrealized_conversion_cast
+func.func @rank_one_identity_binding_offsets(%index: index) {
+  %two = arith.constant 2 : index
+  %four = arith.constant 4 : index
+  %in = hal.interface.binding.subspan layout(#layout) binding(0) offset(%two) : memref<16xf16>
+  %out = hal.interface.binding.subspan layout(#layout) binding(1) offset(%four) : memref<16xf16>
+  %value = memref.load %in[%index] : memref<16xf16>
+  memref.store %value, %out[%index] : memref<16xf16>
+  return
+}
+
+// -----
+
+#layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>
+// CHECK-LABEL: func.func @rank_zero_identity_binding_offsets
+// CHECK: %[[ONE:.+]] = arith.constant 1 : index
+// CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan {{.+}} binding(0) offset(%{{.+}}) : memref<2xf32>
+// CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan {{.+}} binding(1) offset(%{{.+}}) : memref<2xf32>
+// CHECK: %[[VALUE:.+]] = memref.load %[[INPUT]][%[[ONE]]] : memref<2xf32>
+// CHECK: memref.store %[[VALUE]], %[[OUTPUT]][%[[ONE]]] : memref<2xf32>
+// CHECK-NOT: unrealized_conversion_cast
+func.func @rank_zero_identity_binding_offsets() {
+  %four = arith.constant 4 : index
+  %in = hal.interface.binding.subspan layout(#layout) binding(0) offset(%four) : memref<f32>
+  %out = hal.interface.binding.subspan layout(#layout) binding(1) offset(%four) : memref<f32>
+  %value = memref.load %in[] : memref<f32>
+  memref.store %value, %out[] : memref<f32>
+  return
+}
+
+// -----
+
+#layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+// The static offset of a subview is relative to the original binding pointer.
+// After normalisation, both the binding and subview offsets must be retained.
+// CHECK-LABEL: func.func @binding_offset_through_views
+// CHECK: %[[FOUR:.+]] = arith.constant 4 : index
+// CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan {{.+}} offset(%{{.+}}) : memref<9xf16>
+// CHECK-NOT: memref.cast
+// CHECK-NOT: memref.assume_alignment
+// CHECK: %[[VALUE:.+]] = memref.load %[[INPUT]][%[[FOUR]]] : memref<9xf16>
+// CHECK: return %[[VALUE]] : f16
+func.func @binding_offset_through_views() -> f16 {
+  %two = arith.constant 2 : index
+  %zero = arith.constant 0 : index
+  %in = hal.interface.binding.subspan layout(#layout) binding(0) offset(%two) : memref<8xf16>
+  %aligned = memref.assume_alignment %in, 2 : memref<8xf16>
+  %view = memref.subview %aligned[3] [4] [1] : memref<8xf16> to memref<4xf16, strided<[1], offset: 3>>
+  %cast = memref.cast %view : memref<4xf16, strided<[1], offset: 3>> to memref<?xf16, strided<[1], offset: ?>>
+  %value = memref.load %cast[%zero] : memref<?xf16, strided<[1], offset: ?>>
+  return %value : f16
+}
