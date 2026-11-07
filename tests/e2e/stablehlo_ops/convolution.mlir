@@ -914,3 +914,64 @@ func.func @dynamic_conv_i8_padding_dilated() {
   check.expect_eq(%fixed, %expected) : tensor<1x258x1xf32>
   return
 }
+
+// Unsigned padding keeps its value, including the high bit of a narrow type.
+
+func.func @dynamic_conv_ui8_runtime_padding() {
+  %a = util.unfoldable_constant dense<[[[1.0], [2.0]]]> : tensor<1x2x1xf32>
+  %k = util.unfoldable_constant dense<1.0> : tensor<1x1x1xf32>
+  %bits = util.unfoldable_constant dense<[[-128, 0]]> : tensor<1x2xi8>
+  %p = stablehlo.convert %bits : (tensor<1x2xi8>) -> tensor<1x2xui8>
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>
+  } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xui8>) -> tensor<1x?x1xf32>
+  %zeros = arith.constant dense<0.0> : tensor<1x128x1xf32>
+  %tail = arith.constant dense<[[[1.0], [2.0]]]> : tensor<1x2x1xf32>
+  %expected = stablehlo.concatenate %zeros, %tail, dim = 1 : (tensor<1x128x1xf32>, tensor<1x2x1xf32>) -> tensor<1x130x1xf32>
+  %size = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%size, dense<130> : tensor<i32>) : tensor<i32>
+  %fixed = tensor.cast %r : tensor<1x?x1xf32> to tensor<1x130x1xf32>
+  check.expect_eq(%fixed, %expected) : tensor<1x130x1xf32>
+  return
+}
+
+func.func @dynamic_conv_ui8_constant_padding() {
+  %a = util.unfoldable_constant dense<[[[1.0], [2.0]]]> : tensor<1x2x1xf32>
+  %k = util.unfoldable_constant dense<1.0> : tensor<1x1x1xf32>
+  %p = stablehlo.constant dense<[[128, 0]]> : tensor<1x2xui8>
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>
+  } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xui8>) -> tensor<1x?x1xf32>
+  %zeros = arith.constant dense<0.0> : tensor<1x128x1xf32>
+  %tail = arith.constant dense<[[[1.0], [2.0]]]> : tensor<1x2x1xf32>
+  %expected = stablehlo.concatenate %zeros, %tail, dim = 1 : (tensor<1x128x1xf32>, tensor<1x2x1xf32>) -> tensor<1x130x1xf32>
+  %size = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%size, dense<130> : tensor<i32>) : tensor<i32>
+  %fixed = tensor.cast %r : tensor<1x?x1xf32> to tensor<1x130x1xf32>
+  check.expect_eq(%fixed, %expected) : tensor<1x130x1xf32>
+  return
+}
+
+func.func @dynamic_conv_ui64_runtime_padding() {
+  %a = util.unfoldable_constant dense<[[[1.0], [2.0]]]> : tensor<1x2x1xf32>
+  %k = util.unfoldable_constant dense<1.0> : tensor<1x1x1xf32>
+  %bits = util.unfoldable_constant dense<[[1, 0]]> : tensor<1x2xi64>
+  %p = stablehlo.convert %bits : (tensor<1x2xi64>) -> tensor<1x2xui64>
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>
+  } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xui64>) -> tensor<1x?x1xf32>
+  %zeros = arith.constant dense<0.0> : tensor<1x1x1xf32>
+  %tail = arith.constant dense<[[[1.0], [2.0]]]> : tensor<1x2x1xf32>
+  %expected = stablehlo.concatenate %zeros, %tail, dim = 1 : (tensor<1x1x1xf32>, tensor<1x2x1xf32>) -> tensor<1x3x1xf32>
+  %size = stablehlo.get_dimension_size %r, dim = 1 : (tensor<1x?x1xf32>) -> tensor<i32>
+  check.expect_eq_const(%size, dense<3> : tensor<i32>) : tensor<i32>
+  %fixed = tensor.cast %r : tensor<1x?x1xf32> to tensor<1x3x1xf32>
+  check.expect_eq(%fixed, %expected) : tensor<1x3x1xf32>
+  return
+}
