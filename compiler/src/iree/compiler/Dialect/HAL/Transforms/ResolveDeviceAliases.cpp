@@ -69,10 +69,14 @@ resolveAliasAttr(Operation *forOp, IREE::HAL::DeviceAliasAttr aliasAttr,
                       IntegerAttr::get(IndexType::get(forOp->getContext()),
                                        aliasAttr.getOrdinal().value()));
     }
-    defaultAttr = IREE::HAL::DeviceTargetAttr::get(
-        forOp->getContext(), defaultAttr.getDeviceID(),
+    defaultAttr = IREE::HAL::DeviceTargetAttr::getChecked(
+        [forOp] { return forOp->emitError(); }, forOp->getContext(),
+        defaultAttr.getDeviceID(),
         DictionaryAttr::get(forOp->getContext(), configAttrs),
         defaultAttr.getExecutableTargets());
+    if (!defaultAttr) {
+      return failure();
+    }
   }
 
   if (defaultAttr.getExecutableTargets().empty()) {

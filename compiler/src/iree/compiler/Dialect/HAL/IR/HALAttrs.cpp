@@ -8,12 +8,14 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Utils/StringUtils.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Parser/Parser.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
@@ -469,7 +471,34 @@ DeviceTargetAttr DeviceTargetAttr::get(MLIRContext *context,
 }
 
 // static
+LogicalResult
+DeviceTargetAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                         StringAttr, DictionaryAttr configuration,
+                         ArrayRef<ExecutableTargetAttr>) {
+  if (!configuration) {
+    return success();
+  }
+  for (StringRef name :
+       {"stream.min_access_granularity", "stream.min_fill_granularity",
+        "stream.min_copy_granularity"}) {
+    Attribute value = configuration.get(name);
+    if (!value) {
+      continue;
+    }
+    auto integerAttr = dyn_cast<IntegerAttr>(value);
+    if (!integerAttr || !integerAttr.getValue().isSignedIntN(64) ||
+        !integerAttr.getValue().isStrictlyPositive() ||
+        !integerAttr.getValue().isPowerOf2()) {
+      return emitError()
+             << name << " must be a positive power of two representable in i64";
+    }
+  }
+  return success();
+}
+
+// static
 Attribute DeviceTargetAttr::parse(AsmParser &p, Type type) {
+  SMLoc loc = p.getCurrentLocation();
   StringAttr deviceIDAttr;
   DictionaryAttr configAttr;
   SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
@@ -518,7 +547,8 @@ Attribute DeviceTargetAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseGreater())) {
     return {};
   }
-  return get(p.getContext(), deviceIDAttr, configAttr, executableTargetAttrs);
+  return p.getChecked<DeviceTargetAttr>(loc, p.getContext(), deviceIDAttr,
+                                        configAttr, executableTargetAttrs);
 }
 
 void DeviceTargetAttr::print(AsmPrinter &p) const {
@@ -906,6 +936,150 @@ void DeviceAffinityAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
+// Returns a set of target devices that may be active for the given
+// operation. This will recursively walk parent operations until one with
+// the `hal.device.targets` attribute is found.
+//
+// This is a legacy mechanism for performing the search. Newer code should use
+// affinities or !hal.device analysis instead.
+void gatherLegacyDeviceTargetAttrs(
+    Operation *op, SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
+  auto attrId = StringAttr::get(op->getContext(), "hal.device.targets");
+  while (op) {
+    auto targetsAttr = op->getAttrOfType<ArrayAttr>(attrId);
+    if (targetsAttr) {
+      for (auto elementAttr : targetsAttr) {
+        if (auto targetAttr =
+                dyn_cast<IREE::HAL::DeviceTargetAttr>(elementAttr)) {
+          resultSet.insert(targetAttr);
+        } else {
+          // HACK: this legacy approach is deprecated and only preserved for
+          // existing behavior. It's ok to get angry here as users should not be
+          // trying to use this pass prior to device materialization.
+          assert(false &&
+                 "legacy hal.device.targets only support hal.device.targets");
+        }
+      }
+      return;
+    }
+    op = op->getParentOp();
+  }
+  // No devices found; let caller decide what to do.
+}
+
+// Recursively resolves the referenced device into targets.
+void gatherDeviceTargetAttrs(
+    Attribute rootAttr, Operation *fromOp,
+    function_ref<IREE::Util::GlobalOpInterface(SymbolRefAttr)> lookupGlobal,
+    SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
+  SetVector<Attribute> worklist;
+  llvm::SmallDenseSet<Attribute> visited;
+  worklist.insert(rootAttr);
+  do {
+    auto attr = worklist.pop_back_val();
+    // Fallback globals may refer back to a device already considered.
+    if (!visited.insert(attr).second) {
+      continue;
+    }
+    if (!TypeSwitch<Attribute, bool>(attr)
+             .Case([&worklist, lookupGlobal](SymbolRefAttr symRefAttr) {
+               auto globalOp = lookupGlobal(symRefAttr);
+               if (!globalOp) {
+                 return false;
+               }
+               if (auto initialValueAttr = globalOp.getGlobalInitialValue()) {
+                 // Global with a device initialization value we can analyze.
+                 worklist.insert(initialValueAttr);
+                 return true;
+               } else {
+                 return false;
+               }
+             })
+             .Case([&resultSet](IREE::HAL::DeviceTargetAttr targetAttr) {
+               resultSet.insert(targetAttr);
+               return true;
+             })
+             .Case([&worklist](IREE::HAL::DeviceFallbackAttr fallbackAttr) {
+               worklist.insert(fallbackAttr.getName());
+               return true;
+             })
+             .Case([&worklist](IREE::HAL::DeviceSelectAttr selectAttr) {
+               worklist.insert(selectAttr.getDevices().begin(),
+                               selectAttr.getDevices().end());
+               return true;
+             })
+             .Default(false)) {
+      // No initial value means fall back to defaults. We do that by
+      // inserting all knowable targets.
+      gatherLegacyDeviceTargetAttrs(fromOp, resultSet);
+      return;
+    }
+  } while (!worklist.empty());
+}
+
+IREE::Stream::ResourceConfigAttr
+DeviceAffinityAttr::lookupResourceConfigAttr(Operation *fromOp) const {
+  auto globalOp =
+      SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
+          fromOp, getDevice());
+  if (!globalOp) {
+    return {};
+  }
+  SetVector<DeviceTargetAttr> targets;
+  gatherDeviceTargetAttrs(
+      getDevice(), fromOp,
+      [fromOp](SymbolRefAttr symRefAttr) {
+        return SymbolTable::lookupNearestSymbolFrom<
+            IREE::Util::GlobalOpInterface>(fromOp, symRefAttr);
+      },
+      targets);
+  // Every target the device may select must be served.
+  int64_t granularity = 1;
+  int64_t fillGranularity = 1;
+  int64_t copyGranularity = 1;
+  for (DeviceTargetAttr targetAttr : targets) {
+    if (DictionaryAttr config = targetAttr.getConfiguration()) {
+      if (auto attr =
+              config.getAs<IntegerAttr>("stream.min_access_granularity")) {
+        granularity = std::max(granularity, attr.getInt());
+      }
+      if (auto attr =
+              config.getAs<IntegerAttr>("stream.min_fill_granularity")) {
+        fillGranularity = std::max(fillGranularity, attr.getInt());
+      }
+      if (auto attr =
+              config.getAs<IntegerAttr>("stream.min_copy_granularity")) {
+        copyGranularity = std::max(copyGranularity, attr.getInt());
+      }
+    }
+  }
+  if (granularity == 1 && fillGranularity == 1 && copyGranularity == 1) {
+    return {};
+  }
+  // The targets add their units to the configuration that applies without
+  // them: the nearest explicit one, else the host defaults.
+  IREE::Stream::ResourceConfigAttr base;
+  for (Operation *op = fromOp; op && !base; op = op->getParentOp()) {
+    base =
+        op->getAttrOfType<IREE::Stream::ResourceConfigAttr>("stream.resources");
+  }
+  if (!base) {
+    base = IREE::Stream::ResourceConfigAttr::getDefaultHostConstraints(
+        getContext());
+  }
+  granularity = std::max(granularity, base.getMinAccessGranularity());
+  fillGranularity = std::max(fillGranularity, base.getMinFillGranularity());
+  copyGranularity = std::max(copyGranularity, base.getMinCopyGranularity());
+  int64_t unit = std::max({granularity, fillGranularity, copyGranularity});
+  return IREE::Stream::ResourceConfigAttr::get(
+      getContext(), base.getMaxAllocationSize(),
+      std::max(base.getMinBufferOffsetAlignment(), unit),
+      base.getMaxBufferRange(),
+      std::max(base.getMinBufferRangeAlignment(), unit), base.getIndexBits(),
+      base.getAliasMutableBindings(), base.getMemoryModel(), granularity,
+      fillGranularity, copyGranularity);
+}
+
 bool DeviceAffinityAttr::isExecutableWith(
     IREE::Stream::AffinityAttr other) const {
   if (!other) {
@@ -1181,6 +1355,17 @@ DeviceOptimalAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
     }
   }
   return success();
+}
+
+IREE::Stream::ResourceConfigAttr
+DeviceOptimalAttr::lookupResourceConfigAttr(Operation *fromOp) const {
+  // Any member may be selected at runtime, so all of their constraints hold.
+  IREE::Stream::ResourceConfigAttr result;
+  for (IREE::Stream::AffinityAttr affinityAttr : getAffinities()) {
+    result = IREE::Stream::ResourceConfigAttr::intersectBufferConstraints(
+        result, affinityAttr.lookupResourceConfigAttr(fromOp));
+  }
+  return result;
 }
 
 bool DeviceOptimalAttr::isExecutableWith(

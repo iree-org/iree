@@ -9,10 +9,16 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Stream/Transforms/Utils.h"
+#include "iree/compiler/Dialect/Util/Analysis/IntegerDivisibilityAnalysis.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
+#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
+#include "mlir/Analysis/DataFlowFramework.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -64,8 +70,58 @@ replaceUsesAndTransfer(Value oldValue, Value newValue,
   oldValue.replaceAllUsesWith(transferValue);
 }
 
+// Returns true when |value| is a resource the program allocated, which
+// allocation pads to Stream's alignment.
+static bool isOwnedAllocation(Value value) {
+  Value base = IREE::Util::TiedOpInterface::findTiedBaseValue(value);
+  return isa_and_present<IREE::Stream::AsyncAllocaOp,
+                         IREE::Stream::AsyncSplatOp,
+                         IREE::Stream::AsyncCloneOp>(base.getDefiningOp());
+}
+
+// Returns true when no subview lies between |value| and its base, so offsets
+// into |value| are offsets into the base.
+static bool isWholeResource(Value value) {
+  while (auto tiedOp = dyn_cast_if_present<IREE::Util::TiedOpInterface>(
+             value.getDefiningOp())) {
+    if (isa<IREE::Stream::ResourceSubviewOp>(tiedOp.getOperation())) {
+      return false;
+    }
+    Value tiedValue = tiedOp.getTiedResultOperand(value);
+    if (!tiedValue) {
+      break;
+    }
+    value = tiedValue;
+  }
+  return true;
+}
+
+// Returns true when writing |updateOp|'s update in place keeps the access
+// units it touches to itself: its offset and end are multiples of the
+// targets' access granularity, or its end closes an allocation it owns.
+static bool respectsAccessGranularity(IREE::Stream::AsyncUpdateOp updateOp,
+                                      DataFlowSolver *solver) {
+  int64_t granularity = IREE::Stream::ResourceConfigAttr::lookup(updateOp)
+                            .getMinAccessGranularity();
+  if (granularity <= 1 || isConstantIntValue(updateOp.getUpdateSize(), 0)) {
+    return true;
+  }
+  if (!solver || !isWholeResource(updateOp.getTarget()) ||
+      !IREE::Util::isProvenMultipleOf(updateOp.getTargetOffset(), granularity,
+                                      *solver)) {
+    return false;
+  }
+  if (IREE::Util::isProvenMultipleOf(updateOp.getTargetEnd(), granularity,
+                                     *solver)) {
+    return true;
+  }
+  return isEqualConstantIntOrValue(updateOp.getTargetEnd(),
+                                   updateOp.getTargetSize()) &&
+         isOwnedAllocation(updateOp.getTarget());
+}
+
 static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp,
-                                 IndexSet &indexSet) {
+                                 IndexSet &indexSet, DataFlowSolver *solver) {
   [[maybe_unused]] OpPrintingFlags printingFlags;
   LLVM_DEBUG(printingFlags = OpPrintingFlags()
                                  .elideLargeElementsAttrs()
@@ -104,6 +160,14 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp,
     auto updateOp = dyn_cast_if_present<IREE::Stream::AsyncUpdateOp>(userOp);
     if (!updateOp || updateOp.getUpdate() != result) {
       continue; // not relevant
+    }
+
+    if (!respectsAccessGranularity(updateOp, solver)) {
+      LLVM_DEBUG({
+        llvm::dbgs() << "  ! unable to emplace result #" << resultIndex
+                     << ": its range may share an access unit\n";
+      });
+      continue;
     }
 
     // Currently only allow exactly matching affinities.
@@ -278,7 +342,7 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp,
 
 // Emplaces allocations within |region|.
 // Returns true if any allocations were elided by way of emplacement.
-static bool emplaceAllocationsInRegion(Region &region) {
+static bool emplaceAllocationsInRegion(Region &region, DataFlowSolver *solver) {
   bool didChange = false;
   for (auto &block : region.getBlocks()) {
     IndexSet indexSet(region.getLoc(), OpBuilder::atBlockBegin(&block));
@@ -287,7 +351,7 @@ static bool emplaceAllocationsInRegion(Region &region) {
         didChange = TypeSwitch<Operation *, bool>(&op)
                         // TODO(#11249): support in-place collective ops.
                         .Case([&](IREE::Stream::AsyncDispatchOp op) {
-                          return tryEmplaceDispatchOp(op, indexSet);
+                          return tryEmplaceDispatchOp(op, indexSet, solver);
                         })
                         .Default(false) ||
                     didChange;
@@ -301,15 +365,42 @@ static bool emplaceAllocationsInRegion(Region &region) {
 // --iree-stream-emplace-allocations
 //===----------------------------------------------------------------------===//
 
-struct EmplaceAllocationsPass
+static LogicalResult emplaceAllocationsInCallable(Operation *parentOp) {
+  bool needsDivisibilityAnalysis =
+      parentOp
+          ->walk([](IREE::Stream::AsyncUpdateOp updateOp) {
+            return IREE::Stream::ResourceConfigAttr::lookup(updateOp)
+                               .getMinAccessGranularity() > 1
+                       ? WalkResult::interrupt()
+                       : WalkResult::advance();
+          })
+          .wasInterrupted();
+  std::unique_ptr<DataFlowSolver> solver;
+  if (needsDivisibilityAnalysis) {
+    solver = std::make_unique<DataFlowSolver>();
+    solver->load<dataflow::SparseConstantPropagation>();
+    solver->load<dataflow::DeadCodeAnalysis>();
+    solver->load<IREE::Util::IntegerDivisibilityAnalysis>();
+    if (failed(solver->initializeAndRun(parentOp))) {
+      return failure();
+    }
+  }
+  bool didChange = false;
+  parentOp->walk([&](Region *region) {
+    didChange = emplaceAllocationsInRegion(*region, solver.get()) || didChange;
+  });
+  // TODO(benvanik): run canonicalization patterns inline if anything changed.
+  (void)didChange;
+  return success();
+}
+
+struct EmplaceAllocationsPass final
     : IREE::Stream::impl::EmplaceAllocationsPassBase<EmplaceAllocationsPass> {
   void runOnOperation() override {
-    bool didChange = false;
-    getOperation()->walk([&](Region *region) {
-      didChange = emplaceAllocationsInRegion(*region) || didChange;
-    });
-    // TODO(benvanik): run canonicalization patterns inline if anything changed.
-    (void)didChange;
+    if (failed(runOnFunctionLikeOps(getOperation(),
+                                    emplaceAllocationsInCallable))) {
+      signalPassFailure();
+    }
   }
 };
 

@@ -28,6 +28,7 @@ iree_lit_test_suite(
             "command_buffer_ops.mlir",
             "device_folding.mlir",
             "device_ops.mlir",
+            "device_target_invalid.mlir",
             "devices_ops.mlir",
             "executable_folding.mlir",
             "executable_ops.mlir",

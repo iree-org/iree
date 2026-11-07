@@ -759,6 +759,44 @@ struct CmdCollectiveOpPattern
   }
 };
 
+// Returns |length| extended to end on a whole |granularity|-byte access unit,
+// without passing |capacity|: the binding declares the padding it owns. With
+// |reachSlotEnd| a range rounded past |capacity| takes the rest of its
+// binding-table slot, which each call sizes to its own buffer.
+static Value buildOwnedBindingLength(Location loc, Value offset, Value length,
+                                     Value capacity, int64_t granularity,
+                                     bool reachSlotEnd, OpBuilder &builder) {
+  std::optional<int64_t> constantLength = getConstantIntValue(length);
+  if (granularity <= 1 || constantLength == 0) {
+    return length;
+  }
+  Value end = arith::AddIOp::create(builder, loc, offset, length);
+  Value alignedEnd = IREE::Util::AlignOp::create(
+      builder, loc, end,
+      arith::ConstantIndexOp::create(builder, loc, granularity));
+  Value ownedLength;
+  if (reachSlotEnd) {
+    Value pastCapacity = arith::CmpIOp::create(
+        builder, loc, arith::CmpIPredicate::ugt, alignedEnd, capacity);
+    // IREE_HAL_WHOLE_BUFFER.
+    Value wholeSlot = arith::ConstantIndexOp::create(builder, loc, -1);
+    ownedLength = arith::SelectOp::create(
+        builder, loc, pastCapacity, wholeSlot,
+        arith::SubIOp::create(builder, loc, alignedEnd, offset));
+  } else {
+    Value ownedEnd = arith::MinUIOp::create(builder, loc, alignedEnd, capacity);
+    ownedLength = arith::SubIOp::create(builder, loc, ownedEnd, offset);
+  }
+  if (constantLength) {
+    return ownedLength;
+  }
+  // An empty binding stays empty so the runtime binds its dummy word.
+  Value zero = arith::ConstantIndexOp::create(builder, loc, 0);
+  Value isEmpty = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::eq,
+                                        length, zero);
+  return arith::SelectOp::create(builder, loc, isEmpty, zero, ownedLength);
+}
+
 struct CmdDispatchOpPattern
     : StreamConversionPattern<IREE::Stream::CmdDispatchOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -990,9 +1028,29 @@ struct CmdDispatchOpPattern
         loc, exportOp, executable, device, adaptor.getWorkload(), builder);
 
     auto layoutAttr = exportOp.getLayout();
+    int64_t granularity =
+        commandBufferMapping.getResourceConfig().getMinAccessGranularity();
     SmallVector<IREE::HAL::BindingValue> bindings;
     for (auto [i, bindingAttr] : llvm::enumerate(layoutAttr.getBindings())) {
       auto descriptorFlags = bindingAttr.getFlags();
+      bool isIndirect =
+          bitEnumContainsAll(descriptorFlags,
+                             IREE::HAL::DescriptorFlags::Indirect) &&
+          commandBufferMapping.hasSlot(dispatchOp.getResources()[i]);
+      // An external buffer may be longer than its tensor; the import grants
+      // the whole view.
+      bool isExternal = cast<IREE::Stream::ResourceType>(
+                            dispatchOp.getResources()[i].getType())
+                            .getLifetime() == IREE::Stream::Lifetime::External;
+      Value capacity = adaptor.getResourceSizes()[i];
+      if (isExternal && !isIndirect && granularity > 1) {
+        capacity = builder.createOrFold<IREE::HAL::BufferLengthOp>(
+            loc, builder.getIndexType(), adaptor.getResources()[i]);
+      }
+      Value bindingLength = buildOwnedBindingLength(
+          loc, adaptor.getResourceOffsets()[i], adaptor.getResourceLengths()[i],
+          capacity, granularity, /*reachSlotEnd=*/isExternal && isIndirect,
+          builder);
       IREE::HAL::BindingValue binding;
       if (bitEnumContainsAll(descriptorFlags,
                              IREE::HAL::DescriptorFlags::Indirect)) {
@@ -1002,8 +1060,7 @@ struct CmdDispatchOpPattern
         // range bound to the slot in the table.
         auto resolvedBinding = commandBufferMapping.resolveBinding(
             loc, dispatchOp.getResources()[i], adaptor.getResources()[i],
-            adaptor.getResourceOffsets()[i], adaptor.getResourceLengths()[i],
-            builder);
+            adaptor.getResourceOffsets()[i], bindingLength, builder);
         binding.buffer = resolvedBinding.buffer;
         binding.byteOffset = resolvedBinding.byteOffset;
         binding.byteLength = resolvedBinding.byteLength;
@@ -1011,7 +1068,7 @@ struct CmdDispatchOpPattern
         // Direct binding referencing the buffer and range provided on the op.
         binding.buffer = adaptor.getResources()[i];
         binding.byteOffset = adaptor.getResourceOffsets()[i];
-        binding.byteLength = adaptor.getResourceLengths()[i];
+        binding.byteLength = bindingLength;
       }
       bindings.push_back(binding);
     }
@@ -1331,8 +1388,12 @@ struct CmdExecuteOpPattern
     BindingTable bindingTable;
     if (!executeOp.getOnce() && !capturesDynamicUniformValues &&
         clIndirectCommandBuffers) {
-      bindingTable = BindingTable(executeOp, adaptor.getResourceOperands(),
-                                  adaptor.getResourceOperandSizes(), indexSet);
+      bindingTable =
+          BindingTable(executeOp, adaptor.getResourceOperands(),
+                       adaptor.getResourceOperandSizes(),
+                       IREE::Stream::ResourceConfigAttr::lookup(executeOp)
+                           .getMinAccessGranularity(),
+                       indexSet, rewriter);
     }
 
     // If the execute op is one-shot or there's no indirect bindings then mark

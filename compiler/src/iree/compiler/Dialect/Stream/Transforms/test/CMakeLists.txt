@@ -68,6 +68,7 @@ iree_lit_test_suite(
     "schedule_allocation_subviews_nested.mlir"
     "schedule_allocation_subviews_transient.mlir"
     "schedule_concurrency.mlir"
+    "schedule_concurrency_physical_footprints.mlir"
     "schedule_execution.mlir"
     "schedule_execution_invalid.mlir"
     "schedule_execution_scf.mlir"

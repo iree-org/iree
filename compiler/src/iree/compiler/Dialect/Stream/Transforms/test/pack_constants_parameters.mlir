@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(util.func(iree-stream-pack-constants))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-stream-pack-constants)' %s | FileCheck %s
 
 // Tests that PackConstants correctly materializes util.buffer.constant ops for
 // parameter scope and key strings when converting NamedParameterAttr values to
