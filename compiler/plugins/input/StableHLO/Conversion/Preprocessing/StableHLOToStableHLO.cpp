@@ -13,7 +13,10 @@
 
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
+#include "compiler/plugins/input/StableHLO/Conversion/StableHLOPaddingUtils.h"
 #include "compiler/plugins/input/StableHLO/Conversion/StableHLOStatusCheck.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/APInt.h"
@@ -33,6 +36,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/DataLayoutInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/Base.h"
@@ -593,7 +597,7 @@ struct DynamicConvToPaddedConv final
               rewriter.getIntegerType(originalElementType.getWidth())),
           padding);
     }
-    // Dilation and clamped high padding can exceed the source padding width.
+    // Dilation can exceed the source padding width.
     Type paddingElementType = rewriter.getI64Type();
 
     Value zeroIndex = arith::ConstantIndexOp::create(rewriter, loc, 0);
@@ -605,6 +609,14 @@ struct DynamicConvToPaddedConv final
     SmallVector<APInt> interiorValues(rank, APInt(64, 0));
     SmallVector<Value> lows(rank, zeroPaddingElement);
     SmallVector<Value> highs(rank, zeroPaddingElement);
+    SmallVector<Value> paddedSizes;
+    for (int64_t d = 0; d < rank; ++d) {
+      paddedSizes.push_back(
+          rewriter.createOrFold<tensor::DimOp>(loc, op.getLhs(), d));
+    }
+    unsigned indexWidthInBits = DataLayout::closest(op)
+                                    .getTypeSizeInBits(rewriter.getIndexType())
+                                    .getFixedValue();
     for (auto [s, d] : llvm::enumerate(spatialDims)) {
       Value row = arith::ConstantIndexOp::create(rewriter, loc, s);
       Value lowElement = buildConvolutionPaddingElement(
@@ -617,26 +629,14 @@ struct DynamicConvToPaddedConv final
       // apply it again.
       int64_t interior = lhsDilation.empty() ? 0 : lhsDilation[s] - 1;
       interiorValues[d] = APInt(64, interior);
-      Value lowIndex = arith::IndexCastOp::create(
-          rewriter, loc, rewriter.getIndexType(), lowElement);
-      Value highIndex = arith::IndexCastOp::create(
-          rewriter, loc, rewriter.getIndexType(), highElement);
-      Value size = tensor::DimOp::create(rewriter, loc, op.getLhs(), d);
+      highs[d] = highElement;
       Value interiorSize =
-          arith::ConstantIndexOp::create(rewriter, loc, interior);
-      Value span = arith::SubIOp::create(rewriter, loc, size, oneIndex);
-      span = arith::MaxSIOp::create(rewriter, loc, span, zeroIndex);
-      Value dilated = arith::AddIOp::create(
-          rewriter, loc, size,
-          arith::MulIOp::create(rewriter, loc, span, interiorSize));
-      // A fully cropped convolution has no output, but dynamic_pad cannot
-      // represent a negative extent. Clamp its intermediate extent to zero.
-      Value minimum = arith::SubIOp::create(
-          rewriter, loc, zeroIndex,
-          arith::AddIOp::create(rewriter, loc, dilated, lowIndex));
-      Value clamped = arith::MaxSIOp::create(rewriter, loc, highIndex, minimum);
-      highs[d] = arith::IndexCastOp::create(rewriter, loc, paddingElementType,
-                                            clamped);
+          arith::ConstantIntOp::create(rewriter, loc, interior, 64);
+      paddedSizes[d] =
+          buildPaddedDimension(rewriter, loc, paddedSizes[d], lowElement,
+                               highElement, interiorSize,
+                               /*isUnsignedPadding=*/false, indexWidthInBits)
+              .size;
     }
     Value low = tensor::FromElementsOp::create(rewriter, loc, lows);
     Value high = tensor::FromElementsOp::create(rewriter, loc, highs);
@@ -655,10 +655,35 @@ struct DynamicConvToPaddedConv final
     for (int64_t d : spatialDims) {
       paddedShape[d] = ShapedType::kDynamic;
     }
-    Value padded = mlir::stablehlo::DynamicPadOp::create(
-        rewriter, loc,
-        RankedTensorType::get(paddedShape, lhsType.getElementType()),
-        op.getLhs(), zero, low, high, interior);
+    auto paddedType =
+        RankedTensorType::get(paddedShape, lhsType.getElementType());
+    SmallVector<Value> dynamicSizes;
+    Value nonempty = rewriter.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
+    for (int64_t d = 0; d < rank; ++d) {
+      if (paddedType.isDynamicDim(d)) {
+        dynamicSizes.push_back(paddedSizes[d]);
+      }
+      Value positive = rewriter.createOrFold<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::sgt, paddedSizes[d], zeroIndex);
+      nonempty = rewriter.createOrFold<arith::AndIOp>(loc, nonempty, positive);
+    }
+    // A fully cropped convolution is empty, while dynamic_pad requires
+    // nonnegative extents. Preserve the original padding on the nonempty path.
+    auto ifOp =
+        scf::IfOp::create(rewriter, loc, TypeRange{paddedType}, nonempty, true);
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
+      Value padded = mlir::stablehlo::DynamicPadOp::create(
+          rewriter, loc, paddedType, op.getLhs(), zero, low, high, interior);
+      scf::YieldOp::create(rewriter, loc, padded);
+      rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
+      Value empty =
+          tensor::EmptyOp::create(rewriter, loc, paddedType, dynamicSizes);
+      scf::YieldOp::create(rewriter, loc, empty);
+    }
+    Value padded = IREE::Flow::TensorTieShapeOp::create(
+        rewriter, loc, paddedType, ifOp.getResult(0), dynamicSizes);
 
     auto zeroPadding = DenseIntElementsAttr::get(
         RankedTensorType::get({numSpatial, 2}, rewriter.getI64Type()),
@@ -3300,7 +3325,7 @@ struct StableHLOToStableHLOPreprocessing final
     registry.insert<shape::ShapeDialect, mlir::stablehlo::StablehloDialect,
                     chlo::ChloDialect, tensor::TensorDialect,
                     arith::ArithDialect, linalg::LinalgDialect, scf::SCFDialect,
-                    IREE::Util::UtilDialect>();
+                    IREE::Util::UtilDialect, IREE::Flow::FlowDialect>();
   }
 
   void runOnOperation() override {

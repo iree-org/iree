@@ -6,11 +6,15 @@
 
 // Lowerings for the StableHLO ops whose shapes are known only at runtime.
 
+#include <algorithm>
 #include <optional>
 
 #include "compiler/plugins/input/StableHLO/Conversion/Rewriters.h"
+#include "compiler/plugins/input/StableHLO/Conversion/StableHLOPaddingUtils.h"
+#include "compiler/plugins/input/StableHLO/Conversion/StableHLOStatusCheck.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/Support/CheckedArithmetic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -18,6 +22,7 @@
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/Interfaces/DataLayoutInterfaces.h"
@@ -671,69 +676,121 @@ struct DynamicReshapeOpConversion final
 };
 
 struct DynamicPadGeometry {
-  SmallVector<Value> scratchDynamicDims, resultDynamicDims;
+  SmallVector<Value> resultDynamicDims;
+  SmallVector<Value> lowPadding, interiorPadding, inputSizes;
   SmallVector<OpFoldResult> insertSizes, insertOffsets, insertStrides;
-  SmallVector<OpFoldResult> extractOffsets, extractSizes;
+  bool canUseInsert;
+  Value hasCrop;
   Value nonempty;
 };
 
-DynamicPadGeometry buildDynamicPadGeometry(
-    OpBuilder &rewriter, Location loc, Value operand,
-    ArrayRef<OpFoldResult> lowPadding, ArrayRef<OpFoldResult> highPadding,
-    ArrayRef<OpFoldResult> interiorPadding, RankedTensorType resultType) {
+// A strided insert must not contain a constant stride or intermediate shape
+// outside the index range, even in a branch which will not execute. Unknown
+// interior padding and empty sources use output-driven generation instead.
+static bool canInsertDimension(int64_t size, Value interiorPadding,
+                               int64_t indexLimit) {
+  if (size == 0) {
+    return false;
+  }
+  if (size == 1) {
+    return true;
+  }
+  std::optional<int64_t> interior = getConstantIntValue(interiorPadding);
+  if (!interior || *interior < 0) {
+    return false;
+  }
+  if (*interior == 0) {
+    return true;
+  }
+  if (ShapedType::isDynamic(size)) {
+    return false;
+  }
+  auto extra = llvm::checkedMul(size - 1, *interior);
+  auto dilatedSize = extra ? llvm::checkedAdd(size, *extra) : std::nullopt;
+  return dilatedSize && *dilatedSize <= indexLimit;
+}
+
+static bool canUseStridedInsertion(RankedTensorType inputType,
+                                   ArrayRef<Value> interiorPadding,
+                                   unsigned indexWidthInBits) {
+  int64_t limit =
+      APInt::getSignedMaxValue(std::min(64U, indexWidthInBits)).getSExtValue();
+  return llvm::all_of(llvm::zip_equal(inputType.getShape(), interiorPadding),
+                      [limit](auto dimension) {
+                        return canInsertDimension(std::get<0>(dimension),
+                                                  std::get<1>(dimension),
+                                                  limit);
+                      });
+}
+
+static DynamicPadGeometry
+buildDynamicPadGeometry(OpBuilder &rewriter, Location loc, Value operand,
+                        ArrayRef<Value> lowPadding, ArrayRef<Value> highPadding,
+                        ArrayRef<Value> interiorPadding, bool isUnsignedPadding,
+                        RankedTensorType resultType,
+                        unsigned indexWidthInBits) {
   int64_t rank = resultType.getRank();
   DynamicPadGeometry geometry;
   Value zero = arith::ConstantIndexOp::create(rewriter, loc, 0);
   Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
+  Value zeroI64 = arith::ConstantIntOp::create(rewriter, loc, 0, 64);
   geometry.nonempty = rewriter.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
+  geometry.hasCrop = rewriter.createOrFold<arith::ConstantIntOp>(loc, 0, 1);
+  geometry.lowPadding.assign(lowPadding.begin(), lowPadding.end());
+  geometry.interiorPadding.assign(interiorPadding.begin(),
+                                  interiorPadding.end());
+  geometry.canUseInsert =
+      canUseStridedInsertion(cast<RankedTensorType>(operand.getType()),
+                             interiorPadding, indexWidthInBits);
   geometry.insertSizes = tensor::getMixedSizes(rewriter, loc, operand);
   for (int64_t i = 0; i < rank; ++i) {
     Value dim =
         getValueOrCreateConstantIndexOp(rewriter, loc, geometry.insertSizes[i]);
-    Value low = getValueOrCreateConstantIndexOp(rewriter, loc, lowPadding[i]);
-    Value high = getValueOrCreateConstantIndexOp(rewriter, loc, highPadding[i]);
-    Value interior =
-        getValueOrCreateConstantIndexOp(rewriter, loc, interiorPadding[i]);
-
-    Value lowPos = arith::MaxSIOp::create(rewriter, loc, low, zero);
-    Value highPos = arith::MaxSIOp::create(rewriter, loc, high, zero);
-    Value lowNeg = arith::MaxSIOp::create(
-        rewriter, loc, arith::SubIOp::create(rewriter, loc, zero, low), zero);
-
-    Value dimMinusOne = arith::SubIOp::create(rewriter, loc, dim, one);
-    Value clampedDimMinusOne =
-        arith::MaxSIOp::create(rewriter, loc, dimMinusOne, zero);
-    Value interiorTotal =
-        arith::MulIOp::create(rewriter, loc, clampedDimMinusOne, interior);
-    Value dimAndInterior =
-        arith::AddIOp::create(rewriter, loc, dim, interiorTotal);
-
-    // The scratch tensor's size depends on lowPos/highPos, which are
-    // runtime values even where the result type's dim is static, so every
-    // dim of the scratch tensor is dynamic.
-    Value dimAndLowPos =
-        arith::AddIOp::create(rewriter, loc, dimAndInterior, lowPos);
-    Value filledDim =
-        arith::AddIOp::create(rewriter, loc, dimAndLowPos, highPos);
-    geometry.scratchDynamicDims.push_back(filledDim);
-
-    if (resultType.isDynamicDim(i)) {
-      Value dimAndLow =
-          arith::AddIOp::create(rewriter, loc, dimAndInterior, low);
-      Value resultDim = arith::AddIOp::create(rewriter, loc, dimAndLow, high);
-      geometry.extractSizes.push_back(resultDim);
-      geometry.resultDynamicDims.push_back(resultDim);
-    } else {
-      geometry.extractSizes.push_back(
-          rewriter.getIndexAttr(resultType.getDimSize(i)));
+    Value low = lowPadding[i];
+    Value high = highPadding[i];
+    Value interior = interiorPadding[i];
+    geometry.inputSizes.push_back(rewriter.createOrFold<arith::IndexCastUIOp>(
+        loc, rewriter.getI64Type(), dim));
+    auto padded = buildPaddedDimension(rewriter, loc, dim, low, high, interior,
+                                       isUnsignedPadding, indexWidthInBits);
+    Value nonnegative = rewriter.createOrFold<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::eq, padded.isNegative,
+        rewriter.createOrFold<arith::ConstantIntOp>(loc, 0, 1));
+    if (!matchPattern(nonnegative, m_One())) {
+      emitStatusCheck(rewriter, loc, nonnegative,
+                      "padding results in a negative dimension");
+    }
+    if (!isUnsignedPadding) {
+      Value negativeLow = rewriter.createOrFold<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::slt, low, zeroI64);
+      Value negativeHigh = rewriter.createOrFold<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::slt, high, zeroI64);
+      Value cropped =
+          rewriter.createOrFold<arith::OrIOp>(loc, negativeLow, negativeHigh);
+      geometry.hasCrop =
+          rewriter.createOrFold<arith::OrIOp>(loc, geometry.hasCrop, cropped);
     }
 
-    geometry.insertOffsets.push_back(lowPos);
-    geometry.insertStrides.push_back(
-        arith::AddIOp::create(rewriter, loc, interior, one).getResult());
-    geometry.extractOffsets.push_back(lowNeg);
-    Value size = getValueOrCreateConstantIndexOp(rewriter, loc,
-                                                 geometry.extractSizes.back());
+    if (resultType.isDynamicDim(i)) {
+      geometry.resultDynamicDims.push_back(padded.size);
+    }
+
+    // These coordinates are used only on the nonnegative-padding insert path.
+    Value offset = rewriter.createOrFold<arith::IndexCastUIOp>(
+        loc, rewriter.getIndexType(), low);
+    geometry.insertOffsets.push_back(offset);
+    Value stride = rewriter.createOrFold<arith::IndexCastUIOp>(
+        loc, rewriter.getIndexType(), interior);
+    stride = rewriter.createOrFold<arith::AddIOp>(loc, stride, one);
+    Value singleElement = rewriter.createOrFold<arith::CmpIOp>(
+        loc, arith::CmpIPredicate::ule, dim, one);
+    stride =
+        rewriter.createOrFold<arith::SelectOp>(loc, singleElement, one, stride);
+    geometry.insertStrides.push_back(stride);
+    Value size = resultType.isDynamicDim(i)
+                     ? padded.size
+                     : rewriter.createOrFold<arith::ConstantIndexOp>(
+                           loc, resultType.getDimSize(i));
     Value positive = rewriter.createOrFold<arith::CmpIOp>(
         loc, arith::CmpIPredicate::sgt, size, zero);
     geometry.nonempty =
@@ -742,52 +799,184 @@ DynamicPadGeometry buildDynamicPadGeometry(
   return geometry;
 }
 
-Value createPaddedTensor(OpBuilder &rewriter, Location loc, Value operand,
-                         Value paddingValue, RankedTensorType resultType,
-                         const DynamicPadGeometry &geometry) {
-  int64_t rank = resultType.getRank();
-  SmallVector<int64_t> scratchShape(rank, ShapedType::kDynamic);
-  Value empty = tensor::EmptyOp::create(rewriter, loc, scratchShape,
-                                        resultType.getElementType(),
-                                        geometry.scratchDynamicDims);
+static Value createPaddedTensor(OpBuilder &rewriter, Location loc,
+                                Value operand, Value paddingValue,
+                                RankedTensorType resultType,
+                                const DynamicPadGeometry &geometry) {
+  Value empty = tensor::EmptyOp::create(rewriter, loc, resultType,
+                                        geometry.resultDynamicDims);
   Value filled =
       linalg::FillOp::create(rewriter, loc, paddingValue, empty).result();
-  Value inserted = tensor::InsertSliceOp::create(
-                       rewriter, loc, operand, filled, geometry.insertOffsets,
-                       geometry.insertSizes, geometry.insertStrides)
-                       .getResult();
-  // Negative edge padding crops, which the insert cannot express.
-  SmallVector<OpFoldResult> extractStrides(rank, rewriter.getIndexAttr(1));
-  return tensor::ExtractSliceOp::create(rewriter, loc, resultType, inserted,
-                                        geometry.extractOffsets,
-                                        geometry.extractSizes, extractStrides);
+  return tensor::InsertSliceOp::create(
+             rewriter, loc, operand, filled, geometry.insertOffsets,
+             geometry.insertSizes, geometry.insertStrides)
+      .getResult();
 }
 
-Value createCroppedPad(OpBuilder &rewriter, Location loc, Value operand,
-                       Value paddingValue, RankedTensorType resultType,
-                       const DynamicPadGeometry &geometry) {
-  // Empty crops need no scratch buffer. In particular, runtime convolution
-  // padding can remove an arbitrarily large dilated input entirely.
-  auto ifOp =
-      scf::IfOp::create(rewriter, loc, TypeRange{resultType}, geometry.nonempty,
-                        /*withElseRegion=*/true);
-  {
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
-    Value result = createPaddedTensor(rewriter, loc, operand, paddingValue,
-                                      resultType, geometry);
-    scf::YieldOp::create(rewriter, loc, result);
-    rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
-    Value resultEmpty = tensor::EmptyOp::create(rewriter, loc, resultType,
-                                                geometry.resultDynamicDims);
-    scf::YieldOp::create(rewriter, loc, resultEmpty);
+// Read one output coordinate without materialising the potentially enormous
+// dilated input. Unsigned subtraction also represents offsets from INT64_MIN.
+static Value buildCroppedPadElement(OpBuilder &builder, Location loc,
+                                    Value operand, Value paddingValue,
+                                    const DynamicPadGeometry &geometry,
+                                    bool isUnsignedPadding) {
+  ImplicitLocOpBuilder b(loc, builder);
+  Value zero = b.create<arith::ConstantIntOp>(0, 64);
+  Value one = b.create<arith::ConstantIntOp>(1, 64);
+  Value inBounds = b.create<arith::ConstantIntOp>(1, 1);
+  SmallVector<Value> coordinates;
+  for (int64_t d = 0; d < static_cast<int64_t>(geometry.inputSizes.size());
+       ++d) {
+    Value output = b.create<linalg::IndexOp>(d);
+    output = b.createOrFold<arith::IndexCastUIOp>(b.getI64Type(), output);
+    Value afterLow = b.createOrFold<arith::CmpIOp>(
+        isUnsignedPadding ? arith::CmpIPredicate::uge
+                          : arith::CmpIPredicate::sge,
+        output, geometry.lowPadding[d]);
+    Value offset =
+        b.createOrFold<arith::SubIOp>(output, geometry.lowPadding[d]);
+    Value stride =
+        b.createOrFold<arith::AddIOp>(geometry.interiorPadding[d], one);
+    // A wrapped stride denotes 2^64. Every possible offset is smaller, so its
+    // quotient is zero and its remainder is the offset. Never divide by zero.
+    Value wrapped =
+        b.createOrFold<arith::CmpIOp>(arith::CmpIPredicate::eq, stride, zero);
+    Value divisor = b.createOrFold<arith::SelectOp>(wrapped, one, stride);
+    Value quotient = b.createOrFold<arith::DivUIOp>(offset, divisor);
+    Value remainder = b.createOrFold<arith::RemUIOp>(offset, divisor);
+    quotient = b.createOrFold<arith::SelectOp>(wrapped, zero, quotient);
+    remainder = b.createOrFold<arith::SelectOp>(wrapped, offset, remainder);
+    Value aligned = b.createOrFold<arith::CmpIOp>(arith::CmpIPredicate::eq,
+                                                  remainder, zero);
+    Value within = b.createOrFold<arith::CmpIOp>(
+        arith::CmpIPredicate::ult, quotient, geometry.inputSizes[d]);
+    Value valid = b.createOrFold<arith::AndIOp>(afterLow, aligned);
+    valid = b.createOrFold<arith::AndIOp>(valid, within);
+    inBounds = b.createOrFold<arith::AndIOp>(inBounds, valid);
+    coordinates.push_back(
+        b.createOrFold<arith::IndexCastUIOp>(b.getIndexType(), quotient));
   }
-  return IREE::Flow::TensorTieShapeOp::create(
-      rewriter, loc, resultType, ifOp.getResult(0), geometry.resultDynamicDims);
+  auto ifOp =
+      b.create<scf::IfOp>(TypeRange{paddingValue.getType()}, inBounds, true);
+  {
+    OpBuilder::InsertionGuard guard(b);
+    b.setInsertionPointToStart(&ifOp.getThenRegion().front());
+    Value element = b.create<tensor::ExtractOp>(operand, coordinates);
+    b.create<scf::YieldOp>(element);
+    b.setInsertionPointToStart(&ifOp.getElseRegion().front());
+    b.create<scf::YieldOp>(paddingValue);
+  }
+  return ifOp.getResult(0);
 }
 
-// tensor.pad has no interior padding, and whether the interior amounts are
-// zero is unknown here, so the strided insert covers every case.
+// Generate only the final padded shape, including crops across dilation gaps.
+static Value createOutputDrivenPad(OpBuilder &builder, Location loc,
+                                   Value operand, Value paddingValue,
+                                   RankedTensorType resultType,
+                                   const DynamicPadGeometry &geometry,
+                                   bool isUnsignedPadding) {
+  Value empty = tensor::EmptyOp::create(builder, loc, resultType,
+                                        geometry.resultDynamicDims);
+  return linalg::GenericOp::create(
+             builder, loc, TypeRange{resultType}, ValueRange{},
+             ValueRange{empty},
+             SmallVector<AffineMap>{
+                 builder.getMultiDimIdentityMap(resultType.getRank())},
+             mlir::stablehlo::getNParallelLoopsAttrs(resultType.getRank()),
+             [operand, paddingValue, &geometry, isUnsignedPadding](
+                 OpBuilder &nested, Location nestedLoc, ValueRange) {
+               Value element = buildCroppedPadElement(
+                   nested, nestedLoc, operand, paddingValue, geometry,
+                   isUnsignedPadding);
+               linalg::YieldOp::create(nested, nestedLoc, element);
+             })
+      .getResult(0);
+}
+
+static Value createNonemptyPad(OpBuilder &builder, Location loc, Value operand,
+                               Value paddingValue, RankedTensorType resultType,
+                               const DynamicPadGeometry &geometry,
+                               bool isUnsignedPadding) {
+  if (!geometry.canUseInsert || matchPattern(geometry.hasCrop, m_One())) {
+    return createOutputDrivenPad(builder, loc, operand, paddingValue,
+                                 resultType, geometry, isUnsignedPadding);
+  }
+  if (matchPattern(geometry.hasCrop, m_Zero())) {
+    return createPaddedTensor(builder, loc, operand, paddingValue, resultType,
+                              geometry);
+  }
+  auto ifOp = scf::IfOp::create(builder, loc, TypeRange{resultType},
+                                geometry.hasCrop, true);
+  {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+    Value cropped =
+        createOutputDrivenPad(builder, loc, operand, paddingValue, resultType,
+                              geometry, isUnsignedPadding);
+    scf::YieldOp::create(builder, loc, cropped);
+    builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+    Value inserted = createPaddedTensor(builder, loc, operand, paddingValue,
+                                        resultType, geometry);
+    scf::YieldOp::create(builder, loc, inserted);
+  }
+  return ifOp.getResult(0);
+}
+
+static Value createCroppedPad(OpBuilder &builder, Location loc, Value operand,
+                              Value paddingValue, RankedTensorType resultType,
+                              const DynamicPadGeometry &geometry,
+                              bool isUnsignedPadding) {
+  Value result;
+  if (matchPattern(geometry.nonempty, m_Zero())) {
+    result = tensor::EmptyOp::create(builder, loc, resultType,
+                                     geometry.resultDynamicDims);
+  } else if (matchPattern(geometry.nonempty, m_One())) {
+    result = createNonemptyPad(builder, loc, operand, paddingValue, resultType,
+                               geometry, isUnsignedPadding);
+  } else {
+    auto ifOp = scf::IfOp::create(builder, loc, TypeRange{resultType},
+                                  geometry.nonempty, true);
+    {
+      OpBuilder::InsertionGuard guard(builder);
+      builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+      Value padded = createNonemptyPad(builder, loc, operand, paddingValue,
+                                       resultType, geometry, isUnsignedPadding);
+      scf::YieldOp::create(builder, loc, padded);
+      builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+      Value empty = tensor::EmptyOp::create(builder, loc, resultType,
+                                            geometry.resultDynamicDims);
+      scf::YieldOp::create(builder, loc, empty);
+    }
+    result = ifOp.getResult(0);
+  }
+  return IREE::Flow::TensorTieShapeOp::create(builder, loc, resultType, result,
+                                              geometry.resultDynamicDims);
+}
+
+// Keep padding integers in i64 storage until the exact output extent and
+// guarded source coordinates have been computed.
+static SmallVector<Value> extractPaddingElements(OpBuilder &builder,
+                                                 Location loc, Value padding,
+                                                 bool isUnsignedPadding,
+                                                 int64_t rank) {
+  SmallVector<Value> elements;
+  for (int64_t d = 0; d < rank; ++d) {
+    Value index = arith::ConstantIndexOp::create(builder, loc, d);
+    Value element =
+        builder.createOrFold<tensor::ExtractOp>(loc, padding, index);
+    if (element.getType().getIntOrFloatBitWidth() < 64) {
+      if (isUnsignedPadding) {
+        element = builder.createOrFold<arith::ExtUIOp>(
+            loc, builder.getI64Type(), element);
+      } else {
+        element = builder.createOrFold<arith::ExtSIOp>(
+            loc, builder.getI64Type(), element);
+      }
+    }
+    elements.push_back(element);
+  }
+  return elements;
+}
+
 struct DynamicPadOpConversion final
     : OpConversionPattern<mlir::stablehlo::DynamicPadOp> {
   using Base::Base;
@@ -807,20 +996,27 @@ struct DynamicPadOpConversion final
     Value paddingValue = rewriter.createOrFold<tensor::ExtractOp>(
         loc, adaptor.getPaddingValue());
 
-    auto extractAll = [&](Value padding) {
-      return llvm::map_to_vector(
-          llvm::seq<int64_t>(resultType.getRank()), [&](int64_t i) {
-            return OpFoldResult(extractIndex(rewriter, loc, padding, i));
-          });
-    };
+    bool isUnsignedPadding = cast<ShapedType>(op.getEdgePaddingLow().getType())
+                                 .getElementType()
+                                 .isUnsignedInteger();
+    auto lows =
+        extractPaddingElements(rewriter, loc, adaptor.getEdgePaddingLow(),
+                               isUnsignedPadding, resultType.getRank());
+    auto highs =
+        extractPaddingElements(rewriter, loc, adaptor.getEdgePaddingHigh(),
+                               isUnsignedPadding, resultType.getRank());
+    auto interiors =
+        extractPaddingElements(rewriter, loc, adaptor.getInteriorPadding(),
+                               isUnsignedPadding, resultType.getRank());
+    unsigned indexWidth = DataLayout::closest(op)
+                              .getTypeSizeInBits(rewriter.getIndexType())
+                              .getFixedValue();
     auto geometry = buildDynamicPadGeometry(
-        rewriter, loc, adaptor.getOperand(),
-        extractAll(adaptor.getEdgePaddingLow()),
-        extractAll(adaptor.getEdgePaddingHigh()),
-        extractAll(adaptor.getInteriorPadding()), resultType);
-    rewriter.replaceOp(op,
-                       createCroppedPad(rewriter, loc, adaptor.getOperand(),
-                                        paddingValue, resultType, geometry));
+        rewriter, loc, adaptor.getOperand(), lows, highs, interiors,
+        isUnsignedPadding, resultType, indexWidth);
+    rewriter.replaceOp(op, createCroppedPad(rewriter, loc, adaptor.getOperand(),
+                                            paddingValue, resultType, geometry,
+                                            isUnsignedPadding));
     return success();
   }
 };
@@ -833,29 +1029,39 @@ struct PadOpConversion final : OpConversionPattern<mlir::stablehlo::PadOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto resultType =
         getTypeConverter()->convertType<RankedTensorType>(op.getType());
-    if (!resultType || resultType.hasStaticShape()) {
-      return failure();
+    if (!resultType) {
+      return rewriter.notifyMatchFailure(op, "type conversion failed");
     }
     auto isNegative = [](int64_t v) { return v < 0; };
     if (llvm::any_of(op.getInteriorPadding(),
                      [](int64_t v) { return v != 0; }) ||
         llvm::any_of(op.getEdgePaddingLow(), isNegative) ||
         llvm::any_of(op.getEdgePaddingHigh(), isNegative)) {
-      // tensor.pad takes neither, so pad nonnegatively and crop.
+      // tensor.pad cannot represent cropping or interior padding.
       Location loc = op.getLoc();
-      auto toAttrs = [&](ArrayRef<int64_t> values) {
-        return getAsIndexOpFoldResult(rewriter.getContext(), values);
+      auto toValues = [&](ArrayRef<int64_t> values) {
+        return llvm::map_to_vector(values, [&](int64_t value) -> Value {
+          return arith::ConstantIntOp::create(rewriter, loc, value, 64);
+        });
       };
+      unsigned indexWidth = DataLayout::closest(op)
+                                .getTypeSizeInBits(rewriter.getIndexType())
+                                .getFixedValue();
       DynamicPadGeometry geometry = buildDynamicPadGeometry(
-          rewriter, loc, adaptor.getOperand(), toAttrs(op.getEdgePaddingLow()),
-          toAttrs(op.getEdgePaddingHigh()), toAttrs(op.getInteriorPadding()),
-          resultType);
+          rewriter, loc, adaptor.getOperand(), toValues(op.getEdgePaddingLow()),
+          toValues(op.getEdgePaddingHigh()), toValues(op.getInteriorPadding()),
+          /*isUnsignedPadding=*/false, resultType, indexWidth);
       Value paddingValue = rewriter.createOrFold<tensor::ExtractOp>(
           loc, adaptor.getPaddingValue());
       rewriter.replaceOp(op,
                          createCroppedPad(rewriter, loc, adaptor.getOperand(),
-                                          paddingValue, resultType, geometry));
+                                          paddingValue, resultType, geometry,
+                                          /*isUnsignedPadding=*/false));
       return success();
+    }
+    if (resultType.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(
+          op, "upstream handles nonnegative static padding");
     }
     auto toIndexAttr = [&](int64_t size) -> OpFoldResult {
       return rewriter.getIndexAttr(size);

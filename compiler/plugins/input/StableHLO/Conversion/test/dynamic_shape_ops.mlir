@@ -60,28 +60,35 @@ func.func @dynamic_conv_lhs_dilation(%a: tensor<1x4x4x1xf32>, %k: tensor<3x3x1x1
 // The padding amounts are runtime values.
 // CHECK-LABEL: @dynamic_pad
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4xf32>, %[[VAL:.+]]: tensor<f32>, %[[LO:.+]]: tensor<1xi64>, %[[HI:.+]]: tensor<1xi64>, %[[IN:.+]]: tensor<1xi64>)
-// CHECK-DAG: %[[LOWX:.+]] = tensor.extract %[[LO]]
-// CHECK-DAG: %[[LOWV:.+]] = arith.index_cast %[[LOWX]]
-// CHECK-DAG: %[[HIGHX:.+]] = tensor.extract %[[HI]]
-// CHECK-DAG: %[[HIGHV:.+]] = arith.index_cast %[[HIGHX]]
-// CHECK-DAG: %[[INX:.+]] = tensor.extract %[[IN]]
-// CHECK-DAG: %[[INV:.+]] = arith.index_cast %[[INX]]
-// CHECK-DAG: %[[LOWPOS:.+]] = arith.maxsi %[[LOWV]], %c0
-// CHECK-DAG: %[[HIGHPOS:.+]] = arith.maxsi %[[HIGHV]], %c0
-// CHECK-DAG: %[[LOWNEG:.+]] = arith.maxsi %{{.+}}, %c0
-// CHECK-DAG: %[[FILLDIM:.+]] = arith.addi %{{.+}}, %[[HIGHPOS]]
-// CHECK-DAG: %[[RESULTDIM:.+]] = arith.addi %{{.+}}, %[[HIGHV]]
-// CHECK-DAG: %[[STRIDE:.+]] = arith.addi %[[INV]], %c1
+// CHECK-DAG: %[[PAD:.+]] = tensor.extract %[[VAL]]
+// CHECK-DAG: %[[LOW:.+]] = tensor.extract %[[LO]]
+// CHECK-DAG: %[[INTERIOR:.+]] = tensor.extract %[[IN]]
+// CHECK: util.status.check_ok {{.*}}, "interior padding must be nonnegative"
+// CHECK: util.status.check_ok {{.*}}, "padded dimension exceeds the index range"
 // CHECK: %[[IF:.+]] = scf.if
-// CHECK: %[[EMPTY:.+]] = tensor.empty(%[[FILLDIM]]) : tensor<?xf32>
-// CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[EMPTY]] : tensor<?xf32>)
-// CHECK: %[[INS:.+]] = tensor.insert_slice %[[ARG0]] into %[[FILL]][%[[LOWPOS]]] [4] [%[[STRIDE]]] : tensor<4xf32> into tensor<?xf32>
-// CHECK: %[[R:.+]] = tensor.extract_slice %[[INS]][%[[LOWNEG]]] [%[[RESULTDIM]]] [1] : tensor<?xf32> to tensor<?xf32>
-// CHECK: scf.yield %[[R]]
+// CHECK: %[[EMPTY:.+]] = tensor.empty(%[[SIZE:.+]]) : tensor<?xf32>
+// CHECK: %[[GENERATED:.+]] = linalg.generic {{.*}} outs(%[[EMPTY]] : tensor<?xf32>)
+// CHECK: %[[INDEX:.+]] = linalg.index 0
+// CHECK: %[[I64:.+]] = arith.index_castui %[[INDEX]] : index to i64
+// CHECK: arith.cmpi sge, %[[I64]], %[[LOW]]
+// CHECK: %[[OFFSET:.+]] = arith.subi %[[I64]], %[[LOW]]
+// CHECK: %[[STRIDE:.+]] = arith.addi %[[INTERIOR]],
+// CHECK: %[[DIVISOR:.+]] = arith.select {{.*}}, %[[STRIDE]] : i64
+// CHECK: arith.divui %[[OFFSET]], %[[DIVISOR]]
+// CHECK: arith.remui %[[OFFSET]], %[[DIVISOR]]
+// CHECK: arith.cmpi ult
+// CHECK: %[[ELEMENT:.+]] = scf.if {{.*}} -> (f32) {
+// CHECK-NEXT: %[[SOURCE:.+]] = tensor.extract %[[ARG0]][%{{.+}}]
+// CHECK-NEXT: scf.yield %[[SOURCE]]
+// CHECK-NEXT: } else {
+// CHECK-NEXT: scf.yield %[[PAD]]
+// CHECK: linalg.yield %[[ELEMENT]]
+// CHECK: scf.yield %[[GENERATED]]
 // CHECK: } else {
-// CHECK: %[[ZERO_SIZE:.+]] = tensor.empty
-// CHECK: scf.yield %[[ZERO_SIZE]]
-// CHECK: %[[TIED:.+]] = flow.tensor.tie_shape %[[IF]]
+// CHECK: tensor.empty(%[[SIZE]]) : tensor<?xf32>
+// CHECK: %[[TIED:.+]] = flow.tensor.tie_shape %[[IF]] : tensor<?xf32>{%[[SIZE]]}
+// CHECK-NOT: tensor.insert_slice
+// CHECK-NOT: tensor.extract_slice
 // CHECK: return %[[TIED]]
 func.func @dynamic_pad(%a: tensor<4xf32>, %v: tensor<f32>, %lo: tensor<1xi64>, %hi: tensor<1xi64>, %in: tensor<1xi64>) -> tensor<?xf32> {
   %r = "stablehlo.dynamic_pad"(%a, %v, %lo, %hi, %in) : (tensor<4xf32>, tensor<f32>, tensor<1xi64>, tensor<1xi64>, tensor<1xi64>) -> tensor<?xf32>
@@ -92,12 +99,14 @@ func.func @dynamic_pad(%a: tensor<4xf32>, %v: tensor<f32>, %lo: tensor<1xi64>, %
 
 // The padding amounts are runtime values but the result shape is static.
 // CHECK-LABEL: @dynamic_pad_static_result
-// CHECK-SAME: (%[[ARG0:.+]]: tensor<2x3xf32>, %[[VAL:.+]]: tensor<f32>, %[[LO:.+]]: tensor<2xi64>, %[[HI:.+]]: tensor<2xi64>, %[[IN:.+]]: tensor<2xi64>) -> tensor<5x9xf32>
-// CHECK: %[[EMPTY:.+]] = tensor.empty(%{{.+}}, %{{.+}}) : tensor<?x?xf32>
-// CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[EMPTY]] : tensor<?x?xf32>)
-// CHECK: %[[INS:.+]] = tensor.insert_slice %[[ARG0]] into %[[FILL]][%{{.+}}, %{{.+}}] [2, 3] [%{{.+}}, %{{.+}}] : tensor<2x3xf32> into tensor<?x?xf32>
-// CHECK: %[[R:.+]] = tensor.extract_slice %[[INS]][%{{.+}}, %{{.+}}] [5, 9] [1, 1] : tensor<?x?xf32> to tensor<5x9xf32>
-// CHECK: return %[[R]] : tensor<5x9xf32>
+// CHECK-SAME: (%[[ARG:.+]]: tensor<2x3xf32>,
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<5x9xf32>
+// CHECK: %[[RESULT:.+]] = linalg.generic {{.*}} outs(%[[EMPTY]] : tensor<5x9xf32>)
+// CHECK: linalg.index 0
+// CHECK: linalg.index 1
+// CHECK: scf.if {{.*}} -> (f32)
+// CHECK-NEXT: tensor.extract %[[ARG]][%{{.+}}, %{{.+}}]
+// CHECK: return %[[RESULT]] : tensor<5x9xf32>
 func.func @dynamic_pad_static_result(%a: tensor<2x3xf32>, %v: tensor<f32>, %lo: tensor<2xi64>, %hi: tensor<2xi64>, %in: tensor<2xi64>) -> tensor<5x9xf32> {
   %r = "stablehlo.dynamic_pad"(%a, %v, %lo, %hi, %in) : (tensor<2x3xf32>, tensor<f32>, tensor<2xi64>, tensor<2xi64>, tensor<2xi64>) -> tensor<5x9xf32>
   return %r : tensor<5x9xf32>
@@ -105,21 +114,18 @@ func.func @dynamic_pad_static_result(%a: tensor<2x3xf32>, %v: tensor<f32>, %lo: 
 
 // -----
 
-// Rank 3, every dim distinct: the insert keeps the operand sizes and takes
-// one runtime offset and one runtime stride per dim.
+// Rank 3, every dimension distinct: each output coordinate is mapped back
+// to the source only when its offset, alignment and bounds are valid.
 // CHECK-LABEL: @dynamic_pad_rank3
-// CHECK-SAME: (%[[ARG0:.+]]: tensor<2x3x5xf32>,
-// CHECK: %[[IF:.+]] = scf.if
-// CHECK: %[[EMPTY:.+]] = tensor.empty(%{{.+}}, %{{.+}}, %{{.+}}) : tensor<?x?x?xf32>
-// CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}} : f32) outs(%[[EMPTY]] : tensor<?x?x?xf32>)
-// CHECK: %[[INS:.+]] = tensor.insert_slice %[[ARG0]] into %[[FILL]][%{{.+}}, %{{.+}}, %{{.+}}] [2, 3, 5] [%{{.+}}, %{{.+}}, %{{.+}}] : tensor<2x3x5xf32> into tensor<?x?x?xf32>
-// CHECK: %[[R:.+]] = tensor.extract_slice %[[INS]][%{{.+}}, %{{.+}}, %{{.+}}] [%{{.+}}, %{{.+}}, %{{.+}}] [1, 1, 1] : tensor<?x?x?xf32> to tensor<?x?x?xf32>
-// CHECK: scf.yield %[[R]]
-// CHECK: } else {
-// CHECK: %[[ZERO_SIZE:.+]] = tensor.empty
-// CHECK: scf.yield %[[ZERO_SIZE]]
-// CHECK: %[[TIED:.+]] = flow.tensor.tie_shape %[[IF]]
-// CHECK: return %[[TIED]]
+// CHECK-SAME: (%[[ARG:.+]]: tensor<2x3x5xf32>,
+// CHECK: tensor.empty(%{{.+}}, %{{.+}}, %{{.+}}) : tensor<?x?x?xf32>
+// CHECK: linalg.generic
+// CHECK: linalg.index 0
+// CHECK: linalg.index 1
+// CHECK: linalg.index 2
+// CHECK: scf.if {{.*}} -> (f32)
+// CHECK-NEXT: tensor.extract %[[ARG]][%{{.+}}, %{{.+}}, %{{.+}}]
+// CHECK: flow.tensor.tie_shape
 func.func @dynamic_pad_rank3(%a: tensor<2x3x5xf32>, %v: tensor<f32>, %lo: tensor<3xi64>, %hi: tensor<3xi64>, %in: tensor<3xi64>) -> tensor<?x?x?xf32> {
   %r = "stablehlo.dynamic_pad"(%a, %v, %lo, %hi, %in) : (tensor<2x3x5xf32>, tensor<f32>, tensor<3xi64>, tensor<3xi64>, tensor<3xi64>) -> tensor<?x?x?xf32>
   return %r : tensor<?x?x?xf32>
@@ -127,12 +133,14 @@ func.func @dynamic_pad_rank3(%a: tensor<2x3x5xf32>, %v: tensor<f32>, %lo: tensor
 
 // -----
 
-// A dynamic operand: the insert sizes come from tensor.dim.
+// A dynamic operand: source bounds come from tensor.dim.
 // CHECK-LABEL: @dynamic_pad_dynamic_operand
-// CHECK-SAME: (%[[ARG0:.+]]: tensor<?x3x?xf32>,
-// CHECK-DAG: tensor.dim %[[ARG0]], %c0
-// CHECK-DAG: tensor.dim %[[ARG0]], %c2
-// CHECK: tensor.insert_slice %[[ARG0]] into %{{.+}}[%{{.+}}, %{{.+}}, %{{.+}}] [%{{.+}}, 3, %{{.+}}] [%{{.+}}, %{{.+}}, %{{.+}}] : tensor<?x3x?xf32> into tensor<?x?x?xf32>
+// CHECK-SAME: (%[[ARG:.+]]: tensor<?x3x?xf32>,
+// CHECK-DAG: tensor.dim %[[ARG]], %c0
+// CHECK-DAG: tensor.dim %[[ARG]], %c2
+// CHECK: linalg.generic
+// CHECK: scf.if {{.*}} -> (f32)
+// CHECK-NEXT: tensor.extract %[[ARG]][%{{.+}}, %{{.+}}, %{{.+}}]
 func.func @dynamic_pad_dynamic_operand(%a: tensor<?x3x?xf32>, %v: tensor<f32>, %lo: tensor<3xi64>, %hi: tensor<3xi64>, %in: tensor<3xi64>) -> tensor<?x?x?xf32> {
   %r = "stablehlo.dynamic_pad"(%a, %v, %lo, %hi, %in) : (tensor<?x3x?xf32>, tensor<f32>, tensor<3xi64>, tensor<3xi64>, tensor<3xi64>) -> tensor<?x?x?xf32>
   return %r : tensor<?x?x?xf32>
@@ -154,8 +162,10 @@ func.func @dynamic_pad_constant_interior(%a: tensor<2x3x5xf32>, %v: tensor<f32>,
 
 // i32 amounts.
 // CHECK-LABEL: @dynamic_pad_i32_amounts
-// CHECK: arith.index_cast %{{.+}} : i32 to index
-// CHECK: tensor.insert_slice %{{.+}} into %{{.+}}[%{{.+}}, %{{.+}}] [4, 7] [%{{.+}}, %{{.+}}] : tensor<4x7xf32> into tensor<?x?xf32>
+// CHECK: arith.extsi %{{.+}} : i32 to i64
+// CHECK: linalg.generic
+// CHECK: arith.divui
+// CHECK: tensor.extract %{{.+}}[%{{.+}}, %{{.+}}] : tensor<4x7xf32>
 func.func @dynamic_pad_i32_amounts(%a: tensor<4x7xf32>, %v: tensor<f32>, %lo: tensor<2xi32>, %hi: tensor<2xi32>, %in: tensor<2xi32>) -> tensor<?x?xf32> {
   %r = "stablehlo.dynamic_pad"(%a, %v, %lo, %hi, %in) : (tensor<4x7xf32>, tensor<f32>, tensor<2xi32>, tensor<2xi32>, tensor<2xi32>) -> tensor<?x?xf32>
   return %r : tensor<?x?xf32>
@@ -181,7 +191,6 @@ func.func @dynamic_conv(%a: tensor<1x8x8x1xf32>, %k: tensor<3x3x1x1xf32>, %p: te
 // NHWC with distinct dimensions: batch and feature sizes remain static.
 // CHECK-LABEL: @dynamic_conv_nhwc
 // CHECK: %[[INS:.+]] = tensor.insert_slice %{{.+}} into %{{.+}}[0, %{{.+}}, %{{.+}}, 0] [2, 8, 6, 3] [1, 1, 1, 1] : tensor<2x8x6x3xf32> into tensor<2x?x?x3xf32>
-// CHECK: tensor.extract_slice %[[INS]][0, %{{.+}}, %{{.+}}, 0] [2, %{{.+}}, %{{.+}}, 3] [1, 1, 1, 1] : tensor<2x?x?x3xf32> to tensor<2x?x?x3xf32>
 // CHECK: linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME: ins(%{{.+}}, %{{.+}} : tensor<2x?x?x3xf32>, tensor<3x2x3x4xf32>)
 // CHECK: return %{{.+}} : tensor<2x8x6x4xf32>
@@ -622,7 +631,9 @@ func.func @dynamic_reduce_window_empty(%a: tensor<?xi32>, %init: tensor<i32>) ->
 
 // Padding and base dilation affect the runtime output extent and values.
 // CHECK-LABEL: @dynamic_reduce_window_pad_base_dilation
-// CHECK: tensor.insert_slice %[[ARG0:.+]] into %{{.+}}[1] [%{{.+}}] [2] : tensor<?xi32> into tensor<?xi32>
+// CHECK: linalg.generic
+// CHECK: arith.divui
+// CHECK: tensor.extract %{{.+}}[%{{.+}}] : tensor<?xi32>
 // CHECK: arith.cmpi sge
 // CHECK: linalg.generic
 func.func @dynamic_reduce_window_pad_base_dilation(%a: tensor<?xi32>, %init: tensor<i32>) -> tensor<?xi32> {
@@ -813,14 +824,55 @@ func.func @dynamic_slice_unsigned_start(%operand: tensor<5x3xi32>, %row: tensor<
 
 // -----
 
-// A runtime-shaped pad with negative edges and interior padding pads
-// nonnegatively into scratch, then crops the negative edges.
+// A runtime-shaped crop with interior padding uses only the final shape.
 // CHECK-LABEL: @pad_dynamic_negative_interior
-// CHECK-SAME: (%[[ARG:[a-zA-Z0-9]+]]: tensor<?x5xf32>
-// CHECK: %[[FILL:.+]] = linalg.fill {{.+}} -> tensor<?x11xf32>
-// CHECK: %[[INSERTED:.+]] = tensor.insert_slice %[[ARG]] into %[[FILL]][0, 2] [%{{.+}}, 5] [2, 2] : tensor<?x5xf32> into tensor<?x11xf32>
-// CHECK: tensor.extract_slice %[[INSERTED]][1, 0] [%{{.+}}, 10] [1, 1] : tensor<?x11xf32> to tensor<?x10xf32>
+// CHECK-SAME: (%[[ARG:.+]]: tensor<?x5xf32>
+// CHECK: %[[EMPTY:.+]] = tensor.empty(%{{.+}}) : tensor<?x10xf32>
+// CHECK: linalg.generic {{.*}} outs(%[[EMPTY]] : tensor<?x10xf32>)
+// CHECK: scf.if {{.*}} -> (f32)
+// CHECK-NEXT: tensor.extract %[[ARG]][%{{.+}}, %{{.+}}]
+// CHECK-NOT: tensor.insert_slice
+// CHECK-NOT: tensor.extract_slice
+// CHECK: return
 func.func @pad_dynamic_negative_interior(%arg0: tensor<?x5xf32>, %pad: tensor<f32>) -> tensor<?x10xf32> {
   %0 = stablehlo.pad %arg0, %pad, low = [-1, 2], high = [3, -1], interior = [1, 1] : (tensor<?x5xf32>, tensor<f32>) -> tensor<?x10xf32>
   return %0 : tensor<?x10xf32>
+}
+
+// -----
+
+// Dilation exceeds i64 before cropping. Lower the declared three-element
+// result directly, without constructing an invalid dilated insert or scratch.
+// CHECK-LABEL: @pad_extreme_crop_static
+// CHECK-SAME: (%[[ARG:.+]]: tensor<3xi32>,
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<3xi32>
+// CHECK: %[[RESULT:.+]] = linalg.generic {{.*}} outs(%[[EMPTY]] : tensor<3xi32>)
+// CHECK: scf.if {{.*}} -> (i32)
+// CHECK-NEXT: tensor.extract %[[ARG]][%{{.+}}]
+// CHECK-NOT: tensor.insert_slice
+// CHECK-NOT: tensor.extract_slice
+// CHECK: return %[[RESULT]] : tensor<3xi32>
+func.func @pad_extreme_crop_static(%input: tensor<3xi32>, %value: tensor<i32>) -> tensor<3xi32> {
+  %r = stablehlo.pad %input, %value, low = [-9223372036854775804], high = [-9223372036854775806], interior = [9223372036854775805] : (tensor<3xi32>, tensor<i32>) -> tensor<3xi32>
+  return %r : tensor<3xi32>
+}
+
+// -----
+
+// Preserve unsigned padding through storage conversion, including a stride of
+// 2^64. The safe divisor guards the wrapped-zero stride before div/rem.
+// CHECK-LABEL: @dynamic_pad_unsigned
+// CHECK-SAME: (%[[ARG:.+]]: tensor<?xi32>,
+// CHECK: linalg.generic
+// CHECK: arith.cmpi uge
+// CHECK: %[[STRIDE:.+]] = arith.addi
+// CHECK: %[[WRAPPED:.+]] = arith.cmpi eq, %[[STRIDE]],
+// CHECK: %[[DIVISOR:.+]] = arith.select %[[WRAPPED]], %{{.+}}, %[[STRIDE]]
+// CHECK: arith.divui %{{.+}}, %[[DIVISOR]]
+// CHECK: arith.remui %{{.+}}, %[[DIVISOR]]
+// CHECK: scf.if {{.*}} -> (i32)
+// CHECK-NEXT: tensor.extract %[[ARG]][%{{.+}}]
+func.func @dynamic_pad_unsigned(%input: tensor<?xi32>, %value: tensor<i32>, %lo: tensor<1xui64>, %hi: tensor<1xui64>, %interior: tensor<1xui64>) -> tensor<?xi32> {
+  %r = stablehlo.dynamic_pad %input, %value, %lo, %hi, %interior : (tensor<?xi32>, tensor<i32>, tensor<1xui64>, tensor<1xui64>, tensor<1xui64>) -> tensor<?xi32>
+  return %r : tensor<?xi32>
 }
