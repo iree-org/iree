@@ -58,7 +58,7 @@ static iree_status_t CreateSingleDirectory(const std::string& path) {
 }
 
 static iree_status_t EnsureDirectoryExists(std::string path) {
-  if (path.empty()) return iree_ok_status();
+  if (path.empty() || IsDirectory(path)) return iree_ok_status();
   while (path.size() > 1 && IsPathSeparator(path.back())) {
     path.pop_back();
   }

@@ -126,11 +126,34 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_read_stdin(
   return iree_ok_status();
 }
 
-// Opens the file |handle| if it is file descriptor-based with the |mode| as
-// defined by the fdopen API. The returned FILE* has separate lifetime from the
-// |handle| and must be closed by the caller. Operations on the returned file
-// may not be coherent with operations made via any other mechanism due to
-// buffering in stdio.
+#if defined(IREE_PLATFORM_WASI)
+
+// WASI has no dup, so open an independently owned stream from the path instead
+// of converting a file handle whose descriptor must remain separately owned.
+static iree_status_t iree_io_file_contents_fopen(
+    iree_string_view_t path, const char* mode, iree_allocator_t host_allocator,
+    FILE** out_file) {
+  *out_file = NULL;
+  iree_host_size_t capacity = 0;
+  if (!iree_host_size_checked_add(path.size, 1, &capacity)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "file path is too long");
+  }
+  char* c_path = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(host_allocator, capacity, (void**)&c_path));
+  iree_string_view_to_cstring(path, c_path, capacity);
+  FILE* file = fopen(c_path, mode);
+  iree_status_t status =
+      file ? iree_ok_status() : iree_make_stdio_status("unable to open file");
+  iree_allocator_free(host_allocator, c_path);
+  *out_file = file;
+  return status;
+}
+
+#else
+
+// Opens a FILE* with a lifetime independent of |handle|. Its duplicated
+// descriptor shares the underlying file position, and stdio adds buffering.
 static iree_status_t iree_io_file_handle_fdopen(iree_io_file_handle_t* handle,
                                                 const char* mode,
                                                 FILE** out_file) {
@@ -149,8 +172,7 @@ static iree_status_t iree_io_file_handle_fdopen(iree_io_file_handle_t* handle,
   }
   int fd = iree_io_file_handle_primitive(handle).value.fd;
 
-  // Duplicate the file descriptor so that we have our own copy of the seek
-  // position. The initial position will be preserved.
+  // Duplicate the descriptor so the stream can close it independently.
   int dup_fd = iree_dup(fd);
   if (dup_fd == -1) {
     IREE_TRACE_ZONE_END(z0);
@@ -182,6 +204,8 @@ static iree_status_t iree_io_file_handle_fdopen(iree_io_file_handle_t* handle,
   return status;
 }
 
+#endif  // IREE_PLATFORM_WASI
+
 // Returns the size, in bytes, of the |file|. Must be seekable.
 static uint64_t iree_io_stdio_file_length(FILE* file) {
   IREE_ASSERT_ARGUMENT(file);
@@ -212,16 +236,21 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_read(
 
   // Open the file for reading.
   iree_io_file_handle_t* handle = NULL;
+#if !defined(IREE_PLATFORM_WASI)
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_io_file_handle_open(
               IREE_IO_FILE_MODE_READ | IREE_IO_FILE_MODE_SHARE_READ, path,
               host_allocator, &handle));
+#endif  // !IREE_PLATFORM_WASI
 
-  // Get an stdio FILE* for the handle.
-  // This will need to be closed as its lifetime is separate from our file
-  // handle.
+  // Open an independently owned stdio stream.
   FILE* file = NULL;
+#if defined(IREE_PLATFORM_WASI)
+  iree_status_t status =
+      iree_io_file_contents_fopen(path, "rb", host_allocator, &file);
+#else
   iree_status_t status = iree_io_file_handle_fdopen(handle, "rb", &file);
+#endif  // IREE_PLATFORM_WASI
 
   // Query the file size.
   iree_host_size_t file_size = 0;
@@ -267,7 +296,7 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_read(
   // Attempt to read the file into memory, chunking into ~2GB segments.
   // Several implementations of read have limits at ~2GB even on 64-bit systems.
   iree_host_size_t bytes_read = 0;
-  while (bytes_read < file_size) {
+  while (iree_status_is_ok(status) && bytes_read < file_size) {
     const iree_host_size_t chunk_size =
         iree_min(file_size - bytes_read, INT_MAX);
     if (fread(contents->buffer.data + bytes_read, 1, chunk_size, file) !=
@@ -354,16 +383,21 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_write(
 
   // Open file for overwriting (if it exists).
   iree_io_file_handle_t* handle = NULL;
+#if !defined(IREE_PLATFORM_WASI)
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_io_file_handle_open(
               IREE_IO_FILE_MODE_WRITE | IREE_IO_FILE_MODE_OVERWRITE, path,
               host_allocator, &handle));
+#endif  // !IREE_PLATFORM_WASI
 
-  // Get an stdio FILE* handle for the opened file.
-  // This will need to be closed as its lifetime is separate from our file
-  // handle.
+  // Open an independently owned stdio stream.
   FILE* file = NULL;
+#if defined(IREE_PLATFORM_WASI)
+  iree_status_t status =
+      iree_io_file_contents_fopen(path, "wb", host_allocator, &file);
+#else
   iree_status_t status = iree_io_file_handle_fdopen(handle, "wb", &file);
+#endif  // IREE_PLATFORM_WASI
 
   // Write all contents (if any) to the file.
   if (iree_status_is_ok(status) && contents.data_length > 0) {
@@ -378,7 +412,9 @@ IREE_API_EXPORT iree_status_t iree_io_file_contents_write(
 
   // Close the stdio handle as well as our file handle.
   if (file) {
-    fclose(file);
+    if (fclose(file) != 0 && iree_status_is_ok(status)) {
+      status = iree_make_stdio_status("unable to finish writing file");
+    }
   }
   iree_io_file_handle_release(handle);
   IREE_TRACE_ZONE_END(z0);

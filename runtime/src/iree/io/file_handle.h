@@ -226,6 +226,8 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_open(
 
 // Duplicates an existing platform fd that was already opened as |mode|
 // Returns IREE_STATUS_INVALID_ARGUMENT if the fd was not valid.
+// Returns IREE_STATUS_UNAVAILABLE on WASI, where descriptors cannot be
+// duplicated.
 IREE_API_EXPORT iree_status_t iree_io_file_handle_open_fd(
     iree_io_file_mode_t mode, int fd, iree_allocator_t host_allocator,
     iree_io_file_handle_t** out_handle);

@@ -42,6 +42,17 @@ iree_cc_test(
     "requires-filesystem"
 )
 
+if(IREE_BUILD_TESTS AND CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  iree_wasm_cc_test(
+    NAME wasi_file_io_test
+    MAIN "${IREE_SOURCE_DIR}/build_tools/wasm/wasm_test_main.mjs"
+    SRCS "wasi_file_io_test.cc"
+    DEPS ::file_handle ::stream iree::base iree::testing::gtest
+         iree::testing::gtest_main iree::testing::temp_file
+    TESTONLY
+  )
+endif()
+
 iree_cc_test(
   NAME
     memory_stream_test

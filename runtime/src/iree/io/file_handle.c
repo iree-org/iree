@@ -21,8 +21,10 @@
 
 #else
 
-#include <fcntl.h>     // open
+#include <fcntl.h>  // open
+#if !defined(IREE_PLATFORM_WASI)
 #include <sys/mman.h>  // mmap
+#endif                 // !IREE_PLATFORM_WASI
 #include <sys/stat.h>  // fstat
 #include <unistd.h>    // fsync
 
@@ -397,6 +399,10 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_platform_open_fd(
   IREE_ASSERT_ARGUMENT(out_handle_primitive);
   memset(out_handle_primitive, 0, sizeof(*out_handle_primitive));
 
+#if defined(IREE_PLATFORM_WASI)
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "WASI does not support duplicating file descriptors");
+#else
   int new_fd = dup(fd);
 
   if (new_fd == -1) {
@@ -407,6 +413,7 @@ IREE_API_EXPORT iree_status_t iree_io_file_handle_platform_open_fd(
   out_handle_primitive->type = IREE_IO_FILE_HANDLE_TYPE_FD;
   out_handle_primitive->value.fd = new_fd;
   return iree_ok_status();
+#endif  // IREE_PLATFORM_WASI
 }
 
 static void iree_io_file_handle_platform_close(
