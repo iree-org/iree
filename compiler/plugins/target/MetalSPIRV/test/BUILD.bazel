@@ -16,7 +16,10 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         # keep sorted
-        ["smoketest.mlir"],
+        [
+            "loop_buffer_updates.mlir",
+            "smoketest.mlir",
+        ],
         include = ["*.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",

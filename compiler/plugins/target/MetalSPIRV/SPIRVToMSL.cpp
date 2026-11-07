@@ -23,9 +23,27 @@
 namespace mlir::iree_compiler {
 
 namespace {
-class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
+class SPIRVToMSLCompiler final : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
 public:
   using CompilerMSL::CompilerMSL;
+
+  void preserveLoopBufferUpdates(
+      ArrayRef<std::pair<uint32_t, uint32_t>> loopReadWriteBuffers) {
+    ir.for_each_typed_id<SPIRV_CROSS_NAMESPACE::SPIRVariable>(
+        [this, loopReadWriteBuffers](
+            uint32_t id, SPIRV_CROSS_NAMESPACE::SPIRVariable &variable) {
+          if (variable.storage != spv::StorageClassStorageBuffer &&
+              variable.storage != spv::StorageClassUniform) {
+            return;
+          }
+          auto binding =
+              std::make_pair(get_decoration(id, spv::DecorationDescriptorSet),
+                             get_decoration(id, spv::DecorationBinding));
+          if (llvm::is_contained(loopReadWriteBuffers, binding)) {
+            set_decoration(id, spv::DecorationVolatile);
+          }
+        });
+  }
 
   MetalShader::ThreadGroupSize
   getWorkgroupSizeForEntryPoint(StringRef entryName) {
@@ -117,14 +135,15 @@ public:
 
 std::optional<std::pair<MetalShader, std::string>>
 crossCompileSPIRVToMSL(IREE::HAL::MetalTargetPlatform targetPlatform,
-                       llvm::ArrayRef<uint32_t> spvBinary,
-                       StringRef entryPoint) {
+                       llvm::ArrayRef<uint32_t> spvBinary, StringRef entryPoint,
+                       const MetalLoopMemoryRequirements &loopMemory) {
   SPIRVToMSLCompiler spvCrossCompiler(spvBinary.data(), spvBinary.size());
 
   // All spirv-cross operations work on the current entry point. It should be
   // set right after the cross compiler construction.
   spvCrossCompiler.set_entry_point(
       entryPoint.str(), spv::ExecutionModel::ExecutionModelGLCompute);
+  spvCrossCompiler.preserveLoopBufferUpdates(loopMemory.volatileBuffers);
 
   SmallVector<SPIRVToMSLCompiler::Descriptor> descriptors;
   bool hasPushConstant = false;
@@ -160,6 +179,9 @@ crossCompileSPIRVToMSL(IREE::HAL::MetalTargetPlatform targetPlatform,
   spvCrossCompiler.set_msl_options(spvCrossOptions);
 
   std::string mslSource = spvCrossCompiler.compile();
+  if (loopMemory.disableOptimization) {
+    mslSource.insert(0, "#pragma clang optimize off\n");
+  }
   // Get the revised entry point name. Cross compiling to MSL generates source
   // code, where we may run into the case that we are using reserved keyword for
   // the entry point name, e.g., `abs`. Under such circumstances, it will be
