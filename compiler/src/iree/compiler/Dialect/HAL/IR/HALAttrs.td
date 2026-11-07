@@ -855,6 +855,12 @@ def HAL_DeviceTargetAttr : HAL_AttrDef<"DeviceTarget", [
     `stream.min_copy_granularity` settings specify storage access units in bytes.
     Each must be a positive power of two representable in a signed 64-bit integer.
     These units constrain independent storage slices and their binding ranges.
+    Default target construction supplies minima required by registered device
+    and executable providers. Explicit targets and alias overrides must declare
+    units at least as large as those requirements; device verification diagnoses
+    smaller or omitted units before resource scheduling. Larger units are
+    preserved. Providers may leave a unit at one when they impose no additional
+    constraint in that category.
 
     If used to initialize a device global returns the first device matching the
     target requirements or null if no devices match. An optional `ordinal`

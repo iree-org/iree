@@ -54,6 +54,9 @@ table DescriptorSetLayoutBindingDef {
   descriptor_type:VkDescriptorType;
   descriptor_count:uint32;
   stage_flags:uint32;  // VkShaderStageFlags
+  // Bytes the shader accesses at a time; 4 when narrow types are emulated
+  // in 32-bit words. Bindings extend to whole units within owned storage.
+  minimum_access_bytes:uint32 = 1;
 }
 
 // Used to create an VkDescriptorSetLayout.
@@ -81,6 +84,10 @@ table BdaBindingDef {
 
   // Minimum byte length required by the shader.
   minimum_length:uint64 = 0;
+
+  // Physical access unit in bytes, including any emulated narrow storage.
+  // Non-empty ranges must start on a unit boundary and own the rounded tail.
+  minimum_access_bytes:uint32 = 1;
 }
 
 // BDA v1 dispatch ABI layout for one exported pipeline.

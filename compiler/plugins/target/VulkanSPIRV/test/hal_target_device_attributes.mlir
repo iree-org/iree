@@ -17,8 +17,20 @@
 // RUN:              --iree-vulkan-dispatch-abi=all %s \
 // RUN: | FileCheck %s --check-prefix=CHECK-ALL
 //
-// CHECK-ALL: #hal.device.target<"vulkan", [#hal.executable.target<"vulkan-spirv", "vulkan-spirv-bda-v1"
+// CHECK-ALL: #hal.device.target<"vulkan", {{.*}}[#hal.executable.target<"vulkan-spirv", "vulkan-spirv-bda-v1"
 // CHECK-ALL-SAME: #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"
+//
+// Targets that access narrow storage in 32-bit words record that granularity;
+// every target records the 32-bit words its fill builtin patches.
+// RUN: iree-compile --compile-to=preprocessing --iree-hal-target-device=vulkan %s \
+// RUN: | FileCheck %s --check-prefix=CHECK-GRANULARITY-WORD
+// RUN: iree-compile --compile-to=preprocessing --iree-hal-target-device=vulkan \
+// RUN:              --iree-vulkan-target=rx7900xtx %s \
+// RUN: | FileCheck %s --check-prefix=CHECK-GRANULARITY-BYTE
+//
+// CHECK-GRANULARITY-WORD: #hal.device.target<"vulkan", {stream.min_access_granularity = 4 : i64, stream.min_fill_granularity = 4 : i64}
+// CHECK-GRANULARITY-BYTE: #hal.device.target<"vulkan", {stream.min_fill_granularity = 4 : i64}
+// CHECK-GRANULARITY-BYTE-NOT: stream.min_access_granularity
 //
 // Replace the default features
 // RUN: iree-compile --compile-to=preprocessing --iree-hal-target-device=vulkan \

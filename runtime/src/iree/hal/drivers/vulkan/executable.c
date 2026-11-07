@@ -30,9 +30,10 @@ iree_status_t iree_hal_vulkan_executable_infer_format(
 
   const bool unsafe_infer_size = executable_data.data_length == 0;
   iree_const_byte_span_t flatbuffer_data = iree_const_byte_span_empty();
-  IREE_RETURN_IF_ERROR(iree_hal_read_executable_flatbuffer_header(
+  IREE_RETURN_IF_ERROR(iree_hal_read_executable_flatbuffer_header_versioned(
       executable_data, unsafe_infer_size,
-      iree_hal_vulkan_ExecutableDef_file_identifier, &flatbuffer_data));
+      iree_hal_vulkan_ExecutableDef_file_identifier,
+      /*max_supported_version=*/1, &flatbuffer_data));
 
   const int verify_result = iree_hal_vulkan_ExecutableDef_verify_as_root(
       flatbuffer_data.data, flatbuffer_data.data_length);
@@ -169,6 +170,18 @@ static iree_status_t iree_hal_vulkan_verify_descriptor_set_layout_def(
                                 "] has duplicate binding ordinal %u",
                                 descriptor_set_layout_ordinal, binding);
       }
+    }
+
+    const uint32_t minimum_access_bytes =
+        iree_hal_vulkan_DescriptorSetLayoutBindingDef_minimum_access_bytes_get(
+            binding_def);
+    if (minimum_access_bytes != 1 && minimum_access_bytes != 2 &&
+        minimum_access_bytes != 4) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "descriptor_set_layouts[%" PRIhsz "] bindings[%" PRIhsz
+          "] minimum_access_bytes %u is not 1, 2, or 4",
+          descriptor_set_layout_ordinal, i, minimum_access_bytes);
     }
 
     const uint32_t descriptor_count =
@@ -673,6 +686,16 @@ static iree_status_t iree_hal_vulkan_verify_bda_dispatch_layout_def(
                               "pipelines[%" PRIhsz
                               "] BDA binding requirement[%" PRIhsz "] is NULL",
                               pipeline_ordinal, i);
+    }
+    const uint32_t minimum_access_bytes =
+        iree_hal_vulkan_BdaBindingDef_minimum_access_bytes_get(binding_def);
+    if (minimum_access_bytes != 1 && minimum_access_bytes != 2 &&
+        minimum_access_bytes != 4) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "pipelines[%" PRIhsz
+                              "] BDA binding requirement[%" PRIhsz
+                              "] minimum_access_bytes %u is not 1, 2, or 4",
+                              pipeline_ordinal, i, minimum_access_bytes);
     }
     const uint32_t minimum_alignment =
         iree_hal_vulkan_BdaBindingDef_minimum_alignment_get(binding_def);
@@ -1253,6 +1276,9 @@ static iree_status_t iree_hal_vulkan_initialize_pipeline_descriptor_metadata(
       const uint32_t descriptor_count =
           iree_hal_vulkan_DescriptorSetLayoutBindingDef_descriptor_count_get(
               binding_def);
+      const uint32_t minimum_access_bytes =
+          iree_hal_vulkan_DescriptorSetLayoutBindingDef_minimum_access_bytes_get(
+              binding_def);
       for (uint32_t array_element = 0; array_element < descriptor_count;
            ++array_element) {
         if (binding_index == 0 && use_push_descriptors) {
@@ -1268,6 +1294,7 @@ static iree_status_t iree_hal_vulkan_initialize_pipeline_descriptor_metadata(
             .descriptor_type = (VkDescriptorType)
                 iree_hal_vulkan_DescriptorSetLayoutBindingDef_descriptor_type_get(
                     binding_def),
+            .minimum_access_bytes = minimum_access_bytes,
         };
       }
     }
@@ -1319,7 +1346,9 @@ static iree_status_t iree_hal_vulkan_initialize_pipeline_bda_metadata(
     iree_hal_vulkan_BdaBindingDef_table_t binding_def =
         iree_hal_vulkan_BdaBindingDef_vec_at(bindings_vec, i);
     if (iree_hal_vulkan_BdaBindingDef_minimum_alignment_get(binding_def) != 1 ||
-        iree_hal_vulkan_BdaBindingDef_minimum_length_get(binding_def) != 0) {
+        iree_hal_vulkan_BdaBindingDef_minimum_length_get(binding_def) != 0 ||
+        iree_hal_vulkan_BdaBindingDef_minimum_access_bytes_get(binding_def) !=
+            1) {
       has_binding_requirements = true;
       break;
     }
@@ -1334,14 +1363,15 @@ static iree_status_t iree_hal_vulkan_initialize_pipeline_bda_metadata(
   for (iree_host_size_t i = 0; i < binding_requirement_count; ++i) {
     iree_hal_vulkan_BdaBindingDef_table_t binding_def =
         iree_hal_vulkan_BdaBindingDef_vec_at(bindings_vec, i);
-    out_pipeline->bda.binding_requirements[i] =
-        (iree_hal_vulkan_bda_binding_requirement_t){
-            .minimum_alignment =
-                iree_hal_vulkan_BdaBindingDef_minimum_alignment_get(
-                    binding_def),
-            .minimum_length =
-                iree_hal_vulkan_BdaBindingDef_minimum_length_get(binding_def),
-        };
+    out_pipeline->bda
+        .binding_requirements[i] = (iree_hal_vulkan_bda_binding_requirement_t){
+        .minimum_alignment =
+            iree_hal_vulkan_BdaBindingDef_minimum_alignment_get(binding_def),
+        .minimum_length =
+            iree_hal_vulkan_BdaBindingDef_minimum_length_get(binding_def),
+        .minimum_access_bytes =
+            iree_hal_vulkan_BdaBindingDef_minimum_access_bytes_get(binding_def),
+    };
   }
   return iree_ok_status();
 }
@@ -1375,7 +1405,8 @@ static iree_status_t iree_hal_vulkan_initialize_raw_pipeline_bda_metadata(
             .minimum_alignment =
                 metadata->binding_requirements[i].minimum_alignment,
             .minimum_length = metadata->binding_requirements[i].minimum_length,
-        };
+            .minimum_access_bytes = 1,
+    };
   }
   return iree_ok_status();
 }
@@ -1927,9 +1958,10 @@ iree_status_t iree_hal_vulkan_executable_create(
   }
 
   iree_const_byte_span_t executable_flatbuffer = iree_const_byte_span_empty();
-  iree_status_t status = iree_hal_read_executable_flatbuffer_header(
+  iree_status_t status = iree_hal_read_executable_flatbuffer_header_versioned(
       executable_params->executable_data, /*unsafe_infer_size=*/false,
-      iree_hal_vulkan_ExecutableDef_file_identifier, &executable_flatbuffer);
+      iree_hal_vulkan_ExecutableDef_file_identifier,
+      /*max_supported_version=*/1, &executable_flatbuffer);
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_executable_flatbuffer_verify(
         physical_device, enabled_features, dispatch_abi, executable_flatbuffer);

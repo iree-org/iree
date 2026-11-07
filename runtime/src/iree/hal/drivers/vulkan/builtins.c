@@ -8,6 +8,8 @@
 
 #include <string.h>
 
+#include "iree/hal/drivers/vulkan/buffer.h"
+#include "iree/hal/drivers/vulkan/descriptor_range.h"
 #include "iree/hal/drivers/vulkan/physical_device.h"
 
 typedef struct iree_hal_vulkan_fill_unaligned_push_constants_t {
@@ -342,6 +344,66 @@ static iree_status_t iree_hal_vulkan_builtins_create_empty_binding_buffer(
   return iree_ok_status();
 }
 
+iree_status_t iree_hal_vulkan_builtins_resolve_descriptor_length(
+    const iree_hal_vulkan_builtins_t* builtins,
+    VkDescriptorType descriptor_type, uint32_t minimum_access_bytes,
+    iree_hal_buffer_t* buffer, iree_device_size_t offset,
+    iree_device_size_t length, iree_device_size_t* out_length) {
+  const iree_device_size_t view_length = iree_hal_buffer_byte_length(buffer);
+  const iree_device_size_t owned_length =
+      iree_hal_vulkan_buffer_owned_byte_length(buffer);
+  const VkDeviceSize max_range =
+      descriptor_type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+          ? builtins->max_uniform_buffer_range
+          : builtins->max_storage_buffer_range;
+  return iree_hal_vulkan_resolve_descriptor_range(
+      view_length, owned_length, offset, length, minimum_access_bytes,
+      max_range, out_length);
+}
+
+iree_status_t iree_hal_vulkan_builtins_resolve_buffer_descriptor(
+    const iree_hal_vulkan_builtins_t* builtins,
+    VkDescriptorType descriptor_type, uint32_t minimum_access_bytes,
+    iree_hal_buffer_t* buffer, iree_device_size_t offset,
+    iree_device_size_t length, VkDescriptorBufferInfo* out_buffer_info) {
+  iree_device_size_t physical_length = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_builtins_resolve_descriptor_length(
+      builtins, descriptor_type, minimum_access_bytes, buffer, offset, length,
+      &physical_length));
+  if (physical_length == 0) {
+    *out_buffer_info = (VkDescriptorBufferInfo){
+        .buffer = builtins->empty_binding_buffer,
+        .offset = 0,
+        .range = IREE_HAL_VULKAN_EMPTY_BINDING_BUFFER_SIZE,
+    };
+    return iree_ok_status();
+  }
+
+  iree_hal_buffer_t* backing_buffer = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_buffer_resolve_backing(buffer, &backing_buffer));
+  iree_device_size_t backing_offset = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_buffer_resolve_backing_offset(
+      buffer, backing_buffer, offset, &backing_offset));
+  if (minimum_access_bytes > 1 && backing_offset % minimum_access_bytes != 0) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "Vulkan descriptor offset %" PRIu64
+        " is not aligned to its %u-byte storage access unit",
+        (uint64_t)backing_offset, minimum_access_bytes);
+  }
+  VkDeviceMemory memory = VK_NULL_HANDLE;
+  VkBuffer handle = VK_NULL_HANDLE;
+  IREE_RETURN_IF_ERROR(
+      iree_hal_vulkan_buffer_handle(backing_buffer, &memory, &handle));
+  *out_buffer_info = (VkDescriptorBufferInfo){
+      .buffer = handle,
+      .offset = (VkDeviceSize)backing_offset,
+      .range = (VkDeviceSize)physical_length,
+  };
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_vulkan_builtins_initialize(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
@@ -369,6 +431,10 @@ iree_status_t iree_hal_vulkan_builtins_initialize(
   }
   out_builtins->min_storage_buffer_offset_alignment =
       min_storage_buffer_offset_alignment;
+  out_builtins->max_storage_buffer_range =
+      physical_device->properties2.properties.limits.maxStorageBufferRange;
+  out_builtins->max_uniform_buffer_range =
+      physical_device->properties2.properties.limits.maxUniformBufferRange;
 
   VkDescriptorSetLayoutBinding fill_layout_binding = {
       .binding = 0,

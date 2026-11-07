@@ -239,6 +239,38 @@ iree_status_t iree_hal_vulkan_buffer_create_borrowed(
       release_callback, host_allocator, out_buffer);
 }
 
+static void iree_hal_vulkan_buffer_release_reservation(
+    void* user_data, iree_hal_buffer_t* buffer) {
+  (void)buffer;
+  iree_hal_buffer_release((iree_hal_buffer_t*)user_data);
+}
+
+iree_status_t iree_hal_vulkan_buffer_create_from_reservation(
+    iree_hal_buffer_t* reservation, iree_device_size_t byte_length,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
+  iree_hal_vulkan_buffer_t* source = iree_hal_vulkan_buffer_cast(reservation);
+  const iree_hal_buffer_release_callback_t release_callback = {
+      iree_hal_vulkan_buffer_release_reservation,
+      reservation,
+  };
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_buffer_create_internal(
+      &source->syms, source->logical_device,
+      iree_hal_buffer_allocation_placement(reservation),
+      iree_hal_buffer_memory_type(reservation),
+      iree_hal_buffer_allowed_access(reservation),
+      iree_hal_buffer_allowed_usage(reservation),
+      iree_hal_buffer_byte_length(reservation), /*byte_offset=*/0, byte_length,
+      source->memory_property_flags, source->non_coherent_atom_size,
+      source->device_memory, source->handle_offset,
+      source->device_memory_offset,
+      source->mapping_state ? source->mapping_state->device_memory_size : 0,
+      source->mapping_state, source->handle, source->device_address,
+      IREE_HAL_VULKAN_BUFFER_OWNS_NONE, release_callback, host_allocator,
+      out_buffer));
+  iree_hal_buffer_retain(reservation);
+  return iree_ok_status();
+}
+
 static void iree_hal_vulkan_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_vulkan_buffer_t* buffer = iree_hal_vulkan_buffer_cast(base_buffer);
   iree_allocator_t host_allocator = buffer->host_allocator;
@@ -371,6 +403,14 @@ iree_status_t iree_hal_vulkan_buffer_handle(iree_hal_buffer_t* buffer,
   *out_memory = vulkan_buffer->device_memory;
   *out_handle = vulkan_buffer->handle;
   return iree_ok_status();
+}
+
+iree_device_size_t iree_hal_vulkan_buffer_owned_byte_length(
+    iree_hal_buffer_t* buffer) {
+  return iree_hal_buffer_allocated_buffer(buffer) == buffer
+             ? iree_hal_buffer_allocation_size(buffer) -
+                   iree_hal_buffer_byte_offset(buffer)
+             : iree_hal_buffer_byte_length(buffer);
 }
 
 iree_status_t iree_hal_vulkan_buffer_device_address(

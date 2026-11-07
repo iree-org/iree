@@ -54,8 +54,10 @@ createExportDefs(int debugLevel,
 
   for (auto exportOp : exportOps) {
     auto ordinalAttr = exportOp.getOrdinalAttr();
-    assert(ordinalAttr && "ordinals must be assigned");
-    int64_t ordinal = ordinalAttr.getInt();
+    // A single export has implicit ordinal zero before executable linking.
+    assert((ordinalAttr || exportOps.size() == 1) &&
+           "ordinals must be assigned when multiple exports are present");
+    int64_t ordinal = ordinalAttr ? ordinalAttr.getInt() : 0;
 
     flatbuffers_ref_t nameRef = 0;
     if (debugLevel >= 1) {

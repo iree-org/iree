@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_binary")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
@@ -19,6 +20,7 @@ iree_lit_test_suite(
         [
             "hal_target_device_attributes.mlir",
             "materialize_homogeneous_encodings.mlir",
+            "serialize_access_units.mlir",
             "smoketest.mlir",
             "target_device_features.mlir",
         ],
@@ -26,8 +28,28 @@ iree_lit_test_suite(
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
+        ":dump_executable_metadata",
         "//tools:iree-compile",
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
+    ],
+)
+
+# Test-only schema printer keeps checks independent of binary table offsets.
+iree_compiler_cc_binary(
+    name = "dump_executable_metadata",
+    testonly = True,
+    srcs = ["dump_executable_metadata.cc"],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal/utils:executable_header",
+        "//runtime/src/iree/schemas:executable_debug_info_c_fbs",
+        "//runtime/src/iree/schemas:vulkan_executable_def_c_fbs",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Support",
     ],
 )
