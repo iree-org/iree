@@ -507,6 +507,19 @@ static void stripFrontendAttrs(mlir::ModuleOp moduleOp) {
   }
 }
 
+// Producer-specific and shape-assertion rewrites run before final conversion.
+// Report every remaining target before conversion can erase dead calls or
+// replace their operands, obscuring the unsupported producer contract.
+static LogicalResult verifyCustomCallsAreResolved(ModuleOp module) {
+  bool hasUnresolvedCustomCalls = false;
+  module.walk([&hasUnresolvedCustomCalls](mlir::stablehlo::CustomCallOp call) {
+    call.emitOpError() << "no applicable lowering for custom call target '"
+                       << call.getCallTargetName() << "'";
+    hasUnresolvedCustomCalls = true;
+  });
+  return failure(hasUnresolvedCustomCalls);
+}
+
 struct ConvertStableHloToIreeInputDialects final
     : impl::ConvertStableHloToIreeInputDialectsBase<
           ConvertStableHloToIreeInputDialects> {
@@ -519,6 +532,9 @@ struct ConvertStableHloToIreeInputDialects final
   }
 
   void runOnOperation() override {
+    if (failed(verifyCustomCallsAreResolved(getOperation()))) {
+      return signalPassFailure();
+    }
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
 

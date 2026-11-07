@@ -44,6 +44,7 @@ iree_lit_test_suite(
             "stablehlo_to_iree_input_dialects.mlir",
             "stablehlo_to_linalg_ext.mlir",
             "stablehlo_to_linalg_ext_invalid.mlir",
+            "unsupported_custom_call.mlir",
             "verify_compiler_input_legality.mlir",
             "vhlo_stablehlo_mix_invalid.mlir",
         ],
