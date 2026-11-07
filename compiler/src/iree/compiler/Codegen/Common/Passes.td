@@ -325,7 +325,9 @@ def DecomposeLinalgGenericPass :
     Note that this is often an extreme pessimization unless if part of a
     lowering flow which was designed for it.
 
-    Operates on tensor based linalg ops.
+    Operates on tensor based linalg ops whose output block arguments are unused
+    and have integer, index or floating-point types. Scalar body operations must
+    have no regions or memory effects. Other generic operations are preserved.
   }];
 }
 
