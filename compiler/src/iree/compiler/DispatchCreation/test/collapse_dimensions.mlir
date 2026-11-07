@@ -1156,6 +1156,46 @@ util.func public @collapse_reverse_generic(%src: tensor<2x2x2xf32>) -> tensor<2x
 
 // -----
 
+// Collapsing the batch dims delinearises the head index; the query and key
+// indices move down one.
+util.func public @collapse_attention_score_indices(%q: tensor<6x5x4xf32>, %k: tensor<6x7x4xf32>, %v: tensor<6x7x8xf32>, %scale: f32) -> tensor<2x3x5x8xf32> {
+  %eq = tensor.expand_shape %q [[0, 1], [2], [3]] output_shape [2, 3, 5, 4] : tensor<6x5x4xf32> into tensor<2x3x5x4xf32>
+  %ek = tensor.expand_shape %k [[0, 1], [2], [3]] output_shape [2, 3, 7, 4] : tensor<6x7x4xf32> into tensor<2x3x7x4xf32>
+  %ev = tensor.expand_shape %v [[0, 1], [2], [3]] output_shape [2, 3, 7, 8] : tensor<6x7x8xf32> into tensor<2x3x7x8xf32>
+  %0 = flow.dispatch.region -> (tensor<2x3x5x8xf32>) {
+    %init = tensor.empty() : tensor<2x3x5x8xf32>
+    %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]>
+      ins(%eq, %ek, %ev, %scale : tensor<2x3x5x4xf32>, tensor<2x3x7x4xf32>, tensor<2x3x7x8xf32>, f32) outs(%init : tensor<2x3x5x8xf32>) {
+    ^bb0(%score: f32):
+      %h = iree_linalg_ext.index 1 : index
+      %qi = iree_linalg_ext.index 2 : index
+      %ki = iree_linalg_ext.index 3 : index
+      %limit = arith.addi %qi, %h : index
+      %hidden = arith.cmpi ugt, %ki, %limit : index
+      %ninf = arith.constant 0xFF800000 : f32
+      %masked = arith.select %hidden, %ninf, %score : f32
+      iree_linalg_ext.yield %masked : f32
+    } -> tensor<2x3x5x8xf32>
+    flow.return %1 : tensor<2x3x5x8xf32>
+  }
+  util.return %0 : tensor<2x3x5x8xf32>
+}
+// CHECK-LABEL: util.func public @collapse_attention_score_indices
+//       CHECK:   iree_linalg_ext.attention
+//  CHECK-SAME:     tensor<6x5x4xf32>
+//       CHECK:     %[[B:.+]] = iree_linalg_ext.index 0 : index
+//       CHECK:     %[[BH:.+]]:2 = affine.delinearize_index %[[B]] into (2, 3) : index, index
+//       CHECK:     %[[Q:.+]] = iree_linalg_ext.index 1 : index
+//       CHECK:     %[[K:.+]] = iree_linalg_ext.index 2 : index
+//       CHECK:     %[[LIMIT:.+]] = arith.addi %[[Q]], %[[BH]]#1 : index
+//       CHECK:     arith.cmpi ugt, %[[K]], %[[LIMIT]] : index
+
+// -----
+
 // A named batch_matmul whose RHS drops the batch dim indexes batch and M
 // together on the LHS and the output, so the op is generalized and both loops
 // collapse into a single M dim.
