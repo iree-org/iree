@@ -16,18 +16,17 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
 
-// Yields `score`, or -inf where the key position is after the query position,
+// Adds -inf where the key position is after the query position,
 // as torch's tril(ones(L, S)). Score index `queryIndex` is the query position
 // and the next one the key position.
-void buildCausalScore(OpBuilder &builder, Location loc, Value score,
-                      int64_t queryIndex) {
+static void buildCausalScore(OpBuilder &builder, Location loc, Value score,
+                             int64_t queryIndex) {
   Value query = IREE::LinalgExt::IndexOp::create(builder, loc, queryIndex);
   Value key = IREE::LinalgExt::IndexOp::create(builder, loc, queryIndex + 1);
   Value hidden = arith::CmpIOp::create(builder, loc, arith::CmpIPredicate::ugt,
@@ -38,111 +37,22 @@ void buildCausalScore(OpBuilder &builder, Location loc, Value score,
       builder.getFloatAttr(scoreType,
                            APFloat::getInf(scoreType.getFloatSemantics(),
                                            /*Negative=*/true)));
-  Value masked = arith::SelectOp::create(builder, loc, hidden, negInf, score);
+  Value zero =
+      arith::ConstantOp::create(builder, loc, builder.getZeroAttr(scoreType));
+  Value bias = arith::SelectOp::create(builder, loc, hidden, negInf, zero);
+  // The producer adds a bias: masking does not discard an existing NaN.
+  Value masked = arith::AddFOp::create(builder, loc, score, bias);
   IREE::LinalgExt::YieldOp::create(builder, loc, masked);
 }
 
-// Zeroes the rows of `attention` whose mask hides every key, as torch's
-// _safe_softmax does; the attention op would divide by an empty sum there.
-// `maskBatchDims` are the batch dims of `attention` that the mask keeps.
-Value zeroHiddenRows(PatternRewriter &rewriter, Location loc, Value mask,
-                     Value attention, ArrayRef<int64_t> maskBatchDims) {
-  MLIRContext *context = rewriter.getContext();
-  auto maskType = cast<RankedTensorType>(mask.getType());
-  int64_t maskRank = maskType.getRank();
-  SmallVector<OpFoldResult> rowSizes;
-  for (int64_t i = 0; i < maskRank - 1; ++i) {
-    rowSizes.push_back(tensor::getMixedSize(rewriter, loc, mask, i));
-  }
-  Value hidden =
-      tensor::EmptyOp::create(rewriter, loc, rowSizes, rewriter.getI1Type());
-  Value none = arith::ConstantIntOp::create(rewriter, loc, 0, 1);
-  hidden = linalg::FillOp::create(rewriter, loc, none, hidden).getResult(0);
-  AffineMap maskMap = rewriter.getMultiDimIdentityMap(maskRank);
-  SmallVector<utils::IteratorType> iterators(maskRank - 1,
-                                             utils::IteratorType::parallel);
-  iterators.push_back(utils::IteratorType::reduction);
-  auto floatType = dyn_cast<FloatType>(maskType.getElementType());
-  Value visible =
-      linalg::GenericOp::create(
-          rewriter, loc, hidden.getType(), mask, hidden,
-          ArrayRef<AffineMap>{maskMap, maskMap.dropResult(maskRank - 1)},
-          iterators,
-          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-            Value seen = args[0];
-            if (floatType) {
-              // A NaN entry is no -inf, so its row stays visible.
-              Value negativeInfinity = arith::ConstantOp::create(
-                  b, nestedLoc,
-                  b.getFloatAttr(floatType,
-                                 APFloat::getInf(floatType.getFloatSemantics(),
-                                                 /*Negative=*/true)));
-              seen =
-                  arith::CmpFOp::create(b, nestedLoc, arith::CmpFPredicate::UNE,
-                                        args[0], negativeInfinity);
-            }
-            Value any = arith::OrIOp::create(b, nestedLoc, seen, args[1]);
-            linalg::YieldOp::create(b, nestedLoc, any);
-          })
-          .getResult(0);
-
-  auto resultType = cast<RankedTensorType>(attention.getType());
-  int64_t rank = resultType.getRank();
-  SmallVector<AffineExpr> rowExprs;
-  for (int64_t i : maskBatchDims) {
-    rowExprs.push_back(rewriter.getAffineDimExpr(i));
-  }
-  rowExprs.push_back(rewriter.getAffineDimExpr(rank - 2));
-  AffineMap identity = rewriter.getMultiDimIdentityMap(rank);
-  Value init = tensor::EmptyOp::create(
-      rewriter, loc, tensor::getMixedSizes(rewriter, loc, attention),
-      resultType.getElementType());
-  return linalg::GenericOp::create(
-             rewriter, loc, resultType, ValueRange{attention, visible}, init,
-             ArrayRef<AffineMap>{identity,
-                                 AffineMap::get(rank, 0, rowExprs, context),
-                                 identity},
-             SmallVector<utils::IteratorType>(rank,
-                                              utils::IteratorType::parallel),
-             [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-               Value zero = arith::ConstantOp::create(
-                   b, nestedLoc, b.getZeroAttr(args[0].getType()));
-               Value selected = arith::SelectOp::create(b, nestedLoc, args[1],
-                                                        args[0], zero);
-               linalg::YieldOp::create(b, nestedLoc, selected);
-             })
-      .getResult(0);
+// These types have a post-scale score region, which can preserve additive
+// masking and distinguish synthetic padding from the producer's mask.
+static bool supportsTorchAttentionElementType(FloatType type) {
+  return type && (type.isF16() || type.isBF16() || type.isF32());
 }
 
-// Returns true if |mask| is a constant with a visible key in every row; NaN
-// counts as visible, as in zeroHiddenRows.
-bool hasVisibleKeyInEveryRow(Value mask) {
-  DenseElementsAttr values;
-  if (!matchPattern(mask, m_Constant(&values))) {
-    return false;
-  }
-  int64_t rowLength = values.getType().getShape().back();
-  if (rowLength == 0) {
-    return false;
-  }
-  SmallVector<bool> visible;
-  if (values.getElementType().isInteger(1)) {
-    visible = llvm::to_vector(values.getValues<bool>());
-  } else {
-    for (const APFloat &value : values.getValues<APFloat>()) {
-      visible.push_back(!(value.isInfinity() && value.isNegative()));
-    }
-  }
-  for (size_t row = 0; row < visible.size(); row += rowLength) {
-    if (!llvm::is_contained(ArrayRef(visible).slice(row, rowLength), true)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-LogicalResult rewriteAttention(mlir::stablehlo::CompositeOp op,
-                               PatternRewriter &rewriter) {
+static LogicalResult rewriteAttention(mlir::stablehlo::CompositeOp op,
+                                      PatternRewriter &rewriter) {
   auto attrs = op->getAttrOfType<DictionaryAttr>("composite_attributes");
   if (!attrs || !op->getDiscardableAttrs().empty()) {
     return failure();
@@ -173,18 +83,11 @@ LogicalResult rewriteAttention(mlir::stablehlo::CompositeOp op,
   }
   auto elementType = dyn_cast<FloatType>(queryType.getElementType());
   int64_t rank = queryType.getRank();
-  // The attention op accumulates in f32, which would narrow f64.
-  if (!elementType || elementType.getWidth() > 32 || rank < 2 ||
+  if (!supportsTorchAttentionElementType(elementType) || rank < 2 ||
       keyType.getElementType() != elementType ||
       valueType.getElementType() != elementType ||
       resultType.getElementType() != elementType || keyType.getRank() != rank ||
       valueType.getRank() != rank || resultType.getRank() != rank) {
-    return failure();
-  }
-  // Low-precision attention applies its score region before scaling. Causal
-  // exclusion in that region is unsafe for zero/negative scales, so retain the
-  // portable decomposition until a post-scale mask contract is supported.
-  if (isCausal.getValue() && elementType.getWidth() <= 8) {
     return failure();
   }
   ArrayRef<int64_t> q = queryType.getShape(), k = keyType.getShape(),
@@ -279,7 +182,7 @@ LogicalResult rewriteAttention(mlir::stablehlo::CompositeOp op,
       rewriter, loc, rewriter.getFloatAttr(elementType, scaleValue));
 
   // Grouped queries split their head dim into (key heads, groupSize); so does
-  // a mask that keeps the head dim. `mask` stays row-shaped for zeroHiddenRows.
+  // a mask that keeps the head dim.
   int64_t head = numBatches - 1;
   Value query = op.getInputs()[0];
   Value attentionMask = mask;
@@ -384,6 +287,8 @@ LogicalResult rewriteAttention(mlir::stablehlo::CompositeOp op,
       rewriter, loc, attentionType, query, op.getInputs()[1], op.getInputs()[2],
       scale, init, rewriter.getAffineMapArrayAttr(maps),
       mask ? std::optional<Value>(attentionMask) : std::nullopt);
+  attention.setSafeSoftmax(true);
+  attention.setAdditiveMask(static_cast<bool>(mask));
   {
     OpBuilder::InsertionGuard guard(rewriter);
     Block *block = rewriter.createBlock(&attention.getRegion());
@@ -401,9 +306,6 @@ LogicalResult rewriteAttention(mlir::stablehlo::CompositeOp op,
     result =
         tensor::CollapseShapeOp::create(rewriter, loc, resultType, result,
                                         headReassociation(attentionRank, head));
-  }
-  if (numInputs == 4 && !hasVisibleKeyInEveryRow(op.getInputs()[3])) {
-    result = zeroHiddenRows(rewriter, loc, mask, result, maskBatchDims);
   }
   rewriter.replaceOp(op, result);
   return success();

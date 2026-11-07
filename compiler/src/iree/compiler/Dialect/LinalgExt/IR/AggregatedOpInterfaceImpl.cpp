@@ -212,7 +212,8 @@ static Value buildScoreRegion(OpBuilder &builder, Location loc, Region &region,
 }
 
 static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
-                       AffineMap maskMap, Value qk, Value mask, bool useExp2) {
+                       AffineMap maskMap, Value qk, Value mask, bool useExp2,
+                       bool additiveMask) {
 
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{qkMap, maskMap});
@@ -233,7 +234,7 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
         Value qkVal = args[1];
         Value maskVal = args[0];
 
-        // An excluded position scores -inf whatever its key holds.
+        // Exclusion replaces a score; additive masking retains IEEE arithmetic.
         Value result;
         // TODO: Replace bool mask condition once treated as i1 (instead of i8)
         auto maskValType = maskVal.getType();
@@ -242,12 +243,18 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
             maskVal =
                 arith::TruncIOp::create(b, loc, builder.getI1Type(), maskVal);
           }
-          result = arith::SelectOp::create(b, loc, maskVal, qkVal, negInf);
+          if (additiveMask) {
+            Value zero = arith::ConstantOp::create(
+                b, loc, b.getZeroAttr(qkVal.getType()));
+            Value bias = arith::SelectOp::create(b, loc, maskVal, zero, negInf);
+            result = arith::AddFOp::create(b, loc, qkVal, bias);
+          } else {
+            result = arith::SelectOp::create(b, loc, maskVal, qkVal, negInf);
+          }
         } else {
           maskVal = convertScalarToDtype(b, loc, maskVal, qkVal.getType(),
                                          /*isUnsignedCast=*/false);
-          Value excluded = arith::CmpFOp::create(
-              b, loc, arith::CmpFPredicate::OEQ, maskVal, negInf);
+          Value unscaledMask = maskVal;
           // Scaling to compensate for base-2 softmax
           if (useExp2) {
             Value log2e = arith::ConstantOp::create(
@@ -255,7 +262,13 @@ static Value applyMask(OpBuilder &builder, Location loc, AffineMap qkMap,
             maskVal = arith::MulFOp::create(b, loc, maskVal, log2e);
           }
           Value add = arith::AddFOp::create(b, loc, qkVal, maskVal);
-          result = arith::SelectOp::create(b, loc, excluded, negInf, add);
+          if (additiveMask) {
+            result = add;
+          } else {
+            Value excluded = arith::CmpFOp::create(
+                b, loc, arith::CmpFPredicate::OEQ, unscaledMask, negInf);
+            result = arith::SelectOp::create(b, loc, excluded, negInf, add);
+          }
         }
         linalg::YieldOp::create(b, loc, result);
       });
@@ -367,7 +380,7 @@ static Value buildAttentionScores(
     AffineMap scoreMap, std::optional<AffineMap> maskMap,
     SmallVector<OpFoldResult> iterationDomain, Type scoreElementType,
     Region &elementwiseRegion, DictionaryAttr qkAttrs, bool lowPrecision,
-    bool useExp2, bool specialize = false) {
+    bool useExp2, bool additiveMask, bool specialize = false) {
   MLIRContext *context = builder.getContext();
   // If using exp2 for attention instead of the original exp, we have to
   // multiply the scale by log2(e). We use exp2 instead of exp as most platforms
@@ -433,7 +446,7 @@ static Value buildAttentionScores(
   // S += mask
   if (mask != nullptr) {
     scores = applyMask(builder, loc, scoreMap, *maskMap, scores, mask.value(),
-                       useExp2);
+                       useExp2, additiveMask);
   }
 
   return scores;
@@ -480,7 +493,7 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   Value s = buildAttentionScores(
       loc, b, query, key, getScale(), mask, qMap, kMap, sMap, getMaskMap(),
       sizes, f32Type, getRegion(), qkAttrs, lowPrecision, /*useExp2=*/true,
-      /*specialize=*/true);
+      getAdditiveMask(), /*specialize=*/true);
 
   // ---- Softmax ----
 
@@ -527,6 +540,23 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
   // sum = rowSum(P)
   Value sum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, sumFill);
 
+  // All -inf scores produce zero exponential weights with the finite max
+  // initializer. Safe softmax preserves those zeros instead of dividing by
+  // zero.
+  if (getSafeSoftmax()) {
+    auto sumType = cast<RankedTensorType>(sum.getType());
+    AffineMap identity = b.getMultiDimIdentityMap(sumType.getRank());
+    sum = linalg::GenericOp::create(
+              b, loc, sum.getType(), ValueRange{}, sum,
+              ArrayRef<AffineMap>{identity},
+              SmallVector<utils::IteratorType>(sumType.getRank(),
+                                               utils::IteratorType::parallel),
+              [](OpBuilder &b, Location loc, ValueRange args) {
+                Value divisor = buildSafeSoftmaxDenominator(b, loc, args[0]);
+                linalg::YieldOp::create(b, loc, divisor);
+              })
+              .getResult(0);
+  }
   // P = P / sum
   p = elementwiseValueInPlace<arith::DivFOp>(b, loc, pMap, sumMap, p, sum);
 
@@ -544,7 +574,7 @@ FailureOr<SmallVector<Value>> AttentionOp::decomposeOperation(OpBuilder &b) {
     p = truncateFloat(b, loc, pMap, pMap, p, convertP, lowPrecision);
   }
 
-  if (mask && *mask) {
+  if (mask && *mask && !getAdditiveMask()) {
     value = excludeMaskedValues(b, loc, value, getValueMap(), *mask,
                                 *getMaskMap(), opInfo, sizes);
   }
@@ -602,9 +632,10 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   bool lowPrecision = qETy.getIntOrFloatBitWidth() <= 8;
 
   // ---- QK Matmul + elementwise math ----
-  Value s = buildAttentionScores(loc, b, query, key, getScale(), mask, qMap,
-                                 kMap, sMap, getMaskMap(), sizes, elementType,
-                                 getRegion(), qkAttrs, lowPrecision, useExp2);
+  Value s =
+      buildAttentionScores(loc, b, query, key, getScale(), mask, qMap, kMap,
+                           sMap, getMaskMap(), sizes, elementType, getRegion(),
+                           qkAttrs, lowPrecision, useExp2, getAdditiveMask());
 
   // TODO: This decomposition should be in a separate op called
   // "online softmax".
@@ -655,7 +686,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
   // ---- Matmul 2 ----
 
-  if (mask && *mask) {
+  if (mask && *mask && !getAdditiveMask()) {
     value = excludeMaskedValues(b, loc, value, getValueMap(), *mask,
                                 *getMaskMap(), opInfo, sizes);
   }

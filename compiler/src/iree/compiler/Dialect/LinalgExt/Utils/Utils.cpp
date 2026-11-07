@@ -1677,6 +1677,16 @@ bool isKnownZero(Value value) {
   return false;
 }
 
+Value buildSafeSoftmaxDenominator(OpBuilder &builder, Location loc, Value sum) {
+  Value zero = arith::ConstantOp::create(builder, loc,
+                                         builder.getZeroAttr(sum.getType()));
+  Value one = arith::ConstantOp::create(
+      builder, loc, builder.getFloatAttr(sum.getType(), 1.0));
+  Value empty =
+      arith::CmpFOp::create(builder, loc, arith::CmpFPredicate::OEQ, sum, zero);
+  return arith::SelectOp::create(builder, loc, empty, one, sum);
+}
+
 Value computeSubAndExp(OpBuilder &builder, Location loc, AffineMap inputMap,
                        AffineMap outputMap, Value input, Value output,
                        bool useExp2) {

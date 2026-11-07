@@ -555,7 +555,7 @@ util.func public @collapse_attention(%arg0: tensor<20x4096x16xf16>, %arg1: tenso
     %expanded_1 = tensor.expand_shape %arg2 [[0, 1], [2], [3]] output_shape [2, 10, 1024, 64] : tensor<20x1024x64xf16> into tensor<2x10x1024x64xf16>
   %0 = flow.dispatch.region -> (tensor<2x10x4096x64xf16>) {
     %0 = tensor.empty() : tensor<2x10x4096x64xf16>
-    %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>], decomposition_config = {use_exp2 = true}> {test.discardable} ins(%expanded, %expanded_0, %expanded_1, %arg3 : tensor<2x10x4096x16xf16>, tensor<2x10x1024x16xf16>, tensor<2x10x1024x64xf16>, f16) outs(%0 : tensor<2x10x4096x64xf16>) {
+    %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>], decomposition_config = {use_exp2 = true}, safe_softmax> {test.discardable} ins(%expanded, %expanded_0, %expanded_1, %arg3 : tensor<2x10x4096x16xf16>, tensor<2x10x1024x16xf16>, tensor<2x10x1024x64xf16>, f16) outs(%0 : tensor<2x10x4096x64xf16>) {
     ^bb0(%arg4: f16):
       iree_linalg_ext.yield %arg4 : f16
     } -> tensor<2x10x4096x64xf16>
@@ -566,7 +566,7 @@ util.func public @collapse_attention(%arg0: tensor<20x4096x16xf16>, %arg1: tenso
 
 // CHECK-LABEL: util.func public @collapse_attention
 //       CHECK:   %[[ATTN:.*]] = iree_linalg_ext.attention
-//  CHECK-SAME:      decomposition_config = {use_exp2 = true}> {test.discardable}
+//  CHECK-SAME:      decomposition_config = {use_exp2 = true}, safe_softmax> {test.discardable}
 //  CHECK-SAME:      tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16
 //  CHECK-SAME:      tensor<20x4096x64xf16>
 //       CHECK:   flow.return %[[ATTN]] : tensor<20x4096x64xf16>
@@ -585,7 +585,7 @@ util.func public @collapse_online_attention(%arg0: tensor<20x4096x16xf16>, %arg1
     %acc = linalg.fill ins(%cst0 : f32) outs(%acc_e : tensor<2x10x4096x64xf32>) -> tensor<2x10x4096x64xf32>
     %max = linalg.fill ins(%cst_neg : f32) outs(%ms_e : tensor<2x10x4096xf32>) -> tensor<2x10x4096xf32>
     %sum = linalg.fill ins(%cst0 : f32) outs(%ms_e : tensor<2x10x4096xf32>) -> tensor<2x10x4096xf32>
-    %r:3 = iree_linalg_ext.online_attention <indexing_maps = [
+    %r:3 = iree_linalg_ext.online_attention <additive_mask, indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
@@ -605,7 +605,7 @@ util.func public @collapse_online_attention(%arg0: tensor<20x4096x16xf16>, %arg1
 
 // CHECK-LABEL: util.func public @collapse_online_attention
 //       CHECK:   %[[ATTN:.*]]:3 = iree_linalg_ext.online_attention
-//  CHECK-SAME:      decomposition_config = {use_exp2 = true}> {test.discardable}
+//  CHECK-SAME:      decomposition_config = {use_exp2 = true}, additive_mask> {test.discardable}
 //  CHECK-SAME:      tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16
 //  CHECK-SAME:      tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
 //       CHECK:   flow.return %[[ATTN]]#0, %[[ATTN]]#1, %[[ATTN]]#2

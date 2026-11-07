@@ -386,10 +386,10 @@ func.func @online_attention_f8_masked(%query: tensor<192x1024x64xf8E4M3FNUZ>,
 // CHECK:   arith.mulf
 // S = mask == -inf ? -inf : S + mask
 // CHECK:   linalg.generic
-// CHECK:     arith.extf %{{.+}} : f8E4M3FNUZ to f32
-// CHECK:     arith.cmpf oeq
-// CHECK:     arith.addf
-// CHECK:     arith.select
+// CHECK:     %[[MASK_EXT:.+]] = arith.extf %{{.+}} : f8E4M3FNUZ to f32
+// CHECK-DAG: %[[MASK_SUM:.+]] = arith.addf %{{.+}}, %{{.+}} : f32
+// CHECK-DAG: %[[EXCLUDED:.+]] = arith.cmpf oeq, %[[MASK_EXT]], %[[NEG_INF:.+]] : f32
+// CHECK:     arith.select %[[EXCLUDED]], %[[NEG_INF]], %[[MASK_SUM]] : f32
 // CHECK:     linalg.yield
 // newMax = max(oldMax, rowMax(S))
 // CHECK: linalg.generic
@@ -600,3 +600,41 @@ func.func @exp_reduction(
 // CHECK:                             arith.mulf
 // CHECK:                             arith.addf
 // CHECK:      return %[[M]], %[[SUM]], %[[PV]]
+
+// -----
+
+module attributes {transform.with_named_sequence} {
+  transform.named_sequence @__transform_main(%module: !transform.any_op {transform.readonly}) {
+    %attention = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module : (!transform.any_op) -> !transform.any_op
+    transform.iree.decompose_aggregate_op %attention : (!transform.any_op) -> ()
+    transform.yield
+  }
+}
+
+func.func @safe_additive_attention(%q: tensor<2x3x4xf32>, %k: tensor<2x5x4xf32>, %v: tensor<2x5x6xf32>, %mask: tensor<2x3x5xi1>) -> tensor<2x3x6xf32> {
+  %scale = arith.constant 1.0 : f32
+  %empty = tensor.empty() : tensor<2x3x6xf32>
+  %result = iree_linalg_ext.attention <
+      additive_mask, safe_softmax,
+      indexing_maps = [affine_map<(b, m, k1, k2, n) -> (b, m, k1)>,
+                       affine_map<(b, m, k1, k2, n) -> (b, k2, k1)>,
+                       affine_map<(b, m, k1, k2, n) -> (b, k2, n)>,
+                       affine_map<(b, m, k1, k2, n) -> ()>,
+                       affine_map<(b, m, k1, k2, n) -> (b, m, k2)>,
+                       affine_map<(b, m, k1, k2, n) -> (b, m, n)>]>
+      ins(%q, %k, %v, %scale, %mask : tensor<2x3x4xf32>, tensor<2x5x4xf32>, tensor<2x5x6xf32>, f32, tensor<2x3x5xi1>)
+      outs(%empty : tensor<2x3x6xf32>) {
+    ^bb0(%score: f32):
+      iree_linalg_ext.yield %score : f32
+  } -> tensor<2x3x6xf32>
+  return %result : tensor<2x3x6xf32>
+}
+// CHECK-LABEL: func.func @safe_additive_attention
+// CHECK: ^bb0(%[[ENTRY:.+]]: i1, %[[SCORE:.+]]: f32):
+// CHECK: %[[BIAS:.+]] = arith.select %[[ENTRY]], %{{.+}}, %{{.+}} : f32
+// CHECK: arith.addf %[[SCORE]], %[[BIAS]] : f32
+// CHECK: %[[EMPTY:.+]] = arith.cmpf oeq, %[[SUM:.+]], %{{.+}} : f32
+// CHECK: %[[DIVISOR:.+]] = arith.select %[[EMPTY]], %{{.+}}, %[[SUM]] : f32
+// CHECK: linalg.yield %[[DIVISOR]] : f32
+// CHECK: arith.divf
+// CHECK: return

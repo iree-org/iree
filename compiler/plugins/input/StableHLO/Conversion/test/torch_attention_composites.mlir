@@ -10,6 +10,7 @@
 //       CHECK:   %[[SCALE:.+]] = arith.constant 5.000000e-01 : f32
 //       CHECK:   iree_linalg_ext.attention
 //  CHECK-SAME:     indexing_maps = [#[[$Q]], #[[$K]], #[[$V]], #[[$S]], #[[$O]]]
+//  CHECK-SAME:     safe_softmax
 //  CHECK-SAME:     ins(%[[Q]], %[[K]], %[[V]], %[[SCALE]] :
 //  CHECK-SAME:     outs(%{{.+}} : tensor<2x3x5x6xf32>)
 //   CHECK-NOT:   linalg.softmax
@@ -39,7 +40,8 @@ func.func private @sdpa_impl(%q: tensor<2x3x5x4xf32>, %k: tensor<2x3x7x4xf32>, %
 //       CHECK:       %[[QUERY:.+]] = iree_linalg_ext.index 2 : index
 //       CHECK:       %[[KEY:.+]] = iree_linalg_ext.index 3 : index
 //       CHECK:       %[[HIDDEN:.+]] = arith.cmpi ugt, %[[KEY]], %[[QUERY]] : index
-//       CHECK:       %[[MASKED:.+]] = arith.select %[[HIDDEN]], %{{.+}}, %[[SCORE]] : f32
+//       CHECK:       %[[BIAS:.+]] = arith.select %[[HIDDEN]], %{{.+}}, %{{.+}} : f32
+//       CHECK:       %[[MASKED:.+]] = arith.addf %[[SCORE]], %[[BIAS]] : f32
 //       CHECK:       iree_linalg_ext.yield %[[MASKED]] : f32
 func.func @sdpa_causal_scale(%q: tensor<2x3x5x4xf32>, %k: tensor<2x3x7x4xf32>, %v: tensor<2x3x7x6xf32>) -> tensor<2x3x5x6xf32> {
   %0 = stablehlo.composite "torch.scaled_dot_product_attention" %q, %k, %v {
@@ -77,19 +79,16 @@ func.func private @sdpa_causal_dynamic_impl(%q: tensor<2x3x?x4xf32>, %k: tensor<
 }
 // -----
 
-// A per-batch additive mask maps over every batch dimension. A row whose mask
-// is -inf everywhere is zero, as torch's _safe_softmax makes it.
+// A per-batch additive mask maps over every batch dimension. Safe softmax
+// handles empty score rows without discarding NaNs based only on the mask.
 // CHECK-DAG:   #[[$BATCH_MASK:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
 // CHECK-LABEL: func.func @sdpa_float_mask(
 //       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //  CHECK-SAME:     #[[$BATCH_MASK]]
+//  CHECK-SAME:     safe_softmax, additive_mask
 //  CHECK-SAME:     tensor<2x3x5x7xf32>)
-//       CHECK:   %[[VISIBLE:.+]] = linalg.generic
-//       CHECK:     arith.cmpf une, %{{.+}}, %cst{{.*}} : f32
-//       CHECK:     arith.ori
-//       CHECK:     -> tensor<2x3x5xi1>
-//       CHECK:   linalg.generic {{.+}} ins(%[[ATTENTION]], %[[VISIBLE]] : tensor<2x3x5x6xf32>, tensor<2x3x5xi1>)
-//       CHECK:     arith.select
+//   CHECK-NOT:   linalg.generic
+//       CHECK:   return %[[ATTENTION]]
 func.func @sdpa_float_mask(%q: tensor<2x3x5x4xf32>, %k: tensor<2x3x7x4xf32>, %v: tensor<2x3x7x6xf32>, %m: tensor<2x3x5x7xf32>) -> tensor<2x3x5x6xf32> {
   %0 = stablehlo.composite "torch.scaled_dot_product_attention" %q, %k, %v, %m {
     composite_attributes = {enable_gqa = false, is_causal = false},
@@ -112,10 +111,10 @@ func.func private @sdpa_float_mask_impl(%q: tensor<2x3x5x4xf32>, %k: tensor<2x3x
 //       CHECK:   %[[MASK:.+]] = tensor.collapse_shape %{{.+}} {{\[}}[0], [1, 2], [3]] : tensor<2x1x5x7xf32> into tensor<2x5x7xf32>
 //       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //  CHECK-SAME:     #[[$HEAD_BROADCAST_MASK]]
+//  CHECK-SAME:     safe_softmax, additive_mask
 //  CHECK-SAME:     tensor<2x5x7xf32>)
-//       CHECK:   %[[VISIBLE:.+]] = linalg.generic
-//       CHECK:     -> tensor<2x5xi1>
-//       CHECK:   linalg.generic {{.+}} ins(%[[ATTENTION]], %[[VISIBLE]] : tensor<2x3x5x6xf32>, tensor<2x5xi1>)
+//   CHECK-NOT:   linalg.generic
+//       CHECK:   return %[[ATTENTION]]
 func.func @sdpa_head_broadcast_mask(%q: tensor<2x3x5x4xf32>, %k: tensor<2x3x7x4xf32>, %v: tensor<2x3x7x6xf32>, %m: tensor<2x1x5x7xf32>) -> tensor<2x3x5x6xf32> {
   %0 = stablehlo.composite "torch.scaled_dot_product_attention" %q, %k, %v, %m {
     composite_attributes = {enable_gqa = false, is_causal = false},
@@ -130,7 +129,7 @@ func.func private @sdpa_head_broadcast_mask_impl(%q: tensor<2x3x5x4xf32>, %k: te
 
 // -----
 
-// A constant mask with a visible key in every row needs no hidden-row fixup.
+// Constant masks retain additive masking and safe softmax inside attention.
 // CHECK-LABEL: func.func @sdpa_constant_visible_mask(
 //       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
 //   CHECK-NOT:   arith.select
@@ -154,10 +153,12 @@ func.func private @sdpa_constant_visible_mask_impl(%q: tensor<2x3x5x4xf32>, %k: 
 
 // -----
 
-// A constant mask that hides a whole row keeps the fixup.
+// A constant mask that hides a whole row also uses safe softmax.
 // CHECK-LABEL: func.func @sdpa_constant_hidden_row_mask(
-//       CHECK:   iree_linalg_ext.attention
-//       CHECK:   arith.select
+//       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
+//  CHECK-SAME:     safe_softmax, additive_mask
+//   CHECK-NOT:   arith.select
+//       CHECK:   return %[[ATTENTION]]
 func.func @sdpa_constant_hidden_row_mask(%q: tensor<2x3x5x4xf32>, %k: tensor<2x3x7x4xf32>, %v: tensor<2x3x7x6xf32>) -> tensor<2x3x5x6xf32> {
   %m = stablehlo.constant dense<[[true, false, false, false, false, false, false],
                                  [false, false, false, false, false, false, false],
@@ -334,12 +335,9 @@ func.func private @sdpa_gqa_dynamic_heads_impl(%q: tensor<2x?x5x4xf32>, %k: tens
 // A shared boolean mask: a row with no true entry is zero.
 // CHECK-LABEL: func.func @sdpa_bool_mask(
 //       CHECK:   %[[ATTENTION:.+]] = iree_linalg_ext.attention
-//       CHECK:   %[[VISIBLE:.+]] = linalg.generic
-//   CHECK-NOT:     arith.cmpf
-//       CHECK:     arith.ori
-//       CHECK:     -> tensor<5xi1>
-//       CHECK:   linalg.generic {{.+}} ins(%[[ATTENTION]], %[[VISIBLE]] : tensor<2x3x5x6xf32>, tensor<5xi1>)
-//       CHECK:     arith.select
+//  CHECK-SAME:     additive_mask
+//   CHECK-NOT:   linalg.generic
+//       CHECK:   return %[[ATTENTION]]
 func.func @sdpa_bool_mask(%q: tensor<2x3x5x4xf32>, %k: tensor<2x3x7x4xf32>, %v: tensor<2x3x7x6xf32>, %m: tensor<5x7xi1>) -> tensor<2x3x5x6xf32> {
   %0 = stablehlo.composite "torch.scaled_dot_product_attention" %q, %k, %v, %m {
     composite_attributes = {enable_gqa = false, is_causal = false},
@@ -382,6 +380,25 @@ func.func private @sdpa_f64_impl(%q: tensor<2x3x5x4xf64>, %k: tensor<2x3x7x4xf64
 func.func @sdpa_causal_f8_fallback(%q: tensor<1x1xf8E4M3FN>, %k: tensor<1x1xf8E4M3FN>, %v: tensor<1x1xf8E4M3FN>) -> tensor<1x1xf8E4M3FN> {
   %result = stablehlo.composite "torch.scaled_dot_product_attention" %q, %k, %v {
     composite_attributes = {enable_gqa = false, is_causal = true},
+    decomposition = @sdpa_single_key_impl, version = 1 : i32
+  } : (tensor<1x1xf8E4M3FN>, tensor<1x1xf8E4M3FN>, tensor<1x1xf8E4M3FN>) -> tensor<1x1xf8E4M3FN>
+  return %result : tensor<1x1xf8E4M3FN>
+}
+func.func private @sdpa_single_key_impl(%q: tensor<1x1xf8E4M3FN>, %k: tensor<1x1xf8E4M3FN>, %v: tensor<1x1xf8E4M3FN>) -> tensor<1x1xf8E4M3FN> {
+  return %v : tensor<1x1xf8E4M3FN>
+}
+
+// -----
+
+// FP8 keeps its decomposition before mutation, including noncausal profiles.
+// For this singleton case the decomposition returns
+// the only value directly.
+// CHECK-LABEL: func.func @sdpa_f8_fallback
+// CHECK-NOT: iree_linalg_ext.attention
+// CHECK: return %arg2
+func.func @sdpa_f8_fallback(%q: tensor<1x1xf8E4M3FN>, %k: tensor<1x1xf8E4M3FN>, %v: tensor<1x1xf8E4M3FN>) -> tensor<1x1xf8E4M3FN> {
+  %result = stablehlo.composite "torch.scaled_dot_product_attention" %q, %k, %v {
+    composite_attributes = {enable_gqa = false, is_causal = false},
     decomposition = @sdpa_single_key_impl, version = 1 : i32
   } : (tensor<1x1xf8E4M3FN>, tensor<1x1xf8E4M3FN>, tensor<1x1xf8E4M3FN>) -> tensor<1x1xf8E4M3FN>
   return %result : tensor<1x1xf8E4M3FN>
