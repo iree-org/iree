@@ -198,9 +198,8 @@ util.func public @denseTensorFillI1Packed(%arg0: i1, %arg1: !stream.resource<*>,
   // CHECK: %[[MULI_0:.*]] = arith.muli %arg4, %[[CONSTANT_1]] : index
   // CHECK: %[[ADDI_0:.*]] = arith.addi %[[MULI_0]], %arg5 : index
   // CHECK: %[[DIVUI_0:.*]] = arith.divui %[[ADDI_0]], %[[CONSTANT_0]] : index
-  // CHECK: %[[MULI_1:.*]] = arith.muli %arg6, %[[CONSTANT_1]] : index
-  // CHECK: %[[ADDI_1:.*]] = arith.addi %[[MULI_1]], %arg7 : index
-  // CHECK: %[[DIVUI_1:.*]] = arith.divui %[[ADDI_1]], %[[CONSTANT_0]] : index
+  // CHECK: %[[COUNT:.*]] = arith.muli %arg6, %arg7 : index
+  // CHECK: %[[DIVUI_1:.*]] = arith.divui %[[COUNT]], %[[CONSTANT_0]] : index
   // CHECK: %[[ADDI_2:.*]] = arith.addi %[[DIVUI_0]], %[[DIVUI_1]] : index
   // CHECK: %[[ASYNC_0:.*]] = stream.async.fill %[[ORI_6]], %arg1{{\[}}%[[DIVUI_0]] to %[[ADDI_2]] for %[[DIVUI_1]]] : i8 -> %arg1 as !stream.resource<*>{%arg3}
   // CHECK: util.return %[[ASYNC_0]] : !stream.resource<*>
@@ -221,9 +220,8 @@ util.func public @denseTensorFillI4(%arg0: i4, %arg1: !stream.resource<*>, %arg2
   // CHECK: %[[MUL0:.+]] = arith.muli %arg4, %[[C16]] : index
   // CHECK: %[[ADD0:.+]] = arith.addi %[[MUL0]], %arg5 : index
   // CHECK: %[[OFFSET:.+]] = arith.divui %[[ADD0]], %[[C2]] : index
-  // CHECK: %[[MUL1:.+]] = arith.muli %arg6, %[[C16]] : index
-  // CHECK: %[[ADD1:.+]] = arith.addi %[[MUL1]], %arg7 : index
-  // CHECK: %[[LEN:.+]] = arith.divui %[[ADD1]], %[[C2]] : index
+  // CHECK: %[[COUNT:.+]] = arith.muli %arg6, %arg7 : index
+  // CHECK: %[[LEN:.+]] = arith.divui %[[COUNT]], %[[C2]] : index
   // CHECK: %[[END:.+]] = arith.addi %[[OFFSET]], %[[LEN]] : index
   // CHECK: %[[FILL:.+]] = stream.async.fill %[[FULL]], %arg1[%[[OFFSET]] to %[[END]] for %[[LEN]]] : i8 -> %arg1 as !stream.resource<*>{%arg3}
   %0 = stream.tensor.fill %arg0, %arg1[%arg4, %arg5 for %arg6, %arg7] : i4 -> tensor<?x16xi4>{%arg2} in %arg1 as !stream.resource<*>{%arg3}
