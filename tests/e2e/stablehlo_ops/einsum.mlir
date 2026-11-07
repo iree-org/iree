@@ -53,3 +53,38 @@ func.func @reordered_batch_and_contraction_labels() {
   check.expect_eq_const(%r, dense<[[[[225.0]], [[673.0]]], [[[997.0]], [[1605.0]]]]> : tensor<2x2x1x1xf32>) : tensor<2x2x1x1xf32>
   return
 }
+
+func.func @unary_transpose() {
+  %input = flow.tensor.dynamic_constant dense<[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]> : tensor<2x3xf32> -> tensor<?x?xf32>
+  %r = "stablehlo.unary_einsum"(%input) {einsum_config = "ab->ba"} : (tensor<?x?xf32>) -> tensor<?x?xf32>
+  %fixed = tensor.cast %r : tensor<?x?xf32> to tensor<3x2xf32>
+  check.expect_eq_const(%fixed, dense<[[1.0, 4.0], [2.0, 5.0], [3.0, 6.0]]> : tensor<3x2xf32>) : tensor<3x2xf32>
+  return
+}
+
+func.func @unary_reduction() {
+  %input = flow.tensor.dynamic_constant dense<[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]> : tensor<2x3xf32> -> tensor<?x?xf32>
+  %r = "stablehlo.unary_einsum"(%input) {einsum_config = "ab->a"} : (tensor<?x?xf32>) -> tensor<?xf32>
+  %fixed = tensor.cast %r : tensor<?xf32> to tensor<2xf32>
+  check.expect_eq_const(%fixed, dense<[6.0, 15.0]> : tensor<2xf32>) : tensor<2xf32>
+  return
+}
+
+// Transposition is a permutation of elements. Check the bit patterns of a
+// negative zero and a quiet NaN payload rather than comparing floating values.
+func.func @unary_transpose_float_bits() {
+  %bits = util.unfoldable_constant dense<[[-2147483648, 2143289345], [1065353216, 0]]> : tensor<2x2xi32>
+  %input = stablehlo.bitcast_convert %bits : (tensor<2x2xi32>) -> tensor<2x2xf32>
+  %r = "stablehlo.unary_einsum"(%input) {einsum_config = "ab->ba"} : (tensor<2x2xf32>) -> tensor<2x2xf32>
+  %result_bits = stablehlo.bitcast_convert %r : (tensor<2x2xf32>) -> tensor<2x2xi32>
+  check.expect_eq_const(%result_bits, dense<[[-2147483648, 1065353216], [2143289345, 0]]> : tensor<2x2xi32>) : tensor<2x2xi32>
+  return
+}
+
+func.func @empty_unary_reduction() {
+  %input = flow.tensor.dynamic_constant dense<> : tensor<2x0xf32> -> tensor<?x?xf32>
+  %r = "stablehlo.unary_einsum"(%input) {einsum_config = "ab->a"} : (tensor<?x?xf32>) -> tensor<?xf32>
+  %fixed = tensor.cast %r : tensor<?xf32> to tensor<2xf32>
+  check.expect_eq_const(%fixed, dense<0.0> : tensor<2xf32>) : tensor<2xf32>
+  return
+}
