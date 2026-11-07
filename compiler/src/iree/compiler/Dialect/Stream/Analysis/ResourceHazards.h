@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_STREAM_ANALYSIS_RESOURCE_HAZARDS_H_
 #define IREE_COMPILER_DIALECT_STREAM_ANALYSIS_RESOURCE_HAZARDS_H_
 
+#include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Diagnostics.h"
@@ -38,6 +39,13 @@ public:
   bool hasHazard(Operation *producerOp, Operation *consumerOp);
 
 private:
+  // Returns the solver proving range boundaries whole multiples of an access
+  // unit, built on first use; null when it failed.
+  DataFlowSolver *getDivisibilitySolver();
+
+  Operation *rootOp;
+  std::unique_ptr<DataFlowSolver> solver;
+  bool solverFailed = false;
   std::unique_ptr<AsmState> asmState;
 };
 

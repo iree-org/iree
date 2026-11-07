@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Stream/Transforms/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -218,69 +219,75 @@ packDynamicSlicesConservatively(Location loc, Value baseOffset,
 // --iree-stream-layout-slices
 //===----------------------------------------------------------------------===//
 
-struct LayoutSlicesPass
-    : IREE::Stream::impl::LayoutSlicesPassBase<LayoutSlicesPass> {
-  void runOnOperation() override {
-    mlir::CallableOpInterface parentOp = getOperation();
-    if (!parentOp.getCallableRegion() ||
-        parentOp.getCallableRegion()->empty()) {
-      return;
+static LogicalResult layoutSlicesInCallable(Operation *op) {
+  auto parentOp = cast<CallableOpInterface>(op);
+  if (!parentOp.getCallableRegion() || parentOp.getCallableRegion()->empty()) {
+    return success();
+  }
+
+  // NOTE: we could try several algorithms and compute which packs best. For
+  // now we just pack greedily as it's fast and what most existing ML
+  // frameworks do.
+  parentOp.walk([](IREE::Stream::ResourcePackOp packOp) {
+    // Derive resource constraints based on pack affinity.
+    auto resourceConfig = IREE::Stream::ResourceConfigAttr::lookup(packOp);
+
+    // Bucket into static and dynamic sizes. Static packing is a much more
+    // constrained problem.
+    auto allSlices = packOp.getSlices();
+    SmallVector<Slice> staticSlices;
+    SmallVector<Slice> dynamicSlices;
+    staticSlices.reserve(allSlices.size());
+    dynamicSlices.reserve(allSlices.size());
+    for (auto &slice : allSlices) {
+      if (isa_and_nonnull<arith::ConstantOp>(
+              slice.dynamicSize.getDefiningOp())) {
+        staticSlices.push_back(slice);
+      } else {
+        dynamicSlices.push_back(slice);
+      }
     }
 
-    // NOTE: we could try several algorithms and compute which packs best. For
-    // now we just pack greedily as it's fast and what most existing ML
-    // frameworks do.
-    parentOp.walk([&](IREE::Stream::ResourcePackOp packOp) {
-      // Derive resource constraints based on pack affinity.
-      auto resourceConfig = IREE::Stream::ResourceConfigAttr::lookup(packOp);
+    OpBuilder builder(packOp);
+    IndexSet indexSet(packOp.getLoc(), builder);
 
-      // Bucket into static and dynamic sizes. Static packing is a much more
-      // constrained problem.
-      auto allSlices = packOp.getSlices();
-      SmallVector<Slice> staticSlices;
-      SmallVector<Slice> dynamicSlices;
-      staticSlices.reserve(allSlices.size());
-      dynamicSlices.reserve(allSlices.size());
-      for (auto &slice : allSlices) {
-        if (isa_and_nonnull<arith::ConstantOp>(
-                slice.dynamicSize.getDefiningOp())) {
-          staticSlices.push_back(slice);
-        } else {
-          dynamicSlices.push_back(slice);
-        }
-      }
+    // First pack all static slices as these are entirely knowable here at
+    // compile time.
+    Value offset = packOp.getOffset() ? packOp.getOffset() : indexSet.get(0);
+    if (!staticSlices.empty()) {
+      offset = packStaticSlicesGreedily(packOp.getLoc(), offset, staticSlices,
+                                        resourceConfig, indexSet, builder);
 
-      OpBuilder builder(packOp);
-      IndexSet indexSet(packOp.getLoc(), builder);
+      // TODO(benvanik): make this an option; it can be useful for debugging
+      // this code.
+      // offset = packSlicesWithNoAliasing(packOp, offset, staticSlices,
+      //                                   resourceConfig, indexSet, builder);
+    }
 
-      // First pack all static slices as these are entirely knowable here at
-      // compile time.
-      Value offset = packOp.getOffset() ? packOp.getOffset() : indexSet.get(0);
-      if (!staticSlices.empty()) {
-        offset = packStaticSlicesGreedily(packOp.getLoc(), offset, staticSlices,
-                                          resourceConfig, indexSet, builder);
+    // Next pack all dynamic slices. Depending on the analysis information
+    // available we could reuse static slices with non-overlapping lifetimes
+    // in some cases.
+    if (!dynamicSlices.empty()) {
+      offset = packDynamicSlicesConservatively(packOp.getLoc(), offset,
+                                               dynamicSlices, resourceConfig,
+                                               indexSet, builder);
+    }
 
-        // TODO(benvanik): make this an option; it can be useful for debugging
-        // this code.
-        // offset = packSlicesWithNoAliasing(packOp, offset, staticSlices,
-        //                                   resourceConfig, indexSet, builder);
-      }
+    // Total packed length is the current offset after all slices are
+    // allocated. This should be aligned to the range constraints.
+    packOp.getTotalLength().replaceAllUsesWith(offset);
 
-      // Next pack all dynamic slices. Depending on the analysis information
-      // available we could reuse static slices with non-overlapping lifetimes
-      // in some cases.
-      if (!dynamicSlices.empty()) {
-        offset = packDynamicSlicesConservatively(packOp.getLoc(), offset,
-                                                 dynamicSlices, resourceConfig,
-                                                 indexSet, builder);
-      }
+    packOp.erase();
+  });
+  return success();
+}
 
-      // Total packed length is the current offset after all slices are
-      // allocated. This should be aligned to the range constraints.
-      packOp.getTotalLength().replaceAllUsesWith(offset);
-
-      packOp.erase();
-    });
+struct LayoutSlicesPass final
+    : IREE::Stream::impl::LayoutSlicesPassBase<LayoutSlicesPass> {
+  void runOnOperation() override {
+    if (failed(runOnFunctionLikeOps(getOperation(), layoutSlicesInCallable))) {
+      signalPassFailure();
+    }
   }
 };
 

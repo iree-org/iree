@@ -247,7 +247,8 @@ deriveRequiredResourceBufferBits(Location loc, IREE::HAL::Lifetime lifetime,
 
 BindingTable::BindingTable(IREE::Stream::CmdExecuteOp executeOp,
                            ValueRange bufferValues, ValueRange bufferSizes,
-                           IndexSet &indexSet) {
+                           int64_t granularity, IndexSet &indexSet,
+                           OpBuilder &builder) {
   auto resourceValues = executeOp.getResourceOperands();
   auto capturedValues = executeOp.getBody().getArguments();
 
@@ -270,6 +271,21 @@ BindingTable::BindingTable(IREE::Stream::CmdExecuteOp executeOp,
         bindingValue.buffer = bufferValue;
         bindingValue.byteOffset = indexSet.get(0);
         bindingValue.byteLength = bufferSize;
+        // An external slot spans the access units its tensor reaches, within
+        // the buffer bound on each call.
+        auto resourceType =
+            cast<IREE::Stream::ResourceType>(resourceValue.getType());
+        if (granularity > 1 &&
+            resourceType.getLifetime() == IREE::Stream::Lifetime::External) {
+          Location loc = executeOp.getLoc();
+          Value alignedSize = IREE::Util::AlignOp::create(
+              builder, loc, bufferSize,
+              arith::ConstantIndexOp::create(builder, loc, granularity));
+          Value capacity = builder.createOrFold<IREE::HAL::BufferLengthOp>(
+              loc, builder.getIndexType(), bufferValue);
+          bindingValue.byteLength =
+              arith::MinUIOp::create(builder, loc, alignedSize, capacity);
+        }
         indirectBuffers.push_back(bindingValue);
       }
       break;
@@ -318,7 +334,8 @@ void StreamConversionMapping::mapCommandBuffer(
     BindingTable bindingTable) {
   // Wrap metadata for the mapping.
   auto commandBufferMapping = std::make_shared<CommandBufferConversionMapping>(
-      commandBuffer, std::move(bindingTable));
+      commandBuffer, std::move(bindingTable),
+      IREE::Stream::ResourceConfigAttr::lookup(executeOp));
 
   // Map all ops nested within the command buffer so we can query later.
   opCommandBufferMap.insert(
