@@ -13,6 +13,8 @@
 
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
+#include "compiler/plugins/input/StableHLO/Conversion/StableHLOStatusCheck.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
@@ -503,17 +505,72 @@ struct ConvolutionReversal final
   }
 };
 
+// Extract one padding coordinate into signless shape storage without changing
+// its numeric value. Unsigned values beyond the dimension range fail visibly.
+static Value buildConvolutionPaddingElement(PatternRewriter &rewriter,
+                                            Location loc, Value padding,
+                                            Value row, Value column,
+                                            IntegerType originalElementType) {
+  Value element = tensor::ExtractOp::create(rewriter, loc, padding,
+                                            ValueRange{row, column});
+  if (originalElementType.getWidth() < 64) {
+    if (originalElementType.isUnsigned()) {
+      return arith::ExtUIOp::create(rewriter, loc, rewriter.getI64Type(),
+                                    element);
+    }
+    return arith::ExtSIOp::create(rewriter, loc, rewriter.getI64Type(),
+                                  element);
+  }
+  if (originalElementType.isUnsigned()) {
+    Value zero = arith::ConstantIntOp::create(rewriter, loc, 0, 64);
+    Value fits = arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::sge,
+                                       element, zero);
+    emitStatusCheck(
+        rewriter, loc, fits,
+        "convolution padding exceeds the signed 64-bit dimension range");
+  }
+  return element;
+}
+
+// The upstream static-padding matcher sign-extends APInt values. Normalise
+// unsigned constants first; report unrepresentable values before mutation.
+static LogicalResult normalizeUnsignedConvolutionPadding(
+    mlir::stablehlo::DynamicConvOp op, DenseIntElementsAttr constantPadding,
+    bool &hasInvalidPadding, PatternRewriter &rewriter) {
+  SmallVector<int64_t> values;
+  for (const APInt &value : constantPadding.getValues<APInt>()) {
+    if (value.getActiveBits() > 63) {
+      if (!hasInvalidPadding) {
+        op.emitOpError("padding exceeds the signed 64-bit dimension range");
+      }
+      hasInvalidPadding = true;
+      return failure();
+    }
+    values.push_back(value.getZExtValue());
+  }
+  auto type = constantPadding.getType().clone(rewriter.getI64Type());
+  Value padding = mlir::stablehlo::ConstantOp::create(
+      rewriter, op.getLoc(), DenseIntElementsAttr::get(type, values));
+  rewriter.modifyOpInPlace(op, [&] { op.getPaddingMutable().assign(padding); });
+  return success();
+}
+
 // Padding is the only operand dynamic_conv adds to convolution. Move it into
 // a dynamic_pad and lower the rest as a convolution.
 struct DynamicConvToPaddedConv final
     : OpRewritePattern<mlir::stablehlo::DynamicConvOp> {
-  using Base::Base;
+  DynamicConvToPaddedConv(MLIRContext *context, bool &hasInvalidPadding)
+      : OpRewritePattern(context), hasInvalidPadding(hasInvalidPadding) {}
 
   LogicalResult matchAndRewrite(mlir::stablehlo::DynamicConvOp op,
                                 PatternRewriter &rewriter) const override {
-    // A constant padding folds to a static convolution later in the pipeline.
-    if (matchPattern(op.getPadding(), m_Constant())) {
-      return rewriter.notifyMatchFailure(op, "constant padding");
+    DenseIntElementsAttr constantPadding;
+    if (matchPattern(op.getPadding(), m_Constant(&constantPadding))) {
+      if (!constantPadding.getElementType().isUnsignedInteger()) {
+        return rewriter.notifyMatchFailure(op, "constant signed padding");
+      }
+      return normalizeUnsignedConvolutionPadding(op, constantPadding,
+                                                 hasInvalidPadding, rewriter);
     }
     Location loc = op.getLoc();
     auto lhsType = dyn_cast<RankedTensorType>(op.getLhs().getType());
@@ -525,14 +582,19 @@ struct DynamicConvToPaddedConv final
     ArrayRef<int64_t> spatialDims = dims.getInputSpatialDimensions();
     int64_t rank = lhsType.getRank();
     int64_t numSpatial = spatialDims.size();
-    Type paddingElementType = paddingType.getElementType();
-    // Dilation attributes and the clamped high padding can exceed the source
-    // padding width. Widen scalar extracts so this stays shape arithmetic.
-    if (paddingElementType.isSignlessInteger() &&
-        paddingElementType.getIntOrFloatBitWidth() < 64) {
-      paddingElementType = rewriter.getI64Type();
+    auto originalElementType = cast<IntegerType>(paddingType.getElementType());
+    Value padding = op.getPadding();
+    if (originalElementType.isUnsigned()) {
+      // This changes storage signedness only. The tensor conversion removes
+      // the resulting identity operation after normalising the input type.
+      padding = mlir::stablehlo::ConvertOp::create(
+          rewriter, loc,
+          paddingType.clone(
+              rewriter.getIntegerType(originalElementType.getWidth())),
+          padding);
     }
-    unsigned paddingBitWidth = paddingElementType.getIntOrFloatBitWidth();
+    // Dilation and clamped high padding can exceed the source padding width.
+    Type paddingElementType = rewriter.getI64Type();
 
     Value zeroIndex = arith::ConstantIndexOp::create(rewriter, loc, 0);
     Value oneIndex = arith::ConstantIndexOp::create(rewriter, loc, 1);
@@ -540,27 +602,21 @@ struct DynamicConvToPaddedConv final
         rewriter, loc, rewriter.getIntegerAttr(paddingElementType, 0));
     ArrayRef<int64_t> lhsDilation =
         op.getLhsDilation().value_or(ArrayRef<int64_t>{});
-    SmallVector<APInt> interiorValues(rank, APInt(paddingBitWidth, 0));
+    SmallVector<APInt> interiorValues(rank, APInt(64, 0));
     SmallVector<Value> lows(rank, zeroPaddingElement);
     SmallVector<Value> highs(rank, zeroPaddingElement);
     for (auto [s, d] : llvm::enumerate(spatialDims)) {
       Value row = arith::ConstantIndexOp::create(rewriter, loc, s);
-      Value lowElement = tensor::ExtractOp::create(
-          rewriter, loc, op.getPadding(), ValueRange{row, zeroIndex});
-      Value highElement = tensor::ExtractOp::create(
-          rewriter, loc, op.getPadding(), ValueRange{row, oneIndex});
-      if (lowElement.getType() != paddingElementType) {
-        lowElement = arith::ExtSIOp::create(rewriter, loc, paddingElementType,
-                                            lowElement);
-        highElement = arith::ExtSIOp::create(rewriter, loc, paddingElementType,
-                                             highElement);
-      }
+      Value lowElement = buildConvolutionPaddingElement(
+          rewriter, loc, padding, row, zeroIndex, originalElementType);
+      Value highElement = buildConvolutionPaddingElement(
+          rewriter, loc, padding, row, oneIndex, originalElementType);
       lows[d] = lowElement;
 
       // Base dilation is applied by the pad, so the convolution must not
       // apply it again.
       int64_t interior = lhsDilation.empty() ? 0 : lhsDilation[s] - 1;
-      interiorValues[d] = APInt(paddingBitWidth, interior);
+      interiorValues[d] = APInt(64, interior);
       Value lowIndex = arith::IndexCastOp::create(
           rewriter, loc, rewriter.getIndexType(), lowElement);
       Value highIndex = arith::IndexCastOp::create(
@@ -616,6 +672,12 @@ struct DynamicConvToPaddedConv final
         op.getBatchGroupCount(), op.getPrecisionConfigAttr());
     return success();
   }
+
+private:
+  // The greedy driver has no fatal-match result. Keep the failure local to this
+  // pass invocation and report it after rewriting, including constants exposed
+  // by other patterns during the same invocation.
+  bool &hasInvalidPadding;
 };
 
 // The following helpers and the ScatterBatchingDimsExpander pattern below are
@@ -3235,10 +3297,10 @@ struct StableHLOToStableHLOPreprocessing final
       StableHLOToStableHLOPreprocessingBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<shape::ShapeDialect, mlir::stablehlo::StablehloDialect,
-                chlo::ChloDialect, tensor::TensorDialect, arith::ArithDialect,
-                linalg::LinalgDialect, scf::SCFDialect>();
+    registry.insert<shape::ShapeDialect, mlir::stablehlo::StablehloDialect,
+                    chlo::ChloDialect, tensor::TensorDialect,
+                    arith::ArithDialect, linalg::LinalgDialect, scf::SCFDialect,
+                    IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {
@@ -3255,6 +3317,7 @@ struct StableHLOToStableHLOPreprocessing final
       return signalPassFailure();
     }
 
+    bool hasInvalidConvolutionPadding = false;
     RewritePatternSet patterns(context);
     // General StableHLO canonicalization patterns. Run these with a high
     // benefit to enable more rewrites and avoid needless expansions that could
@@ -3280,7 +3343,9 @@ struct StableHLOToStableHLOPreprocessing final
                     ScatterImplicitIndex, ScatterImplicitBatch,
                     ScatterMaterializeInsertedDim, ScatterCollapseBatch,
                     ScatterBatchFirst, ScatterIndexedDimsFirst>(context);
-    patterns.insert<ConvolutionReversal, DynamicConvToPaddedConv>(context);
+    patterns.insert<ConvolutionReversal>(context);
+    patterns.insert<DynamicConvToPaddedConv>(context,
+                                             hasInvalidConvolutionPadding);
 
     // dot_general canonicalization patterns.
     populatePreprocessingDotGeneralToDotPatterns(context, &patterns);
@@ -3362,7 +3427,8 @@ struct StableHLOToStableHLOPreprocessing final
       patterns.insert<ReorderConvOpKernelDimensions>(context);
       patterns.insert<ReorderConvOpOutputDimensions>(context);
     }
-    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))) ||
+        hasInvalidConvolutionPadding) {
       return signalPassFailure();
     }
   }

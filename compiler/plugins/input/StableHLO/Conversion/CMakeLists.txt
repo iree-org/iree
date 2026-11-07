@@ -36,6 +36,21 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    StatusCheck
+  HDRS
+    "StableHLOStatusCheck.h"
+  SRCS
+    "StableHLOStatusCheck.cpp"
+  DEPS
+    LLVMSupport
+    MLIRArithDialect
+    MLIRIR
+    iree::compiler::Dialect::Util::IR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     StableHLOLegalization
   SRCS
     "CheckVHLOStableHloMixUsage.cpp"
@@ -48,13 +63,12 @@ iree_cc_library(
     "LegalizeToLinalgUtils.h"
     "MapStableHLOToScalarOp.h"
     "StableHLOCustomCalls.cpp"
-    "StableHLOStatusCheck.cpp"
-    "StableHLOStatusCheck.h"
     "StableHLOToIREEInputDialects.cpp"
     "StableHLOToLinalgExt.cpp"
     "VerifyCompilerInputLegality.cpp"
   DEPS
     ::PassHeaders
+    ::StatusCheck
     ChloOps
     LLVMSupport
     MLIRAffineDialect

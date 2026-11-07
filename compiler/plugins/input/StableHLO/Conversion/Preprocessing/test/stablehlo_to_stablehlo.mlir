@@ -1606,3 +1606,71 @@ func.func @scatter_window_padded_extent_overflow(%operand: tensor<46116860184273
   }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 0>, indices_are_sorted = false, unique_indices = true} : (tensor<4611686018427387904xi8>, tensor<1xi64>, tensor<2305843009213693952xi8>) -> tensor<4611686018427387904xi8>
   return %r : tensor<4611686018427387904xi8>
 }
+
+// -----
+
+// Preserve unsigned padding values in signless shape storage.
+// CHECK-LABEL: @dynamic_conv_ui8_padding
+// CHECK: %[[PADDING:.+]] = stablehlo.convert %arg2 : (tensor<1x2xui8>) -> tensor<1x2xi8>
+// CHECK: %[[RAW:.+]] = tensor.extract %[[PADDING]]
+// CHECK: arith.extui %[[RAW]] : i8 to i64
+// CHECK: stablehlo.dynamic_pad
+// CHECK: stablehlo.convolution
+func.func @dynamic_conv_ui8_padding(%a: tensor<1x2x1xf32>, %k: tensor<1x1x1xf32>, %p: tensor<1x2xui8>) -> tensor<1x?x1xf32> {
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>
+  } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xui8>) -> tensor<1x?x1xf32>
+  return %r : tensor<1x?x1xf32>
+}
+
+// -----
+
+// Preserve unsigned padding values in signless shape storage.
+// CHECK-LABEL: @dynamic_conv_ui64_padding
+// CHECK-COUNT-2: util.status.check_ok {{.*}}, "convolution padding exceeds the signed 64-bit dimension range"
+// CHECK: stablehlo.dynamic_pad
+// CHECK: stablehlo.convolution
+func.func @dynamic_conv_ui64_padding(%a: tensor<1x2x1xf32>, %k: tensor<1x1x1xf32>, %p: tensor<1x2xui64>) -> tensor<1x?x1xf32> {
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>
+  } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xui64>) -> tensor<1x?x1xf32>
+  return %r : tensor<1x?x1xf32>
+}
+
+// -----
+
+// The upstream static-padding matcher reads APInt as signed; widen first.
+// CHECK-LABEL: @dynamic_conv_ui8_constant_padding
+// CHECK: %[[P:.+]] = stablehlo.constant dense<{{\[\[128, 0\]\]}}> : tensor<1x2xi64>
+// CHECK: "stablehlo.dynamic_conv"(%arg0, %arg1, %[[P]])
+func.func @dynamic_conv_ui8_constant_padding(%a: tensor<1x2x1xf32>, %k: tensor<1x1x1xf32>) -> tensor<1x?x1xf32> {
+  %p = stablehlo.constant dense<[[128, 0]]> : tensor<1x2xui8>
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>
+  } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xui8>) -> tensor<1x?x1xf32>
+  return %r : tensor<1x?x1xf32>
+}
+
+// -----
+
+// A value unknown when matched is checked at runtime even if a producer later
+// folds to a constant. This must not depend on greedy rewrite order.
+// CHECK-LABEL: @dynamic_conv_unsigned_padding_folded
+// CHECK: util.status.check_ok {{.*}}, "convolution padding exceeds the signed 64-bit dimension range"
+func.func @dynamic_conv_unsigned_padding_folded(%a: tensor<1x2x1xf32>, %k: tensor<1x1x1xf32>) -> tensor<1x?x1xf32> {
+  %large = stablehlo.constant dense<[[0, 18446744073709551615]]> : tensor<1x2xui64>
+  %zero = stablehlo.constant dense<0> : tensor<1x2xui64>
+  %p = stablehlo.add %large, %zero : tensor<1x2xui64>
+  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
+    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
+    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
+    window_strides = array<i64: 1>, lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>
+  } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xui64>) -> tensor<1x?x1xf32>
+  return %r : tensor<1x?x1xf32>
+}
