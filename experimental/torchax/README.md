@@ -154,8 +154,20 @@ Select a native backend with `--target-backend` and, when needed, a runtime
 device URI with `--device`. Repeat `--compiler-arg=...` for target options.
 For example, `--target-backend=vmvx` uses local-task, and
 `--target-backend=vulkan-spirv --device=vulkan` uses Vulkan. Use a separate
-output directory for each target. Backend and device failures propagate; the
-harness does not skip unavailable or failing targets. WASM deployment requires
+output directory for each target. For this f32 model, VMVX also requires
+`--compiler-arg=--iree-vmvx-reassociate-fp-reductions` to meet the numerical
+comparison policy. This opt-in setting groups eligible f32 sums into contiguous
+chunks of 64 before combining their partial sums. It changes association and
+rounded results, including possible overflow and underflow, and does not
+promise improved accuracy for every input. Extra partial-sum storage and loops
+may increase execution time. The original init participates only
+in the final sum. Other types, nondivisible or dynamic reduction extents, and
+unsupported scalar bodies keep their original lowering. Reassociation is
+otherwise disabled by default; the setting is retained in executable target
+configuration when compilation is resumed from a checkpoint.
+
+Backend and device failures propagate; the harness does not skip unavailable
+or failing targets. WASM deployment requires
 its own runtime runner and is not exercised by this Python harness.
 It does not establish BF16 or GPU conformance: the broader suite currently has
 a BF16 mixed-matmul discrepancy also present when weights are ordinary arguments.

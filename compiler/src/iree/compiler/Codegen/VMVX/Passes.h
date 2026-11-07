@@ -26,16 +26,20 @@ namespace mlir::iree_compiler {
 /// Populates the passes to lower to tiled/distributed/bufferized ops,
 /// suitable for library call dispatch and lowering to loops.
 void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
-                                bool enableUKernels);
+                                bool enableUKernels,
+                                bool reassociateFpReductions = false);
 
 /// Wraps VMVX pipeline options for passing through
 /// PipelineAttrInterface::buildPipeline.
 struct VMVXCodegenPipelineOptions final
     : CodegenPipelineOptionsBase<VMVXCodegenPipelineOptions> {
-  explicit VMVXCodegenPipelineOptions(bool enableUKernels)
-      : enableUKernels(enableUKernels) {}
+  explicit VMVXCodegenPipelineOptions(bool enableUKernels,
+                                      bool reassociateFpReductions = false)
+      : enableUKernels(enableUKernels),
+        reassociateFpReductions(reassociateFpReductions) {}
 
   bool enableUKernels = false;
+  bool reassociateFpReductions = false;
 };
 
 //----------------------------------------------------------------------------//
