@@ -282,14 +282,18 @@ std::optional<SizeProduct> factorDim(Value tensor, int64_t dim, int depth,
 // 0-d tensor round trips. A narrowing cast keeps its width. A wrapped i32
 // product would break the reshape's element count or the broadcast's operand
 // size, so products are read as exact.
-std::optional<SizeProduct> factorSize(Value value, int depth,
-                                      FactorBudget &budget) {
+static std::optional<SizeProduct> factorSize(Value value, int depth,
+                                             FactorBudget &budget) {
   if (++budget.visits > kMaxFactorVisits) {
     return std::nullopt;
   }
   APInt constant;
   if (matchPattern(value, m_ConstantInt(&constant))) {
-    return SizeProduct{constant.getSExtValue(), {}};
+    std::optional<int64_t> size = constant.trySExtValue();
+    if (!size) {
+      return std::nullopt;
+    }
+    return SizeProduct{*size, {}};
   }
   if (depth > 0) {
     if (auto indexCast = value.getDefiningOp<arith::IndexCastOp>()) {
@@ -337,7 +341,7 @@ std::optional<SizeProduct> factorSize(Value value, int depth,
       Operation *vector = source.getDefiningOp();
       if (auto fromElements =
               dyn_cast_if_present<tensor::FromElementsOp>(vector);
-          fromElements && index &&
+          fromElements && index && *index >= 0 &&
           *index < static_cast<int64_t>(fromElements.getNumOperands())) {
         element =
             factorSize(fromElements.getOperand(*index), depth - 1, budget);
