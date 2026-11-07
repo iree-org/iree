@@ -8,6 +8,7 @@
 
 #include <string.h>
 
+#include "iree/async/notification.h"
 #include "iree/async/operations/scheduling.h"
 #include "iree/async/platform/js/imports.h"
 #include "iree/async/platform/js/token_table.h"
@@ -44,6 +45,60 @@ static iree_async_operation_t* iree_async_proactor_js_ready_dequeue(
     operation->next = NULL;
   }
   return operation;
+}
+
+//===----------------------------------------------------------------------===//
+// Notification wait queues
+//===----------------------------------------------------------------------===//
+
+// Ends the implicit observation held by a default-token pending wait. Explicit
+// token waits instead use operation.c's retained observation, which lasts until
+// completion. Both paths retain the notification while it is in the ready
+// queue.
+static void iree_async_proactor_js_ready_enqueue_notification_wait(
+    iree_async_proactor_js_t* proactor,
+    iree_async_notification_wait_operation_t* wait) {
+  if (!iree_any_bit_set(wait->wait_flags,
+                        IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN)) {
+    iree_async_notification_end_observe(wait->notification);
+  }
+  iree_async_proactor_js_ready_enqueue(proactor, &wait->base);
+}
+
+// Moves waits satisfied by this notification to the ready queue without running
+// callbacks. A callback may free its operation, drop the last notification ref,
+// or submit another wait, so dispatch must happen after this traversal.
+static iree_host_size_t
+iree_async_proactor_js_enqueue_satisfied_notification_waits(
+    iree_async_proactor_js_t* proactor,
+    iree_async_notification_t* notification) {
+  uint32_t epoch = iree_async_notification_query_epoch(notification);
+  iree_host_size_t count = 0;
+  iree_async_operation_t** cursor = &proactor->notification_waits;
+  while (*cursor) {
+    iree_async_notification_wait_operation_t* wait =
+        (iree_async_notification_wait_operation_t*)*cursor;
+    if (wait->notification != notification || wait->wait_token == epoch) {
+      cursor = &wait->base.next;
+      continue;
+    }
+    *cursor = wait->base.next;
+    iree_async_proactor_js_ready_enqueue_notification_wait(proactor, wait);
+    ++count;
+  }
+  return count;
+}
+
+static bool iree_async_proactor_js_remove_notification_wait(
+    iree_async_proactor_js_t* proactor, iree_async_operation_t* operation) {
+  iree_async_operation_t** cursor = &proactor->notification_waits;
+  while (*cursor && *cursor != operation) {
+    cursor = &(*cursor)->next;
+  }
+  if (!*cursor) return false;
+  *cursor = operation->next;
+  operation->next = NULL;
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -107,16 +162,16 @@ static void iree_async_proactor_js_dispatch_linked_continuation(
 //===----------------------------------------------------------------------===//
 
 // Dispatches a completion callback for an operation.
-// Releases retained resources, dispatches any linked continuations, then
-// invokes the user callback. The linked continuation dispatch must happen
-// before the callback because the callback may free the operation.
+// Dispatches linked continuations while retained resources are still valid,
+// releases those resources, then invokes the user callback. Both steps must
+// precede the callback because the callback may free the operation.
 static void iree_async_proactor_js_complete(
     iree_async_proactor_js_t* proactor, iree_async_operation_t* operation,
     iree_status_t status, iree_async_completion_flags_t flags) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_async_operation_release_resources(operation);
   iree_async_proactor_js_dispatch_linked_continuation(proactor, operation,
                                                       status);
+  iree_async_operation_release_resources(operation);
   operation->completion_fn(operation->user_data, operation, status, flags);
   IREE_TRACE_ZONE_END(z0);
 }
@@ -125,10 +180,43 @@ static void iree_async_proactor_js_complete(
 // Submit
 //===----------------------------------------------------------------------===//
 
+static iree_status_t iree_async_proactor_js_submit_notification_wait(
+    iree_async_proactor_js_t* proactor,
+    iree_async_notification_wait_operation_t* wait) {
+  if (!wait->notification || wait->notification->proactor != &proactor->base) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "notification must belong to the JS proactor");
+  }
+  if (wait->wait_flags & ~IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "unsupported notification wait flags");
+  }
+  iree_async_operation_retain_resources(&wait->base);
+  IREE_TRACE(wait->base.submit_time_ns = iree_time_now();)
+  if (!iree_any_bit_set(wait->wait_flags,
+                        IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN)) {
+    wait->wait_token =
+        iree_async_notification_begin_observe(wait->notification);
+  }
+  if (iree_async_notification_query_epoch(wait->notification) !=
+      wait->wait_token) {
+    iree_async_proactor_js_ready_enqueue_notification_wait(proactor, wait);
+    iree_async_js_import_schedule_drain();
+  } else {
+    wait->base.next = proactor->notification_waits;
+    proactor->notification_waits = &wait->base;
+  }
+  return iree_ok_status();
+}
+
 static iree_status_t iree_async_proactor_js_submit_one(
     iree_async_proactor_js_t* proactor, iree_async_operation_t* operation) {
   iree_async_operation_clear_internal_flags(operation);
   switch (operation->type) {
+    case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT:
+      return iree_async_proactor_js_submit_notification_wait(
+          proactor, (iree_async_notification_wait_operation_t*)operation);
+
     case IREE_ASYNC_OPERATION_TYPE_NOP: {
       iree_async_operation_retain_resources(operation);
       IREE_TRACE(operation->submit_time_ns = iree_time_now();)
@@ -329,7 +417,7 @@ static iree_status_t iree_async_proactor_js_poll(
   // Run progress callbacks (shared infrastructure with other backends).
   completed_count += iree_async_proactor_run_progress(proactor);
 
-  // Drain ready queue (NOPs, expired timers queued during submit).
+  // Drain ready operations, including satisfied notification waits.
   completed_count += iree_async_proactor_js_drain_ready(js_proactor);
 
   // Drain completions from the JS ring.
@@ -371,6 +459,16 @@ static iree_status_t iree_async_proactor_js_cancel(
     iree_async_proactor_t* proactor, iree_async_operation_t* operation) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  if (operation->type == IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT) {
+    iree_async_notification_wait_operation_t* wait =
+        (iree_async_notification_wait_operation_t*)operation;
+    if (!wait->notification || wait->notification->proactor != proactor) {
+      IREE_TRACE_ZONE_END(z0);
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "notification must belong to the JS proactor");
+    }
+  }
+
   // Set the CANCELLED flag. Since we're single-threaded, relaxed ordering is
   // sufficient.
   iree_atomic_fetch_or(&operation->internal_flags,
@@ -378,6 +476,18 @@ static iree_status_t iree_async_proactor_js_cancel(
                        iree_memory_order_relaxed);
 
   switch (operation->type) {
+    case IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT: {
+      iree_async_proactor_js_t* js_proactor =
+          iree_async_proactor_js_cast(proactor);
+      if (iree_async_proactor_js_remove_notification_wait(js_proactor,
+                                                          operation)) {
+        iree_async_proactor_js_ready_enqueue_notification_wait(
+            js_proactor, (iree_async_notification_wait_operation_t*)operation);
+        iree_async_js_import_schedule_drain();
+      }
+      break;
+    }
+
     case IREE_ASYNC_OPERATION_TYPE_TIMER: {
       iree_async_timer_operation_t* timer =
           (iree_async_timer_operation_t*)operation;
@@ -428,7 +538,7 @@ iree_async_proactor_js_query_capabilities(iree_async_proactor_t* proactor) {
 }
 
 //===----------------------------------------------------------------------===//
-// Unavailable vtable methods
+// Platform resources
 //===----------------------------------------------------------------------===//
 
 static iree_status_t iree_async_proactor_js_create_socket(
@@ -491,8 +601,21 @@ static void iree_async_proactor_js_unregister_event_source(
 static iree_status_t iree_async_proactor_js_create_notification(
     iree_async_proactor_t* proactor, iree_async_notification_flags_t flags,
     iree_async_notification_t** out_notification) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "JS proactor does not support notifications yet");
+  *out_notification = NULL;
+  if (flags != IREE_ASYNC_NOTIFICATION_FLAG_NONE) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "JS proactor supports only local notifications");
+  }
+  iree_async_notification_t* notification = NULL;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      proactor->allocator, sizeof(*notification), (void**)&notification));
+  memset(notification, 0, sizeof(*notification));
+  iree_atomic_ref_count_init(&notification->ref_count);
+  notification->proactor = proactor;
+  notification->epoch_ptr = &notification->epoch;
+  notification->mode = IREE_ASYNC_NOTIFICATION_MODE_EMULATED;
+  *out_notification = notification;
+  return iree_ok_status();
 }
 
 static iree_status_t iree_async_proactor_js_create_notification_shared(
@@ -505,20 +628,34 @@ static iree_status_t iree_async_proactor_js_create_notification_shared(
 
 static void iree_async_proactor_js_destroy_notification(
     iree_async_proactor_t* proactor, iree_async_notification_t* notification) {
-  IREE_ASSERT(false, "destroy_notification called on JS proactor");
+  iree_allocator_free(proactor->allocator, notification);
 }
 
 static void iree_async_proactor_js_notification_signal(
     iree_async_proactor_t* proactor, iree_async_notification_t* notification,
     int32_t wake_count) {
-  IREE_ASSERT(false, "notification_signal called on JS proactor");
+  (void)wake_count;
+  // notification.c has already advanced the epoch. All pending waits with an
+  // older token are eligible; wake_count is an OS wakeup hint on other
+  // backends.
+  if (iree_async_proactor_js_enqueue_satisfied_notification_waits(
+          iree_async_proactor_js_cast(proactor), notification)) {
+    iree_async_js_import_schedule_drain();
+  }
 }
 
 static bool iree_async_proactor_js_notification_wait(
     iree_async_proactor_t* proactor, iree_async_notification_t* notification,
     uint32_t wait_token, iree_timeout_t timeout) {
-  IREE_ASSERT(false, "notification_wait called on JS proactor");
-  return false;
+  (void)proactor;
+  // This blocks the Wasm thread and cannot service event-loop callbacks. Async
+  // notification waits are required when those callbacks provide the signal.
+  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
+  while (iree_async_notification_query_epoch(notification) == wait_token) {
+    if (iree_time_now() >= deadline_ns) return false;
+    iree_wait_until(deadline_ns);
+  }
+  return true;
 }
 
 static iree_status_t iree_async_proactor_js_register_relay(
@@ -621,6 +758,8 @@ static void iree_async_proactor_js_destroy(iree_async_proactor_t* proactor) {
   // The ready queue should be empty by the time we destroy.
   IREE_ASSERT(js_proactor->ready_head == NULL,
               "JS proactor destroyed with operations in ready queue");
+  IREE_ASSERT(js_proactor->notification_waits == NULL,
+              "JS proactor destroyed with pending notification waits");
 
   iree_async_js_token_table_deinitialize(&js_proactor->token_table);
   iree_allocator_free(allocator, js_proactor);
@@ -633,6 +772,12 @@ iree_status_t iree_async_proactor_create_js(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(out_proactor);
   *out_proactor = NULL;
+
+  if (options.threading_mode != IREE_ASYNC_PROACTOR_THREADING_SAME_THREAD) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "JS proactor must stay on its creating thread");
+  }
 
   // Token table capacity from options, with default fallback.
   iree_host_size_t token_table_capacity = options.max_concurrent_operations;
