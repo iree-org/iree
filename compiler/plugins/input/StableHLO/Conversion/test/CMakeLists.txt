@@ -50,6 +50,27 @@ iree_lit_test_suite(
 
 iree_cc_test(
   NAME
+    DynamicReduceWindowTest
+  SRCS
+    "DynamicReduceWindowTest.cpp"
+  DEPS
+    MLIRArithDialect
+    MLIRFuncDialect
+    MLIRIR
+    MLIRParser
+    MLIRPass
+    MLIRTensorDialect
+    StablehloOps
+    gmock
+    gtest
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::plugins::input::StableHLO::Conversion::PassHeaders
+    iree::compiler::plugins::input::StableHLO::Conversion::StableHLOLegalization
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
     TargetRegistryTest
   SRCS
     "TargetRegistryTest.cpp"
