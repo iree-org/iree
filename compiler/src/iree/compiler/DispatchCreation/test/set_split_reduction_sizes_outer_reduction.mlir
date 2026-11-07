@@ -266,3 +266,68 @@ util.func public @small_outer_reduction_skipped(%arg0: tensor<4x15xi32>, %arg1: 
   } -> tensor<15xi32>
   util.return %2 : tensor<15xi32>
 }
+
+// -----
+
+// CHECK-LABEL: @basic_multi_output
+util.func public @basic_multi_output(%arg0: tensor<1025x8xf32>)
+    -> (tensor<8xf32>, tensor<8xf32>) {
+  // Outputs with independent combiners remain supported.
+  // CHECK: iree_linalg_ext.split_reduction = [41 : index]
+  %cst = arith.constant 0.0 : f32
+  %0 = tensor.empty() : tensor<8xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<8xf32>) -> tensor<8xf32>
+  %2 = tensor.empty() : tensor<8xf32>
+  %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<8xf32>) -> tensor<8xf32>
+  %4:2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d1)>,
+                       affine_map<(d0, d1) -> (d1)>],
+      iterator_types = ["reduction", "parallel"]
+  } ins(%arg0 : tensor<1025x8xf32>)
+    outs(%1, %3 : tensor<8xf32>, tensor<8xf32>) {
+  ^bb0(%in: f32, %out0: f32, %out1: f32):
+    %5 = arith.addf %in, %out0 : f32
+    %6 = arith.addf %in, %out1 : f32
+    linalg.yield %5, %6 : f32, f32
+  } -> (tensor<8xf32>, tensor<8xf32>)
+  util.return %4#0, %4#1 : tensor<8xf32>, tensor<8xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @coupled_argmax_outer_reduction
+util.func public @coupled_argmax_outer_reduction(%arg0: tensor<1025x8xi32>)
+    -> (tensor<8xi32>, tensor<8xi64>) {
+  // The index update depends on the value accumulator. Leave the coupled
+  // outputs unsplit.
+  // CHECK-NOT: iree_linalg_ext.split_reduction
+  %min = arith.constant -2147483648 : i32
+  %last = arith.constant 9223372036854775807 : i64
+  %empty_values = tensor.empty() : tensor<8xi32>
+  %values = linalg.fill ins(%min : i32)
+      outs(%empty_values : tensor<8xi32>) -> tensor<8xi32>
+  %empty_indices = tensor.empty() : tensor<8xi64>
+  %indices = linalg.fill ins(%last : i64)
+      outs(%empty_indices : tensor<8xi64>) -> tensor<8xi64>
+  %result:2 = linalg.generic {
+      indexing_maps = [affine_map<(r, c) -> (r, c)>,
+                       affine_map<(r, c) -> (c)>,
+                       affine_map<(r, c) -> (c)>],
+      iterator_types = ["reduction", "parallel"]
+  } ins(%arg0 : tensor<1025x8xi32>)
+    outs(%values, %indices : tensor<8xi32>, tensor<8xi64>) {
+  ^bb0(%incoming: i32, %best: i32, %best_index: i64):
+    %r = linalg.index 0 : index
+    %index = arith.index_cast %r : index to i64
+    %maximum = arith.maxsi %incoming, %best : i32
+    %greater = arith.cmpi sgt, %incoming, %best : i32
+    %equal = arith.cmpi eq, %incoming, %best : i32
+    %earlier = arith.cmpi slt, %index, %best_index : i64
+    %tie = arith.andi %equal, %earlier : i1
+    %take = arith.ori %greater, %tie : i1
+    %selected = arith.select %take, %index, %best_index : i64
+    linalg.yield %maximum, %selected : i32, i64
+  } -> (tensor<8xi32>, tensor<8xi64>)
+  util.return %result#0, %result#1 : tensor<8xi32>, tensor<8xi64>
+}
