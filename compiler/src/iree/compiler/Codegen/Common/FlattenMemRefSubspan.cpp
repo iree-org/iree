@@ -55,6 +55,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -86,6 +87,57 @@ static bool isRankZeroOrOneMemRef(Type type) {
     return memrefType.hasRank() && memrefType.getRank() <= 1;
   }
   return false;
+}
+
+// Follow only views that preserve the binding's logical origin. A reinterpret
+// cast can reset that origin and needs its own conversion contract.
+static IREE::HAL::InterfaceBindingSubspanOp
+getBindingForPreservedView(Value value) {
+  while (Operation *producer = value.getDefiningOp()) {
+    if (!isa<memref::AssumeAlignmentOp, memref::CastOp, memref::SubViewOp,
+             memref::CollapseShapeOp, memref::ExpandShapeOp>(producer)) {
+      return dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(producer);
+    }
+    value = cast<ViewLikeOpInterface>(producer).getViewSource();
+  }
+  return {};
+}
+
+// A binding offset is part of the logical view even when its rank is already
+// zero or one. Its consumers must adopt the replacement view's layout before
+// the alias-folding patterns move that offset into their indices.
+static bool isFlattenedMemRef(Value value) {
+  if (!isRankZeroOrOneMemRef(value.getType())) {
+    return false;
+  }
+  auto binding = getBindingForPreservedView(value);
+  return !binding || !binding.getByteOffset() ||
+         matchPattern(binding.getByteOffset(), m_Zero());
+}
+
+// A nonzero binding offset becomes a subview of the zero-offset base. Match
+// that view type during conversion so consumers receive it directly instead of
+// requesting a cast back to the original identity layout.
+static std::optional<Type> getFlattenedBindingViewType(Value value) {
+  auto binding = getBindingForPreservedView(value);
+  if (!binding || !binding.getByteOffset() ||
+      matchPattern(binding.getByteOffset(), m_Zero())) {
+    return std::nullopt;
+  }
+  auto type = dyn_cast<MemRefType>(value.getType());
+  if (!type) {
+    return std::nullopt;
+  }
+  SmallVector<int64_t> shape, strides;
+  if (type.getRank() > 0) {
+    shape.push_back(type.hasStaticShape() ? type.getNumElements()
+                                          : ShapedType::kDynamic);
+    strides.push_back(1);
+  }
+  return MemRefType::get(
+      shape, type.getElementType(),
+      StridedLayoutAttr::get(type.getContext(), ShapedType::kDynamic, strides),
+      type.getMemorySpace());
 }
 
 /// Flattens n-D MemRef to 1-D MemRef and allows other types.
@@ -443,8 +495,11 @@ struct FlattenSubView final : OpConversionPattern<memref::SubViewOp> {
       return rewriter.notifyMatchFailure(
           op, "expected converted memref of rank <= 1");
     }
-    Type neededResultType =
-        getTypeConverter()->convertType(op.getResult().getType());
+    if (isRankZeroMemRef(adaptor.getSource().getType())) {
+      rewriter.replaceOp(op, adaptor.getSource());
+      return success();
+    }
+    Type neededResultType = getTypeConverter()->convertType(op.getResult());
     if (!neededResultType || !isRankZeroOrOneMemRef(neededResultType)) {
       return failure();
     }
@@ -476,6 +531,11 @@ struct LinearizeLoadIndices final : OpConversionPattern<memref::LoadOp> {
           loadOp, "expected converted memref of rank <= 1");
     }
 
+    if (isRankZeroMemRef(adaptor.getMemref().getType())) {
+      rewriter.replaceOpWithNewOp<memref::LoadOp>(loadOp, adaptor.getMemref(),
+                                                  ValueRange{});
+      return success();
+    }
     Value linearIndex = linearizeIndices(
         loadOp.getMemref(), loadOp.getIndices(), loadOp.getLoc(), rewriter);
     if (!linearIndex) {
@@ -526,6 +586,11 @@ struct LinearizeStoreIndices final : OpConversionPattern<memref::StoreOp> {
           storeOp, "expected converted memref of rank <= 1");
     }
 
+    if (isRankZeroMemRef(adaptor.getMemref().getType())) {
+      rewriter.replaceOpWithNewOp<memref::StoreOp>(
+          storeOp, adaptor.getValue(), adaptor.getMemref(), ValueRange{});
+      return success();
+    }
     Value linearIndex = linearizeIndices(
         storeOp.getMemref(), storeOp.getIndices(), storeOp.getLoc(), rewriter);
     if (!linearIndex) {
@@ -647,6 +712,26 @@ struct FlattenDealloc final : OpConversionPattern<memref::DeallocOp> {
   }
 };
 
+struct FlattenMemRefCast final : OpConversionPattern<memref::CastOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(memref::CastOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Type resultType = getTypeConverter()->convertType(op.getResult());
+    if (!resultType ||
+        !memref::CastOp::areCastCompatible(
+            TypeRange{adaptor.getSource().getType()}, TypeRange{resultType})) {
+      return rewriter.notifyMatchFailure(op,
+                                         "incompatible flattened view types");
+    }
+    Operation *converted = mlir::cloneWithoutRegions(
+        rewriter, op, TypeRange{resultType}, ValueRange{adaptor.getSource()});
+    rewriter.replaceOp(op, converted->getResults());
+    return success();
+  }
+};
+
 /// Adjusts unrealized_conversion_cast ops' inputs to flattened memref values.
 struct AdjustConversionCast final
     : OpConversionPattern<UnrealizedConversionCastOp> {
@@ -699,8 +784,7 @@ struct FoldMemRefReshape final : OpConversionPattern<ReshapeOpTy> {
     // to become more static (i.e. memref<?xf32> -> memref<5xf32>).
     // Refuse to match if the cast would be illegal.
     Type newSourceType = adaptor.getSrc().getType();
-    Type neededResultType =
-        typeConverter->convertType(op.getResult().getType());
+    Type neededResultType = typeConverter->convertType(op.getResult());
     if (!neededResultType) {
       return failure();
     }
@@ -782,6 +866,7 @@ struct FlattenMemRefSubspanPass final
           // Fall back to the default conversion flow.
           return std::nullopt;
         });
+    interfaceTypeConverter.addConversion(getFlattenedBindingViewType);
     flattenPatterns.add<FlattenBindingSubspan>(interfaceTypeConverter, context);
     flattenPatterns.add<FoldAssumeAlignOp>(context);
 
@@ -800,15 +885,17 @@ struct FlattenMemRefSubspanPass final
           // Fall back to the default conversion flow.
           return std::nullopt;
         });
-    flattenPatterns.add<
-        FlattenAlloc<memref::AllocaOp>, FlattenAlloc<memref::AllocOp>,
-        FlattenGlobal, FlattenGetGlobal, FlattenReinterpretCast,
-        LinearizeLoadIndices, LinearizeMMALoadIndices, LinearizeStoreIndices,
-        LinearizeMMAStoreIndices, LinearizeTransferReadIndices,
-        LinearizeTransferWriteIndices, FlattenDealloc, AdjustConversionCast,
-        FlattenSubView, FoldMemRefReshape<memref::CollapseShapeOp>,
-        FoldMemRefReshape<memref::ExpandShapeOp>>(internalTypeConverter,
-                                                  context);
+    internalTypeConverter.addConversion(getFlattenedBindingViewType);
+    flattenPatterns
+        .add<FlattenAlloc<memref::AllocaOp>, FlattenAlloc<memref::AllocOp>,
+             FlattenGlobal, FlattenGetGlobal, FlattenReinterpretCast,
+             LinearizeLoadIndices, LinearizeMMALoadIndices,
+             LinearizeStoreIndices, LinearizeMMAStoreIndices,
+             LinearizeTransferReadIndices, LinearizeTransferWriteIndices,
+             FlattenDealloc, AdjustConversionCast, FlattenSubView,
+             FlattenMemRefCast, FoldMemRefReshape<memref::CollapseShapeOp>,
+             FoldMemRefReshape<memref::ExpandShapeOp>>(internalTypeConverter,
+                                                       context);
 
     ConversionTarget target(*context);
     // This pass currently doesn't support alignment hints so always fold them.
@@ -822,7 +909,7 @@ struct FlattenMemRefSubspanPass final
         .addDynamicallyLegalOp<memref::CollapseShapeOp, memref::ExpandShapeOp>(
             [](Operation *op) {
               return isRankZeroOrOneMemRef(op->getResultTypes().front()) &&
-                     isRankZeroOrOneMemRef(op->getOperandTypes().front());
+                     isFlattenedMemRef(op->getOperand(0));
             });
     target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
         [&](IREE::HAL::InterfaceBindingSubspanOp op) {
@@ -836,7 +923,7 @@ struct FlattenMemRefSubspanPass final
       return isRankZeroOrOneMemRef(op.getType());
     });
     target.addDynamicallyLegalOp<memref::LoadOp>([](memref::LoadOp loadOp) {
-      return isRankZeroOrOneMemRef(loadOp.getMemRefType());
+      return isFlattenedMemRef(loadOp.getMemref());
     });
     target.addDynamicallyLegalOp<memref::ReinterpretCastOp>(
         [](memref::ReinterpretCastOp castOp) {
@@ -844,24 +931,22 @@ struct FlattenMemRefSubspanPass final
         });
     target.addDynamicallyLegalOp<gpu::SubgroupMmaLoadMatrixOp>(
         [](gpu::SubgroupMmaLoadMatrixOp loadOp) {
-          return isRankZeroOrOneMemRef(loadOp.getSrcMemref().getType());
+          return isFlattenedMemRef(loadOp.getSrcMemref());
         });
     target.addDynamicallyLegalOp<memref::StoreOp>([](memref::StoreOp storeOp) {
-      return isRankZeroOrOneMemRef(storeOp.getMemRefType());
+      return isFlattenedMemRef(storeOp.getMemref());
     });
     target.addDynamicallyLegalOp<gpu::SubgroupMmaStoreMatrixOp>(
         [](gpu::SubgroupMmaStoreMatrixOp storeOp) {
-          return isRankZeroOrOneMemRef(storeOp.getDstMemref().getType());
+          return isFlattenedMemRef(storeOp.getDstMemref());
         });
     target.addDynamicallyLegalOp<vector::TransferReadOp>(
         [](vector::TransferReadOp readOp) {
-          return isRankZeroOrOneMemRef(
-              cast<MemRefType>(readOp.getBase().getType()));
+          return isFlattenedMemRef(readOp.getBase());
         });
     target.addDynamicallyLegalOp<vector::TransferWriteOp>(
         [](vector::TransferWriteOp writeOp) {
-          return isRankZeroOrOneMemRef(
-              cast<MemRefType>(writeOp.getBase().getType()));
+          return isFlattenedMemRef(writeOp.getBase());
         });
     target.addDynamicallyLegalOp<UnrealizedConversionCastOp>(
         [](UnrealizedConversionCastOp castOp) {
@@ -873,12 +958,16 @@ struct FlattenMemRefSubspanPass final
           return !isa<BaseMemRefType>(inputType) ||
                  isRankZeroOrOneMemRef(inputType);
         });
+    target.addDynamicallyLegalOp<memref::CastOp>([](memref::CastOp op) {
+      return isRankZeroOrOneMemRef(op.getType()) &&
+             isFlattenedMemRef(op.getSource());
+    });
     target.addDynamicallyLegalOp<memref::SubViewOp>([](memref::SubViewOp op) {
-      return isRankZeroOrOneMemRef(op.getType());
+      return isRankZeroOrOneMemRef(op.getType()) &&
+             isFlattenedMemRef(op.getSource());
     });
-    target.addDynamicallyLegalOp<memref::DeallocOp>([](memref::DeallocOp op) {
-      return isRankZeroOrOneMemRef(op.getMemref().getType());
-    });
+    target.addDynamicallyLegalOp<memref::DeallocOp>(
+        [](memref::DeallocOp op) { return isFlattenedMemRef(op.getMemref()); });
 
     // Use partial conversion here so that we can ignore allocations created
     // by promotion and their load/store ops.
