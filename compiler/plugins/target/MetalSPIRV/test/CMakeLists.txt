@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "add_positive_zero.mlir"
     "loop_buffer_updates.mlir"
     "smoketest.mlir"
   TOOLS

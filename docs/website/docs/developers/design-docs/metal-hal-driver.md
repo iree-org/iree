@@ -254,6 +254,11 @@ instead disable MSL optimisation for the shader: SPIRV-Cross cannot propagate
 volatile qualifiers through every pointer expression or composite assignment.
 Helpers proven free of memory effects do not require this fallback. Both embedded
 MSL source and precompiled Metal libraries carry these requirements.
+Additions of a scalar or splat positive zero also use SPIRV-Cross's invariant
+addition helper. Metal's ordinary fast-math compilation can discard these
+additions, changing the required result for a negative-zero operand. The backend
+marks these add instructions in its private SPIRV-Cross IR so other arithmetic
+retains its existing lowering.
 
 ### Workgroup/threadgroup size
 

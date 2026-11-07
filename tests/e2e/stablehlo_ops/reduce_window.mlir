@@ -237,3 +237,168 @@ func.func @reduce_window_dynamic_batch_max_2x4x3x1xf32() {
                                         [[[19.0], [20.0]], [[22.0], [23.0]]]]> : tensor<2x2x2x1xf32>) : tensor<2x2x2x1xf32>
   return
 }
+
+// Check the sign bit: floating-point equality cannot distinguish +0 from -0.
+func.func @scan_prefix_positive_zero_init() {
+  %input = util.unfoldable_constant dense<-0.0> : tensor<4xf32>
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<f32>, %rhs: tensor<f32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<f32>
+    stablehlo.return %sum : tensor<f32>
+  }) {window_dimensions = array<i64: 4>, padding = dense<[[3, 0]]> : tensor<1x2xi64>} : (tensor<4xf32>, tensor<f32>) -> tensor<4xf32>
+  %original_bits = stablehlo.bitcast_convert %input : (tensor<4xf32>) -> tensor<4xi32>
+  check.expect_eq_const(%original_bits, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  %bits = stablehlo.bitcast_convert %result : (tensor<4xf32>) -> tensor<4xi32>
+  check.expect_eq_const(%bits, dense<0> : tensor<4xi32>) : tensor<4xi32>
+  return
+}
+
+func.func @scan_prefix_negative_zero_init() {
+  %input = util.unfoldable_constant dense<-0.0> : tensor<4xf32>
+  %init = stablehlo.constant dense<-0.0> : tensor<f32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<f32>, %rhs: tensor<f32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<f32>
+    stablehlo.return %sum : tensor<f32>
+  }) {window_dimensions = array<i64: 4>, padding = dense<[[3, 0]]> : tensor<1x2xi64>} : (tensor<4xf32>, tensor<f32>) -> tensor<4xf32>
+  %original_bits = stablehlo.bitcast_convert %input : (tensor<4xf32>) -> tensor<4xi32>
+  check.expect_eq_const(%original_bits, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  %bits = stablehlo.bitcast_convert %result : (tensor<4xf32>) -> tensor<4xi32>
+  check.expect_eq_const(%bits, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  return
+}
+
+func.func @scan_suffix_positive_zero_init() {
+  %input = util.unfoldable_constant dense<-0.0> : tensor<4xf32>
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<f32>, %rhs: tensor<f32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<f32>
+    stablehlo.return %sum : tensor<f32>
+  }) {window_dimensions = array<i64: 4>, padding = dense<[[0, 3]]> : tensor<1x2xi64>} : (tensor<4xf32>, tensor<f32>) -> tensor<4xf32>
+  %original_bits = stablehlo.bitcast_convert %input : (tensor<4xf32>) -> tensor<4xi32>
+  check.expect_eq_const(%original_bits, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  %bits = stablehlo.bitcast_convert %result : (tensor<4xf32>) -> tensor<4xi32>
+  check.expect_eq_const(%bits, dense<0> : tensor<4xi32>) : tensor<4xi32>
+  return
+}
+
+func.func @scan_suffix_negative_zero_init() {
+  %input = util.unfoldable_constant dense<-0.0> : tensor<4xf32>
+  %init = stablehlo.constant dense<-0.0> : tensor<f32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<f32>, %rhs: tensor<f32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<f32>
+    stablehlo.return %sum : tensor<f32>
+  }) {window_dimensions = array<i64: 4>, padding = dense<[[0, 3]]> : tensor<1x2xi64>} : (tensor<4xf32>, tensor<f32>) -> tensor<4xf32>
+  %original_bits = stablehlo.bitcast_convert %input : (tensor<4xf32>) -> tensor<4xi32>
+  check.expect_eq_const(%original_bits, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  %bits = stablehlo.bitcast_convert %result : (tensor<4xf32>) -> tensor<4xi32>
+  check.expect_eq_const(%bits, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  return
+}
+
+func.func @dynamic_scan_prefix_positive_zero_init() {
+  %input = flow.tensor.dynamic_constant dense<-0.0> : tensor<4xf32> -> tensor<?xf32>
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %size = stablehlo.get_dimension_size %input, dim = 0 : (tensor<?xf32>) -> tensor<i32>
+  %n = tensor.extract %size[] : tensor<i32>
+  %one = arith.constant 1 : i32
+  %zero = arith.constant 0 : i32
+  %nm1 = arith.subi %n, %one : i32
+  %window = tensor.from_elements %n : tensor<1xi32>
+  %ones = stablehlo.constant dense<1> : tensor<1xi32>
+  %padding = tensor.from_elements %nm1, %zero : tensor<1x2xi32>
+  %result = stablehlo.custom_call @stablehlo.dynamic_reduce_window(%input, %init, %window, %ones, %ones, %ones, %padding) {api_version = 2 : i32, called_computations = [@scan_zero_sum]} : (tensor<?xf32>, tensor<f32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1x2xi32>) -> tensor<?xf32>
+  %original_bits = stablehlo.bitcast_convert %input : (tensor<?xf32>) -> tensor<?xi32>
+  %original_fixed = tensor.cast %original_bits : tensor<?xi32> to tensor<4xi32>
+  check.expect_eq_const(%original_fixed, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  %bits = stablehlo.bitcast_convert %result : (tensor<?xf32>) -> tensor<?xi32>
+  %fixed = tensor.cast %bits : tensor<?xi32> to tensor<4xi32>
+  check.expect_eq_const(%fixed, dense<0> : tensor<4xi32>) : tensor<4xi32>
+  return
+}
+
+func.func @dynamic_scan_prefix_negative_zero_init() {
+  %input = flow.tensor.dynamic_constant dense<-0.0> : tensor<4xf32> -> tensor<?xf32>
+  %init = stablehlo.constant dense<-0.0> : tensor<f32>
+  %size = stablehlo.get_dimension_size %input, dim = 0 : (tensor<?xf32>) -> tensor<i32>
+  %n = tensor.extract %size[] : tensor<i32>
+  %one = arith.constant 1 : i32
+  %zero = arith.constant 0 : i32
+  %nm1 = arith.subi %n, %one : i32
+  %window = tensor.from_elements %n : tensor<1xi32>
+  %ones = stablehlo.constant dense<1> : tensor<1xi32>
+  %padding = tensor.from_elements %nm1, %zero : tensor<1x2xi32>
+  %result = stablehlo.custom_call @stablehlo.dynamic_reduce_window(%input, %init, %window, %ones, %ones, %ones, %padding) {api_version = 2 : i32, called_computations = [@scan_zero_sum]} : (tensor<?xf32>, tensor<f32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1x2xi32>) -> tensor<?xf32>
+  %original_bits = stablehlo.bitcast_convert %input : (tensor<?xf32>) -> tensor<?xi32>
+  %original_fixed = tensor.cast %original_bits : tensor<?xi32> to tensor<4xi32>
+  check.expect_eq_const(%original_fixed, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  %bits = stablehlo.bitcast_convert %result : (tensor<?xf32>) -> tensor<?xi32>
+  %fixed = tensor.cast %bits : tensor<?xi32> to tensor<4xi32>
+  check.expect_eq_const(%fixed, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  return
+}
+
+func.func @dynamic_scan_suffix_positive_zero_init() {
+  %input = flow.tensor.dynamic_constant dense<-0.0> : tensor<4xf32> -> tensor<?xf32>
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %size = stablehlo.get_dimension_size %input, dim = 0 : (tensor<?xf32>) -> tensor<i32>
+  %n = tensor.extract %size[] : tensor<i32>
+  %one = arith.constant 1 : i32
+  %zero = arith.constant 0 : i32
+  %nm1 = arith.subi %n, %one : i32
+  %window = tensor.from_elements %n : tensor<1xi32>
+  %ones = stablehlo.constant dense<1> : tensor<1xi32>
+  %padding = tensor.from_elements %zero, %nm1 : tensor<1x2xi32>
+  %result = stablehlo.custom_call @stablehlo.dynamic_reduce_window(%input, %init, %window, %ones, %ones, %ones, %padding) {api_version = 2 : i32, called_computations = [@scan_zero_sum]} : (tensor<?xf32>, tensor<f32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1x2xi32>) -> tensor<?xf32>
+  %original_bits = stablehlo.bitcast_convert %input : (tensor<?xf32>) -> tensor<?xi32>
+  %original_fixed = tensor.cast %original_bits : tensor<?xi32> to tensor<4xi32>
+  check.expect_eq_const(%original_fixed, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  %bits = stablehlo.bitcast_convert %result : (tensor<?xf32>) -> tensor<?xi32>
+  %fixed = tensor.cast %bits : tensor<?xi32> to tensor<4xi32>
+  check.expect_eq_const(%fixed, dense<0> : tensor<4xi32>) : tensor<4xi32>
+  return
+}
+
+func.func @dynamic_scan_suffix_negative_zero_init() {
+  %input = flow.tensor.dynamic_constant dense<-0.0> : tensor<4xf32> -> tensor<?xf32>
+  %init = stablehlo.constant dense<-0.0> : tensor<f32>
+  %size = stablehlo.get_dimension_size %input, dim = 0 : (tensor<?xf32>) -> tensor<i32>
+  %n = tensor.extract %size[] : tensor<i32>
+  %one = arith.constant 1 : i32
+  %zero = arith.constant 0 : i32
+  %nm1 = arith.subi %n, %one : i32
+  %window = tensor.from_elements %n : tensor<1xi32>
+  %ones = stablehlo.constant dense<1> : tensor<1xi32>
+  %padding = tensor.from_elements %zero, %nm1 : tensor<1x2xi32>
+  %result = stablehlo.custom_call @stablehlo.dynamic_reduce_window(%input, %init, %window, %ones, %ones, %ones, %padding) {api_version = 2 : i32, called_computations = [@scan_zero_sum]} : (tensor<?xf32>, tensor<f32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1x2xi32>) -> tensor<?xf32>
+  %original_bits = stablehlo.bitcast_convert %input : (tensor<?xf32>) -> tensor<?xi32>
+  %original_fixed = tensor.cast %original_bits : tensor<?xi32> to tensor<4xi32>
+  check.expect_eq_const(%original_fixed, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  %bits = stablehlo.bitcast_convert %result : (tensor<?xf32>) -> tensor<?xi32>
+  %fixed = tensor.cast %bits : tensor<?xi32> to tensor<4xi32>
+  check.expect_eq_const(%fixed, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  return
+}
+
+func.func private @scan_zero_sum(%lhs: tensor<f32>, %rhs: tensor<f32>) -> tensor<f32> {
+  %sum = stablehlo.add %lhs, %rhs : tensor<f32>
+  return %sum : tensor<f32>
+}
+
+// Seeding the first slice must also preserve a zero batch extent.
+func.func @scan_empty_batch_f32() {
+  %input = flow.tensor.dynamic_constant dense<> : tensor<0x4xf32> -> tensor<?x4xf32>
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<f32>, %rhs: tensor<f32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<f32>
+    stablehlo.return %sum : tensor<f32>
+  }) {window_dimensions = array<i64: 1, 4>, padding = dense<[[0, 0], [3, 0]]> : tensor<2x2xi64>} : (tensor<?x4xf32>, tensor<f32>) -> tensor<?x4xf32>
+  %bits = stablehlo.bitcast_convert %result : (tensor<?x4xf32>) -> tensor<?x4xi32>
+  %fixed = tensor.cast %bits : tensor<?x4xi32> to tensor<0x4xi32>
+  check.expect_eq_const(%fixed, dense<> : tensor<0x4xi32>) : tensor<0x4xi32>
+  return
+}

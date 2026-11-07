@@ -481,3 +481,66 @@ func.func nested @nested_reducer(%lhs: tensor<i32>, %rhs: tensor<i32>) -> tensor
   %sum = stablehlo.add %lhs, %rhs : tensor<i32>
   return %sum : tensor<i32>
 }
+
+// -----
+
+// Positive zero must seed the first element without replacing the scan with a
+// general window reduction. Bit-pattern runtime coverage lives in reduce_window.
+// CHECK-LABEL: func.func @positive_zero_prefix(
+// CHECK-SAME: %[[INPUT:[a-zA-Z0-9]+]]: tensor<?xf32>
+// CHECK: %[[ONE:.+]] = arith.constant 1 : index
+// CHECK: %[[LIMIT:.+]] = arith.minui %{{.+}}, %[[ONE]] : index
+// CHECK: %[[FIRST:.+]] = tensor.extract_slice %[[INPUT]][0] [%[[LIMIT]]] [1]
+// CHECK: %[[SEEDED:.+]] = linalg.generic {{.*}} ins(%[[FIRST]], %{{.+}} : tensor<?xf32>, tensor<f32>)
+// CHECK: ^bb0(%[[VALUE:.+]]: f32, %[[INIT:.+]]: f32, %{{.+}}: f32):
+// CHECK: %[[SUM:.+]] = arith.addf %[[INIT]], %[[VALUE]] : f32
+// CHECK: linalg.yield %[[SUM]] : f32
+// CHECK: %[[PATCHED:.+]] = tensor.insert_slice %[[SEEDED]] into %[[INPUT]][0] [%[[LIMIT]]] [1]
+// CHECK: iree_linalg_ext.scan {{.*}} ins(%[[PATCHED]] : tensor<?xf32>)
+func.func @positive_zero_prefix(%input: tensor<?xf32>) -> tensor<?xf32> {
+  %axis = arith.constant 0 : index
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %zero = arith.constant 0 : i32
+  %one = arith.constant 1 : i32
+  %ones = stablehlo.constant dense<1> : tensor<1xi32>
+  %dim = tensor.dim %input, %axis : tensor<?xf32>
+  %n = arith.index_cast %dim : index to i32
+  %nm1 = arith.subi %n, %one : i32
+  %window = tensor.from_elements %n : tensor<1xi32>
+  %padding = tensor.from_elements %nm1, %zero : tensor<1x2xi32>
+  %result = stablehlo.custom_call @stablehlo.dynamic_reduce_window(%input, %init, %window, %ones, %ones, %ones, %padding) {api_version = 2 : i32, called_computations = [@positive_zero_sum]} : (tensor<?xf32>, tensor<f32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1x2xi32>) -> tensor<?xf32>
+  return %result : tensor<?xf32>
+}
+func.func private @positive_zero_sum(%lhs: tensor<f32>, %rhs: tensor<f32>) -> tensor<f32> {
+  %sum = stablehlo.add %lhs, %rhs : tensor<f32>
+  return %sum : tensor<f32>
+}
+
+// -----
+
+// Classify the complete reducer body before selecting a scan. An extra effect
+// must remain for the general lowering rather than being omitted at the first
+// element of an inclusive scan or its initial seed.
+// CHECK-LABEL: func.func @negative_effectful_scan(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.custom_call @stablehlo.dynamic_reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_effectful_scan(%input: tensor<?xf32>) -> tensor<?xf32> {
+  %axis = arith.constant 0 : index
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %zero = arith.constant 0 : i32
+  %one = arith.constant 1 : i32
+  %ones = stablehlo.constant dense<1> : tensor<1xi32>
+  %dim = tensor.dim %input, %axis : tensor<?xf32>
+  %n = arith.index_cast %dim : index to i32
+  %nm1 = arith.subi %n, %one : i32
+  %window = tensor.from_elements %n : tensor<1xi32>
+  %padding = tensor.from_elements %nm1, %zero : tensor<1x2xi32>
+  %result = stablehlo.custom_call @stablehlo.dynamic_reduce_window(%input, %init, %window, %ones, %ones, %ones, %padding) {api_version = 2 : i32, called_computations = [@effectful_sum], has_side_effect = true} : (tensor<?xf32>, tensor<f32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1xi32>, tensor<1x2xi32>) -> tensor<?xf32>
+  return %result : tensor<?xf32>
+}
+func.func private @effectful_sum(%lhs: tensor<f32>, %rhs: tensor<f32>) -> tensor<f32> {
+  %sum = stablehlo.add %lhs, %rhs : tensor<f32>
+  stablehlo.custom_call @side_effect() {has_side_effect = true} : () -> ()
+  return %sum : tensor<f32>
+}
