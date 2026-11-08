@@ -580,6 +580,8 @@ struct ConvertStableHloToIreeInputDialects final
         GenericTypeConvert<scf::ForOp>, GenericTypeConvert<scf::IfOp>,
         GenericTypeConvert<scf::YieldOp>, GenericTypeConvert<scf::ConditionOp>,
         GenericTypeConvert<scf::WhileOp>,
+        GenericTypeConvert<IREE::Flow::TensorTieShapeOp>,
+        GenericTypeConvert<tensor::DimOp>,
         GenericTypeConvert<tensor::FromElementsOp>,
         GenericTypeConvert<tensor::ExtractOp>,
         GenericTypeConvert<tensor::CollapseShapeOp>,

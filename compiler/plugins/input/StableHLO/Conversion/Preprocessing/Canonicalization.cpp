@@ -361,6 +361,9 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
     Value rhs = op.getRhs();
 
     if (lhs == rhs) {
+      if (!type.hasStaticShape()) {
+        return rewriter.notifyMatchFailure(op, "dynamic self comparison");
+      }
       switch (direction) {
       case ComparisonDirection::EQ:
       case ComparisonDirection::GE:
@@ -396,6 +399,10 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
     }
 
     if (lhsAttr && rhsAttr) {
+      if (!type.hasStaticShape()) {
+        return rewriter.notifyMatchFailure(op,
+                                           "requires a static constant result");
+      }
       if (Attribute res = constFoldBinaryOp<IntegerAttr, IntegerAttr,
                                             IntegerAttr::ValueType,
                                             IntegerAttr::ValueType, void>(
@@ -808,14 +815,104 @@ struct DynamicBroadcastInDimOfDynamicReshape final
   }
 };
 
+// Ordinary convert handles integer, floating-point and complex element types.
+// Identical quantized element types need no numerical conversion.
+static bool canConvertReductionElementType(Type sourceType, Type targetType) {
+  return sourceType == targetType ||
+         (isa<IntegerType, FloatType, ComplexType>(sourceType) &&
+          isa<IntegerType, FloatType, ComplexType>(targetType));
+}
+
+// The reducer can promote both its input and initializer element types. Keep
+// those conversions explicit before scalarization remaps its block arguments
+// from the operand types, which would otherwise lose the required promotion.
+// For a reducer with i32 block arguments:
+//   %r = stablehlo.reduce(%x init: %init) ... :
+//       (tensor<?xi8>, tensor<i32>) -> tensor<i32>
+// becomes:
+//   %wide = stablehlo.convert %x : (tensor<?xi8>) -> tensor<?xi32>
+//   %r = stablehlo.reduce(%wide init: %init) ... :
+//       (tensor<?xi32>, tensor<i32>) -> tensor<i32>
+// The region, result types and attributes stay unchanged. Tensor conversions
+// remain available for fusion with the reduction.
+struct NormalizeReduceOperandTypes final
+    : OpRewritePattern<mlir::stablehlo::ReduceOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ReduceOp op,
+                                PatternRewriter &rewriter) const override {
+    int64_t inputCount = op.getInputs().size();
+    Block &body = op.getBody().front();
+    SmallVector<RankedTensorType> operandTypes;
+    bool needsConversion = false;
+    for (auto [index, operand] : llvm::enumerate(op.getOperands())) {
+      // Operands are (inputs, initializers); body arguments are (accumulators,
+      // inputs). Their counts agree by the ReduceOp verifier.
+      int64_t bodyArgumentIndex =
+          index < inputCount ? index + inputCount : index - inputCount;
+      auto sourceType = cast<RankedTensorType>(operand.getType());
+      Type targetElementType =
+          getElementTypeOrSelf(body.getArgument(bodyArgumentIndex).getType());
+      if (!canConvertReductionElementType(sourceType.getElementType(),
+                                          targetElementType)) {
+        return rewriter.notifyMatchFailure(op,
+                                           "requires non-quantized promotion");
+      }
+      auto targetType = RankedTensorType::get(
+          sourceType.getShape(), targetElementType, sourceType.getEncoding());
+      operandTypes.push_back(targetType);
+      needsConversion |= targetType != sourceType;
+    }
+    if (!needsConversion) {
+      return rewriter.notifyMatchFailure(op,
+                                         "operand types already normalized");
+    }
+
+    SmallVector<Value> operands;
+    for (auto [operand, type] :
+         llvm::zip_equal(op.getOperands(), operandTypes)) {
+      if (operand.getType() != type) {
+        operand = mlir::stablehlo::ConvertOp::create(rewriter, op.getLoc(),
+                                                     type, operand);
+      }
+      operands.push_back(operand);
+    }
+    rewriter.modifyOpInPlace(op,
+                             [op, &operands] { op->setOperands(operands); });
+    return success();
+  }
+};
+
 struct NoopReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ReduceOp op,
                                 PatternRewriter &rewriter) const override {
-    // No dimensions to reduce.
+    // With no reduction dimensions, the inputs still need conversion to the
+    // declared result types, including any element promotion or shape cast.
     if (op.getDimensions().empty()) {
-      rewriter.replaceOp(op, op.getInputs());
+      for (auto [input, resultType] :
+           llvm::zip_equal(op.getInputs(), op.getResultTypes())) {
+        if (!canConvertReductionElementType(getElementTypeOrSelf(input),
+                                            getElementTypeOrSelf(resultType))) {
+          return rewriter.notifyMatchFailure(
+              op, "requires non-quantized conversion");
+        }
+      }
+      SmallVector<Value> results;
+      for (auto [input, resultType] :
+           llvm::zip_equal(op.getInputs(), op.getResultTypes())) {
+        Value result = input;
+        if (getElementTypeOrSelf(input) != getElementTypeOrSelf(resultType)) {
+          result = mlir::stablehlo::ConvertOp::create(rewriter, op.getLoc(),
+                                                      resultType, input);
+        } else if (input.getType() != resultType) {
+          result = rewriter.createOrFold<tensor::CastOp>(op.getLoc(),
+                                                         resultType, input);
+        }
+        results.push_back(result);
+      }
+      rewriter.replaceOp(op, results);
       return success();
     }
 
@@ -830,6 +927,12 @@ struct NoopReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
         return failure();
       }
 
+      // A captured scalar is not a replacement for a tensor-valued partial
+      // reduction; ordinary lowering broadcasts it over the remaining axes.
+      if (!llvm::equal(retOp.getOperandTypes(), op.getResultTypes())) {
+        return rewriter.notifyMatchFailure(
+            op, "captured results have different types");
+      }
       rewriter.replaceOp(op, retOp.getResults());
       return success();
     }
@@ -853,6 +956,16 @@ struct EmptyReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
 
     if (!llvm::is_contained(elemTy.getShape(), 0)) {
       return failure();
+    }
+
+    // NormalizeReduceOperandTypes establishes the initializer element type.
+    // Decline until it does, regardless of greedy pattern visitation order.
+    for (auto [init, resultType] :
+         llvm::zip_equal(op.getInitValues(), op.getResultTypes())) {
+      if (getElementTypeOrSelf(init) != getElementTypeOrSelf(resultType)) {
+        return rewriter.notifyMatchFailure(
+            op, "initializer type needs normalization");
+      }
     }
 
     Location loc = op.getLoc();
@@ -1311,7 +1424,7 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       DynamicBroadcastInDimAllDimsNonExpanding, DynamicBroadcastInDimOfOwnShape,
       DynamicBroadcastInDimOfDynamicReshape,
       // Reduce op.
-      NoopReduceOpCanon, EmptyReduceOpCanon,
+      NormalizeReduceOperandTypes, NoopReduceOpCanon, EmptyReduceOpCanon,
       // Shape manipulation(-ish) ops.
       ConcatenateOpCanon, ConcatenateOpFlatten, ConvertOpCanon,
       DynamicReshapeOpCanon, GatherOpCanon, ReshapeOpCanon,
