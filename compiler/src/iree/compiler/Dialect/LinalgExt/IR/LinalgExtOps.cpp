@@ -1411,6 +1411,8 @@ LogicalResult SortOp::verify() {
     return op->emitOpError("dimension must be within (0, ") << rank << "]";
   }
 
+  // Cast folding can leave inputs and destinations with different, compatible
+  // static shape information.
   ArrayRef<int64_t> shape = getOperandShape();
   for (auto [index, operand] : llvm::enumerate(getInputs())) {
     auto operandType = getOperandType(index);
@@ -1418,7 +1420,7 @@ LogicalResult SortOp::verify() {
       return op->emitOpError("expected operand ")
              << index << " to be rank " << rank << ", same as other operands";
     }
-    if (operandType.getShape() != shape) {
+    if (failed(verifyCompatibleShape(operandType.getShape(), shape))) {
       return op->emitOpError("expected operand ")
              << index << " to have same shape as other operands";
     }
@@ -1437,7 +1439,9 @@ LogicalResult SortOp::verify() {
       return op->emitOpError("expected output ")
              << index << " to be rank " << rank << ", same as inputs";
     }
-    if (outputType.getShape() != shape) {
+    if (failed(verifyCompatibleShape(outputType.getShape(), shape)) ||
+        failed(verifyCompatibleShape(outputType.getShape(),
+                                     operandType.getShape()))) {
       return op->emitOpError("expected output ")
              << index << " to have same shape as inputs";
     }
