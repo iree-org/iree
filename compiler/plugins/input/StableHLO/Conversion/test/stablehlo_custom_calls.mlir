@@ -301,3 +301,54 @@ func.func @scatter_with_other_effect(%operand: tensor<4xf32>, %indices: tensor<2
   }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [], inserted_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>, indices_are_sorted = false, unique_indices = false} : (tensor<4xf32>, tensor<2x1xi32>, tensor<2xf32>) -> tensor<4xf32>
   return %result : tensor<4xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @shape_assertion
+// CHECK-SAME: %[[PRED:.*]]: tensor<i1>
+// CHECK-DAG: %[[OK:.*]] = arith.constant 0 : i32
+// CHECK-DAG: %[[FAILED_PRECONDITION:.*]] = arith.constant 9 : i32
+// CHECK-DAG: %[[SCALAR:.*]] = tensor.extract %[[PRED]][] : tensor<i1>
+// CHECK: %[[STATUS:.*]] = arith.select %[[SCALAR]], %[[OK]], %[[FAILED_PRECONDITION]] : i32
+// CHECK: util.status.check_ok %[[STATUS]], "expected a positive dimension"
+// CHECK-NOT: stablehlo.custom_call
+func.func @shape_assertion(%predicate: tensor<i1>, %dimension: tensor<i32>) {
+  stablehlo.custom_call @shape_assertion(%predicate, %dimension) {
+    error_message = "expected a positive dimension", has_side_effect = true
+  } : (tensor<i1>, tensor<i32>) -> ()
+  return
+}
+
+// -----
+
+// A malformed predicate must not be silently discarded.
+// CHECK-LABEL: @shape_assertion_vector
+// CHECK: stablehlo.custom_call @shape_assertion
+func.func @shape_assertion_vector(%predicate: tensor<4xi1>) {
+  stablehlo.custom_call @shape_assertion(%predicate) {
+    error_message = "expected a scalar predicate", has_side_effect = true
+  } : (tensor<4xi1>) -> ()
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @shape_assertion_missing_predicate
+// CHECK: stablehlo.custom_call @shape_assertion
+func.func @shape_assertion_missing_predicate() {
+  stablehlo.custom_call @shape_assertion() {
+    error_message = "missing predicate", has_side_effect = true
+  } : () -> ()
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @shape_assertion_missing_message
+// CHECK: stablehlo.custom_call @shape_assertion
+func.func @shape_assertion_missing_message(%predicate: tensor<i1>) {
+  stablehlo.custom_call @shape_assertion(%predicate) {
+    has_side_effect = true
+  } : (tensor<i1>) -> ()
+  return
+}

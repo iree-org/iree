@@ -3130,3 +3130,77 @@ func.func @general_scatter_memref(%updates0: memref<2x2xi32>, %updates1: memref<
   }
   return
 }
+
+// -----
+
+func.func @sort_compatible_shapes(
+    %arg0: tensor<?x7xi32>, %arg1: tensor<5x?xf32>)
+    -> (tensor<?x7xi32>, tensor<5x?xf32>) {
+  %0:2 = iree_linalg_ext.sort dimension(1)
+      ins(%arg0, %arg1 : tensor<?x7xi32>, tensor<5x?xf32>)
+      outs(%arg0, %arg1 : tensor<?x7xi32>, tensor<5x?xf32>) {
+      ^bb0(%arg2: i32, %arg3: i32, %arg4: f32, %arg5: f32):
+        %1 = arith.cmpf ogt, %arg4, %arg5 : f32
+        iree_linalg_ext.yield %1 : i1
+      } -> tensor<?x7xi32>, tensor<5x?xf32>
+  return %0#0, %0#1 : tensor<?x7xi32>, tensor<5x?xf32>
+}
+// CHECK-LABEL: func.func @sort_compatible_shapes(
+// CHECK:         iree_linalg_ext.sort
+// CHECK-SAME:      outs({{.*}} : tensor<?x7xi32>, tensor<5x?xf32>)
+
+// -----
+
+func.func @scatter_indices_updates_dynamic_static(
+    %original: tensor<8xf32>, %indices: tensor<?x1xi32>,
+    %update: tensor<2xf32>) -> tensor<8xf32> {
+  %0 = iree_linalg_ext.scatter
+    dimension_map = [0]
+    unique_indices(true)
+    ins(%update, %indices : tensor<2xf32>, tensor<?x1xi32>)
+    outs(%original: tensor<8xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      %1 = arith.addf %arg1, %arg2 : f32
+      iree_linalg_ext.yield %1 : f32
+    } -> tensor<8xf32>
+  return %0 : tensor<8xf32>
+}
+// CHECK-LABEL: func.func @scatter_indices_updates_dynamic_static(
+//       CHECK:   iree_linalg_ext.scatter
+//  CHECK-SAME:     ins(%{{.+}}, %{{.+}} : tensor<2xf32>, tensor<?x1xi32>)
+
+// -----
+
+func.func @scatter_indices_static_updates_dynamic(
+    %original: tensor<8xf32>, %indices: tensor<2x1xi32>,
+    %update: tensor<?xf32>) -> tensor<8xf32> {
+  %0 = iree_linalg_ext.scatter
+    dimension_map = [0]
+    unique_indices(true)
+    ins(%update, %indices : tensor<?xf32>, tensor<2x1xi32>)
+    outs(%original: tensor<8xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      %1 = arith.addf %arg1, %arg2 : f32
+      iree_linalg_ext.yield %1 : f32
+    } -> tensor<8xf32>
+  return %0 : tensor<8xf32>
+}
+// CHECK-LABEL: func.func @scatter_indices_static_updates_dynamic(
+//       CHECK:   iree_linalg_ext.scatter
+//  CHECK-SAME:     ins(%{{.+}}, %{{.+}} : tensor<?xf32>, tensor<2x1xi32>)
+
+// -----
+
+func.func @gather_indices_static_output_dynamic(
+    %source: tensor<8xf32>, %indices: tensor<2x1xi32>,
+    %result: tensor<?xf32>) -> tensor<?xf32> {
+  %0 = iree_linalg_ext.gather
+    dimension_map = [0]
+    ins(%source, %indices : tensor<8xf32>, tensor<2x1xi32>)
+    outs(%result : tensor<?xf32>) -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+// CHECK-LABEL: func.func @gather_indices_static_output_dynamic(
+//       CHECK:   iree_linalg_ext.gather
+//  CHECK-SAME:     ins(%{{.+}}, %{{.+}} : tensor<8xf32>, tensor<2x1xi32>)
+//  CHECK-SAME:     outs(%{{.+}} : tensor<?xf32>)

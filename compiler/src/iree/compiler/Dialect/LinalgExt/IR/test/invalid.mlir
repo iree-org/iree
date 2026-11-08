@@ -36,21 +36,19 @@ func.func @sort_mismatch_rank(%arg0: tensor<?x?xi32>, %arg1: tensor<?xf32>)
 
 // -----
 
-func.func @sort_mismatch_shape(%arg0: tensor<?xi32>, %arg1: tensor<42xf32>)
-    -> (tensor<?xi32>, tensor<42xf32>) {
-  %c0 = arith.constant 0 : index
-  %d0 = tensor.dim %arg0, %c0 : tensor<?xi32>
-  %empty0 = tensor.empty(%d0) : tensor<?xi32>
-  %empty1 = tensor.empty() : tensor<42xf32>
+func.func @sort_mismatch_shape(%arg0: tensor<5x41xi32>, %arg1: tensor<5x42xf32>)
+    -> (tensor<5x41xi32>, tensor<5x42xf32>) {
+  %empty0 = tensor.empty() : tensor<5x41xi32>
+  %empty1 = tensor.empty() : tensor<5x42xf32>
   // expected-error @+1 {{expected operand 1 to have same shape as other operands}}
-  %0:2 = iree_linalg_ext.sort dimension(0)
-      ins(%arg0, %arg1 : tensor<?xi32>, tensor<42xf32>)
-      outs(%empty0, %empty1 : tensor<?xi32>, tensor<42xf32>) {
+  %0:2 = iree_linalg_ext.sort dimension(1)
+      ins(%arg0, %arg1 : tensor<5x41xi32>, tensor<5x42xf32>)
+      outs(%empty0, %empty1 : tensor<5x41xi32>, tensor<5x42xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
         %1 = arith.cmpf ogt, %arg4, %arg5 : f32
         iree_linalg_ext.yield %1 : i1
-      } -> tensor<?xi32>, tensor<42xf32>
-  return %0#0, %0#1 : tensor<?xi32>, tensor<42xf32>
+      } -> tensor<5x41xi32>, tensor<5x42xf32>
+  return %0#0, %0#1 : tensor<5x41xi32>, tensor<5x42xf32>
 }
 
 // -----

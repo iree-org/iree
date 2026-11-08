@@ -1406,3 +1406,76 @@ func.func @scatter_coupled_current(%input0: tensor<?xi32>,
 // CHECK: %[[NEXT0:.*]] = arith.addi %[[SUM]], %[[UPDATE0]] : i32
 // CHECK: %[[NEXT1:.*]] = arith.addi %[[SUM]], %[[UPDATE1]] : i32
 // CHECK: iree_linalg_ext.yield %[[NEXT0]], %[[NEXT1]]
+
+// -----
+
+// Batching dims keep every dim of the rank-3 operands.
+// CHECK-LABEL: func.func @scatter_batching_rank3
+// CHECK: iree_linalg_ext.general_scatter <update_window_dims = [2], inserted_window_dims = [1], input_batching_dims = [0], scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1], index_vector_dim = 2>
+// CHECK-SAME: ins(%{{.+}} : tensor<2x4x3xi32>) indices(%{{.+}} : tensor<2x4x1xi64>) outs(%{{.+}} : tensor<2x5x3xi32>)
+// CHECK: arith.addi
+func.func @scatter_batching_rank3(%input: tensor<2x5x3xi32>, %indices: tensor<2x4x1xi64>, %updates: tensor<2x4x3xi32>) -> tensor<2x5x3xi32> {
+  %result = "stablehlo.scatter"(%input, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    %sum = stablehlo.add %current, %update : tensor<i32>
+    "stablehlo.return"(%sum) : (tensor<i32>) -> ()
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [2],
+        inserted_window_dims = [1], input_batching_dims = [0],
+        scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1],
+        index_vector_dim = 2>,
+    indices_are_sorted = false, unique_indices = false
+  } : (tensor<2x5x3xi32>, tensor<2x4x1xi64>, tensor<2x4x3xi32>) -> tensor<2x5x3xi32>
+  return %result : tensor<2x5x3xi32>
+}
+
+// -----
+
+// A runtime window extent selects the whole-window scatter when it matches the
+// operand and the general lowering otherwise.
+// CHECK-LABEL: func.func @scatter_dynamic_window
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<?x?x7xf32>
+// CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]: tensor<?x?x7xf32>
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[OPERAND_DIM:.+]] = tensor.dim %[[INPUT]], %[[C1]]
+// CHECK-DAG:     %[[UPDATE_DIM:.+]] = tensor.dim %[[UPDATES]], %[[C1]]
+// CHECK:         %[[WHOLE:.+]] = arith.cmpi eq, %[[UPDATE_DIM]], %[[OPERAND_DIM]]
+// CHECK:         %[[RESULT:.+]] = scf.if %[[WHOLE]] -> (tensor<?x?x7xf32>)
+// CHECK:           %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:        ins(%[[UPDATES]], %{{.+}} : tensor<?x?x7xf32>, tensor<?x1xi32>)
+// CHECK:           scf.yield %[[SCATTER]]
+// CHECK:         } else {
+// CHECK:           %[[GENERAL:.+]] = iree_linalg_ext.general_scatter
+// CHECK:           scf.yield %[[GENERAL]]
+// CHECK:         return %[[RESULT]]
+func.func @scatter_dynamic_window(%input: tensor<?x?x7xf32>, %indices: tensor<?x1xi32>, %updates: tensor<?x?x7xf32>) -> tensor<?x?x7xf32> {
+  %0 = "stablehlo.scatter"(%input, %indices, %updates) ({
+    ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
+      %sum = stablehlo.add %arg0, %arg1 : tensor<f32>
+      stablehlo.return %sum : tensor<f32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [1, 2], inserted_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>,
+    indices_are_sorted = false, unique_indices = false
+  } : (tensor<?x?x7xf32>, tensor<?x1xi32>, tensor<?x?x7xf32>) -> tensor<?x?x7xf32>
+  return %0 : tensor<?x?x7xf32>
+}
+
+// -----
+
+// Window extents read from the operand itself are equal without a runtime
+// check.
+// CHECK-LABEL: func.func @scatter_dynamic_window_proven
+// CHECK-NOT:     scf.if
+// CHECK-NOT:     iree_linalg_ext.general_scatter
+// CHECK:         iree_linalg_ext.scatter
+// CHECK-SAME:      ins(%{{.+}}, %{{.+}} : tensor<?x?xf32>, tensor<?x1xi32>)
+func.func @scatter_dynamic_window_proven(%input: tensor<?x?xf32>, %indices: tensor<?x1xi32>) -> tensor<?x?xf32> {
+  %0 = "stablehlo.scatter"(%input, %indices, %input) ({
+    ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
+      stablehlo.return %arg1 : tensor<f32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [1], inserted_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>,
+    indices_are_sorted = false, unique_indices = false
+  } : (tensor<?x?xf32>, tensor<?x1xi32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
