@@ -60,6 +60,12 @@ inline bool bitEnumContains(ResourceUsageBitfield bits,
 // Resource usage analysis
 //===----------------------------------------------------------------------===//
 
+// Returns whether a resource has a mutating tied use, following corresponding
+// optimization-barrier results. Scheduling passthroughs and metadata uses do
+// not mutate. Unknown tied operations are conservatively mutating. This query
+// does not modify IR or retain analysis state across calls.
+bool hasMutatingTiedUses(Value value);
+
 // Performs whole-program analysis of resource usage.
 // All `!stream.resource` SSA values will be analyzed and their usage will be
 // available for querying via the lookup functions.
