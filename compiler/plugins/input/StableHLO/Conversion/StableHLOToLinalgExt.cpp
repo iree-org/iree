@@ -334,10 +334,9 @@ struct ScatterOpConversion final
     return dims;
   }
 
-  static Value createWindowScatter(mlir::stablehlo::ScatterOp op,
-                                   Value original, Value indices, Value updates,
-                                   bool cloneReducer,
-                                   ConversionPatternRewriter &rewriter) {
+  Value createWindowScatter(mlir::stablehlo::ScatterOp op, Value original,
+                            Value indices, Value updates, bool cloneReducer,
+                            ConversionPatternRewriter &rewriter) const {
     SmallVector<int64_t> scatterDimMap(
         op.getScatterDimensionNumbers().getScatterDimsToOperandDims());
     auto scatterOp = IREE::LinalgExt::ScatterOp::create(
@@ -359,7 +358,8 @@ struct ScatterOpConversion final
     // where output[O] maps to block args #1 in linalg_ext.scatter ops.
     signatureConverter.addInputs(1, argType);
     signatureConverter.addInputs(0, argType);
-    rewriter.applySignatureConversion(&region.front(), signatureConverter);
+    rewriter.applySignatureConversion(&region.front(), signatureConverter,
+                                      getTypeConverter());
     return scatterOp->getResult(0);
   }
 
@@ -427,7 +427,8 @@ struct ScatterOpConversion final
       signatureConverter.addInputs(
           i, getTypeConverter()->convertType(argument.getType()));
     }
-    rewriter.applySignatureConversion(&region.front(), signatureConverter);
+    rewriter.applySignatureConversion(&region.front(), signatureConverter,
+                                      getTypeConverter());
     SmallVector<Value> results;
     for (auto [result, sourceType] :
          llvm::zip(generalScatter.getResults(), op.getResultTypes())) {
