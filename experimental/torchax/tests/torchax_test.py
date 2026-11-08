@@ -80,5 +80,72 @@ class TorchaxImportTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
 
+_STATE = textwrap.dedent(
+    """
+    import jax
+    import torch
+    import torchax
+    from torchax.ops import ops_registry
+    import iree_torchax
+
+    def state():
+        return (
+            bool(jax.config.jax_enable_x64),
+            jax.config.jax_default_matmul_precision,
+            dict(torchax.default_env()._ops),
+            dict(ops_registry.all_aten_ops),
+            dict(ops_registry.all_torch_functions),
+            torch._C._is_torch_function_mode_enabled(),
+        )
+
+    class Attend(torch.nn.Module):
+        def forward(self, q, k, v):
+            return torch.nn.functional.scaled_dot_product_attention(q, k, v)
+
+    rows = tuple(torch.randn(1, 2, 3, 4) for _ in range(3))
+    attend = torch.export.export(Attend(), rows)
+    """
+)
+
+
+class TorchaxScopedExportTest(unittest.TestCase):
+    def test_failed_export_restores_the_caller_state(self):
+        result = _run_alone(
+            _STATE
+            + textwrap.dedent(
+                """
+            @torch.library.custom_op("iree_scope_test::fails", mutates_args=())
+            def fails(x: torch.Tensor) -> torch.Tensor:
+                return x
+
+            @fails.register_fake
+            def _(x):
+                return torch.empty_like(x)
+
+            def broken(x, *, env):
+                raise RuntimeError("handler failed")
+
+            iree_torchax.register_composite(
+                torch.ops.iree_scope_test.fails.default, broken, provider="test")
+
+            class Fails(torch.nn.Module):
+                def forward(self, x):
+                    return torch.ops.iree_scope_test.fails(x)
+
+            exported = torch.export.export(Fails(), (torch.ones(3),))
+            before = state()
+            try:
+                iree_torchax.exported_program_to_stablehlo(exported)
+            except RuntimeError as error:
+                assert "handler failed" in str(error), error
+            else:
+                raise AssertionError("the export did not fail")
+            assert state() == before
+                """
+            )
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
