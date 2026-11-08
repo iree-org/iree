@@ -79,6 +79,47 @@ class TorchaxImportTest(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_registration_loads_neither_torchax_nor_jax(self):
+        result = _run_alone(
+            """
+            import sys
+            import torch
+            import iree_torchax
+
+            @torch.library.custom_op("iree_lazy_test::twice", mutates_args=())
+            def twice(x: torch.Tensor) -> torch.Tensor:
+                return x * 2
+
+            @twice.register_fake
+            def _(x):
+                return torch.empty_like(x)
+
+            op = torch.ops.iree_lazy_test.twice.default
+            iree_torchax.register_composite(
+                op, lambda x, *, env: x, provider="example.lazy")
+            iree_torchax.register_decomposition(
+                torch.ops.aten.hardtanh.default, lambda x, lo, hi: x,
+                provider="example.lazy")
+            sdpa = torch.ops.aten.scaled_dot_product_attention.default
+            try:
+                iree_torchax.register_composite(
+                    sdpa, lambda *a, env: a[0], provider="example.lazy")
+            except ValueError as error:
+                assert "iree.attention" in str(error), error
+            else:
+                raise AssertionError("an IREE built-in was replaced silently")
+            assert "torchax" not in sys.modules
+            assert "jax" not in sys.modules
+
+            class Affine(torch.nn.Module):
+                def forward(self, x):
+                    return x * 2 + 1
+
+            torch.export.export(Affine(), (torch.ones(3),), strict=True)
+            """
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
 
 _STATE = textwrap.dedent(
     """
@@ -143,6 +184,97 @@ class TorchaxScopedExportTest(unittest.TestCase):
             assert state() == before
                 """
             )
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_export_restores_the_caller_state(self):
+        result = _run_alone(
+            _STATE
+            + textwrap.dedent(
+                """
+            before = state()
+            _, artifact = iree_torchax.exported_program_to_stablehlo(attend)
+            text = str(artifact.mlir_module())
+            assert 'composite "torch.scaled_dot_product_attention"' in text
+            assert state() == before
+                """
+            )
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_export_inside_an_environment_leaves_it_active(self):
+        result = _run_alone(
+            _STATE
+            + textwrap.dedent(
+                """
+            caller = torchax.tensor.Environment()
+            outside = state()
+            with caller:
+                inside = state()
+                iree_torchax.exported_program_to_stablehlo(attend)
+                assert state() == inside
+                ones = torch.ones(2, device="jax")
+                assert isinstance(ones + 1, torchax.tensor.Tensor)
+            assert state() == outside
+                """
+            )
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
+class TorchaxLegacyImportTest(unittest.TestCase):
+    def test_export_keeps_default_environment_overrides(self):
+        # Exporting through the family modules leaves the default environment
+        # as the caller set it.
+        result = _run_alone(
+            """
+            import torch
+            aten = torch.ops.aten
+            import torchax
+            from iree_torchax import torchax_export
+            env = torchax.default_env()
+            sdpa = aten.scaled_dot_product_attention.default
+
+            def mine(*args, **kwargs):
+                raise AssertionError("not called")
+
+            env.override_op_definition(sdpa, mine)
+
+            class Attend(torch.nn.Module):
+                def forward(self, q, k, v):
+                    return torch.nn.functional.scaled_dot_product_attention(q, k, v)
+
+            rows = tuple(torch.randn(1, 2, 3, 4) for _ in range(3))
+            torchax_export.exported_program_to_jax(
+                torch.export.export(Attend(), rows))
+            assert env._ops[sdpa].func is mine
+            """
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+
+class TorchaxExportBoundaryTest(unittest.TestCase):
+    def test_export_with_dropout_diagnoses(self):
+        result = _run_alone(
+            """
+            import torch
+            import iree_torchax
+
+            class AttendWithDropout(torch.nn.Module):
+                def forward(self, query, key, value):
+                    return torch.nn.functional.scaled_dot_product_attention(
+                        query, key, value, dropout_p=0.5)
+
+            rows = tuple(torch.randn(1, 2, 3, 4) for _ in range(3))
+            exported = torch.export.export(AttendWithDropout(), rows)
+            try:
+                iree_torchax.exported_program_to_stablehlo(exported)
+            except NotImplementedError as error:
+                import re
+                assert re.search("scaled_dot_product_attention.*dropout", str(error)), error
+            else:
+                raise AssertionError("dropout export did not fail")
+            """
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
