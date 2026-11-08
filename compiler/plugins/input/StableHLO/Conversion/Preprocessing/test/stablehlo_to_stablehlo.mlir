@@ -1674,3 +1674,73 @@ func.func @dynamic_conv_unsigned_padding_folded(%a: tensor<1x2x1xf32>, %k: tenso
   } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xui64>) -> tensor<1x?x1xf32>
   return %r : tensor<1x?x1xf32>
 }
+
+// -----
+
+// A one-element contraction still obeys an explicitly specified dot
+// algorithm; do not replace it with a plain multiply.
+// CHECK-LABEL: @dot_general_unit_contract_with_algorithm
+// CHECK: stablehlo.dot_general
+// CHECK-SAME: algorithm = <lhs_precision_type = f8E4M3FN, rhs_precision_type = f8E4M3FN, accumulation_type = f32, lhs_component_count = 1, rhs_component_count = 1, num_primitive_operations = 3, allow_imprecise_accumulation = false>
+func.func @dot_general_unit_contract_with_algorithm(%lhs: tensor<?x2x1xf32>, %rhs: tensor<?x1x3xf32>) -> tensor<?x2x3xf32> {
+  %0 = stablehlo.dot_general %lhs, %rhs, batching_dims = [0] x [0], contracting_dims = [2] x [1], precision = [DEFAULT, DEFAULT], algorithm = <lhs_precision_type = f8E4M3FN, rhs_precision_type = f8E4M3FN, accumulation_type = f32, lhs_component_count = 1, rhs_component_count = 1, num_primitive_operations = 3, allow_imprecise_accumulation = false> : (tensor<?x2x1xf32>, tensor<?x1x3xf32>) -> tensor<?x2x3xf32>
+  return %0 : tensor<?x2x3xf32>
+}
+
+// -----
+
+// Aliased custom calls require a lowering that preserves the shared storage contract.
+// CHECK-LABEL: @custom_call_topk_tuple_with_alias
+// CHECK-SAME: %[[INPUT:[^: ]+]]
+// CHECK-NOT: chlo.top_k
+// CHECK: %[[RESULT:[^: ]+]]{{(:2)?}} = stablehlo.custom_call @TopK(%[[INPUT]]
+// CHECK-SAME: output_operand_aliases = [#stablehlo.output_operand_alias<output_tuple_indices = [0], operand_index = 0, operand_tuple_indices = []>]
+func.func @custom_call_topk_tuple_with_alias(%arg0: tensor<2x3xf32>) -> tuple<tensor<2x3xf32>, tensor<2x3xi32>> {
+  %r = stablehlo.custom_call @TopK(%arg0) {called_computations = [@comparison], output_operand_aliases = [#stablehlo.output_operand_alias<output_tuple_indices = [0], operand_index = 0, operand_tuple_indices = []>]} : (tensor<2x3xf32>) -> tuple<tensor<2x3xf32>, tensor<2x3xi32>>
+  // CHECK-NOT: chlo.top_k
+  // CHECK: return %[[RESULT]]
+  return %r : tuple<tensor<2x3xf32>, tensor<2x3xi32>>
+}
+func.func private @comparison(%a: tensor<f32>, %b: tensor<f32>, %i: tensor<i32>, %j: tensor<i32>) -> tensor<i1> {
+  %c = stablehlo.compare GT, %a, %b : (tensor<f32>, tensor<f32>) -> tensor<i1>
+  return %c : tensor<i1>
+}
+
+// -----
+
+// Aliased custom calls require a lowering that preserves the shared storage contract.
+// CHECK-LABEL: @custom_call_topk_flat_with_alias
+// CHECK-SAME: %[[INPUT:[^: ]+]]
+// CHECK-NOT: chlo.top_k
+// CHECK: %[[RESULT:[^: ]+]]{{(:2)?}} = stablehlo.custom_call @TopK(%[[INPUT]]
+// CHECK-SAME: output_operand_aliases = [#stablehlo.output_operand_alias<output_tuple_indices = [0], operand_index = 0, operand_tuple_indices = []>]
+func.func @custom_call_topk_flat_with_alias(%arg0: tensor<2x3xf32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+  %r:2 = stablehlo.custom_call @TopK(%arg0) {called_computations = [@comparison], output_operand_aliases = [#stablehlo.output_operand_alias<output_tuple_indices = [0], operand_index = 0, operand_tuple_indices = []>]} : (tensor<2x3xf32>) -> (tensor<2x3xf32>, tensor<2x3xi32>)
+  // CHECK-NOT: chlo.top_k
+  // CHECK: return %[[RESULT]]#0, %[[RESULT]]#1
+  return %r#0, %r#1 : tensor<2x3xf32>, tensor<2x3xi32>
+}
+func.func private @comparison(%a: tensor<f32>, %b: tensor<f32>, %i: tensor<i32>, %j: tensor<i32>) -> tensor<i1> {
+  %c = stablehlo.compare GT, %a, %b : (tensor<f32>, tensor<f32>) -> tensor<i1>
+  return %c : tensor<i1>
+}
+
+// -----
+
+// Aliased custom calls require a lowering that preserves the shared storage contract.
+// CHECK-LABEL: @custom_call_approx_topk_with_alias
+// CHECK-SAME: %[[INPUT:[^: ]+]]
+// CHECK-NOT: chlo.top_k
+// CHECK: %[[RESULT:[^: ]+]]{{(:2)?}} = stablehlo.custom_call @ApproxTopK(%[[INPUT]]
+// CHECK-SAME: output_operand_aliases = [#stablehlo.output_operand_alias<output_tuple_indices = [0], operand_index = 0, operand_tuple_indices = []>]
+func.func @custom_call_approx_topk_with_alias(%arg0: tensor<2x3xf32>, %init: tensor<f32>, %index: tensor<i32>) -> (tensor<2x3xf32>, tensor<2x3xi32>) {
+  %iota = stablehlo.iota dim = 1 : tensor<2x3xi32>
+  %r:2 = stablehlo.custom_call @ApproxTopK(%arg0, %iota, %init, %index) {called_computations = [@comparison], output_operand_aliases = [#stablehlo.output_operand_alias<output_tuple_indices = [0], operand_index = 0, operand_tuple_indices = []>]} : (tensor<2x3xf32>, tensor<2x3xi32>, tensor<f32>, tensor<i32>) -> (tensor<2x3xf32>, tensor<2x3xi32>)
+  // CHECK-NOT: chlo.top_k
+  // CHECK: return %[[RESULT]]#0, %[[RESULT]]#1
+  return %r#0, %r#1 : tensor<2x3xf32>, tensor<2x3xi32>
+}
+func.func private @comparison(%a: tensor<f32>, %b: tensor<f32>, %i: tensor<i32>, %j: tensor<i32>) -> tensor<i1> {
+  %c = stablehlo.compare GT, %a, %b : (tensor<f32>, tensor<f32>) -> tensor<i1>
+  return %c : tensor<i1>
+}
