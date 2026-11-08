@@ -129,8 +129,10 @@ iree_cc_test(
     "block_processor_test.cc"
   DEPS
     ::block_builder
+    ::block_command_buffer
     ::block_isa
     ::block_processor
+    ::task_driver
     iree::base::internal::arena
     iree::base::threading::thread
     iree::hal::local::executable_loader

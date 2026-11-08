@@ -25,6 +25,7 @@
 #include "iree/async/span.h"
 #include "iree/base/alignment.h"
 #include "iree/base/api.h"
+#include "iree/hal/command_buffer.h"
 #include "iree/hal/local/executable_library.h"
 
 typedef struct iree_hal_local_executable_t iree_hal_local_executable_t;
@@ -39,13 +40,15 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 
 typedef enum iree_hal_cmd_opcode_e {
-  IREE_HAL_CMD_DISPATCH = 0,  // Execute a tiled compute grid.
-  IREE_HAL_CMD_FILL = 1,      // Fill a buffer region with a pattern.
-  IREE_HAL_CMD_COPY = 2,      // Copy between buffer regions.
-  IREE_HAL_CMD_UPDATE = 3,    // Copy inline host data to a buffer region.
-  IREE_HAL_CMD_BARRIER = 4,   // Region boundary: all prior work completes.
-  IREE_HAL_CMD_BRANCH = 5,    // Continue at target block.
-  IREE_HAL_CMD_RETURN = 6,    // Command buffer complete.
+  IREE_HAL_CMD_DISPATCH = 0,    // Execute a tiled compute grid.
+  IREE_HAL_CMD_FILL = 1,        // Fill a buffer region with a pattern.
+  IREE_HAL_CMD_COPY = 2,        // Copy between buffer regions.
+  IREE_HAL_CMD_UPDATE = 3,      // Copy inline host data to a buffer region.
+  IREE_HAL_CMD_BARRIER = 4,     // Region boundary: all prior work completes.
+  IREE_HAL_CMD_BRANCH = 5,      // Continue at target block.
+  IREE_HAL_CMD_RETURN = 6,      // Command buffer complete.
+  IREE_HAL_CMD_FLUSH = 7,       // Flush a buffer range from host caches.
+  IREE_HAL_CMD_INVALIDATE = 8,  // Invalidate a buffer range in host caches.
 } iree_hal_cmd_opcode_t;
 
 typedef uint8_t iree_hal_cmd_flags_t;
@@ -118,7 +121,8 @@ typedef struct iree_hal_cmd_header_t {
   // size is 255 * 8 = 2040 bytes. Push constants are inline; bindings are
   // NOT (they live in .data via fixup).
   uint8_t size_qwords;
-  // Work commands (DISPATCH, FILL, COPY, UPDATE): region-local index into .data
+  // Work commands (DISPATCH, FILL, COPY, UPDATE, FLUSH, INVALIDATE):
+  // region-local index into .data
   // tile_indices[]. The builder resets this to 0 at each barrier, so commands
   // in different regions reuse the same .data slots. The multi-worker processor
   // uses this to distribute tiles across workers for all work command types.
@@ -165,6 +169,10 @@ typedef struct iree_hal_fill_params_t {
 typedef struct iree_hal_cmd_binding_entry_t {
   void* base;
   size_t length;
+  // Queue-owned mapping used for cache maintenance on indirect references.
+  iree_hal_buffer_mapping_t* mapping;
+  // Submitted binding range, which may be shorter than the mapped span.
+  iree_device_size_t binding_length;
 } iree_hal_cmd_binding_entry_t;
 
 typedef uint32_t iree_hal_cmd_fixup_flags_t;
@@ -511,6 +519,18 @@ typedef struct iree_hal_cmd_update_t {
 
 static_assert(sizeof(iree_hal_cmd_update_t) == 24,
               "update command is 3 qwords (plus trailing inline data)");
+
+// Cache maintenance retains the HAL buffer reference so direct buffers can be
+// used as-is and indirect references can be resolved from the binding table.
+// The host pointer fixup alone cannot issue buffer mapping cache operations.
+typedef struct iree_hal_cmd_cache_t {
+  iree_hal_cmd_header_t header;  // opcode=FLUSH or INVALIDATE
+  uint32_t reserved;
+  iree_hal_buffer_ref_t target_ref;
+} iree_hal_cmd_cache_t;
+
+static_assert(sizeof(iree_hal_cmd_cache_t) % 8 == 0,
+              "cache command must be qword aligned");
 
 //===----------------------------------------------------------------------===//
 // BARRIER, BRANCH, RETURN commands
