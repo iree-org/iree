@@ -19,6 +19,7 @@ iree_lit_test_suite(
         # keep sorted
         [
             "auto_input_conversion.mlir",
+            "auto_input_conversion_vhlo.mlir",
             "canonicalize_dynamism.mlir",
             "convert_collectives.mlir",
             "dynamic_broadcast_identity.mlir",

@@ -9,7 +9,9 @@
 #include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Conversion/Passes.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
+#include "mlir/IR/AttrTypeSubElements.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
@@ -23,35 +25,6 @@ namespace {
 struct StableHLOOptions {
   void bindOptions(OptionsBinder &binder) {}
 };
-
-static bool checkOpForTuples(Operation *op) {
-  if (auto funcOp = dyn_cast<mlir::FunctionOpInterface>(op)) {
-    for (auto t : funcOp.getArgumentTypes()) {
-      if (isa<TupleType>(t)) {
-        return true;
-      }
-    }
-    for (auto t : funcOp.getResultTypes()) {
-      if (isa<TupleType>(t)) {
-        return true;
-      }
-    }
-  }
-
-  // Check for tuple operands or results.
-  for (auto t : op->getOperandTypes()) {
-    if (isa<TupleType>(t)) {
-      return true;
-    }
-  }
-  for (auto t : op->getResultTypes()) {
-    if (isa<TupleType>(t)) {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 // StableHLO (https://github.com/openxla/stablehlo) support plugin.
 //
@@ -72,6 +45,15 @@ struct StableHLOSession
     registry.insert<mlir::stablehlo::StablehloDialect>();
     registry.insert<mlir::vhlo::VhloDialect>();
     registry.insert<IREE::Flow::FlowDialect>();
+
+    // Automatic input conversion constructs these pipelines after the outer
+    // pass manager has loaded its dependent dialects. Register their union
+    // here so a VHLO-only input does not rely on dialects loaded by parsing.
+    StableHloOptions stableHloOptions;
+    OpPassManager passManager(ModuleOp::getOperationName());
+    buildStableHLOInputConversionPassPipeline(passManager, stableHloOptions);
+    buildStableHLOXLAInputConversionPassPipeline(passManager, stableHloOptions);
+    passManager.getDependentDialects(registry);
   }
 
   bool extendCustomInputConversionPassPipeline(
@@ -107,27 +89,53 @@ struct StableHLOSession
     const Dialect *stablehloDialect = ctx->getLoadedDialect("stablehlo");
     const Dialect *vhloDialect = ctx->getLoadedDialect("vhlo");
 
-    // stablehlo ops _with tuples_    --> only "stablehlo_xla" type
-    // stablehlo ops _without tuples_ --> only "stablehlo" type
-    // no stablehlo ops --> no types
-
+    auto isInputDialect = [chloDialect, stablehloDialect,
+                           vhloDialect](const Dialect *dialect) {
+      return dialect && (dialect == chloDialect ||
+                         dialect == stablehloDialect || dialect == vhloDialect);
+    };
+    // Input dialect types and tensor encodings also require conversion when
+    // the module has no input dialect operations. Any tuples in such a module
+    // require the tuple-flattening pipeline.
     bool hasStableHLO = false;
     bool hasTuples = false;
-    module.walk([&](Operation *op) {
-      Dialect *d = op->getDialect();
-      if (d == chloDialect || d == stablehloDialect || d == vhloDialect) {
-        hasStableHLO = true;
-        if (checkOpForTuples(op)) {
-          hasTuples = true;
-          // Early exit, no need to continue scanning.
-          return WalkResult::interrupt();
-        }
-        // Keep scanning in case a future op contains tuples.
+    AttrTypeWalker typeWalker;
+    typeWalker.addWalk([&hasStableHLO, &hasTuples, &isInputDialect](Type type) {
+      hasStableHLO |= isInputDialect(&type.getDialect());
+      hasTuples |= isa<TupleType>(type);
+    });
+    typeWalker.addWalk([&hasStableHLO, &isInputDialect](Attribute attr) {
+      hasStableHLO |= isInputDialect(&attr.getDialect());
+    });
+    auto walkTypes = [&typeWalker](TypeRange types) {
+      for (Type type : types) {
+        typeWalker.walk(type);
       }
-      return WalkResult::advance();
+    };
+    module.walk([&hasStableHLO, &hasTuples, &isInputDialect,
+                 &walkTypes](Operation *op) {
+      hasStableHLO |= isInputDialect(op->getDialect());
+      walkTypes(op->getOperandTypes());
+      walkTypes(op->getResultTypes());
+      if (auto funcOp = dyn_cast<FunctionOpInterface>(op)) {
+        // Defined functions expose their inputs through entry block arguments.
+        if (funcOp.isExternal()) {
+          walkTypes(funcOp.getArgumentTypes());
+        }
+        walkTypes(funcOp.getResultTypes());
+      }
+      for (Region &region : op->getRegions()) {
+        for (Block &block : region) {
+          walkTypes(block.getArgumentTypes());
+        }
+      }
+      // Keep scanning until both the input dialect and tuple requirements are
+      // known, even if they occur in different operations.
+      return hasStableHLO && hasTuples ? WalkResult::interrupt()
+                                       : WalkResult::advance();
     });
 
-    if (hasTuples) {
+    if (hasStableHLO && hasTuples) {
       typeMnemonics.insert("stablehlo_xla");
     } else if (hasStableHLO) {
       typeMnemonics.insert("stablehlo");
