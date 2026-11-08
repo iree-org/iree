@@ -224,6 +224,10 @@ struct GeneralDotConvert final
   // Note: This requires an empty list of batch dimensions.
   LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
                                 PatternRewriter &rewriter) const override {
+    if (op.getAlgorithm()) {
+      return rewriter.notifyMatchFailure(
+          op, "dot algorithm cannot be represented by stablehlo.dot");
+    }
     Location loc = op.getLoc();
 
     auto dotNumbers = op.getDotDimensionNumbers();

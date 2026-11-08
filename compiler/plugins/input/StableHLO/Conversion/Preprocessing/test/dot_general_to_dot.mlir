@@ -280,3 +280,14 @@ func.func @dynamic_result_rhs_unit(%lhs: tensor<?x4xf32>, %rhs: tensor<4x1xf32>)
   %result = stablehlo.dot %lhs, %rhs : (tensor<?x4xf32>, tensor<4x1xf32>) -> tensor<?x1xf32>
   return %result : tensor<?x1xf32>
 }
+
+// -----
+
+// The legacy dot operation cannot represent an explicit arithmetic algorithm.
+// CHECK-LABEL: @dot_general_matrix_with_algorithm
+// CHECK: stablehlo.dot_general
+// CHECK-SAME: algorithm = <lhs_precision_type = f8E4M3FN, rhs_precision_type = f8E4M3FN, accumulation_type = f32, lhs_component_count = 1, rhs_component_count = 1, num_primitive_operations = 3, allow_imprecise_accumulation = false>
+func.func @dot_general_matrix_with_algorithm(%lhs: tensor<2x4xf32>, %rhs: tensor<4x3xf32>) -> tensor<2x3xf32> {
+  %0 = stablehlo.dot_general %lhs, %rhs, contracting_dims = [1] x [0], precision = [DEFAULT, DEFAULT], algorithm = <lhs_precision_type = f8E4M3FN, rhs_precision_type = f8E4M3FN, accumulation_type = f32, lhs_component_count = 1, rhs_component_count = 1, num_primitive_operations = 3, allow_imprecise_accumulation = false> : (tensor<2x4xf32>, tensor<4x3xf32>) -> tensor<2x3xf32>
+  return %0 : tensor<2x3xf32>
+}

@@ -2849,6 +2849,10 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
 
   LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
                                 PatternRewriter &rewriter) const override {
+    if (op.getAlgorithm()) {
+      return rewriter.notifyMatchFailure(
+          op, "dot algorithm cannot be represented by stablehlo.multiply");
+    }
     auto lhs = cast<Value>(op.getLhs());
     auto rhs = cast<Value>(op.getRhs());
     auto lhsTy = dyn_cast<RankedTensorType>(lhs.getType());
@@ -3019,6 +3023,10 @@ struct CustomCallIsTopK final
                                 PatternRewriter &rewriter) const override {
     if (op.getCallTargetName() != "TopK") {
       return rewriter.notifyMatchFailure(op, "not a TopK custom call");
+    }
+    if (!op.getOutputOperandAliases().empty()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "aliases need an aliasing lowering");
     }
 
     if (op.getNumOperands() != 1 ||
@@ -3240,6 +3248,10 @@ struct ApproxTopK final : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
                                 PatternRewriter &rewriter) const override {
     if (op.getCallTargetName() != "ApproxTopK") {
       return rewriter.notifyMatchFailure(op, "not ApproxTopK operation.");
+    }
+    if (!op.getOutputOperandAliases().empty()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "aliases need an aliasing lowering");
     }
 
     auto computationName =
