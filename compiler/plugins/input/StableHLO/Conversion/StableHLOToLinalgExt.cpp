@@ -29,6 +29,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -129,11 +130,21 @@ struct StableHloToStdTypeConverter final : TypeConverter {
 // Utils
 //===----------------------------------------------------------------------===//
 
-bool isInBodyOfLinalgExtOps(Operation *op) {
+static bool isInBodyOfLinalgExtOps(Operation *op) {
   auto parent_op = op->getParentRegion()->getParentOp();
   return parent_op->getDialect() ==
          parent_op->getContext()
              ->getLoadedDialect<IREE::LinalgExt::IREELinalgExtDialect>();
+}
+
+static bool isNestedInLinalgExtOp(Operation *op) {
+  for (Operation *parent = op->getParentOp(); parent;
+       parent = parent->getParentOp()) {
+    if (isa<IREE::LinalgExt::IREELinalgExtDialect>(parent->getDialect())) {
+      return true;
+    }
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -146,12 +157,12 @@ struct LinalgExtRegionHLOOpConversion final : OpConversionPattern<OpTy> {
   LogicalResult
   matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!isInBodyOfLinalgExtOps(op)) {
+    if (!isNestedInLinalgExtOp(op)) {
       return failure();
     }
-    TensorType origRetType = dyn_cast<TensorType>(op.getType());
-    if (!origRetType) {
-      return failure();
+    auto origRetType = dyn_cast<RankedTensorType>(op.getType());
+    if (!origRetType || origRetType.getRank() != 0) {
+      return rewriter.notifyMatchFailure(op, "expected a scalar tensor result");
     }
     SmallVector<Value> scalarArgs;
     Type newRetType = getElementTypeOrSelf(
@@ -1398,6 +1409,25 @@ struct ConvertStableHloToLinalgExt final
         IREE::Flow::FlowDialect, mlir::cf::ControlFlowDialect,
         mlir::math::MathDialect, mlir::arith::ArithDialect, scf::SCFDialect,
         tensor::TensorDialect, complex::ComplexDialect>();
+    // Reducer control flow must carry scalars too. Leaving tensor-valued guards
+    // here would introduce rank-zero buffers with incompatible branch layouts.
+    // Keep structural operations outside LinalgExt regions at tensor level.
+    scf::populateSCFStructuralTypeConversions(typeConverter, patterns);
+    target.addDynamicallyLegalOp<scf::ForOp, scf::IfOp, scf::WhileOp,
+                                 scf::ConditionOp, scf::IndexSwitchOp,
+                                 scf::ExecuteRegionOp>(
+        [&typeConverter](Operation *op) {
+          return !isNestedInLinalgExtOp(op) || typeConverter.isLegal(op);
+        });
+    target.addDynamicallyLegalOp<scf::YieldOp>(
+        [&typeConverter](scf::YieldOp op) {
+          if (!isNestedInLinalgExtOp(op) ||
+              !isa<scf::ForOp, scf::IfOp, scf::WhileOp, scf::IndexSwitchOp,
+                   scf::ExecuteRegionOp>(op->getParentOp())) {
+            return true;
+          }
+          return typeConverter.isLegal(op.getOperands());
+        });
     // TODO: Scatter is not marked as illegal to allow falling back to the
     // generic LinAlg lowering, the generic lowering is not always performant
     // and even though only used in fallback here, may hide performance
@@ -1410,7 +1440,7 @@ struct ConvertStableHloToLinalgExt final
     // other linalg_ext op regions.
     target.addDynamicallyLegalOp<mlir::stablehlo::ComplexOp>(
         [](mlir::stablehlo::ComplexOp complexOp) {
-          return !isInBodyOfLinalgExtOps(complexOp);
+          return !isNestedInLinalgExtOp(complexOp);
         });
     // We deliberately allow unrealized casts to persist. These should fall away
     // when the rest of StableHlo is converted.

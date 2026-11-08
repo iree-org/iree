@@ -25,10 +25,12 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Interfaces/Utils/InferIntRangeCommon.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -1356,21 +1358,28 @@ static void propagateShapeAssertionFacts(FunctionOpInterface function) {
         .run();
   }
 }
-static LogicalResult rewriteShapeAssertion(mlir::stablehlo::CustomCallOp op,
-                                           PatternRewriter &rewriter) {
+static const char *getShapeAssertionBlocker(mlir::stablehlo::CustomCallOp op) {
   if (op.getNumOperands() == 0 || op.getNumResults() != 0) {
-    return rewriter.notifyMatchFailure(op,
-                                       "expected a predicate and no results");
+    return "expected a predicate and no results";
   }
   auto predicateType = dyn_cast<RankedTensorType>(op.getOperand(0).getType());
   if (!predicateType || predicateType.getRank() != 0 ||
       !predicateType.getElementType().isInteger(1)) {
-    return rewriter.notifyMatchFailure(op, "expected a scalar i1 predicate");
+    return "expected a scalar i1 predicate";
   }
   auto message = op->getAttrOfType<StringAttr>("error_message");
   if (!message) {
-    return rewriter.notifyMatchFailure(op, "expected an error_message string");
+    return "expected an error_message string";
   }
+  return nullptr;
+}
+
+static LogicalResult rewriteShapeAssertion(mlir::stablehlo::CustomCallOp op,
+                                           PatternRewriter &rewriter) {
+  if (const char *blocker = getShapeAssertionBlocker(op)) {
+    return rewriter.notifyMatchFailure(op, blocker);
+  }
+  auto message = op->getAttrOfType<StringAttr>("error_message");
   Value predicate = tensor::ExtractOp::create(rewriter, op.getLoc(),
                                               op.getOperand(0), ValueRange{});
   // Semantic assertions must survive executable debug stripping.
@@ -1378,6 +1387,205 @@ static LogicalResult rewriteShapeAssertion(mlir::stablehlo::CustomCallOp op,
   rewriter.eraseOp(op);
   return success();
 }
+
+// A coupled status component uses the same scatter geometry as the data. It
+// records the first failing assertion at each destination, including across
+// repeated indices. Reducing it afterwards keeps the failure check on the host
+// without introducing shader status ABI requirements.
+static Value createScatterStatusTensor(Value shapedValue,
+                                       PatternRewriter &rewriter,
+                                       Location loc) {
+  Value empty = tensor::EmptyOp::create(
+      rewriter, loc, tensor::getMixedSizes(rewriter, loc, shapedValue),
+      rewriter.getI32Type());
+  Value zero = arith::ConstantIntOp::create(rewriter, loc, 0, 32);
+  return linalg::FillOp::create(rewriter, loc, zero, empty).getResult(0);
+}
+
+// The failure branch retains the current data and status. Building the reducer
+// continuation in the success branch prevents subsequent operations (such as a
+// division protected by the assertion) from running after a failed check.
+static scf::IfOp createScatterAssertionGuard(Value condition,
+                                             ValueRange currentValues,
+                                             Value failureStatus,
+                                             PatternRewriter &rewriter,
+                                             Location loc) {
+  SmallVector<Value> failureValues(currentValues);
+  failureValues.push_back(failureStatus);
+  auto guard = scf::IfOp::create(
+      rewriter, loc, ValueRange(failureValues).getTypes(), condition,
+      /*addThenBlock=*/true, /*addElseBlock=*/true);
+  OpBuilder::InsertionGuard insertionGuard(rewriter);
+  rewriter.setInsertionPointToStart(guard.elseBlock());
+  scf::YieldOp::create(rewriter, loc, failureValues);
+  return guard;
+}
+
+static void buildCheckedScatterReducer(mlir::stablehlo::ScatterOp source,
+                                       mlir::stablehlo::ScatterOp target,
+                                       PatternRewriter &rewriter) {
+  OpBuilder::InsertionGuard insertionGuard(rewriter);
+  Block &sourceBlock = source.getUpdateComputation().front();
+  int64_t inputCount = source.getInputs().size();
+  SmallVector<Type> argumentTypes(sourceBlock.getArgumentTypes());
+  auto statusType = RankedTensorType::get({}, rewriter.getI32Type());
+  argumentTypes.insert(argumentTypes.begin() + inputCount, statusType);
+  argumentTypes.push_back(statusType);
+  SmallVector<Location> locations(argumentTypes.size(), source.getLoc());
+  Block *block = rewriter.createBlock(&target.getUpdateComputation(), {},
+                                      argumentTypes, locations);
+  IRMapping mapping;
+  mapping.map(sourceBlock.getArguments().take_front(inputCount),
+              block->getArguments().take_front(inputCount));
+  mapping.map(sourceBlock.getArguments().drop_front(inputCount),
+              block->getArguments().slice(inputCount + 1, inputCount));
+  ValueRange currentValues = block->getArguments().take_front(inputCount);
+  Value previousStatus = block->getArgument(inputCount);
+  Location loc = source.getLoc();
+  Value zero = arith::ConstantIntOp::create(rewriter, loc, 0, 32);
+  Value scalarStatus = tensor::ExtractOp::create(rewriter, loc, previousStatus);
+  Value wasSuccessful = arith::CmpIOp::create(
+      rewriter, loc, arith::CmpIPredicate::eq, scalarStatus, zero);
+  auto guard = createScatterAssertionGuard(wasSuccessful, currentValues,
+                                           previousStatus, rewriter, loc);
+  mlir::stablehlo::ReturnOp::create(rewriter, loc, guard.getResults());
+  rewriter.setInsertionPointToStart(guard.thenBlock());
+  Value successStatus = tensor::FromElementsOp::create(
+      rewriter, loc, statusType, ValueRange{zero});
+  int64_t assertionIndex = 0;
+  for (Operation &operation : sourceBlock.without_terminator()) {
+    auto assertion = dyn_cast<mlir::stablehlo::CustomCallOp>(operation);
+    if (!assertion || assertion.getCallTargetName() != "shape_assertion") {
+      rewriter.clone(operation, mapping);
+      continue;
+    }
+    Value predicate = tensor::ExtractOp::create(
+        rewriter, assertion.getLoc(),
+        mapping.lookupOrDefault(assertion.getOperand(0)));
+    Value failureStatus = arith::ConstantIntOp::create(
+        rewriter, assertion.getLoc(), ++assertionIndex, 32);
+    failureStatus = tensor::FromElementsOp::create(
+        rewriter, assertion.getLoc(), statusType, ValueRange{failureStatus});
+    auto continuation = createScatterAssertionGuard(
+        predicate, currentValues, failureStatus, rewriter, assertion.getLoc());
+    scf::YieldOp::create(rewriter, assertion.getLoc(),
+                         continuation.getResults());
+    rewriter.setInsertionPointToStart(continuation.thenBlock());
+  }
+  SmallVector<Value> results;
+  for (Value result : sourceBlock.getTerminator()->getOperands()) {
+    results.push_back(mapping.lookupOrDefault(result));
+  }
+  results.push_back(successStatus);
+  scf::YieldOp::create(rewriter, loc, results);
+}
+
+static Value createScatterFailureReduction(Value status,
+                                           PatternRewriter &rewriter,
+                                           Location loc) {
+  auto type = cast<RankedTensorType>(status.getType());
+  auto scalarType = RankedTensorType::get({}, rewriter.getI32Type());
+  Value zero = mlir::stablehlo::ConstantOp::create(
+      rewriter, loc, DenseIntElementsAttr::get(scalarType, {0}));
+  SmallVector<int64_t> dimensions(type.getRank());
+  std::iota(dimensions.begin(), dimensions.end(), 0);
+  auto reduce = mlir::stablehlo::ReduceOp::create(
+      rewriter, loc, TypeRange{scalarType}, ValueRange{status},
+      ValueRange{zero}, rewriter.getDenseI64ArrayAttr(dimensions));
+  {
+    OpBuilder::InsertionGuard insertionGuard(rewriter);
+    Block *block = rewriter.createBlock(&reduce.getBody(), {},
+                                        {scalarType, scalarType}, {loc, loc});
+    Value maximum = mlir::stablehlo::MaxOp::create(
+        rewriter, loc, block->getArgument(0), block->getArgument(1));
+    mlir::stablehlo::ReturnOp::create(rewriter, loc, maximum);
+  }
+  return tensor::ExtractOp::create(rewriter, loc, reduce.getResult(0));
+}
+
+// Before (inside the update computation):
+//   stablehlo.custom_call @shape_assertion(%predicate) ...
+//   stablehlo.return %updated
+// After adding a coupled status component:
+//   %next:2 = scf.if %predicate -> (tensor<T>, tensor<i32>) {
+//     scf.yield %updated, %success : tensor<T>, tensor<i32>
+//   } else {
+//     scf.yield %current, %failure : tensor<T>, tensor<i32>
+//   }
+//   stablehlo.return %next#0, %next#1
+// A reduction selects a failed check for the host to report. Scatter does not
+// specify an update order, so independent failing destinations need not report
+// the same message. Other effects and nested checks retain the existing
+// lowering.
+struct ScatterShapeAssertionLowering final
+    : OpRewritePattern<mlir::stablehlo::ScatterOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    Block &block = op.getUpdateComputation().front();
+    SmallVector<mlir::stablehlo::CustomCallOp> assertions;
+    for (Operation &operation : block.without_terminator()) {
+      auto assertion = dyn_cast<mlir::stablehlo::CustomCallOp>(operation);
+      if (!assertion || assertion.getCallTargetName() != "shape_assertion") {
+        if (!isMemoryEffectFree(&operation)) {
+          return rewriter.notifyMatchFailure(
+              op, "expected pure computation between direct shape assertions");
+        }
+        continue;
+      }
+      if (const char *blocker = getShapeAssertionBlocker(assertion)) {
+        return rewriter.notifyMatchFailure(op, blocker);
+      }
+      assertions.push_back(assertion);
+    }
+    if (assertions.empty()) {
+      return failure();
+    }
+    if (assertions.size() > std::numeric_limits<int32_t>::max()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "too many scatter shape assertions");
+    }
+    TypeRange currentTypes(
+        block.getArguments().take_front(op.getInputs().size()));
+    if (!llvm::equal(currentTypes, block.getTerminator()->getOperandTypes())) {
+      return rewriter.notifyMatchFailure(
+          op, "scatter input promotion must precede assertion lifting");
+    }
+
+    Location loc = op.getLoc();
+    SmallVector<Value> inputs(op.getInputs());
+    inputs.push_back(createScatterStatusTensor(inputs.front(), rewriter, loc));
+    SmallVector<Value> updates(op.getUpdates());
+    // The status update argument is never read. Initialising it would introduce
+    // a dynamic temporary inside the scatter dispatch after producer fusion.
+    updates.push_back(tensor::EmptyOp::create(
+        rewriter, loc, tensor::getMixedSizes(rewriter, loc, updates.front()),
+        rewriter.getI32Type()));
+    SmallVector<Type> resultTypes(op.getResultTypes());
+    resultTypes.push_back(inputs.back().getType());
+    auto scatter = mlir::stablehlo::ScatterOp::create(
+        rewriter, loc, resultTypes, inputs, op.getScatterIndices(), updates,
+        op.getScatterDimensionNumbers(), op.getIndicesAreSorted(),
+        op.getUniqueIndices());
+    scatter->setDiscardableAttrs(op->getDiscardableAttrDictionary());
+    buildCheckedScatterReducer(op, scatter, rewriter);
+    Value failure = createScatterFailureReduction(scatter.getResults().back(),
+                                                  rewriter, loc);
+    for (auto [index, assertion] : llvm::enumerate(assertions)) {
+      Value code = arith::ConstantIntOp::create(rewriter, assertion.getLoc(),
+                                                index + 1, 32);
+      Value passed =
+          arith::CmpIOp::create(rewriter, assertion.getLoc(),
+                                arith::CmpIPredicate::ne, failure, code);
+      emitStatusCheck(
+          rewriter, assertion.getLoc(), passed,
+          assertion->getAttrOfType<StringAttr>("error_message").getValue());
+    }
+    rewriter.replaceOp(op, scatter.getResults().drop_back());
+    return success();
+  }
+};
 
 struct ShapeAssertionLowering final
     : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
@@ -1408,6 +1616,14 @@ struct LegalizeStableHLOCustomCalls final
     MLIRContext *ctx = f.getContext();
 
     propagateShapeAssertionFacts(f);
+
+    // Lift reducer checks before lowering individual custom calls. Otherwise
+    // the status checks would become device effects inside the scatter body.
+    RewritePatternSet scatterPatterns(ctx);
+    scatterPatterns.add<ScatterShapeAssertionLowering>(ctx);
+    if (failed(applyPatternsGreedily(f, std::move(scatterPatterns)))) {
+      return signalPassFailure();
+    }
 
     RewritePatternSet patterns(ctx);
     patterns.add<HouseholderReflectorRewriter, ShapeAssertionLowering>(ctx);
