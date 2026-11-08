@@ -94,6 +94,10 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     pipelines). A `false` mask value suppresses the corresponding scatter
     update, leaving `original` unchanged for that batch element.
 
+    Each update element is applied only when its computed result index is in
+    bounds for `original`; out-of-bounds elements leave `original` unchanged.
+    Any error a frontend raises for such indices is a separate check.
+
     The unique_indices attribute carries the information whether all the
     indices are unique. If `unique_indices` is `true` and two or more updates
     scatter to the same location in `original` the final value in `original` is

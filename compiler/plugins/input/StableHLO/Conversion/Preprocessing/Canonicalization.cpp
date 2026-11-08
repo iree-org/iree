@@ -595,6 +595,10 @@ struct ConcatenateOpCanon final
   }
 };
 
+// concatenate(concatenate(x, y), z) on one dimension is concatenate(x, y, z).
+// Only a single-use inner concatenate is absorbed, so no tensor is duplicated.
+// Mirrors upstream ConcatenateOpFlatten, which StableHLO registers only with
+// its whole aggressive simplification set.
 struct ConcatenateOpFlatten final
     : OpRewritePattern<mlir::stablehlo::ConcatenateOp> {
   using Base::Base;
