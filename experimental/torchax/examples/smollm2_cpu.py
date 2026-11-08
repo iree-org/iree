@@ -18,6 +18,7 @@ import gc
 import hashlib
 import importlib.metadata
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -208,6 +209,7 @@ def unsupported_attention_version(module_text):
 
 def compile_programs(args, fallback):
     from iree.compiler import tools
+    import smollm2_wasm
 
     mode = "fallback" if fallback else "specialized"
     binaries = {}
@@ -215,11 +217,27 @@ def compile_programs(args, fallback):
         module = (args.output_dir / f"{name}.mlir").read_text()
         if fallback:
             module = unsupported_attention_version(module)
-        flags = (
-            ["--iree-llvmcpu-target-cpu=generic"]
-            if args.target_backend == "llvm-cpu"
-            else []
-        ) + args.compiler_arg
+        if args.wasi:
+            module = smollm2_wasm.prepare_module(module, mode, name)
+        flags = smollm2_wasm.compiler_arguments(args, mode, name)
+        if args.wasi:
+            source_path = args.output_dir / "wasi_model" / f"{mode}-{name}.mlir"
+            source_path.write_text(module)
+            (source_path.with_suffix(".compiler.json")).write_text(
+                json.dumps(
+                    {
+                        "source": str(source_path),
+                        "output": str(args.output_dir / f"{mode}-{name}.vmfb"),
+                        "arguments": [
+                            "--iree-input-type=stablehlo",
+                            f"--iree-hal-target-backends={args.target_backend}",
+                            *flags,
+                        ],
+                    },
+                    indent=2,
+                )
+                + "\n"
+            )
         lowered = tools.compile_str(
             module,
             input_type="stablehlo",
@@ -308,6 +326,25 @@ def main():
     parser.add_argument("--export-only", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--reuse-export", action="store_true")
     parser.add_argument(
+        "--prepare-reference-only",
+        action="store_true",
+        help="export and prepare NPY references without compiling or executing IREE",
+    )
+    parser.add_argument(
+        "--wasi", action="store_true", help="execute VMVX or LLVM-WASM AOT under Node"
+    )
+    parser.add_argument(
+        "--prepare-wasi-runner-only",
+        action="store_true",
+        help="prepare WASI inputs, modules and build files without building/running",
+    )
+    parser.add_argument(
+        "--bazel", default="bazel", help="Bazel executable for WASI builds"
+    )
+    parser.add_argument("--bazel-startup-arg", action="append", default=[])
+    parser.add_argument("--bazel-build-arg", action="append", default=[])
+    parser.add_argument("--node", default=os.environ.get("IREE_WASM_NODE", "node"))
+    parser.add_argument(
         "--retain-state",
         action="store_true",
         help="disable donation and check every previous cache value",
@@ -329,6 +366,16 @@ def main():
     args = parser.parse_args()
     if args.capacity < 5 or args.decode_steps < 1:
         parser.error("capacity must be at least 5 and decode-steps must be positive")
+    if args.prepare_reference_only and args.prepare_wasi_runner_only:
+        parser.error("choose reference preparation or runner preparation")
+    if args.prepare_wasi_runner_only:
+        args.wasi = True
+    if args.wasi:
+        if args.target_backend not in ("llvm-cpu", "vmvx"):
+            parser.error("--wasi supports llvm-cpu and vmvx")
+        if args.device not in (None, "local-sync"):
+            parser.error("--wasi uses the local-sync device")
+        args.device = "local-sync"
     if args.device is None:
         args.device = {
             "llvm-cpu": "local-task",
@@ -339,6 +386,15 @@ def main():
             "metal-spirv": "metal",
         }[args.target_backend]
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    args.output_dir = args.output_dir.resolve()
+    if args.wasi:
+        (args.output_dir / "wasi_model").mkdir(exist_ok=True)
+        import smollm2_wasm
+
+        try:
+            smollm2_wasm.compiler_arguments(args, "specialized", "prefill")
+        except ValueError as error:
+            parser.error(str(error))
     torch.set_num_threads(4)
     if args.export_only:
         export_programs(args)
@@ -354,6 +410,17 @@ def main():
         parser.error("reused export must match --retain-state")
     reference = make_reference(args, metadata)
     gc.collect()
+    if args.wasi or args.prepare_reference_only:
+        import smollm2_wasm
+
+        smollm2_wasm.write_reference_case(
+            args.output_dir / "wasi_case",
+            metadata,
+            reference,
+            full_prefix_checked=True,
+        )
+        if args.prepare_reference_only:
+            return
     results = {
         "export": metadata,
         "prompt": args.prompt,
@@ -365,17 +432,39 @@ def main():
         )
         + args.compiler_arg,
         "device": args.device,
+        "execution_environment": "wasi" if args.wasi else "native",
         "rtol": 1e-4,
         "atol": 1e-4,
         "reference_checked_against_full_prefix": True,
         "modes": {},
     }
-    for fallback in (False, True):
-        binaries = compile_programs(args, fallback)
-        mode = "fallback" if fallback else "specialized"
-        results["modes"][mode] = run_programs(
-            args, metadata, binaries, reference, fallback
+    if args.wasi:
+        import smollm2_wasm
+
+        for fallback in (False, True):
+            compile_programs(args, fallback)
+        smollm2_wasm.write_model_repository(
+            args.output_dir / "wasi_model", args.target_backend
         )
+        if args.prepare_wasi_runner_only:
+            return
+        bundle, build = smollm2_wasm.build_runner(args)
+        results["wasi_build"] = build
+        results["compiler_programs"] = {
+            path.stem: json.loads(path.read_text())
+            for path in sorted((args.output_dir / "wasi_model").glob("*.compiler.json"))
+        }
+        for mode in ("specialized", "fallback"):
+            results["modes"][mode] = smollm2_wasm.run_programs(
+                args, metadata, reference, bundle, mode
+            )
+    else:
+        for fallback in (False, True):
+            binaries = compile_programs(args, fallback)
+            mode = "fallback" if fallback else "specialized"
+            results["modes"][mode] = run_programs(
+                args, metadata, binaries, reference, fallback
+            )
     (args.output_dir / "results.json").write_text(json.dumps(results, indent=2) + "\n")
 
 

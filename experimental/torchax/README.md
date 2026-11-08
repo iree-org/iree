@@ -201,9 +201,54 @@ median times of 27.1 ms without the profile and 23.0 ms with it, including logit
 readback but excluding compilation and parameter loading. These measurements
 describe this workload and device.
 
+For WASI, the same harness builds a small direct-VM runner with the checkout's
+Bazel WASI toolchain and executes it with Node. Keep `smollm2_cpu.py`,
+`smollm2_wasm.py`, and `wasi/smollm2_wasi.c` together. From the repository root,
+with the same Python bindings and model dependencies installed:
+
+```sh
+python experimental/torchax/run_bazel.py \
+  experimental/torchax/examples/smollm2_cpu.py \
+  --output-dir /tmp/smollm2-wasi-vmvx --wasi --target-backend=vmvx \
+  --retain-state --compiler-arg=--iree-vmvx-reassociate-fp-reductions
+python experimental/torchax/run_bazel.py \
+  experimental/torchax/examples/smollm2_cpu.py \
+  --output-dir /tmp/smollm2-wasi-llvm --wasi --target-backend=llvm-cpu \
+  --retain-state
+```
+
+The LLVM variant emits wasm32 static executable objects; the VMVX variant uses
+the VMVX loader. Both use local-sync, preloaded external parameters and the
+maintained WASI entry point. The runner checks every output cache, logits and
+predicted token at the same tolerances, and reads retained physical inputs
+again after invocation. Omit `--retain-state` to exercise donation in a separate
+output directory. Node and Bazel failures propagate. `results.json` records
+the build command and runner hashes alongside the model results.
+Node can access only the output directory; reused parameter archives must be
+stored there rather than symlinked to a file outside it.
+
+The generated `wasi_model` directory is an injected Bazel repository, so no
+experimental build package needs to be added to the main workspace. It also
+contains `iree_runtime_plugin.cmake` for an existing WASI CMake runtime build
+using `IREE_CMAKE_PLUGIN_PATHS`; enable file I/O with
+`-DCMAKE_C_FLAGS=-DIREE_FILE_IO_ENABLE=1`. Selecting the VMVX plugin also enables
+`IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE` for its required runtime loader. Use
+`--prepare-wasi-runner-only` to generate its modules and build files first.
+`--prepare-reference-only` writes portable NPY inputs and Torch references
+without compiling or executing IREE. The focused checker test is
+`examples/wasi/test_runner.py`; it runs small stateful modules through both WASI
+loaders and checks numerical, token, file and bytecode failure propagation.
+
+Recorded local validation passed native LLVM CPU, VMVX and Metal, plus WASI
+VMVX and LLVM-WASM: 60 model invocations covering both attention paths and both
+state ownership modes, with all 60 caches, logits and predicted tokens checked.
+Vulkan compilation passed for all eight model modules; Vulkan hardware execution
+was unavailable. The comparison policy remains `rtol=atol=1e-4`, with exact
+predicted-token equality. Full validation across the applicable CI matrix is
+still required before merge.
+
 Backend and device failures propagate; the harness does not skip unavailable
-or failing targets. WASM deployment requires
-its own runtime runner and is not exercised by this Python harness.
+or failing targets.
 These f32 runs do not establish BF16 or complete GPU conformance: the broader
 suite has a BF16 mixed-matmul discrepancy also present when weights are ordinary
 arguments.
