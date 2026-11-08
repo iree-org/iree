@@ -205,6 +205,29 @@ func.func @compare_folds()
 
 // -----
 
+// CHECK-LABEL: func.func @compare_dynamic_integer_self
+// CHECK: %[[RESULT:.+]] = stablehlo.compare EQ, %arg0, %arg0, SIGNED
+// CHECK: return %[[RESULT]] : tensor<?xi1>
+func.func @compare_dynamic_integer_self(%x: tensor<?xi32>) -> tensor<?xi1> {
+  %r = stablehlo.compare EQ, %x, %x, SIGNED : (tensor<?xi32>, tensor<?xi32>) -> tensor<?xi1>
+  return %r : tensor<?xi1>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @compare_dynamic_integer_constants
+// CHECK: %[[RESULT:.+]] = stablehlo.compare LT
+// CHECK-SAME: -> tensor<?xi1>
+// CHECK: return %[[RESULT]] : tensor<?xi1>
+func.func @compare_dynamic_integer_constants() -> tensor<?xi1> {
+  %a = stablehlo.constant dense<[0, 1]> : tensor<2xi32>
+  %b = stablehlo.constant dense<[1, 0]> : tensor<2xi32>
+  %r = stablehlo.compare LT, %a, %b, SIGNED : (tensor<2xi32>, tensor<2xi32>) -> tensor<?xi1>
+  return %r : tensor<?xi1>
+}
+
+// -----
+
 // CHECK-LABEL: func.func @select
 // CHECK-SAME:   ([[ARG0:%.+]]: tensor<2xi32>, [[ARG1:%.+]]: tensor<2xi32>, [[ARGC:%.+]]: tensor<2xi1>)
 func.func @select(%arg0: tensor<2xi32>, %arg1: tensor<2xi32>, %argC: tensor<2xi1>)
