@@ -1555,19 +1555,36 @@ static iree_status_t iree_hal_task_queue_drain_recording(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_task_queue_resolve_binding_entry(
+iree_status_t iree_hal_task_queue_resolve_binding_entry(
     const iree_hal_buffer_binding_t* binding,
+    iree_hal_memory_access_t required_cache_access,
     iree_hal_buffer_mapping_t* mapping,
     iree_hal_cmd_binding_entry_t* out_entry) {
   if (binding->buffer) {
+    if (required_cache_access != IREE_HAL_MEMORY_ACCESS_NONE) {
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
+          iree_hal_buffer_allowed_access(binding->buffer),
+          required_cache_access));
+    }
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
         binding->buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-        IREE_HAL_MEMORY_ACCESS_ANY, binding->offset, binding->length, mapping));
+        IREE_HAL_MEMORY_ACCESS_ANY | required_cache_access, binding->offset,
+        binding->length, mapping));
     out_entry->base = mapping->contents.data;
     out_entry->length = mapping->contents.data_length;
+    out_entry->mapping = mapping;
+    out_entry->binding_length =
+        binding->length == IREE_HAL_WHOLE_BUFFER
+            ? iree_hal_buffer_byte_length(binding->buffer) - binding->offset
+            : binding->length;
+  } else if (required_cache_access != IREE_HAL_MEMORY_ACCESS_NONE) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "cache command binding slot is unbound");
   } else {
     out_entry->base = NULL;
     out_entry->length = 0;
+    out_entry->mapping = NULL;
+    out_entry->binding_length = 0;
   }
   return iree_ok_status();
 }
@@ -1624,14 +1641,17 @@ static iree_status_t iree_hal_task_queue_drain_commands(
     operation->commands.binding_mappings = mappings;
     operation->commands.binding_mapping_count = resolved_binding_count;
     for (iree_host_size_t i = 0; i < hal_table.count; ++i) {
+      const iree_hal_memory_access_t cache_access =
+          iree_hal_block_command_buffer_cache_binding_access(
+              operation->commands.command_buffer, i);
       IREE_RETURN_IF_ERROR(iree_hal_task_queue_resolve_binding_entry(
-          &hal_table.bindings[i], &mappings[i], &entries[i]));
+          &hal_table.bindings[i], cache_access, &mappings[i], &entries[i]));
     }
     for (iree_host_size_t i = 0; i < late_binding_count; ++i) {
       const iree_host_size_t binding_index = late_binding_base + i;
       IREE_RETURN_IF_ERROR(iree_hal_task_queue_resolve_binding_entry(
-          &late_bindings[i], &mappings[binding_index],
-          &entries[binding_index]));
+          &late_bindings[i], IREE_HAL_MEMORY_ACCESS_NONE,
+          &mappings[binding_index], &entries[binding_index]));
     }
     binding_table = entries;
     binding_table_length = resolved_binding_count;

@@ -289,6 +289,10 @@ static uint32_t iree_hal_cmd_region_tile_count(
         tile_count += iree_hal_cmd_transfer_tile_count(
             ((const iree_hal_cmd_update_t*)cmd)->length);
         break;
+      case IREE_HAL_CMD_FLUSH:
+      case IREE_HAL_CMD_INVALIDATE:
+        tile_count += 1;
+        break;
       default:
         break;
     }
@@ -1182,6 +1186,67 @@ static uint32_t iree_hal_cmd_execute_update(const iree_hal_cmd_update_t* update,
   return tile_count;
 }
 
+static iree_status_t iree_hal_cmd_execute_cache(
+    const iree_hal_cmd_cache_t* cmd,
+    const iree_hal_cmd_binding_entry_t* binding_table,
+    iree_host_size_t binding_table_length, iree_atomic_int64_t* tile_index,
+    int32_t region_epoch, uint32_t worker_count,
+    uint32_t* out_tiles_completed) {
+  *out_tiles_completed = 0;
+  if (worker_count > 1) {
+    uint32_t tile = 0;
+    if (!iree_hal_cmd_transfer_claim_tile(tile_index, region_epoch, 1, &tile)) {
+      return iree_ok_status();
+    }
+  }
+
+  const iree_hal_buffer_ref_t ref = cmd->target_ref;
+  iree_device_size_t length = ref.length;
+  if (!ref.buffer) {
+    if (IREE_UNLIKELY(ref.buffer_slot >= binding_table_length ||
+                      !binding_table[ref.buffer_slot].mapping)) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "cache command binding slot %u is unbound",
+                              ref.buffer_slot);
+    }
+    const iree_hal_cmd_binding_entry_t* entry = &binding_table[ref.buffer_slot];
+    if (IREE_UNLIKELY(ref.offset > entry->binding_length ||
+                      (length != IREE_HAL_WHOLE_BUFFER &&
+                       length > entry->binding_length - ref.offset))) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "cache command range exceeds bound buffer");
+    }
+    if (length == IREE_HAL_WHOLE_BUFFER) {
+      length = entry->binding_length - ref.offset;
+    }
+    if (length != 0) {
+      // The queue mapped the submitted binding starting at its base offset.
+      // Keep that mapping alive for the queue to unmap after execution.
+      IREE_RETURN_IF_ERROR(cmd->header.opcode == IREE_HAL_CMD_FLUSH
+                               ? iree_hal_buffer_mapping_flush_range(
+                                     entry->mapping, ref.offset, length)
+                               : iree_hal_buffer_mapping_invalidate_range(
+                                     entry->mapping, ref.offset, length));
+    }
+  } else if (length != 0) {
+    iree_hal_buffer_mapping_t mapping;
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+        ref.buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+        cmd->header.opcode == IREE_HAL_CMD_FLUSH ? IREE_HAL_MEMORY_ACCESS_WRITE
+                                                 : IREE_HAL_MEMORY_ACCESS_READ,
+        ref.offset, length, &mapping));
+    iree_status_t status = cmd->header.opcode == IREE_HAL_CMD_FLUSH
+                               ? iree_hal_buffer_mapping_flush_range(
+                                     &mapping, 0, IREE_HAL_WHOLE_BUFFER)
+                               : iree_hal_buffer_mapping_invalidate_range(
+                                     &mapping, 0, IREE_HAL_WHOLE_BUFFER);
+    IREE_RETURN_IF_ERROR(
+        iree_status_join(status, iree_hal_buffer_unmap_range(&mapping)));
+  }
+  *out_tiles_completed = 1;
+  return iree_ok_status();
+}
+
 //===----------------------------------------------------------------------===//
 // Block and region processing
 //===----------------------------------------------------------------------===//
@@ -1263,6 +1328,21 @@ static uint32_t iree_hal_cmd_block_processor_process_region(
         tiles_completed += iree_hal_cmd_execute_update(
             (const iree_hal_cmd_update_t*)cmd, binding_ptrs, tile_idx,
             region_epoch, context->worker_count);
+        break;
+      }
+      case IREE_HAL_CMD_FLUSH:
+      case IREE_HAL_CMD_INVALIDATE: {
+        uint32_t cache_tiles = 0;
+        iree_status_t status = iree_hal_cmd_execute_cache(
+            (const iree_hal_cmd_cache_t*)cmd, context->binding_table,
+            context->binding_table_length, tile_idx, region_epoch,
+            context->worker_count, &cache_tiles);
+        if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+          iree_hal_cmd_block_processor_report_error(context, status);
+          IREE_TRACE_ZONE_END(z_region);
+          return tiles_completed;
+        }
+        tiles_completed += cache_tiles;
         break;
       }
       default: {
@@ -1519,6 +1599,15 @@ static iree_status_t iree_hal_cmd_block_processor_execute_single_worker(
         case IREE_HAL_CMD_UPDATE: {
           *out_tiles_executed += iree_hal_cmd_execute_update(
               (const iree_hal_cmd_update_t*)cmd, binding_ptrs, NULL, 0, 1);
+          break;
+        }
+        case IREE_HAL_CMD_FLUSH:
+        case IREE_HAL_CMD_INVALIDATE: {
+          uint32_t cache_tiles = 0;
+          IREE_RETURN_IF_ERROR(iree_hal_cmd_execute_cache(
+              (const iree_hal_cmd_cache_t*)cmd, context->binding_table,
+              context->binding_table_length, NULL, 0, 1, &cache_tiles));
+          *out_tiles_executed += cache_tiles;
           break;
         }
         case IREE_HAL_CMD_BARRIER: {

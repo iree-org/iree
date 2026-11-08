@@ -47,6 +47,9 @@ typedef struct iree_hal_block_command_buffer_t {
   // Total allocated capacity of late_bindings.
   iree_host_size_t late_binding_capacity;
 
+  // Cache access required by each indirect binding slot during queue mapping.
+  iree_hal_memory_access_t* cache_binding_access;
+
   // Profiling sideband metadata collected during command recording.
   struct {
     // Distinct executable metadata required by recorded dispatch commands.
@@ -435,7 +438,7 @@ static iree_status_t iree_hal_block_command_buffer_get_late_binding_slot(
           .buffer = buffer_ref.buffer,
           .offset = buffer_ref.offset,
           .length = buffer_ref.length,
-      };
+  };
   *out_slot = (uint16_t)slot;
   return iree_ok_status();
 }
@@ -447,6 +450,15 @@ const iree_hal_buffer_binding_t* iree_hal_block_command_buffer_late_bindings(
       iree_hal_block_command_buffer_cast(base_command_buffer);
   *out_late_binding_count = command_buffer->late_binding_count;
   return command_buffer->late_bindings;
+}
+
+iree_hal_memory_access_t iree_hal_block_command_buffer_cache_binding_access(
+    iree_hal_command_buffer_t* base_command_buffer, iree_host_size_t slot) {
+  iree_hal_block_command_buffer_t* command_buffer =
+      iree_hal_block_command_buffer_cast(base_command_buffer);
+  return slot < command_buffer->base.binding_capacity
+             ? command_buffer->cache_binding_access[slot]
+             : IREE_HAL_MEMORY_ACCESS_NONE;
 }
 
 // Resolves |count| buffer references into fixup entries. For each ref:
@@ -556,6 +568,16 @@ iree_status_t iree_hal_block_command_buffer_create(
 
   iree_status_t status =
       iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
+  if (iree_status_is_ok(status) && binding_capacity > 0) {
+    status = iree_allocator_malloc_array(
+        host_allocator, binding_capacity,
+        sizeof(*command_buffer->cache_binding_access),
+        (void**)&command_buffer->cache_binding_access);
+    if (iree_status_is_ok(status)) {
+      memset(command_buffer->cache_binding_access, 0,
+             binding_capacity * sizeof(*command_buffer->cache_binding_access));
+    }
+  }
   if (iree_status_is_ok(status)) {
     *out_command_buffer = &command_buffer->base;
   } else {
@@ -574,6 +596,7 @@ static void iree_hal_block_command_buffer_destroy(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_cmd_block_recording_release(&command_buffer->recording);
+  iree_allocator_free(host_allocator, command_buffer->cache_binding_access);
   iree_allocator_free(host_allocator, command_buffer->late_bindings);
   iree_allocator_free(host_allocator,
                       command_buffer->profile.executables.profile_id_set);
@@ -651,7 +674,13 @@ static iree_status_t iree_hal_block_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_block_command_buffer_t* command_buffer =
       iree_hal_block_command_buffer_cast(base_command_buffer);
-  return iree_hal_cmd_block_builder_begin(&command_buffer->builder);
+  IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_begin(&command_buffer->builder));
+  if (command_buffer->cache_binding_access) {
+    memset(command_buffer->cache_binding_access, 0,
+           command_buffer->base.binding_capacity *
+               sizeof(*command_buffer->cache_binding_access));
+  }
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_block_command_buffer_end(
@@ -745,6 +774,52 @@ static iree_status_t iree_hal_block_command_buffer_advise_buffer(
     iree_hal_buffer_ref_t buffer_ref, iree_hal_memory_advise_flags_t flags,
     uint64_t arg0, uint64_t arg1) {
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_block_command_buffer_record_cache_command(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref, iree_hal_cmd_opcode_t opcode) {
+  iree_hal_block_command_buffer_t* command_buffer =
+      iree_hal_block_command_buffer_cast(base_command_buffer);
+  if (!target_ref.buffer &&
+      IREE_UNLIKELY(target_ref.buffer_slot >=
+                    command_buffer->base.binding_capacity)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "cache command binding slot %u exceeds capacity",
+                            target_ref.buffer_slot);
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_strided(
+      command_buffer->resource_set, 1, &target_ref,
+      offsetof(iree_hal_buffer_ref_t, buffer), sizeof(target_ref)));
+
+  // One tile ensures that the operation runs once and that a following
+  // explicit barrier waits for it. The operation itself adds no dependency.
+  iree_hal_cmd_cache_t* cmd = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_cmd_block_builder_append_cmd(
+      &command_buffer->builder, opcode, IREE_HAL_CMD_FLAG_NONE, sizeof(*cmd),
+      /*fixup_count=*/0, /*binding_count=*/0,
+      /*tile_count=*/1, (void**)&cmd, /*out_fixups=*/NULL));
+  cmd->target_ref = target_ref;
+  if (!target_ref.buffer) {
+    command_buffer->cache_binding_access[target_ref.buffer_slot] |=
+        opcode == IREE_HAL_CMD_FLUSH ? IREE_HAL_MEMORY_ACCESS_WRITE
+                                     : IREE_HAL_MEMORY_ACCESS_READ;
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_block_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  return iree_hal_block_command_buffer_record_cache_command(
+      base_command_buffer, target_ref, IREE_HAL_CMD_FLUSH);
+}
+
+static iree_status_t iree_hal_block_command_buffer_invalidate_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  return iree_hal_block_command_buffer_record_cache_command(
+      base_command_buffer, target_ref, IREE_HAL_CMD_INVALIDATE);
 }
 
 //===----------------------------------------------------------------------===//
@@ -933,6 +1008,8 @@ static const iree_hal_command_buffer_vtable_t
         .reset_event = iree_hal_block_command_buffer_reset_event,
         .wait_events = iree_hal_block_command_buffer_wait_events,
         .advise_buffer = iree_hal_block_command_buffer_advise_buffer,
+        .flush_buffer = iree_hal_block_command_buffer_flush_buffer,
+        .invalidate_buffer = iree_hal_block_command_buffer_invalidate_buffer,
         .fill_buffer = iree_hal_block_command_buffer_fill_buffer,
         .update_buffer = iree_hal_block_command_buffer_update_buffer,
         .copy_buffer = iree_hal_block_command_buffer_copy_buffer,
