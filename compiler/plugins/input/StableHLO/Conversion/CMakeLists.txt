@@ -105,6 +105,7 @@ iree_cc_library(
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRSCFDialect
+    MLIRSCFTransforms
     MLIRShapeDialect
     MLIRShapeOpsTransforms
     MLIRSideEffectInterfaces

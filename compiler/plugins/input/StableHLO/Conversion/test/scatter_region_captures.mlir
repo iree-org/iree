@@ -6,7 +6,7 @@
 // CHECK-LABEL: func.func @guarded_window_scatter
 // CHECK: iree_linalg_ext.scatter
 // CHECK: tensor.from_elements
-// CHECK: scf.if
+// CHECK: scf.if {{.*}} -> (f32)
 // INPUT-LABEL: util.func public @guarded_window_scatter
 // INPUT-NOT: unrealized_conversion_cast
 func.func @guarded_window_scatter(%operand: tensor<4xf32>, %indices: tensor<2x1xi32>, %updates: tensor<2xf32>) -> tensor<4xf32> {
@@ -31,7 +31,7 @@ func.func @guarded_window_scatter(%operand: tensor<4xf32>, %indices: tensor<2x1x
 // CHECK-LABEL: func.func @guarded_general_scatter
 // CHECK: iree_linalg_ext.general_scatter
 // CHECK: tensor.from_elements
-// CHECK: scf.if
+// CHECK: scf.if {{.*}} -> (f32, i32)
 // INPUT-LABEL: util.func public @guarded_general_scatter
 // INPUT-NOT: unrealized_conversion_cast
 func.func @guarded_general_scatter(%operand: tensor<4xf32>, %state: tensor<4xi32>, %indices: tensor<2x1xi32>, %updates: tensor<2xf32>, %state_updates: tensor<2xi32>) -> (tensor<4xf32>, tensor<4xi32>) {
@@ -48,4 +48,21 @@ func.func @guarded_general_scatter(%operand: tensor<4xf32>, %state: tensor<4xi32
     stablehlo.return %next#0, %next#1 : tensor<f32>, tensor<i32>
   }) {scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [], inserted_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>, indices_are_sorted = false, unique_indices = false} : (tensor<4xf32>, tensor<4xi32>, tensor<2x1xi32>, tensor<2xf32>, tensor<2xi32>) -> (tensor<4xf32>, tensor<4xi32>)
   return %result#0, %result#1 : tensor<4xf32>, tensor<4xi32>
+}
+
+// -----
+
+// Structural scalarisation is confined to LinalgExt regions. Tensor-valued
+// control flow elsewhere stays available to the ordinary input lowering.
+// CHECK-LABEL: func.func @outside_reducer
+// CHECK: scf.if {{.*}} -> (tensor<f32>)
+// INPUT-LABEL: util.func public @outside_reducer
+// INPUT-NOT: unrealized_conversion_cast
+func.func @outside_reducer(%condition: i1, %left: tensor<f32>, %right: tensor<f32>) -> tensor<f32> {
+  %result = scf.if %condition -> tensor<f32> {
+    scf.yield %left : tensor<f32>
+  } else {
+    scf.yield %right : tensor<f32>
+  }
+  return %result : tensor<f32>
 }
