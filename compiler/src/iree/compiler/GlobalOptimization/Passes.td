@@ -181,8 +181,51 @@ def PropagateAffineQuantizationPass :
     collapsed `[M, G, L]` and `[N, G, L]` operands thus iterates over
     `(m, n, g, l)`. When a contraction consumes the result, the dequantize
     becomes its direct producer so the integer contraction rewrite can match
-    it.
+    it. A pad is not moved onto storage that is not byte-aligned, such as `i4`,
+    where it could shift values off byte boundaries.
   }];
+}
+
+def PackSubByteQuantizedConstantsPass :
+    Pass<"iree-global-opt-pack-sub-byte-quantized-constants", "mlir::ModuleOp"> {
+  let summary = "Packs constant quantized values with sub-byte ranges into i2 or i4 storage.";
+  let description = [{
+    Packs the constant `i8` input of an `iree_linalg_ext.dequantize_affine`
+    into `i2` or `i4` storage, which the dequantize then reads through an
+    `iree_tensor_ext.bitcast`. With `w`-bit storage, element `k * i + j` of the
+    innermost dimension goes to bits `[j * w, (j + 1) * w)` of byte `i`, where
+    `k = 8 / w`.
+
+    A dequantize can use `w`-bit storage if its `quant_min`/`quant_max` range
+    and its zero point fit `w` bits. The zero point must be a constant, and the
+    input must have a static, non-empty shape whose innermost dimension is a
+    multiple of `k`. Each dequantize needs the narrowest such type. An input
+    value that several dequantizes read is packed once, into the widest type
+    they need. Every load of a global is packed into the same type, and the
+    identical packings are merged later.
+
+    An input is packed only when constant evaluation folds the packing and no
+    `i8` reader remains. The input must be computed from inline constants or
+    immutable globals with an inline initial value, at the top level of a
+    function, where hoisting reaches. Every read of the input value must be the
+    input of a packed dequantize, in the same shape. This includes reads
+    through reshapes and through other loads of the same global, which must be
+    private, since code outside the module can read a public one.
+    Each packing must also store no more bytes than leaving its input
+    unpacked. Unpacked, hoisting stores a computed input no larger than the
+    constants and globals it reads in a global of its own, which packing
+    shrinks. Reshapes and slices are read in place instead, so their packing,
+    like that of any larger input, must take no more bytes than the constants
+    and globals it frees, which only the computation of packed inputs reads.
+    Either way, hoisting accepts the packing at any size threshold. Other
+    inputs, such as runtime values and parameters, stay `i8`.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
+  ];
 }
 
 def ConvertQDQToIntegerMathPass :

@@ -31,6 +31,14 @@ static llvm::cl::opt<bool> clConvertQDQToIntegerMath(
                    "changes floating-point rounding and exceptional-value "
                    "behavior)."),
     llvm::cl::init(true));
+static llvm::cl::opt<bool> clEnableSubByteQuantizedStorage(
+    "iree-global-opt-enable-sub-byte-quantized-storage",
+    llvm::cl::desc("Packs constant quantized values whose quantization range "
+                   "fits 2 or 4 bits into i2 or i4 storage. Requires "
+                   "const-expr hoisting and const-eval. With data tiling, "
+                   "contractions on packed values currently lose the "
+                   "data-tiling speedup."),
+    llvm::cl::init(false));
 static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",
     llvm::cl::desc(
@@ -130,11 +138,19 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
       .addPass(createLinalgQuantizedConvToConvPass)
       .addPass(createLinalgQuantizedMatmulToMatmulPass)
-      // Run propagation immediately before the QDQ rewrite so contractions
-      // consume dequantize results directly. This must happen before im2col
-      // inserts a packing operation between dequantize and its matmul.
+      // Run propagation before the QDQ rewrite so contractions consume
+      // dequantize results directly. This must happen before im2col inserts a
+      // packing operation between dequantize and its matmul.
       .addPredicatedPass(clConvertQDQToIntegerMath,
-                         createPropagateAffineQuantizationPass)
+                         createPropagateAffineQuantizationPass);
+  // Pack sub-byte constants between propagation, which moves reshapes onto the
+  // i8 values, and the QDQ rewrite, so the integer contraction reads the packed
+  // storage. Without hoisting and const-eval, the packing would run at runtime.
+  if (clEnableSubByteQuantizedStorage && transformOptions.constExprHoisting &&
+      transformOptions.constEval) {
+    mainPassManager.addPass(createPackSubByteQuantizedConstantsPass());
+  }
+  FunctionLikeNest(mainPassManager)
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createConvertQDQToIntegerMathPass)
       .addPredicatedPass(transformOptions.useIm2colForConvs,
