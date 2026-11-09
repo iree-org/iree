@@ -332,9 +332,7 @@ module version, and whether they changed since the previous release:
         ```
 
     * Upload the candidate's attestation bundles for the `iree-dist-*.tar.xz`
-        files too. The files are the same, so the bundles let users verify
-        them offline with `gh attestation verify --bundle`, and OpenSSF
-        Scorecard counts the release as signed.
+        files
 
         ```bash
         gh release download iree-3.1.0rc20241119 --repo iree-org/iree \
