@@ -160,3 +160,43 @@ func.func @no_emulation() attributes {hal.executable.target = #executable_target
 //       CHECK:   {{%.+}}           = arith.addi {{%.+}} : i64
 //       CHECK:   memref.store {{%.+}}, [[REF_I64_1]][{{%.+}}] : memref<8xi64, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   return
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
+    subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
+}>
+func.func @scf_if_i64(%cond: i1) attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<8xi32, #spirv.storage_class<StorageBuffer>>
+  %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<8xi64, #spirv.storage_class<StorageBuffer>>
+  %2 = scf.if %cond -> (i64) {
+    %3 = memref.load %0[%c0] : memref<8xi32, #spirv.storage_class<StorageBuffer>>
+    %4 = arith.extsi %3 : i32 to i64
+    scf.yield %4 : i64
+  } else {
+    %5 = memref.load %1[%c1] : memref<8xi64, #spirv.storage_class<StorageBuffer>>
+    scf.yield %5 : i64
+  }
+  memref.store %2, %1[%c0] : memref<8xi64, #spirv.storage_class<StorageBuffer>>
+  return
+}
+
+// An scf.if yielding i64 yields the emulating vector<2xi32>.
+//
+// CHECK-LABEL: func.func @scf_if_i64
+//       CHECK:   [[RES:%.+]] = scf.if {{%.+}} -> (vector<2xi32>)
+//       CHECK:     scf.yield {{%.+}} : vector<2xi32>
+//       CHECK:   } else {
+//       CHECK:     scf.yield {{%.+}} : vector<2xi32>
+//       CHECK:   memref.store [[RES]], {{%.+}}[{{%.+}}] : memref<8xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
