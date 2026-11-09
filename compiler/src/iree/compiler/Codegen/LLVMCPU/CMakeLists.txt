@@ -110,6 +110,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRComplexToLLVM
     MLIRComplexToStandard
+    MLIRControlFlowDialect
     MLIRControlFlowToLLVM
     MLIRFuncDialect
     MLIRFuncToLLVM

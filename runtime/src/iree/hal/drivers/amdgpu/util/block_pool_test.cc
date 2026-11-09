@@ -616,9 +616,13 @@ TEST_F(BlockPoolTest, AllocatorAllocate) {
 
   // Trim the block pool - the allocator should have returned the block on the
   // free above.
+  iree_slim_mutex_lock(&allocator.mutex);
   EXPECT_EQ(allocator.block_head, nullptr);
+  iree_slim_mutex_unlock(&allocator.mutex);
   iree_hal_amdgpu_block_pool_trim(&block_pool);
+  iree_slim_mutex_lock(&block_pool.mutex);
   EXPECT_EQ(block_pool.free_blocks_head, nullptr);
+  iree_slim_mutex_unlock(&block_pool.mutex);
 
   iree_hal_amdgpu_block_allocator_deinitialize(&allocator);
 
