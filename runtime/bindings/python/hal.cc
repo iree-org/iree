@@ -671,6 +671,13 @@ void HalDevice::QueueCopy(HalBuffer& source_buffer, HalBuffer& target_buffer,
 
 py::object HalDevice::CreateDLPackCapsule(HalBufferView& buffer_view,
                                           int device_type_code, int device_id) {
+  iree_hal_memory_access_t access = iree_hal_buffer_allowed_access(
+      iree_hal_buffer_view_buffer(buffer_view.raw_ptr()));
+  if (!iree_all_bits_set(
+          access, IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE)) {
+    throw std::invalid_argument(
+        "Legacy dlpack cannot preserve read-only or write-only buffer access");
+  }
   const size_t kStaticDimLimit = 6;
   struct ExtDLManagedTensor : public DLManagedTensor {
     ~ExtDLManagedTensor() {
@@ -801,7 +808,75 @@ py::object HalDevice::CreateDLPackCapsule(HalBufferView& buffer_view,
   return py::steal<py::object>(capsule);
 }
 
-HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
+namespace {
+
+// Validates a dense row-major DLPack layout, fills |dims| and returns the
+// tensor size in bytes.
+iree_device_size_t ValidateDLPackLayout(const DLTensor& dlt,
+                                        iree_hal_element_type_t et,
+                                        std::vector<iree_hal_dim_t>& dims) {
+  if (dlt.ndim < 0) {
+    throw std::invalid_argument("dlpack tensor rank must be nonnegative");
+  }
+  if (dlt.ndim > 0 && !dlt.shape) {
+    throw std::invalid_argument("dlpack tensor shape is missing");
+  }
+  if (dlt.dtype.bits == 0) {
+    throw std::invalid_argument("dlpack dtype bits must be nonzero");
+  }
+
+  // Validate dimensions before allocating or multiplying sizes.
+  bool is_empty = false;
+  for (int32_t i = 0; i < dlt.ndim; ++i) {
+    if (dlt.shape[i] < 0) {
+      throw std::invalid_argument(
+          "dlpack tensor dimension must be nonnegative");
+    }
+    is_empty |= dlt.shape[i] == 0;
+  }
+  dims.resize(dlt.ndim);
+  iree_device_size_t byte_size = is_empty ? 0 : iree_hal_element_bit_count(et);
+  for (int32_t i = 0; i < dlt.ndim; ++i) {
+    dims[i] = dlt.shape[i];
+    if (dims[i] != 0 &&
+        byte_size > std::numeric_limits<iree_device_size_t>::max() / dims[i]) {
+      throw std::invalid_argument("dlpack tensor size overflows");
+    }
+    byte_size *= dims[i];
+  }
+  if ((byte_size % 8) != 0) {
+    throw std::invalid_argument(
+        "dlpack tensor does not have a byte aligned size");
+  }
+  byte_size /= 8;
+
+  // Verify dense row major strides (for now a requirement).
+  if (!is_empty && dlt.strides && dlt.ndim > 0) {
+    uint64_t stride = 1;
+    for (int32_t i = dlt.ndim - 1; i >= 0; --i) {
+      auto dim = dlt.shape[i];
+      // The stride value for 1 or 0 dims is undefined and dlpack can normalize
+      // it, so we skip validation for these.
+      // See:
+      // https://github.com/pytorch/pytorch/issues/99803#issuecomment-1521214463
+      if (dim == 1 || dim == 0) continue;
+      if (dlt.strides[i] < 0 ||
+          static_cast<uint64_t>(dlt.strides[i]) != stride) {
+        throw std::invalid_argument("Unsupported strided tensor");
+      }
+      if (stride > std::numeric_limits<uint64_t>::max() / dim) {
+        throw std::invalid_argument("dlpack tensor stride size overflows");
+      }
+      stride *= dim;
+    }
+  }
+  return byte_size;
+}
+
+}  // namespace
+
+HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule,
+                                           int memory_type, int memory_access) {
   struct State {
     ~State() {
       if (managed_tensor && managed_tensor->deleter) {
@@ -817,12 +892,12 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
   if (!state.raw) {
     throw py::python_error();
   }
-  state.managed_tensor = static_cast<DLManagedTensor*>(state.raw);
-  // Takes ownership.
+  // The capsule owns the tensor until renaming succeeds.
   if (PyCapsule_SetName(state.capsule.ptr(), "used_dltensor")) {
     throw py::python_error();
   }
 
+  state.managed_tensor = static_cast<DLManagedTensor*>(state.raw);
   DLTensor* dlt = &state.managed_tensor->dl_tensor;
 
   // Some validation on what we accept.
@@ -860,58 +935,33 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
       throw std::invalid_argument("Unsupported dlpack dtype code");
   }
 
-  // Verify dense row major strides (for now a requirement).
-  if (dlt->strides && dlt->ndim > 0) {
-    int64_t stride = 1;
-    for (int32_t i = dlt->ndim - 1; i >= 0; --i) {
-      auto dim = dlt->shape[i];
-      // The stride value for 1 or 0 dims is undefined and dlpack can normalize
-      // it, so we skip validation for these.
-      // See:
-      // https://github.com/pytorch/pytorch/issues/99803#issuecomment-1521214463
-      if (dim == 1 || dim == 0) continue;
-      if (dlt->strides[i] != stride) {
-        throw std::invalid_argument("Unsupported strided tensor");
-      }
-      stride *= dim;
-    }
-  }
+  std::vector<iree_hal_dim_t> dims;
+  iree_device_size_t byte_size = ValidateDLPackLayout(*dlt, et, dims);
 
-  // Verify no byte offset. We could technically allow this, but there are all
-  // kinds of bugs and caveats listed, and would like to see how it is used.
-  if (dlt->byte_offset != 0) {
-    throw std::invalid_argument("NYI: dlpack byte_offset != 0");
+  // DLPack offsets are relative to the producer's allocation pointer.
+  uintptr_t data = reinterpret_cast<uintptr_t>(dlt->data);
+  if (byte_size != 0 && !data) {
+    throw std::invalid_argument("dlpack tensor data is missing");
   }
-
-  // Compute size.
-  auto* dims = static_cast<iree_hal_dim_t*>(
-      iree_alloca(sizeof(iree_hal_dim_t) * dlt->ndim));
-  iree_device_size_t byte_size = iree_hal_element_bit_count(et);
-  if (dlt->ndim > 0) {
-    for (int32_t i = 0; i < dlt->ndim; ++i) {
-      byte_size *= dlt->shape[i];
-      dims[i] = dlt->shape[i];
-    }
+  if (dlt->byte_offset > std::numeric_limits<uintptr_t>::max() - data ||
+      byte_size >
+          std::numeric_limits<uintptr_t>::max() - data - dlt->byte_offset) {
+    throw std::invalid_argument("dlpack tensor byte offset or size overflows");
   }
-  if ((byte_size % 8) != 0) {
-    throw std::invalid_argument(
-        "dlpack tensor does not have a byte aligned size");
-  }
-  byte_size /= 8;
+  data += dlt->byte_offset;
 
   iree_hal_buffer_t* imported_buffer;
   iree_hal_allocator_t* allocator = iree_hal_device_allocator(raw_ptr());
   iree_hal_buffer_params_t params;
   memset(&params, 0, sizeof(params));
   params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
-  params.access = IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE;
-  params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  params.access = static_cast<iree_hal_memory_access_t>(memory_access);
+  params.type = static_cast<iree_hal_memory_type_t>(memory_type);
   iree_hal_external_buffer_t external_buffer;
   memset(&external_buffer, 0, sizeof(external_buffer));
   external_buffer.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION;
   external_buffer.size = byte_size;
-  external_buffer.handle.device_allocation.ptr =
-      reinterpret_cast<uint64_t>(dlt->data);
+  external_buffer.handle.device_allocation.ptr = data;
   iree_hal_buffer_release_callback_t release_callback = {
       +[](void* user_data, struct iree_hal_buffer_t* buffer) {
         auto managed_tensor = static_cast<DLManagedTensor*>(user_data);
@@ -930,7 +980,7 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
   // Create Buffer View.
   iree_hal_buffer_view_t* buffer_view;
   iree_status_t status =
-      iree_hal_buffer_view_create(imported_buffer, dlt->ndim, dims, et,
+      iree_hal_buffer_view_create(imported_buffer, dims.size(), dims.data(), et,
                                   IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
                                   iree_allocator_system(), &buffer_view);
 
@@ -1362,7 +1412,12 @@ int HalModuleDebugSinkTpClear(PyObject* self) {
 int HalMappedMemory::HandleBufferProtocol(Py_buffer* view, int flags) {
   view->buf = mapped_memory_.contents.data;
   view->len = mapped_memory_.contents.data_length;
-  view->readonly = 1;  // Mapped with IREE_HAL_MEMORY_ACCESS_READ
+  view->readonly = !iree_all_bits_set(mapped_memory_.impl.allowed_access,
+                                      IREE_HAL_MEMORY_ACCESS_WRITE);
+  if (view->readonly && (flags & PyBUF_WRITABLE)) {
+    PyErr_SetString(PyExc_BufferError, "Mapped memory is read-only");
+    return -1;
+  }
   view->itemsize = 1;
   view->format = (char*)"B";
   view->ndim = 1;
@@ -1448,6 +1503,7 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("WRITE", IREE_HAL_MEMORY_ACCESS_WRITE)
       .value("DISCARD", IREE_HAL_MEMORY_ACCESS_DISCARD)
       .value("DISCARD_WRITE", IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE)
+      .value("UNALIGNED", IREE_HAL_MEMORY_ACCESS_UNALIGNED)
       .value("ALL", IREE_HAL_MEMORY_ACCESS_ALL)
       .export_values();
 
@@ -1559,7 +1615,11 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("create_dlpack_capsule", &HalDevice::CreateDLPackCapsule,
            py::arg("buffer_view"), py::arg("device_type_code"),
            py::arg("device_id"))
-      .def("from_dlpack_capsule", &HalDevice::FromDLPackCapsule)
+      .def("from_dlpack_capsule", &HalDevice::FromDLPackCapsule,
+           py::arg("capsule"), py::kw_only(),
+           py::arg("memory_type") = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+           py::arg("memory_access") =
+               IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE)
       .def("__repr__", [](HalDevice& self) {
         auto id_sv = iree_hal_device_id(self.raw_ptr());
         return std::string(id_sv.data, id_sv.size);
@@ -1993,18 +2053,18 @@ void SetupHalBindings(nanobind::module_ m) {
                               buffer_protocol_slots<HalMappedMemory>())
       .def(
           "asarray",
-          [](HalMappedMemory* self, py::handle shape, py::object dtype_descr) {
-            size_t rank = py::len(shape);
-            intptr_t* dims =
-                static_cast<intptr_t*>(alloca(sizeof(intptr_t) * rank));
-            for (size_t i = 0; i < rank; ++i) {
-              dims[i] = py::cast<intptr_t>(shape[i]);
+          [](py::object self, py::handle shape, py::object dtype_descr) {
+            if (py::cast<bool>(dtype_descr.attr("hasobject"))) {
+              throw py::value_error("Cannot map memory with an object dtype");
             }
-            return numpy::SimpleNewFromData(
-                rank, dims, dtype_descr, self->mapped_memory().contents.data);
+            py::object memory_view =
+                py::steal<py::object>(PyMemoryView_FromObject(self.ptr()));
+            if (!memory_view.ptr()) throw py::python_error();
+            return py::module_::import_("numpy").attr("ndarray")(
+                shape, py::arg("dtype") = dtype_descr,
+                py::arg("buffer") = memory_view);
           },
-          py::arg("shape"), py::arg("numpy_dtype_descr"),
-          py::keep_alive<0, 1>());
+          py::arg("shape"), py::arg("numpy_dtype_descr"));
 
   py::class_<HalExternalTimepoint>(m, "HalExternalTimepoint")
       .def(
