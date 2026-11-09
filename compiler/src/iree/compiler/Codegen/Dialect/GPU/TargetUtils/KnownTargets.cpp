@@ -1495,8 +1495,17 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   // TODO: Add feature bits for physical storage buffer.
 
   if (std::optional<TargetDetails> details = getAMDGPUTargetDetails(target)) {
+    StringRef features = "spirv:v1.6,cap:Shader";
+    // RDNA3 and RDNA4 support preserving FP32 signed zeros, infinities and
+    // NaNs. Keep this explicit: SPIR-V version alone does not guarantee the
+    // mode.
+    if (details->wgp == getRDNA3WgpDetails() ||
+        details->wgp == getRDNA4WgpDetails()) {
+      features = "spirv:v1.6,cap:Shader,cap:SignedZeroInfNanPreserve,"
+                 "ext:SPV_KHR_float_controls";
+    }
     return createTargetAttr(*details, normalizeVulkanAMDGPUTarget(target),
-                            /*features=*/"spirv:v1.6,cap:Shader", context);
+                            features, context);
   }
   if (std::optional<TargetDetails> details = getARMGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeARMGPUTarget(target),

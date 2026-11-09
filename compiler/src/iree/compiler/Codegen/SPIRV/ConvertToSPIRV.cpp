@@ -38,6 +38,7 @@
 #include "mlir/Conversion/TensorToSPIRV/TensorToSPIRV.h"
 #include "mlir/Conversion/UBToSPIRV/UBToSPIRV.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -57,6 +58,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -733,6 +735,25 @@ struct RemoveIdentityConversionCast final
 // Conversion pass
 //===----------------------------------------------------------------------===//
 
+static bool needsFP32SignedZeroPreservation(FunctionOpInterface funcOp) {
+  return funcOp
+      ->walk([](arith::ArithFastMathInterface op) {
+        auto flags = op.getFastMathFlagsAttr();
+        if (flags && arith::bitEnumContainsAny(flags.getValue(),
+                                               arith::FastMathFlags::nsz)) {
+          return WalkResult::advance();
+        }
+        auto isFP32 = [](Type type) {
+          return getElementTypeOrSelf(type).isF32();
+        };
+        return llvm::any_of(op->getOperandTypes(), isFP32) ||
+                       llvm::any_of(op->getResultTypes(), isFP32)
+                   ? WalkResult::interrupt()
+                   : WalkResult::advance();
+      })
+      .wasInterrupted();
+}
+
 /// A pass to perform the SPIR-V conversion.
 ///
 /// Converts remaining interface ops into SPIR-V global variables, GPU processor
@@ -776,6 +797,10 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   bool useIndirectBindings = usesIndirectBindingsAttr(moduleOp);
   bool useBdaRootBindings = usesBdaRootDispatchAbiAttr(moduleOp);
+  auto fpTargetEnv = spirv::lookupTargetEnv(moduleOp);
+  bool supportsFP32Preservation =
+      fpTargetEnv && spirv::TargetEnv(fpTargetEnv)
+                         .allows(spirv::Capability::SignedZeroInfNanPreserve);
 
   // Build a map from function name to dispatch_config for workgroup_size
   // and subgroup_size lookup.
@@ -806,9 +831,15 @@ void ConvertToSPIRVPass::runOnOperation() {
     if (std::optional<uint64_t> sg = configOp.getSubgroupSize()) {
       subgroupSize = sg.value();
     }
-    funcOp->setAttr(
-        spirv::getEntryPointABIAttrName(),
-        spirv::getEntryPointABIAttr(context, workgroupSize, subgroupSize));
+    // Without the execution mode, Vulkan may discard signed zeros even when
+    // the arithmetic has no nsz fast-math permission.
+    std::optional<int> targetWidth;
+    if (supportsFP32Preservation && needsFP32SignedZeroPreservation(funcOp)) {
+      targetWidth = 32;
+    }
+    funcOp->setAttr(spirv::getEntryPointABIAttrName(),
+                    spirv::getEntryPointABIAttr(context, workgroupSize,
+                                                subgroupSize, targetWidth));
   }
 
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
