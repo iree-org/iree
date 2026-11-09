@@ -6788,6 +6788,15 @@ gh<span class="w"> </span>release<span class="w"> </span>upload<span class="w"> 
 </code></pre></div>
 </li>
 <li>
+<p>Upload the candidate's attestation bundles for the <code>iree-dist-*.tar.xz</code>
+    files</p>
+<div class="highlight"><pre><span></span><code>gh<span class="w"> </span>release<span class="w"> </span>download<span class="w"> </span>iree-3.1.0rc20241119<span class="w"> </span>--repo<span class="w"> </span>iree-org/iree<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pattern<span class="w"> </span><span class="s1">'*-main-dist-linux.sigstore.json'</span><span class="w"> </span>--dir<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">WHEEL_DIR</span><span class="si">}</span><span class="s2">"</span>
+gh<span class="w"> </span>release<span class="w"> </span>upload<span class="w"> </span>v3.1.0<span class="w"> </span>--repo<span class="w"> </span>iree-org/iree<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"</span><span class="si">${</span><span class="nv">WHEEL_DIR</span><span class="si">}</span><span class="s2">"</span>/*-main-dist-linux.sigstore.json
+</code></pre></div>
+</li>
+<li>
 <p>Publish the release. Uncheck the option for "pre-release", and check the
     option for "latest" and hit publish.</p>
 <p><img alt="promote_release" src="../release-latest.png" /></p>
