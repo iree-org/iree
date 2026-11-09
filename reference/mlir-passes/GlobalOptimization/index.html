@@ -3524,6 +3524,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-global-opt-pack-sub-byte-quantized-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-global-opt-pack-sub-byte-quantized-constants
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-global-opt-propagate-affine-quantization" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6596,6 +6607,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-global-opt-pack-sub-byte-quantized-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-global-opt-pack-sub-byte-quantized-constants
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-global-opt-propagate-affine-quantization" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6828,6 +6850,35 @@ dequantization folding) still apply, and no broadcast is materialized.</p>
 <p><em>Materializes logical encodings to physical encodings if there is a single device target.</em></p>
 <h3 id="-iree-global-opt-optimize-numerics"><code>-iree-global-opt-optimize-numerics</code><a class="headerlink" href="#-iree-global-opt-optimize-numerics" title="Permanent link">link</a></h3>
 <p><em>Optimizes numerics given annotations added via iree-global-opt-infer-numeric-narrowing.</em></p>
+<h3 id="-iree-global-opt-pack-sub-byte-quantized-constants"><code>-iree-global-opt-pack-sub-byte-quantized-constants</code><a class="headerlink" href="#-iree-global-opt-pack-sub-byte-quantized-constants" title="Permanent link">link</a></h3>
+<p><em>Packs constant quantized values with sub-byte ranges into i2 or i4 storage.</em></p>
+<p>Packs the constant <code>i8</code> input of an <code>iree_linalg_ext.dequantize_affine</code>
+into <code>i2</code> or <code>i4</code> storage, which the dequantize then reads through an
+<code>iree_tensor_ext.bitcast</code>. With <code>w</code>-bit storage, element <code>k * i + j</code> of the
+innermost dimension goes to bits <code>[j * w, (j + 1) * w)</code> of byte <code>i</code>, where
+<code>k = 8 / w</code>.</p>
+<p>A dequantize can use <code>w</code>-bit storage if its <code>quant_min</code>/<code>quant_max</code> range
+and its zero point fit <code>w</code> bits. The zero point must be a constant, and the
+input must have a static, non-empty shape whose innermost dimension is a
+multiple of <code>k</code>. Each dequantize needs the narrowest such type. An input
+value that several dequantizes read is packed once, into the widest type
+they need. Every load of a global is packed into the same type, and the
+identical packings are merged later.</p>
+<p>An input is packed only when constant evaluation folds the packing and no
+<code>i8</code> reader remains. The input must be computed from inline constants or
+immutable globals with an inline initial value, at the top level of a
+function, where hoisting reaches. Every read of the input value must be the
+input of a packed dequantize, in the same shape. This includes reads
+through reshapes and through other loads of the same global, which must be
+private, since code outside the module can read a public one.
+Each packing must also store no more bytes than leaving its input
+unpacked. Unpacked, hoisting stores a computed input no larger than the
+constants and globals it reads in a global of its own, which packing
+shrinks. Reshapes and slices are read in place instead, so their packing,
+like that of any larger input, must take no more bytes than the constants
+and globals it frees, which only the computation of packed inputs reads.
+Either way, hoisting accepts the packing at any size threshold. Other
+inputs, such as runtime values and parameters, stay <code>i8</code>.</p>
 <h3 id="-iree-global-opt-propagate-affine-quantization"><code>-iree-global-opt-propagate-affine-quantization</code><a class="headerlink" href="#-iree-global-opt-propagate-affine-quantization" title="Permanent link">link</a></h3>
 <p><em>Propagates affine quantization through adjacent tensor operations.</em></p>
 <p>Moves <code>iree_linalg_ext.quantize_affine</code> before a producer-side
@@ -6842,7 +6893,8 @@ by expanding the consumer's iteration space; a blockwise matmul over
 collapsed <code>[M, G, L]</code> and <code>[N, G, L]</code> operands thus iterates over
 <code>(m, n, g, l)</code>. When a contraction consumes the result, the dequantize
 becomes its direct producer so the integer contraction rewrite can match
-it.</p>
+it. A pad is not moved onto storage that is not byte-aligned, such as <code>i4</code>,
+where it could shift values off byte boundaries.</p>
 <h3 id="-iree-global-opt-propagate-linalg-transpose"><code>-iree-global-opt-propagate-linalg-transpose</code><a class="headerlink" href="#-iree-global-opt-propagate-linalg-transpose" title="Permanent link">link</a></h3>
 <p><em>Propagates linalg.transpose through a restricted set of ops.</em></p>
 <h4 id="options_4">Options<a class="headerlink" href="#options_4" title="Permanent link">link</a></h4>

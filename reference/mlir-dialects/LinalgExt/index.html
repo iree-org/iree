@@ -6864,7 +6864,8 @@ type is wider (PT2E emits <code>i64</code> zero points for <code>i8</code> data)
 type, <code>PowerOf2Ceil(storage_width + 1)</code>, so <code>i8</code> data subtracts in <code>i16</code>
 whatever the zero point's own element type.</p>
 <p><code>quant_min</code>/<code>quant_max</code> optionally describe the inclusive range of the
-quantized input values. They do not clamp the input or change the
+quantized input values. Input values outside the range give undefined
+results. The attributes do not clamp the input or change the
 dequantization arithmetic. This preserves information that the storage
 type alone cannot express: an i8 tensor with range <code>[-8, 7]</code> uses a
 four-bit quantization grid, which a consumer can use to pack the values
