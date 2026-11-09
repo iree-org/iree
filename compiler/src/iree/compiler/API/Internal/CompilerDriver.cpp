@@ -616,6 +616,7 @@ Session::Session(GlobalInit &globalInit)
 
   // Register each options struct with the binder so we can manipulate
   // mnemonically via the API.
+  pluginManagerOptions.bindOptions(binder);
   pipelineOptions.bindOptions(binder);
   bindingOptions.bindOptions(binder);
   preprocessingOptions.bindOptions(binder);
