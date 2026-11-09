@@ -25,4 +25,3 @@ func.func @invalid_unsigned_padding_high(%a: tensor<1x2x1xf32>, %k: tensor<1x1x1
   } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xui64>) -> tensor<1x?x1xf32>
   return %r : tensor<1x?x1xf32>
 }
-
