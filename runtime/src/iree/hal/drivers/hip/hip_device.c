@@ -1382,10 +1382,11 @@ typedef enum iree_hal_hip_device_semaphore_buffer_operation_type_e {
       IREE_HAL_HIP_DEVICE_SEMAPHORE_OPERATION_ASYNC_DEALLOC,
 } iree_hal_hip_device_semaphore_buffer_operation_type_t;
 
+// Runs |callback| once the work submitted to |stream| so far completes.
 static iree_status_t iree_hal_hip_device_stream_add_cleanup(
-    iree_hal_hip_device_t* device, iree_hal_hip_cleanup_thread_t* thread,
-    iree_host_size_t device_ordinal, iree_hal_hip_cleanup_callback_t callback,
-    void* user_data) {
+    iree_hal_hip_device_t* device, hipStream_t stream,
+    iree_hal_hip_cleanup_thread_t* thread, iree_host_size_t device_ordinal,
+    iree_hal_hip_cleanup_callback_t callback, void* user_data) {
   iree_hal_hip_event_t* event = NULL;
   iree_status_t status = iree_hal_hip_event_pool_acquire(
       device->devices[device_ordinal].device_event_pool, 1, &event);
@@ -1393,8 +1394,7 @@ static iree_status_t iree_hal_hip_device_stream_add_cleanup(
   if (iree_status_is_ok(status)) {
     status = IREE_HIP_CALL_TO_STATUS(
         device->hip_symbols,
-        hipEventRecord(iree_hal_hip_event_handle(event),
-                       device->devices[device_ordinal].hip_dispatch_stream));
+        hipEventRecord(iree_hal_hip_event_handle(event), stream));
   }
 
   if (iree_status_is_ok(status)) {
@@ -1449,8 +1449,10 @@ iree_hal_hip_device_stream_signal_semaphores_and_add_cleanup(
   }
 
   if (iree_status_is_ok(status)) {
+    // On |stream|: the callback advances the signal semaphores from events
+    // recorded there.
     status = iree_hal_hip_device_stream_add_cleanup(
-        device, thread, device_ordinal, callback, user_data);
+        device, stream, thread, device_ordinal, callback, user_data);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -2280,7 +2282,8 @@ static iree_status_t iree_hal_hip_device_perform_queue_read_now(
         break;
       } else {
         status = iree_hal_hip_device_stream_add_cleanup(
-            device, device->cleanup_thread, device_ordinal,
+            device, device->devices[device_ordinal].hip_dispatch_stream,
+            device->cleanup_thread, device_ordinal,
             &iree_hal_hip_device_complete_queue_read_operation, data);
       }
     }
