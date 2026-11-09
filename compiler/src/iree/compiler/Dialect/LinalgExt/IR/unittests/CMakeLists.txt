@@ -20,9 +20,9 @@ iree_cc_test(
     MLIRIR
     MLIRParser
     gmock
+    gmock_main
     gtest
     iree::compiler::Dialect::LinalgExt::IR
-    iree::testing::compiler_gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

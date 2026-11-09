@@ -11,4 +11,3 @@ iree_setup_c_src_root(
 )
 
 add_subdirectory(iree/compiler)
-add_subdirectory(iree/testing)

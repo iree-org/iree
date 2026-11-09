@@ -23,10 +23,10 @@ iree_cc_test(
     MLIRLinalgDialect
     MLIRParser
     gmock
+    gmock_main
     gtest
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::GlobalOptimization::QuantizedContraction
-    iree::testing::compiler_gtest_main
 )
 
 iree_cc_test(
@@ -36,9 +36,9 @@ iree_cc_test(
     "QuantizationUtilsTest.cpp"
   DEPS
     gmock
+    gmock_main
     gtest
     iree::compiler::GlobalOptimization::QuantizationUtils
-    iree::testing::compiler_gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

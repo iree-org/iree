@@ -18,8 +18,8 @@ iree_compiler_cc_test(
     deps = [
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "//compiler/src/iree/compiler/GlobalOptimization:QuantizedContraction",
-        "//compiler/src/iree/testing:compiler_gtest_main",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:FuncDialect",
@@ -35,7 +35,7 @@ iree_compiler_cc_test(
     srcs = ["QuantizationUtilsTest.cpp"],
     deps = [
         "//compiler/src/iree/compiler/GlobalOptimization:QuantizationUtils",
-        "//compiler/src/iree/testing:compiler_gtest_main",
         "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
 )

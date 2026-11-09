@@ -28,10 +28,10 @@ iree_cc_test(
     "codegen_flags_test.cc"
   DEPS
     gmock
+    gmock_main
     gtest
     iree::compiler::API::Impl
     iree::compiler::bindings::c::headers
-    iree::testing::compiler_gtest_main
 )
 
 iree_cc_test(
