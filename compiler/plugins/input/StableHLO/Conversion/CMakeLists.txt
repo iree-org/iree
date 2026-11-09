@@ -98,6 +98,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRInferIntRangeCommon
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRLinalgUtils

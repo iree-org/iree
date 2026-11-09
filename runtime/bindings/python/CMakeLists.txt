@@ -98,6 +98,7 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::io::parameter_provider
   iree::io::scope_map
   iree::modules::hal
+  iree::modules::hal::debugging
   iree::modules::io::parameters
   iree::schemas::parameter_archive
   iree::io::file_handle

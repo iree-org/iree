@@ -172,11 +172,9 @@ VULKAN_SRCS = enforce_glob(
     [
         "argmax.mlir",
         "conv2d.mlir",
-        "fp_to_subbyte.mlir",
         "gather_like_ops.mlir",
         "index.mlir",
         "narrow_n_matmuls.mlir",
-        "small_float_arith.mlir",
         "softmax.mlir",
         "subbyte_to_fp.mlir",
     ],
@@ -187,10 +185,12 @@ VULKAN_SRCS = enforce_glob(
         # TODO(#23387): Enable the test once scaling_extf/truncf lowering is
         # supported.
         "fp4_f32_conversion.mlir",
+        "fp_to_subbyte.mlir",
         "large_linalg_matmul.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
+        "small_float_arith.mlir",
         "unpack.mlir",
     ],
 )
@@ -199,6 +199,23 @@ iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
     srcs = VULKAN_SRCS,
     driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+# Subbyte stores require a target with native 8-bit storage.
+iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv_vulkan_subbyte",
+    srcs = [
+        "fp_to_subbyte.mlir",
+        "small_float_arith.mlir",
+    ],
+    compiler_flags = ["--iree-vulkan-target=rdna3"],
+    driver = "vulkan",
+    tags = [
+        "requires-gpu-rdna3",
+        "vulkan_uses_vk_khr_8bit_storage",
+        "vulkan_uses_vk_khr_shader_float16_int8",
+    ],
     target_backend = "vulkan-spirv",
 )
 
@@ -346,6 +363,7 @@ test_suite(
         ":check_llvm-cpu_local-task",
         ":check_vmvx_local-task",
         ":check_vulkan-spirv_vulkan",
+        ":check_vulkan-spirv_vulkan_subbyte",
         ":check_winograd_llvm-cpu_local-task",
         ":check_winograd_vulkan-spirv_vulkan",
     ],

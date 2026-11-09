@@ -319,7 +319,6 @@ iree_check_single_backend_test_suite(
     "concatenate.mlir"
     "constant.mlir"
     "convert.mlir"
-    "convolution.mlir"
     "convolution_window.mlir"
     "cosine.mlir"
     "divide.mlir"
@@ -342,12 +341,9 @@ iree_check_single_backend_test_suite(
     "minimum.mlir"
     "multiply.mlir"
     "negate.mlir"
-    "pad.mlir"
-    "pad_dynamic.mlir"
     "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
-    "reduce_window.mlir"
     "remainder.mlir"
     "reshape.mlir"
     "reverse.mlir"
@@ -377,6 +373,26 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vulkan-spirv_vulkan_i64
+  SRCS
+    "convolution.mlir"
+    "pad.mlir"
+    "pad_dynamic.mlir"
+    "reduce_window.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32"
+    "--iree-vulkan-target=rdna3"
+  LABELS
+    "requires-gpu-rdna3"
+    "vulkan_uses_shader_int64"
 )
 
 iree_check_single_backend_test_suite(
