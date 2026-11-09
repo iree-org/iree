@@ -227,7 +227,7 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_vmvx_local-task_general_scatter",
     srcs = ["scatter_general.mlir"],
-    compiler_flags = ["--iree-input-promote-f16-to-f32"],
+    compiler_flags = ["--iree-input-demote-f64-to-f32"],
     driver = "local-task",
     target_backend = "vmvx",
 )
@@ -236,7 +236,7 @@ iree_check_single_backend_test_suite(
     name = "check_vmvx_local-task_index32_general_scatter",
     srcs = ["scatter_general.mlir"],
     compiler_flags = [
-        "--iree-input-promote-f16-to-f32",
+        "--iree-input-demote-f64-to-f32",
         "--iree-vm-target-index-bits=32",
     ],
     driver = "local-task",
@@ -334,6 +334,7 @@ iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv-bda_vulkan",
     srcs = [
         "add.mlir",
+        "scatter_dynamic.mlir",
     ],
     compiler_flags = [
         "--iree-input-demote-f64-to-f32",
