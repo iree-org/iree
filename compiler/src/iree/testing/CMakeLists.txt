@@ -12,7 +12,7 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    gtest_main
+    compiler_gtest_main
   SRCS
     "gtest_main.cc"
   DEPS

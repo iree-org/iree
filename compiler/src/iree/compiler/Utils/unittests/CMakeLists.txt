@@ -21,7 +21,7 @@ iree_cc_test(
     gmock
     gtest
     iree::compiler::Utils
-    iree::testing::gtest_main
+    iree::testing::compiler_gtest_main
 )
 
 iree_cc_test(
@@ -36,7 +36,7 @@ iree_cc_test(
     gmock
     gtest
     iree::compiler::Utils
-    iree::testing::gtest_main
+    iree::testing::compiler_gtest_main
 )
 
 iree_cc_test(
@@ -52,7 +52,7 @@ iree_cc_test(
     gtest
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
-    iree::testing::gtest_main
+    iree::testing::compiler_gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

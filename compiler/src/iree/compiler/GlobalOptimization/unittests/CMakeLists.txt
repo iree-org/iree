@@ -26,7 +26,7 @@ iree_cc_test(
     gtest
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::GlobalOptimization::QuantizedContraction
-    iree::testing::gtest_main
+    iree::testing::compiler_gtest_main
 )
 
 iree_cc_test(
@@ -38,7 +38,7 @@ iree_cc_test(
     gmock
     gtest
     iree::compiler::GlobalOptimization::QuantizationUtils
-    iree::testing::gtest_main
+    iree::testing::compiler_gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

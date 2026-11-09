@@ -29,7 +29,7 @@ iree_cc_test(
     gtest
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
-    iree::testing::gtest_main
+    iree::testing::compiler_gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

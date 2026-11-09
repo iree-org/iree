@@ -31,7 +31,7 @@ iree_cc_test(
     gtest
     iree::compiler::API::Impl
     iree::compiler::bindings::c::headers
-    iree::testing::gtest_main
+    iree::testing::compiler_gtest_main
 )
 
 iree_cc_test(

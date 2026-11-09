@@ -14,8 +14,10 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# Not named gtest_main: CMake drops the compiler/src/ prefix from target names,
+# so that would collide with //runtime/src/iree/testing:gtest_main.
 iree_runtime_cc_library(
-    name = "gtest_main",
+    name = "compiler_gtest_main",
     testonly = True,
     srcs = ["gtest_main.cc"],
     tags = ["keep_dep"],

@@ -20,7 +20,7 @@ iree_cc_test(
     gmock
     gtest
     iree::compiler::Dialect::Encoding::IR
-    iree::testing::gtest_main
+    iree::testing::compiler_gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
