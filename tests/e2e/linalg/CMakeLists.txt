@@ -136,17 +136,33 @@ iree_check_single_backend_test_suite(
   SRCS
     "argmax.mlir"
     "conv2d.mlir"
-    "fp_to_subbyte.mlir"
     "gather_like_ops.mlir"
     "index.mlir"
     "narrow_n_matmuls.mlir"
-    "small_float_arith.mlir"
     "softmax.mlir"
     "subbyte_to_fp.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
     "vulkan"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vulkan-spirv_vulkan_subbyte
+  SRCS
+    "fp_to_subbyte.mlir"
+    "small_float_arith.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-vulkan-target=rdna3"
+  LABELS
+    "requires-gpu-rdna3"
+    "vulkan_uses_vk_khr_8bit_storage"
+    "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
 iree_check_single_backend_test_suite(
