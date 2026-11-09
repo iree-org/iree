@@ -285,7 +285,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-promote-f16-to-f32"
+    "--iree-input-demote-f64-to-f32"
 )
 
 iree_check_single_backend_test_suite(
@@ -298,7 +298,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-promote-f16-to-f32"
+    "--iree-input-demote-f64-to-f32"
     "--iree-vm-target-index-bits=32"
 )
 
@@ -384,6 +384,7 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv-bda_vulkan
   SRCS
     "add.mlir"
+    "scatter_dynamic.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
