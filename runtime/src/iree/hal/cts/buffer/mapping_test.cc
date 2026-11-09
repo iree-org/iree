@@ -14,6 +14,53 @@ namespace iree::hal::cts {
 
 using ::testing::ContainerEq;
 
+// Access validation is independent of a driver or buffer allocation.
+TEST(BufferAccessTest, AllowedAndRequiredAccess) {
+  constexpr auto kNone = IREE_HAL_MEMORY_ACCESS_NONE;
+  constexpr auto kRead = IREE_HAL_MEMORY_ACCESS_READ;
+  constexpr auto kWrite = IREE_HAL_MEMORY_ACCESS_WRITE;
+  constexpr auto kReadWrite = kRead | kWrite;
+  constexpr auto kAny = IREE_HAL_MEMORY_ACCESS_ANY;
+  constexpr auto kDiscardWrite = IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE;
+  struct TestCase {
+    iree_hal_memory_access_t allowed;
+    iree_hal_memory_access_t required;
+    iree_status_code_t expected;
+  };
+  const TestCase cases[] = {
+      {kAny, kRead, IREE_STATUS_OK},
+      {kAny, kWrite, IREE_STATUS_OK},
+      {kAny, kReadWrite, IREE_STATUS_OK},
+      {kAny, kDiscardWrite, IREE_STATUS_OK},
+      {kAny, kNone, IREE_STATUS_OK},
+      {kAny, kAny, IREE_STATUS_OK},
+      {kNone, kAny, IREE_STATUS_OK},
+      {kRead, kAny, IREE_STATUS_OK},
+      {kWrite, kAny, IREE_STATUS_OK},
+      {kReadWrite, kAny, IREE_STATUS_OK},
+      {kRead, kRead, IREE_STATUS_OK},
+      {kWrite, kWrite, IREE_STATUS_OK},
+      {kReadWrite, kRead, IREE_STATUS_OK},
+      {kReadWrite, kWrite, IREE_STATUS_OK},
+      {kReadWrite, kReadWrite, IREE_STATUS_OK},
+      {kRead, kWrite, IREE_STATUS_PERMISSION_DENIED},
+      {kWrite, kRead, IREE_STATUS_PERMISSION_DENIED},
+      {kRead, kReadWrite, IREE_STATUS_PERMISSION_DENIED},
+      {kWrite, kReadWrite, IREE_STATUS_PERMISSION_DENIED},
+      {kNone, kRead, IREE_STATUS_PERMISSION_DENIED},
+      {kReadWrite, kDiscardWrite, IREE_STATUS_PERMISSION_DENIED},
+      {kReadWrite, kNone, IREE_STATUS_INVALID_ARGUMENT},
+  };
+  for (const auto& test_case : cases) {
+    SCOPED_TRACE(::testing::Message() << "allowed=" << test_case.allowed
+                                      << " required=" << test_case.required);
+    iree_status_t status =
+        iree_hal_buffer_validate_access(test_case.allowed, test_case.required);
+    EXPECT_EQ(iree_status_code(status), test_case.expected);
+    iree_status_ignore(status);
+  }
+}
+
 namespace {
 constexpr iree_device_size_t kDefaultAllocationSize = 1024;
 }  // namespace
