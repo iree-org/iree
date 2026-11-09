@@ -1406,7 +1406,7 @@ static iree_status_t iree_hal_vulkan_initialize_raw_pipeline_bda_metadata(
                 metadata->binding_requirements[i].minimum_alignment,
             .minimum_length = metadata->binding_requirements[i].minimum_length,
             .minimum_access_bytes = 1,
-    };
+        };
   }
   return iree_ok_status();
 }

@@ -212,9 +212,9 @@ static void iree_hal_vulkan_command_buffer_destroy(
 enum {
   IREE_HAL_VULKAN_COMMAND_BUFFER_INLINE_DESCRIPTOR_SET_CAPACITY = 8,
   IREE_HAL_VULKAN_COMMAND_BUFFER_INLINE_DESCRIPTOR_BINDING_CAPACITY = 16,
-  IREE_HAL_VULKAN_COMMAND_BUFFER_MINIMUM_COMMAND_BLOCK_CAPACITY = 64 *
-      (sizeof(iree_hal_vulkan_command_t) +
-       sizeof(iree_hal_vulkan_command_dispatch_t)),
+  IREE_HAL_VULKAN_COMMAND_BUFFER_MINIMUM_COMMAND_BLOCK_CAPACITY =
+      64 * (sizeof(iree_hal_vulkan_command_t) +
+            sizeof(iree_hal_vulkan_command_dispatch_t)),
 };
 
 static iree_host_size_t iree_hal_vulkan_command_buffer_payload_offset(void) {
@@ -2312,7 +2312,7 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
                     .query_pool = profile_marker->query_pool,
                     .start_query = query_index,
                     .end_query = query_index + 1,
-            };
+                };
             dispatch_profile_marker_ptr = &dispatch_profile_marker;
             dispatch_query_ordinal = dispatch_query_ordinal + 1;
           }

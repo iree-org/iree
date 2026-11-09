@@ -1318,7 +1318,7 @@ iree_hal_vulkan_queue_try_acquire_bda_publication_under_lock(
                 .block = block,
                 .offset = offset,
                 .length = length,
-        };
+            };
         queue->bda_publication_cache.cursor = block;
         *out_acquired = true;
         return iree_ok_status();
@@ -1816,7 +1816,7 @@ iree_hal_vulkan_queue_try_acquire_command_buffer_under_lock(
             (iree_hal_vulkan_queue_command_buffer_lease_t){
                 .block = block,
                 .slot = slot,
-        };
+            };
         submission->native_command_buffer = block->command_buffers[slot];
         queue->command_buffer_cache.cursor = block;
         *out_acquired = true;
@@ -2574,7 +2574,7 @@ static bool iree_hal_vulkan_queue_try_acquire_timestamp_queries_under_lock(
               .block = block,
               .first_query = first_query,
               .query_count = query_count,
-      };
+          };
       submission->profile.query_pool = block->pool;
       submission->profile.first_query = first_query;
       submission->profile.query_count = query_count;
@@ -4009,7 +4009,7 @@ static iree_status_t iree_hal_vulkan_queue_record_fill_native(
           {
               VK_NULL_HANDLE,
               VK_NULL_HANDLE,
-  };
+          };
   uint32_t descriptor_set_count = 0;
   if (needs_unaligned_fill) {
     descriptor_set_count =
@@ -4143,7 +4143,7 @@ static iree_status_t iree_hal_vulkan_queue_record_update_native(
           {
               VK_NULL_HANDLE,
               VK_NULL_HANDLE,
-  };
+          };
   uint32_t descriptor_set_count = 0;
   if (needs_unaligned_update) {
     descriptor_set_count =
@@ -4675,7 +4675,7 @@ static iree_status_t iree_hal_vulkan_queue_resolve_waits(
             .value = minimum_value,
             .stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
             .deviceIndex = 0,
-    };
+        };
     resolution->wait_info_count = resolution->wait_info_count + 1;
   }
   return iree_ok_status();
