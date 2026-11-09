@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
@@ -38,27 +39,57 @@ iree_lit_test_suite(
     ],
 )
 
-# Tests that need an LLVM target other than X86. The tags let builds whose LLVM
-# lacks the target exclude them, like build_and_test_byo_llvm.sh does.
+# The tests below compile for other architectures. That needs the LLVM target
+# and the ukernel bitcode of the architecture. CMake builds both only if
+# LLVM_TARGETS_TO_BUILD has the target, and only then adds the test. The Bazel
+# build always has these targets.
+
+iree_cmake_extra_content(
+    content = """
+iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_ARM_64 "arm_64")
+if(_IREE_COMPILER_TARGETING_ARM_64)
+""",
+    inline = True,
+)
 
 iree_lit_test_suite(
     name = "lit_aarch64",
     srcs = ["ukernel_inlining_aarch64.mlir"],
     cfg = "//compiler:lit.cfg.py",
-    tags = ["requires-llvm-target-aarch64"],
     tools = [
         "//tools:iree-compile",
         "@llvm-project//llvm:FileCheck",
     ],
 )
 
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
+)
+
+iree_cmake_extra_content(
+    content = """
+iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_RISCV_64 "riscv_64")
+if(_IREE_COMPILER_TARGETING_RISCV_64)
+""",
+    inline = True,
+)
+
 iree_lit_test_suite(
     name = "lit_riscv64",
     srcs = ["ukernel_inlining_riscv64.mlir"],
     cfg = "//compiler:lit.cfg.py",
-    tags = ["requires-llvm-target-riscv"],
     tools = [
         "//tools:iree-compile",
         "@llvm-project//llvm:FileCheck",
     ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )

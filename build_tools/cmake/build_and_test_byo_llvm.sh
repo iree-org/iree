@@ -47,7 +47,4 @@ echo "*********************** TESTING IREE **********************************"
 iree_build_dir="${IREE_BYOLLVM_BUILD_DIR}/iree"
 echo "Build Directory: ${iree_build_dir}"
 cmake --build "${iree_build_dir}" --target iree-test-deps
-# byo_llvm.sh builds LLVM with only the X86 target by default, so skip the
-# tests that need other LLVM targets.
-export IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE="^requires-llvm-target-aarch64$,^requires-llvm-target-riscv$"
 build_tools/cmake/ctest_all.sh "${iree_build_dir}"

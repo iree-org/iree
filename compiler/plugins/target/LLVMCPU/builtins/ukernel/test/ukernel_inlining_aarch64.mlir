@@ -20,9 +20,8 @@
 // RUN: cat %t/dotprod/*.linked.ll | FileCheck %s --check-prefix=LINKED
 // RUN: cat %t/dotprod/*.optimized.ll | FileCheck %s --check-prefix=OPT
 
-// Same checks as ukernel_inlining.mlir, on aarch64. This test needs the AArch64
-// LLVM target and is tagged requires-llvm-target-aarch64 in BUILD.bazel so that
-// builds without that target can skip it.
+// Same checks as ukernel_inlining.mlir, on aarch64. CMake only adds this test
+// if LLVM_TARGETS_TO_BUILD has AArch64, see BUILD.bazel.
 
 // LINKED: call {{.*}}@iree_uk_mmt4d(
 // OPT: define {{.*}}_dispatch_0

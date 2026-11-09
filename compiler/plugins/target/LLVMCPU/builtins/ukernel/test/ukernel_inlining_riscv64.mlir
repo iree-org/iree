@@ -10,9 +10,8 @@
 // RUN: cat %t/rvv/*.linked.ll | FileCheck %s --check-prefix=LINKED
 // RUN: cat %t/rvv/*.optimized.ll | FileCheck %s --check-prefix=OPT
 
-// Same checks as ukernel_inlining.mlir, on riscv64. This test needs the RISCV
-// LLVM target and is tagged requires-llvm-target-riscv in BUILD.bazel so that
-// builds without that target can skip it.
+// Same checks as ukernel_inlining.mlir, on riscv64. CMake only adds this test
+// if LLVM_TARGETS_TO_BUILD has RISCV, see BUILD.bazel.
 
 // LINKED: call {{.*}}@iree_uk_mmt4d(
 // OPT: define {{.*}}_dispatch_0

@@ -26,6 +26,9 @@ iree_lit_test_suite(
     iree-opt
 )
 
+iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_ARM_64 "arm_64")
+if(_IREE_COMPILER_TARGETING_ARM_64)
+
 iree_lit_test_suite(
   NAME
     lit_aarch64
@@ -34,9 +37,12 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-compile
-  LABELS
-    "requires-llvm-target-aarch64"
 )
+
+endif()
+
+iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_RISCV_64 "riscv_64")
+if(_IREE_COMPILER_TARGETING_RISCV_64)
 
 iree_lit_test_suite(
   NAME
@@ -46,8 +52,8 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-compile
-  LABELS
-    "requires-llvm-target-riscv"
 )
+
+endif()
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
