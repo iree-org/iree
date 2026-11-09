@@ -1,6 +1,10 @@
 ### Components built ###
 
 set(LLVM_ENABLE_PROJECTS "clang;clang-tools-extra;lld" CACHE STRING "")
+# ClangIR is on by default since llvm/llvm-project#221291 and pulls MLIR into
+# this build. MLIR is built separately against this install (see byo_llvm.sh
+# build_mlir), so keep ClangIR off.
+set(CLANG_ENABLE_CIR OFF CACHE BOOL "")
 
 ### Target architectures ###
 
