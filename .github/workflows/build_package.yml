@@ -355,13 +355,33 @@ jobs:
           path: ./bindist/*
           retention-days: 5
 
-      # Attest the same files that are uploaded as release assets below, so
-      # users can verify them with `gh attestation verify`.
+      # Attest the ./bindist files that are uploaded as release assets below,
+      # so users can verify them with `gh attestation verify`.
       - name: Attest Release Assets
+        id: attest
         if: github.event.inputs.release_id != ''
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: ./bindist/iree*.*
+
+      # Publish the attestation as a Sigstore bundle next to the files it
+      # covers, so that it can be verified offline with
+      # `gh attestation verify --bundle` and is found by the OpenSSF Scorecard
+      # Signed-Releases check, which only looks at release assets. The Linux
+      # container builds create ./bindist as root, so the bundle is staged in
+      # the runner's temp directory instead.
+      - name: Stage Attestation Bundle
+        if: steps.attest.outcome == 'success'
+        shell: bash
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+          PACKAGE_VERSION: ${{ github.event.inputs.package_version }}
+          BUILD_FAMILY: ${{ matrix.build-family }}
+          BUILD_PACKAGE: ${{ matrix.build-package }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/attestation"
+          cp "${BUNDLE_PATH}" \
+            "${RUNNER_TEMP}/attestation/iree-${PACKAGE_VERSION}-${BUILD_FAMILY}-${BUILD_PACKAGE}.sigstore.json"
 
       # TODO: Upload the tar.bz2 files too when ready
       - name: Upload Release Assets
@@ -372,8 +392,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
           release_id: ${{ github.event.inputs.release_id }}
-          # Only upload iree artifacts.
-          assets_path: ./bindist/iree*.*
+          # Only upload iree artifacts and their attestation bundle.
+          assets_path: |
+            ./bindist/iree*.*
+            ${{ runner.temp }}/attestation/*.sigstore.json
 
   validate_and_publish:
     name: "Trigger validate and publish release"
