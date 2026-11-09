@@ -35,8 +35,8 @@ enum class ResourceUsageBitfield : uint32_t {
   GlobalStorage = 1u << 12,
 
   Unknown = Indirect | External | Mutated | Constant | TransferRead |
-      TransferWrite | StagingRead | StagingWrite | DispatchRead |
-      DispatchWrite | GlobalRead | GlobalWrite | GlobalStorage,
+            TransferWrite | StagingRead | StagingWrite | DispatchRead |
+            DispatchWrite | GlobalRead | GlobalWrite | GlobalStorage,
 };
 
 inline ResourceUsageBitfield operator|(ResourceUsageBitfield lhs,
