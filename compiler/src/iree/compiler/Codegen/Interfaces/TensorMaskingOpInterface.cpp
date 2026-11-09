@@ -275,9 +275,9 @@ createAttentionPaddingValues(OpBuilder &builder,
   return values;
 }
 
-// User masks add a bias, but padding positions must be excluded even when
-// their zero-filled keys produce NaN with a non-finite query. Mask only the
-// synthetic key positions in the score region, after the original region.
+// Padding positions must be excluded even when their zero-filled keys produce
+// NaN with a non-finite query. Mask only the synthetic key positions in the
+// score region, after the original region.
 static void maskPaddedAttentionScores(OpBuilder &builder,
                                       IREE::LinalgExt::OnlineAttentionOp op,
                                       ArrayRef<OpFoldResult> bounds) {
@@ -337,9 +337,11 @@ struct OnlineAttentionOpInterface final
     // FP8 regions precede scaling, so they cannot exclude padding for all
     // scales (in particular zero). This optional padding must leave them
     // intact.
+    bool needsScoreMask =
+        onlineAttentionOp.getAdditiveMask() || !onlineAttentionOp.getMask();
     auto queryElementType = dyn_cast<FloatType>(
         getElementTypeOrSelf(onlineAttentionOp.getQuery().getType()));
-    if (onlineAttentionOp.getAdditiveMask() &&
+    if (needsScoreMask &&
         (!queryElementType || queryElementType.getWidth() <= 8)) {
       return failure();
     }
@@ -347,13 +349,7 @@ struct OnlineAttentionOpInterface final
     // Check if padding is actually needed. If all dimensions are already
     // aligned to the pad multiples, we can skip padding entirely.
     auto tilingOp = cast<TilingInterface>(op);
-    bool needsPadding = isPaddingNeeded(builder, tilingOp, padMultiples);
-    if (needsPadding && !onlineAttentionOp.getMask()) {
-      op->emitError(
-          "Padding OnlineAttention without existing mask is not yet supported");
-      return failure();
-    }
-    if (!needsPadding) {
+    if (!isPaddingNeeded(builder, tilingOp, padMultiples)) {
       return failure();
     }
     SmallVector<Attribute> paddingValues =
@@ -389,7 +385,7 @@ struct OnlineAttentionOpInterface final
                                          maskNeutralKind, bounds,
                                          *paddedOp.getMaskMap());
     }
-    if (paddedOp.getAdditiveMask()) {
+    if (needsScoreMask) {
       maskPaddedAttentionScores(builder, paddedOp, bounds);
     }
     return result->replacements;
