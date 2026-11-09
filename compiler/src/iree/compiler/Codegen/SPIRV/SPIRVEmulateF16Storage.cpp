@@ -46,16 +46,15 @@ static bool hasHalfValues(Operation *function) {
       .wasInterrupted();
 }
 
-static bool hasNarrowStorage(Operation *function) {
-  auto isNarrowMemref = [](Type type) {
+static bool has16BitStorage(Operation *function) {
+  auto is16BitMemref = [](Type type) {
     auto memref = dyn_cast<MemRefType>(type);
-    return memref && memref.getElementType().isSignlessInteger() &&
-           memref.getElementTypeBitWidth() < 32;
+    return memref && memref.getElementType().isSignlessInteger(16);
   };
   return function
-      ->walk([isNarrowMemref](Operation *op) {
-        if (llvm::any_of(op->getOperandTypes(), isNarrowMemref) ||
-            llvm::any_of(op->getResultTypes(), isNarrowMemref)) {
+      ->walk([is16BitMemref](Operation *op) {
+        if (llvm::any_of(op->getOperandTypes(), is16BitMemref) ||
+            llvm::any_of(op->getResultTypes(), is16BitMemref)) {
           return WalkResult::interrupt();
         }
         return WalkResult::advance();
@@ -118,8 +117,10 @@ struct SPIRVEmulateF16StoragePass final
     bool emulateHalf = hasHalfValues(function);
     bool nativeInteger = IREE::GPU::bitEnumContainsAll(
         compute, IREE::GPU::ComputeBitwidths::Int16);
+    // Byte storage alone needs no half emulation. Its subbyte atomic updates
+    // are widened by SPIR-V conversion, not by narrow-type emulation again.
     if (!emulateHalf &&
-        ((nativeInteger && nativeStorage) || !hasNarrowStorage(function))) {
+        ((nativeInteger && nativeStorage) || !has16BitStorage(function))) {
       return;
     }
     OpPassManager pipeline = buildHalfEmulationPipeline(
