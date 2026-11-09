@@ -145,7 +145,8 @@ static Operation *getLastAnchorOpBeforeRootOp(ArrayRef<Operation *> computeOps,
 /// Returns whether a slice uses the same producer value across every iteration
 /// of the surrounding reduction loops.
 /// Uses a conservative dependency analysis that may reject slices that are
-/// actually invariant.
+/// actually invariant, e.g. slices that depend on operations containing
+/// regions.
 static bool isInvariantReductionSlice(tensor::ExtractSliceOp slice,
                                       Operation *rootOp) {
   scf::ForOp outermostLoop;
