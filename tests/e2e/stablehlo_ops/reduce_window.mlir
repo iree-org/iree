@@ -238,7 +238,24 @@ func.func @reduce_window_dynamic_batch_max_2x4x3x1xf32() {
   return
 }
 
-// Check the sign bit: floating-point equality cannot distinguish +0 from -0.
+// Vulkan's relaxed default may discard the sign of arithmetic zero results.
+// Ignore only that bit on Vulkan; CPU and VMVX still check the exact sign.
+func.func private @check_scan_zero(%bits: tensor<4xi32>, %expected: tensor<4xi32>) {
+  %device_index = arith.constant 0 : index
+  %device = hal.devices.get %device_index : !hal.device
+  %ok, %is_vulkan = hal.device.query<%device : !hal.device> key("hal.device.id"::"vulkan") : i1, i1
+  check.expect_true(%ok) : i1
+  %false = arith.constant false
+  %relaxed = arith.select %ok, %is_vulkan, %false : i1
+  %absolute_mask = arith.constant dense<2147483647> : tensor<4xi32>
+  %exact_mask = arith.constant dense<-1> : tensor<4xi32>
+  %mask = arith.select %relaxed, %absolute_mask, %exact_mask : tensor<4xi32>
+  %masked_bits = stablehlo.and %bits, %mask : tensor<4xi32>
+  %masked_expected = stablehlo.and %expected, %mask : tensor<4xi32>
+  check.expect_eq(%masked_bits, %masked_expected) : tensor<4xi32>
+  return
+}
+
 func.func @scan_prefix_positive_zero_init() {
   %input = util.unfoldable_constant dense<-0.0> : tensor<4xf32>
   %init = stablehlo.constant dense<0.0> : tensor<f32>
@@ -250,7 +267,8 @@ func.func @scan_prefix_positive_zero_init() {
   %original_bits = stablehlo.bitcast_convert %input : (tensor<4xf32>) -> tensor<4xi32>
   check.expect_eq_const(%original_bits, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
   %bits = stablehlo.bitcast_convert %result : (tensor<4xf32>) -> tensor<4xi32>
-  check.expect_eq_const(%bits, dense<0> : tensor<4xi32>) : tensor<4xi32>
+  %expected_bits = arith.constant dense<0> : tensor<4xi32>
+  call @check_scan_zero(%bits, %expected_bits) : (tensor<4xi32>, tensor<4xi32>) -> ()
   return
 }
 
@@ -265,7 +283,8 @@ func.func @scan_prefix_negative_zero_init() {
   %original_bits = stablehlo.bitcast_convert %input : (tensor<4xf32>) -> tensor<4xi32>
   check.expect_eq_const(%original_bits, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
   %bits = stablehlo.bitcast_convert %result : (tensor<4xf32>) -> tensor<4xi32>
-  check.expect_eq_const(%bits, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  %expected_bits = arith.constant dense<-2147483648> : tensor<4xi32>
+  call @check_scan_zero(%bits, %expected_bits) : (tensor<4xi32>, tensor<4xi32>) -> ()
   return
 }
 
@@ -280,7 +299,8 @@ func.func @scan_suffix_positive_zero_init() {
   %original_bits = stablehlo.bitcast_convert %input : (tensor<4xf32>) -> tensor<4xi32>
   check.expect_eq_const(%original_bits, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
   %bits = stablehlo.bitcast_convert %result : (tensor<4xf32>) -> tensor<4xi32>
-  check.expect_eq_const(%bits, dense<0> : tensor<4xi32>) : tensor<4xi32>
+  %expected_bits = arith.constant dense<0> : tensor<4xi32>
+  call @check_scan_zero(%bits, %expected_bits) : (tensor<4xi32>, tensor<4xi32>) -> ()
   return
 }
 
@@ -295,7 +315,8 @@ func.func @scan_suffix_negative_zero_init() {
   %original_bits = stablehlo.bitcast_convert %input : (tensor<4xf32>) -> tensor<4xi32>
   check.expect_eq_const(%original_bits, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
   %bits = stablehlo.bitcast_convert %result : (tensor<4xf32>) -> tensor<4xi32>
-  check.expect_eq_const(%bits, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  %expected_bits = arith.constant dense<-2147483648> : tensor<4xi32>
+  call @check_scan_zero(%bits, %expected_bits) : (tensor<4xi32>, tensor<4xi32>) -> ()
   return
 }
 
@@ -316,7 +337,8 @@ func.func @dynamic_scan_prefix_positive_zero_init() {
   check.expect_eq_const(%original_fixed, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
   %bits = stablehlo.bitcast_convert %result : (tensor<?xf32>) -> tensor<?xi32>
   %fixed = tensor.cast %bits : tensor<?xi32> to tensor<4xi32>
-  check.expect_eq_const(%fixed, dense<0> : tensor<4xi32>) : tensor<4xi32>
+  %expected_bits = arith.constant dense<0> : tensor<4xi32>
+  call @check_scan_zero(%fixed, %expected_bits) : (tensor<4xi32>, tensor<4xi32>) -> ()
   return
 }
 
@@ -337,7 +359,8 @@ func.func @dynamic_scan_prefix_negative_zero_init() {
   check.expect_eq_const(%original_fixed, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
   %bits = stablehlo.bitcast_convert %result : (tensor<?xf32>) -> tensor<?xi32>
   %fixed = tensor.cast %bits : tensor<?xi32> to tensor<4xi32>
-  check.expect_eq_const(%fixed, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  %expected_bits = arith.constant dense<-2147483648> : tensor<4xi32>
+  call @check_scan_zero(%fixed, %expected_bits) : (tensor<4xi32>, tensor<4xi32>) -> ()
   return
 }
 
@@ -358,7 +381,8 @@ func.func @dynamic_scan_suffix_positive_zero_init() {
   check.expect_eq_const(%original_fixed, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
   %bits = stablehlo.bitcast_convert %result : (tensor<?xf32>) -> tensor<?xi32>
   %fixed = tensor.cast %bits : tensor<?xi32> to tensor<4xi32>
-  check.expect_eq_const(%fixed, dense<0> : tensor<4xi32>) : tensor<4xi32>
+  %expected_bits = arith.constant dense<0> : tensor<4xi32>
+  call @check_scan_zero(%fixed, %expected_bits) : (tensor<4xi32>, tensor<4xi32>) -> ()
   return
 }
 
@@ -379,7 +403,8 @@ func.func @dynamic_scan_suffix_negative_zero_init() {
   check.expect_eq_const(%original_fixed, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
   %bits = stablehlo.bitcast_convert %result : (tensor<?xf32>) -> tensor<?xi32>
   %fixed = tensor.cast %bits : tensor<?xi32> to tensor<4xi32>
-  check.expect_eq_const(%fixed, dense<-2147483648> : tensor<4xi32>) : tensor<4xi32>
+  %expected_bits = arith.constant dense<-2147483648> : tensor<4xi32>
+  call @check_scan_zero(%fixed, %expected_bits) : (tensor<4xi32>, tensor<4xi32>) -> ()
   return
 }
 
