@@ -1145,3 +1145,102 @@ util.func public @cloneableBarrierDeeplyNested(%arg0: !stream.resource<external>
 
   util.return %result : !stream.resource<external>
 }
+
+// -----
+
+// Tests scf.for loop whose init value is a barrier also used by the loop
+// result's consumer. The barrier must not join the consumer's partition, which
+// would then feed its own input through the loop.
+
+util.global private @device_a : !hal.device
+
+// CHECK-LABEL: @scfForBarrierUsedByLoopAndConsumer
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>)
+util.func public @scfForBarrierUsedByLoopAndConsumer(%arg0: !stream.resource<external>) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+
+  // CHECK: %[[PRODUCED:.+]], %[[TIMEPOINT:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE:.+]]: !stream.resource<external>{%c128})
+  // CHECK-NEXT: %[[PRODUCER:.+]] = stream.async.dispatch @ex::@producer[%c1](%[[ARG0_CAPTURE]][{{.+}}])
+  %producer = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@producer[%c1](%arg0[%c0 to %c128 for %c128]) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128}
+  // CHECK-NEXT: stream.yield %[[PRODUCER]]
+  // CHECK-NEXT: } => !stream.timepoint
+  %barrier = stream.async.barrier on(#hal.device.affinity<@device_a>) %producer : !stream.resource<external>{%c128}
+  // CHECK: %[[READY:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[PRODUCED]]
+  // CHECK: %[[LOOP:.+]] = scf.for {{.+}} iter_args(%[[ITER:.+]] = %[[READY]])
+  %loop = scf.for %i = %c0 to %c4 step %c1 iter_args(%iter = %barrier) -> (!stream.resource<external>) {
+    // CHECK: stream.async.execute
+    // CHECK-SAME: on(#hal.device.affinity<@device_a>)
+    // CHECK-SAME: with(%[[ITER]] as %[[ITER_CAPTURE:.+]]: !stream.resource<external>{%c128})
+    // CHECK-NEXT: stream.async.dispatch @ex::@body[%c1](%[[ITER_CAPTURE]][{{.+}}])
+    %body = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@body[%c1](%iter[%c0 to %c128 for %c128]) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128}
+    scf.yield %body : !stream.resource<external>
+  }
+
+  // CHECK: %[[RESULT:.+]], %[[RESULT_TIMEPOINT:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: await(%[[TIMEPOINT]])
+  // CHECK-SAME: with(%[[PRODUCED]] as %[[PRODUCED_CAPTURE:.+]]: !stream.resource<external>{%c128},
+  // CHECK-SAME:      %[[LOOP]] as %[[LOOP_CAPTURE:.+]]: !stream.resource<external>{%c128})
+  // CHECK-NEXT: %[[CONSUMER:.+]] = stream.async.dispatch @ex::@consumer[%c1](%[[PRODUCED_CAPTURE]][{{.+}}], %[[LOOP_CAPTURE]][{{.+}}])
+  %consumer = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@consumer[%c1](%barrier[%c0 to %c128 for %c128], %loop[%c0 to %c128 for %c128]) : (!stream.resource<external>{%c128}, !stream.resource<external>{%c128}) -> !stream.resource<external>{%c128}
+  // CHECK-NEXT: stream.yield %[[CONSUMER]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK-NEXT: %[[DONE:.+]] = stream.timepoint.await %[[RESULT_TIMEPOINT]] => %[[RESULT]]
+  // CHECK-NEXT: util.return %[[DONE]]
+  util.return %consumer : !stream.resource<external>
+}
+
+// -----
+
+// Tests scf.for loop whose init value is a dispatch result also used by the
+// loop result's consumer. The dispatch must not join the consumer's partition.
+
+util.global private @device_a : !hal.device
+
+// CHECK-LABEL: @scfForProducerUsedByLoopAndConsumer
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>)
+util.func public @scfForProducerUsedByLoopAndConsumer(%arg0: !stream.resource<external>) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c4 = arith.constant 4 : index
+  %c128 = arith.constant 128 : index
+
+  // CHECK: %[[PRODUCED:.+]], %[[TIMEPOINT:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE:.+]]: !stream.resource<external>{%c128})
+  // CHECK-NEXT: %[[PRODUCER:.+]] = stream.async.dispatch @ex::@producer[%c1](%[[ARG0_CAPTURE]][{{.+}}])
+  %producer = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@producer[%c1](%arg0[%c0 to %c128 for %c128]) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128}
+  // CHECK-NEXT: stream.yield %[[PRODUCER]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK: %[[READY:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[PRODUCED]]
+  // CHECK: %[[LOOP:.+]] = scf.for {{.+}} iter_args(%[[ITER:.+]] = %[[READY]])
+  %loop = scf.for %i = %c0 to %c4 step %c1 iter_args(%iter = %producer) -> (!stream.resource<external>) {
+    // CHECK: stream.async.execute
+    // CHECK-SAME: on(#hal.device.affinity<@device_a>)
+    // CHECK-SAME: with(%[[ITER]] as %[[ITER_CAPTURE:.+]]: !stream.resource<external>{%c128})
+    // CHECK-NEXT: stream.async.dispatch @ex::@body[%c1](%[[ITER_CAPTURE]][{{.+}}])
+    %body = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@body[%c1](%iter[%c0 to %c128 for %c128]) : (!stream.resource<external>{%c128}) -> !stream.resource<external>{%c128}
+    scf.yield %body : !stream.resource<external>
+  }
+
+  // CHECK: %[[RESULT:.+]], %[[RESULT_TIMEPOINT:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: await(%[[TIMEPOINT]])
+  // CHECK-SAME: with(%[[PRODUCED]] as %[[PRODUCED_CAPTURE:.+]]: !stream.resource<external>{%c128},
+  // CHECK-SAME:      %[[LOOP]] as %[[LOOP_CAPTURE:.+]]: !stream.resource<external>{%c128})
+  // CHECK-NEXT: %[[CONSUMER:.+]] = stream.async.dispatch @ex::@consumer[%c1](%[[PRODUCED_CAPTURE]][{{.+}}], %[[LOOP_CAPTURE]][{{.+}}])
+  %consumer = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@consumer[%c1](%producer[%c0 to %c128 for %c128], %loop[%c0 to %c128 for %c128]) : (!stream.resource<external>{%c128}, !stream.resource<external>{%c128}) -> !stream.resource<external>{%c128}
+  // CHECK-NEXT: stream.yield %[[CONSUMER]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK-NEXT: %[[DONE:.+]] = stream.timepoint.await %[[RESULT_TIMEPOINT]] => %[[RESULT]]
+  // CHECK-NEXT: util.return %[[DONE]]
+  util.return %consumer : !stream.resource<external>
+}
