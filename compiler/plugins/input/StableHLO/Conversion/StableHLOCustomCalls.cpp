@@ -4,8 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Implements logic for lowering CHLO ops to StableHLO and Shape dialect ops,
-// taking care of CHLO's broadcasting semantics
+// Lowers supported StableHLO custom calls and preserves runtime shape
+// assertions. Assertion analysis and IR materialization have separate mutation
+// boundaries.
 
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
