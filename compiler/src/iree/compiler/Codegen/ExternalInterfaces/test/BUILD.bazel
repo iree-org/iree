@@ -19,6 +19,7 @@ iree_lit_test_suite(
         [
             "invalid.mlir",
             "materialize_encoding_invalid.mlir",
+            "materialize_encoding_scalar.mlir",
             "roundtrip.mlir",
         ],
         include = ["*.mlir"],
