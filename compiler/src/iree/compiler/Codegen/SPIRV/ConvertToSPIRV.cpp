@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <tuple>
 
+#include "iree/compiler/Codegen/Common/WidenNarrowIntegers.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
@@ -38,9 +39,11 @@
 #include "mlir/Conversion/TensorToSPIRV/TensorToSPIRV.h"
 #include "mlir/Conversion/UBToSPIRV/UBToSPIRV.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
@@ -745,7 +748,8 @@ public:
   explicit ConvertToSPIRVPass(unsigned indexBits) : indexBits(indexBits) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<spirv::SPIRVDialect>();
+    registry.insert<arith::ArithDialect, math::MathDialect,
+                    vector::VectorDialect, spirv::SPIRVDialect>();
   }
 
   LogicalResult initializeOptions(
@@ -892,6 +896,25 @@ void ConvertToSPIRVPass::runOnOperation() {
   options.use64bitIndex = use64bitIndex;
 
   SPIRVTypeConverter typeConverter(targetAttr, options);
+
+  // Packed loads preserve only the logical low bits. Extend operands before
+  // widening operations whose result depends on the logical integer width.
+  {
+    auto isEmulated = [&typeConverter](Type type) {
+      auto integer = dyn_cast<IntegerType>(getElementTypeOrSelf(type));
+      if (!integer || integer.getWidth() == 1 || integer.getWidth() >= 32) {
+        return false;
+      }
+      Type converted = typeConverter.convertType(integer);
+      return converted && converted != integer;
+    };
+    RewritePatternSet narrowPatterns(context);
+    arith::populateCeilFloorDivExpandOpsPatterns(narrowPatterns);
+    populateWidenNarrowIntegerHighBitOpPatterns(narrowPatterns, 32, isEmulated);
+    if (failed(applyPatternsGreedily(moduleOp, std::move(narrowPatterns)))) {
+      return signalPassFailure();
+    }
+  }
 
   // Additionally pull in conversion rules for GPU subgroup MMA ops.
   populateMMAToSPIRVCoopMatrixTypeConversion(typeConverter);
