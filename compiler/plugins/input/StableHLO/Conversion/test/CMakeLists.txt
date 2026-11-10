@@ -35,7 +35,6 @@ iree_lit_test_suite(
     "legalize_shape_computations.mlir"
     "lower_bounds_pipeline.mlir"
     "lower_bounds_tuple.mlir"
-    "public_reducer_pipeline.mlir"
     "scatter_region_captures.mlir"
     "shape_assertion_dispatch.mlir"
     "shape_assertion_pipeline.mlir"
@@ -52,6 +51,7 @@ iree_lit_test_suite(
     FileCheck
     iree-compile
     iree-opt
+    split-file
 )
 
 iree_cc_test(
