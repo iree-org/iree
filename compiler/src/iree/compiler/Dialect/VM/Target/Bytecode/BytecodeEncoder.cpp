@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Diagnostics.h"
 
@@ -486,6 +487,32 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
   result.blockCount = funcOp.getBlocks().size();
   result.i32RegisterCount = registerAllocation.getMaxI32RegisterOrdinal() + 1;
   result.refRegisterCount = registerAllocation.getMaxRefRegisterOrdinal() + 1;
+
+  // The descriptor stores the block count as an int16 and the runtime verifier
+  // rounds each register bank up to a power of two before comparing it with
+  // the maximum (isa.h: IREE_VM_ISA_I32_REGISTER_COUNT and
+  // IREE_VM_ISA_REF_REGISTER_COUNT). Fail here instead of producing a module
+  // that the runtime refuses to load.
+  if (result.blockCount > INT16_MAX) {
+    funcOp.emitError() << "function has " << result.blockCount
+                       << " blocks; VM currently restricts functions to "
+                       << INT16_MAX << " blocks";
+    return std::nullopt;
+  }
+  if (llvm::PowerOf2Ceil(result.i32RegisterCount) > 0x7FFFu) {
+    funcOp.emitError() << "function needs " << result.i32RegisterCount
+                       << " i32 registers; VM currently restricts functions to "
+                       << 0x4000u << " (the count is rounded up to a power of "
+                       << "two and must not exceed 0x7FFF)";
+    return std::nullopt;
+  }
+  if (llvm::PowerOf2Ceil(result.refRegisterCount) > 0x3FFFu) {
+    funcOp.emitError() << "function needs " << result.refRegisterCount
+                       << " ref registers; VM currently restricts functions to "
+                       << 0x2000u << " (the count is rounded up to a power of "
+                       << "two and must not exceed 0x3FFF)";
+    return std::nullopt;
+  }
   return result;
 }
 
