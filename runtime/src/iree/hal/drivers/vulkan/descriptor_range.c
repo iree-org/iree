@@ -49,23 +49,22 @@ iree_status_t iree_hal_vulkan_resolve_descriptor_range(
   const iree_device_size_t owned_end =
       logical_end == view_length ? owned_length : logical_end;
   if (physical_end > owned_end) {
-    const uint64_t needed = (uint64_t)(physical_end - offset);
-    const uint64_t owned =
-        (uint64_t)(owned_end > offset ? owned_end - offset : 0);
     if (logical_end != view_length) {
       return iree_make_status(
           IREE_STATUS_OUT_OF_RANGE,
           "binding at offset %" PRIu64 " needs %" PRIu64 " bytes of %" PRIu64
           "-byte access units but owns %" PRIu64
           " bytes; declare the padding it reserves in the binding range",
-          (uint64_t)offset, needed, (uint64_t)unit, owned);
+          (uint64_t)offset, (uint64_t)(physical_end - offset), (uint64_t)unit,
+          (uint64_t)(owned_end > offset ? owned_end - offset : 0));
     }
     return iree_make_status(
         IREE_STATUS_OUT_OF_RANGE,
         "binding at offset %" PRIu64 " needs %" PRIu64 " bytes of %" PRIu64
         "-byte access units but its buffer provides %" PRIu64
         " bytes; bind a whole allocation or a view covering the access unit",
-        (uint64_t)offset, needed, (uint64_t)unit, owned);
+        (uint64_t)offset, (uint64_t)(physical_end - offset), (uint64_t)unit,
+        (uint64_t)(owned_end > offset ? owned_end - offset : 0));
   }
   iree_device_size_t physical_length = physical_end - offset;
   if (physical_length > max_range) {
