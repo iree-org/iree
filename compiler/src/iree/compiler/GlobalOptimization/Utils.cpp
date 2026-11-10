@@ -227,16 +227,18 @@ getUsesOfSameData(Value value, const SymbolUserMap &symbolUsers,
 }
 
 /// Returns the attribute holding `value` when it is a constant or a load of an
-/// immutable global, or null otherwise. For a global this is its initial
-/// value, which may be a parameter reference rather than data.
-static Attribute getConstantAttr(Value value,
+/// immutable global that only loads use, or null otherwise. For a global this
+/// is its initial value, which may be a parameter reference rather than data.
+static Attribute getConstantAttr(Value value, const SymbolUserMap &symbolUsers,
                                  SymbolTableCollection &symbolTables) {
   Attribute attr;
   if (matchPattern(value, m_Constant(&attr))) {
     return attr;
   }
   IREE::Util::GlobalOpInterface globalOp = getLoadedGlobal(value, symbolTables);
-  if (!globalOp || globalOp.isGlobalMutable()) {
+  if (!globalOp || globalOp.isGlobalMutable() ||
+      !llvm::all_of(symbolUsers.getUsers(globalOp),
+                    llvm::IsaPred<IREE::Util::GlobalLoadOpInterface>)) {
     return {};
   }
   return globalOp.getGlobalInitialValue();
@@ -276,8 +278,10 @@ static std::optional<SmallVector<APSInt>> getIntegerValues(Attribute attr,
 
 std::optional<SmallVector<APSInt>>
 getConstantIntegerValues(Value value, bool isUnsigned,
+                         const SymbolUserMap &symbolUsers,
                          SymbolTableCollection &symbolTables) {
-  Attribute attr = getConstantAttr(getReshapeSource(value), symbolTables);
+  Attribute attr =
+      getConstantAttr(getReshapeSource(value), symbolUsers, symbolTables);
   if (!attr) {
     return std::nullopt;
   }
@@ -286,13 +290,13 @@ getConstantIntegerValues(Value value, bool isUnsigned,
 
 bool isComputedFromInlineData(
     const IREE::Util::ConstExprAnalysis::ConstValueInfo &info,
-    SymbolTableCollection &symbolTables) {
+    const SymbolUserMap &symbolUsers, SymbolTableCollection &symbolTables) {
   if (!info.isConstExpr()) {
     return false;
   }
   return llvm::all_of(info.roots, [&](Value root) {
     return isa_and_present<ElementsAttr, IntegerAttr, FloatAttr>(
-        getConstantAttr(root, symbolTables));
+        getConstantAttr(root, symbolUsers, symbolTables));
   });
 }
 

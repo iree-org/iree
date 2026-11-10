@@ -79,17 +79,20 @@ getUsesOfSameData(Value value, const SymbolUserMap &symbolUsers,
                   SymbolTableCollection &symbolTables);
 
 /// Returns the integers `value` holds, read as unsigned if `isUnsigned`, when
-/// it is a constant or a load of an immutable global, possibly through
-/// reshapes, or nullopt otherwise. A splat gives a single value.
+/// it is a constant or a load of an immutable global that only loads use,
+/// possibly through reshapes, or nullopt otherwise. A splat gives a single
+/// value.
 std::optional<SmallVector<APSInt>>
 getConstantIntegerValues(Value value, bool isUnsigned,
+                         const SymbolUserMap &symbolUsers,
                          SymbolTableCollection &symbolTables);
 
 /// Returns true when `info` is a constant expression whose roots are inline
-/// constants or loads of immutable globals with an inline initial value.
+/// constants or loads of immutable globals that only loads use and that have
+/// an inline initial value.
 bool isComputedFromInlineData(
     const IREE::Util::ConstExprAnalysis::ConstValueInfo &info,
-    SymbolTableCollection &symbolTables);
+    const SymbolUserMap &symbolUsers, SymbolTableCollection &symbolTables);
 
 } // namespace mlir::iree_compiler::GlobalOptimization
 

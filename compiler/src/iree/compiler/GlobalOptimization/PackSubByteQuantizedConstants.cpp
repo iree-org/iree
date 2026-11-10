@@ -56,7 +56,8 @@ static bool allValuesInRange(ArrayRef<APSInt> values, QuantMinMax range) {
 /// Returns the narrowest bit width the input of `op` can be packed into, or
 /// nullopt if its type, shape, range or zero point rules out packing.
 static std::optional<unsigned>
-getPackedBitWidth(DequantizeAffineOp op, SymbolTableCollection &symbolTables) {
+getPackedBitWidth(DequantizeAffineOp op, const SymbolUserMap &symbolUsers,
+                  SymbolTableCollection &symbolTables) {
   // Quantized values arrive in i8; wider storage would need a truncation
   // before packing.
   auto inputType = dyn_cast<RankedTensorType>(op.getInput().getType());
@@ -74,8 +75,8 @@ getPackedBitWidth(DequantizeAffineOp op, SymbolTableCollection &symbolTables) {
   QuantMinMax range{*quantMin, *op.getQuantMax()};
   SmallVector<APSInt> zeroPointValues;
   if (Value zeroPoint = op.getZeroPoint()) {
-    std::optional<SmallVector<APSInt>> values =
-        getConstantIntegerValues(zeroPoint, op.getZpUnsigned(), symbolTables);
+    std::optional<SmallVector<APSInt>> values = getConstantIntegerValues(
+        zeroPoint, op.getZpUnsigned(), symbolUsers, symbolTables);
     if (!values) {
       LDBG() << "zero point is not an integer constant: " << op;
       return std::nullopt;
@@ -253,32 +254,34 @@ struct PackingCandidate {
   const ConstValueInfo *info;
 };
 
-/// Returns the dequantizes in `moduleOp` whose input fits a packed bit width
-/// and is computed from inline data at the top level of a function.
+/// Returns the ops in `dequantizes` whose input fits a packed bit width and is
+/// computed from inline data at the top level of a function.
 static SmallVector<PackingCandidate>
-collectCandidates(ModuleOp moduleOp,
+collectCandidates(ArrayRef<DequantizeAffineOp> dequantizes,
                   const IREE::Util::ConstExprAnalysis &constExprs,
+                  const SymbolUserMap &symbolUsers,
                   SymbolTableCollection &symbolTables) {
   SmallVector<PackingCandidate> candidates;
-  moduleOp.walk([&](DequantizeAffineOp op) {
-    std::optional<unsigned> bitWidth = getPackedBitWidth(op, symbolTables);
+  for (DequantizeAffineOp op : dequantizes) {
+    std::optional<unsigned> bitWidth =
+        getPackedBitWidth(op, symbolUsers, symbolTables);
     if (!bitWidth) {
-      return;
+      continue;
     }
     const ConstValueInfo *info = constExprs.lookup(op.getInput());
-    if (!info || !isComputedFromInlineData(*info, symbolTables)) {
+    if (!info || !isComputedFromInlineData(*info, symbolUsers, symbolTables)) {
       LDBG() << "input is not computed from inline data: " << op;
-      return;
+      continue;
     }
     // Hoisting only reaches the top level of a function, where the packing must
     // go next to the input.
     if (!isa<FunctionOpInterface>(
             op.getInput().getParentRegion()->getParentOp())) {
       LDBG() << "input is defined inside control flow: " << op;
-      return;
+      continue;
     }
     candidates.push_back({op, *bitWidth, info});
-  });
+  }
   return candidates;
 }
 
@@ -291,12 +294,11 @@ collectCandidates(ModuleOp moduleOp,
 /// freed, so this repeats until none is dropped.
 static void
 dropCandidatesThatGrowStorage(SmallVectorImpl<PackingCandidate> &candidates,
-                              ModuleOp moduleOp,
+                              const SymbolUserMap &symbolUsers,
                               SymbolTableCollection &symbolTables) {
   if (candidates.empty()) {
     return;
   }
-  SymbolUserMap symbolUsers(symbolTables, moduleOp);
   BackwardSliceOptions sliceOptions;
   sliceOptions.inclusive = true;
   sliceOptions.omitBlockArguments = true;
@@ -392,13 +394,20 @@ struct PackSubByteQuantizedConstantsPass final
     : impl::PackSubByteQuantizedConstantsPassBase<
           PackSubByteQuantizedConstantsPass> {
   void runOnOperation() override {
+    SmallVector<DequantizeAffineOp> dequantizes;
+    getOperation().walk(
+        [&](DequantizeAffineOp op) { dequantizes.push_back(op); });
+    if (dequantizes.empty()) {
+      return markAllAnalysesPreserved();
+    }
     // ConstExprAnalysis is not updated by the rewrites, so collect every
     // candidate first.
     SymbolTableCollection symbolTables;
+    SymbolUserMap symbolUsers(symbolTables, getOperation());
     SmallVector<PackingCandidate> candidates = collectCandidates(
-        getOperation(), getAnalysis<IREE::Util::ConstExprAnalysis>(),
+        dequantizes, getAnalysis<IREE::Util::ConstExprAnalysis>(), symbolUsers,
         symbolTables);
-    dropCandidatesThatGrowStorage(candidates, getOperation(), symbolTables);
+    dropCandidatesThatGrowStorage(candidates, symbolUsers, symbolTables);
     packCandidates(candidates, symbolTables);
   }
 };
