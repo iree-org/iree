@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "roundeven_native.mlir"
     "smoketest_embedded.mlir"
     "smoketest_system.mlir"
+    "source_locations.mlir"
     "vscale_range_validation.mlir"
   TOOLS
     ${IREE_LLD_TARGET}

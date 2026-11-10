@@ -104,7 +104,7 @@ public:
   struct SourceLocation {
     std::string stage;
     std::string path;
-    uint32_t line;
+    uint32_t line = 0;
   };
 
   // iree_hal_executable_dispatch_parameter_v0_t
