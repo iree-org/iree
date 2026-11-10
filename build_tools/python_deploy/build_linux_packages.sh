@@ -222,8 +222,6 @@ function install_deps() {
     echo "The architecture is aarch64 and we use manylinux 2_28 so install deps"
     yum install -y epel-release
     yum update -y
-    # Required for Tracy
-    yum install -y libzstd-devel
     yum install -y clang-20.1.8-2.module_el8.10.0+4062+b20d4441 lld-20.1.8-2.module_el8.10.0+4062+b20d4441
   elif [[ "$uname_m" == "x86_64" ]]; then
     echo "The architecture is x86_64 so assume we are on a managed image with deps"

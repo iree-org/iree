@@ -85,15 +85,15 @@ UI and CLI capture tool, is a PDF manual:
 
 You will need three things to capture a trace:
 
-1. The Tracy profiler UI or CLI capture tool
+1. The Tracy profiler UI or CLI capture tool  [v0.15.0](https://github.com/wolfpld/tracy/releases/tag/v0.15.0)
 2. A binary tool to trace, such as `iree-run-module`, built with tracing
     support enabled
 3. A program to profile, e.g. a `.vmfb` file with parameters and input values
 
 The Tracy tools can either be downloaded from
-[the official releases](https://github.com/wolfpld/tracy/releases) or they can
-be built from source by using either the upstream CMake build or IREE's
-[downstream CMake build](#building-tracy-from-source).
+[the official releases](https://github.com/wolfpld/tracy/releases/tag/v0.15.0)
+or they can be built from source by using either the upstream CMake build or
+IREE's [downstream CMake build](#building-tracy-from-source).
 
 ### :octicons-rocket-16: Quickstart
 
