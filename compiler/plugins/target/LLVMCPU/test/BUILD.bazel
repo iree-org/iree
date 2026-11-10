@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
@@ -17,9 +18,6 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
-            "early_data_tiling.mlir",
-            "early_data_tiling_convolution.mlir",
-            "early_data_tiling_dynamic.mlir",
             "executable_object_data.mlir",
             "hal_target_device_attributes.mlir",
             "materialize_homogeneous_encodings.mlir",
@@ -29,6 +27,13 @@ iree_lit_test_suite(
             "vscale_range_validation.mlir",
         ],
         include = ["*.mlir"],
+        exclude = [
+            "early_data_tiling.mlir",
+            "early_data_tiling_convolution.mlir",
+            "early_data_tiling_dynamic.mlir",
+            "roundeven_native_aarch64.mlir",
+            "roundeven_native_riscv64.mlir",
+        ],
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
@@ -38,4 +43,65 @@ iree_lit_test_suite(
         "@llvm-project//llvm:FileCheck",
         "@llvm-project//llvm:not",
     ],
+)
+
+# The tests below compile for other architectures and need the LLVM target of
+# the architecture. CMake adds them only if LLVM_TARGETS_TO_BUILD has the
+# target. The Bazel build always has these targets.
+
+iree_cmake_extra_content(
+    content = """
+iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_ARM_64 "arm_64")
+if(_IREE_COMPILER_TARGETING_ARM_64)
+""",
+    inline = True,
+)
+
+iree_lit_test_suite(
+    name = "lit_aarch64",
+    srcs = [
+        "early_data_tiling.mlir",
+        "early_data_tiling_convolution.mlir",
+        "early_data_tiling_dynamic.mlir",
+        "roundeven_native_aarch64.mlir",
+    ],
+    cfg = "//compiler:lit.cfg.py",
+    tools = [
+        "//tools:iree-compile",
+        "@llvm-project//lld",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
+)
+
+iree_cmake_extra_content(
+    content = """
+iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_RISCV_64 "riscv_64")
+if(_IREE_COMPILER_TARGETING_RISCV_64)
+""",
+    inline = True,
+)
+
+iree_lit_test_suite(
+    name = "lit_riscv64",
+    srcs = ["roundeven_native_riscv64.mlir"],
+    cfg = "//compiler:lit.cfg.py",
+    tools = [
+        "//tools:iree-compile",
+        "@llvm-project//lld",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )
