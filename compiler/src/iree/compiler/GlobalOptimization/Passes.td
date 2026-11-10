@@ -186,6 +186,45 @@ def PropagateAffineQuantizationPass :
   }];
 }
 
+def RebaseQuantizedOperandsPass :
+    Pass<"iree-global-opt-rebase-quantized-operands", "mlir::ModuleOp"> {
+  let summary = "Moves quantized contraction operands to the signedness the target tiles.";
+  let description = [{
+    Rebases the quantized operands of a contraction that
+    `ConvertQDQToIntegerMath` will rewrite when the targets it runs on give
+    the integer contraction a data-tiled layout only after some operands move
+    to the other signedness, such as a u8 activation on CPU targets that tile
+    s8 x s8.
+
+    Rebasing moves the stored values, the zero point and the
+    `quant_min`/`quant_max` bounds by 2^(w-1) on the narrowest w-bit grid that
+    holds the bounds and zero points of the value's quantize and readers. A
+    value moves at its `iree_linalg_ext.quantize_affine`, or with an
+    elementwise shift of constant data, together with every
+    `iree_linalg_ext.dequantize_affine` that reads it.
+
+    A value is rebased only if:
+    - every reader is such a dequantize, and every op that
+      `ConvertQDQToIntegerMath` rewrites from a reader rebases that operand,
+    - its constant data is computed from inline constants of at least a byte,
+    - a symmetric operand, which gains a zero point, meets a constant
+      expression,
+    - the integer intermediates still fit in i32,
+    - its quantize computes in a float type that holds every integer of the
+      grid.
+
+    Every resolver of every target must give the tiled layout. Of {lhs},
+    {rhs} and {lhs, rhs}, the first that gets one is rebased.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+    "IREE::LinalgExt::IREELinalgExtDialect",
+  ];
+}
+
 def PackSubByteQuantizedConstantsPass :
     Pass<"iree-global-opt-pack-sub-byte-quantized-constants", "mlir::ModuleOp"> {
   let summary = "Packs constant quantized values with sub-byte ranges into i2 or i4 storage.";

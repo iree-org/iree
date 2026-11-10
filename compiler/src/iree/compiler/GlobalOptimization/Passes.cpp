@@ -100,6 +100,20 @@ static llvm::cl::opt<bool> clEnableEdgeReshapePropagation(
         "will be removed soon."),
     llvm::cl::init(false));
 
+/// Adds the pass that rebases quantized operands to the signedness data tiling
+/// tiles, when data tiling, hoisting and a const-eval pipeline are on.
+static void
+addRebaseQuantizedOperandsPass(OpPassManager &passManager,
+                               const TransformOptions &transformOptions) {
+  if (clConvertQDQToIntegerMath &&
+      (transformOptions.dataTiling || transformOptions.earlyDataTiling ||
+       transformOptions.dispatchCreationDataTiling) &&
+      transformOptions.constExprHoisting &&
+      transformOptions.buildConstEvalPassPipeline) {
+    passManager.addPass(createRebaseQuantizedOperandsPass());
+  }
+}
+
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
@@ -143,6 +157,8 @@ void buildGlobalOptimizationPassPipeline(
       // packing operation between dequantize and its matmul.
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createPropagateAffineQuantizationPass);
+  // Rebase before packing and the first QDQ rewrite.
+  addRebaseQuantizedOperandsPass(mainPassManager, transformOptions);
   // Pack sub-byte constants between propagation, which moves reshapes onto the
   // i8 values, and the QDQ rewrite, so the integer contraction reads the packed
   // storage. Without hoisting and const-eval, the packing would run at runtime.
@@ -232,7 +248,10 @@ void buildGlobalOptimizationPassPipeline(
       // Run propagation immediately before the QDQ rewrite again: earlier
       // reshape/transpose passes can separate dequantize from its consumers.
       .addPredicatedPass(clConvertQDQToIntegerMath,
-                         createPropagateAffineQuantizationPass)
+                         createPropagateAffineQuantizationPass);
+  // Rebase the contractions that only the second QDQ rewrite matches.
+  addRebaseQuantizedOperandsPass(mainPassManager, transformOptions);
+  FunctionLikeNest(mainPassManager)
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createConvertQDQToIntegerMathPass)
       .addPass(IREE::Flow::createCanonicalizePass)

@@ -43,16 +43,6 @@ namespace {
 /// divides 8, so a byte holds a whole number of values.
 constexpr unsigned kPackedBitWidths[] = {2, 4};
 
-/// Returns true when every value in `values` lies in `range`.
-static bool allValuesInRange(ArrayRef<APSInt> values, QuantMinMax range) {
-  APSInt min = APSInt::get(range.min);
-  APSInt max = APSInt::get(range.max);
-  return llvm::all_of(values, [&](const APSInt &value) {
-    return APSInt::compareValues(value, min) >= 0 &&
-           APSInt::compareValues(value, max) <= 0;
-  });
-}
-
 /// Returns the narrowest bit width the input of `op` can be packed into, or
 /// nullopt if its type, shape, range or zero point rules out packing.
 static std::optional<unsigned>
@@ -73,33 +63,27 @@ getPackedBitWidth(DequantizeAffineOp op, const SymbolUserMap &symbolUsers,
     return std::nullopt;
   }
   QuantMinMax range{*quantMin, *op.getQuantMax()};
-  SmallVector<APSInt> zeroPointValues;
+  // dequantize_affine requires the zero point to fit the input element type,
+  // so it must also fit i<bitWidth>.
   if (Value zeroPoint = op.getZeroPoint()) {
-    std::optional<SmallVector<APSInt>> values = getConstantIntegerValues(
+    std::optional<QuantMinMax> zeroPointRange = getConstantIntegerRange(
         zeroPoint, op.getZpUnsigned(), symbolUsers, symbolTables);
-    if (!values) {
+    if (!zeroPointRange) {
       LDBG() << "zero point is not an integer constant: " << op;
       return std::nullopt;
     }
-    zeroPointValues = std::move(*values);
+    range = unionRanges(range, *zeroPointRange);
   }
+  std::optional<unsigned> gridBitWidth =
+      getGridBitWidth(range, op.getInputUnsigned(), /*maxBitWidth=*/8);
   for (unsigned bitWidth : kPackedBitWidths) {
-    QuantMinMax storage = *getStorageRange(bitWidth, op.getInputUnsigned());
-    if (range.min < storage.min || range.max > storage.max) {
-      continue;
-    }
     // Packing works row by row, while narrow-type emulation indexes the
     // flattened tensor; the layouts agree only when every row starts on a byte
     // boundary.
-    if (inputType.getShape().back() % (8 / bitWidth) != 0) {
-      continue;
+    if (gridBitWidth && bitWidth >= *gridBitWidth &&
+        inputType.getShape().back() % (8 / bitWidth) == 0) {
+      return bitWidth;
     }
-    // dequantize_affine requires the zero point to fit the input element
-    // type, so it must also fit i<bitWidth>.
-    if (!allValuesInRange(zeroPointValues, storage)) {
-      continue;
-    }
-    return bitWidth;
   }
   LDBG() << "range, shape or zero point fits no packed bit width: " << op;
   return std::nullopt;

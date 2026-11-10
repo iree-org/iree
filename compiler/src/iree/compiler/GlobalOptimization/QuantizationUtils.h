@@ -33,6 +33,21 @@ int64_t getStorageMagnitude(unsigned bitWidth, bool isUnsigned);
 /// kAccumulatorWidth.
 std::optional<QuantMinMax> getStorageRange(unsigned bitWidth, bool isUnsigned);
 
+/// Returns the smallest range containing `lhs` and `rhs`.
+QuantMinMax unionRanges(QuantMinMax lhs, QuantMinMax rhs);
+
+/// Returns the width of the narrowest storage grid of the given signedness that
+/// contains `range`, up to `maxBitWidth`, or nullopt if none does. For example,
+/// [0, 15] is on the unsigned 4-bit grid and [-8, 7] on the signed one.
+std::optional<unsigned> getGridBitWidth(QuantMinMax range, bool isUnsigned,
+                                        unsigned maxBitWidth);
+
+/// Returns the amount that moves values on the `bitWidth`-bit grid of the given
+/// signedness to the same positions on the grid of the other signedness:
+/// -2^(bitWidth-1) from unsigned and 2^(bitWidth-1) from signed. Shifting both
+/// a quantized value and its zero point by it keeps the real value.
+int64_t getSignednessFlipOffset(unsigned bitWidth, bool isUnsigned);
+
 struct QuantizedOperandRanges {
   QuantMinMax input;
   QuantMinMax zeroPoint;

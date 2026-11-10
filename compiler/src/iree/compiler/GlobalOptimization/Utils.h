@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
+#include "iree/compiler/GlobalOptimization/QuantizationUtils.h"
 #include "llvm/ADT/APSInt.h"
 
 namespace mlir {
@@ -86,6 +87,14 @@ std::optional<SmallVector<APSInt>>
 getConstantIntegerValues(Value value, bool isUnsigned,
                          const SymbolUserMap &symbolUsers,
                          SymbolTableCollection &symbolTables);
+
+/// Returns the smallest range holding the integers `value` holds, read as
+/// unsigned if `isUnsigned`, when it is a constant or a load of an immutable
+/// global that only loads use, possibly through reshapes, or nullopt otherwise.
+std::optional<QuantMinMax>
+getConstantIntegerRange(Value value, bool isUnsigned,
+                        const SymbolUserMap &symbolUsers,
+                        SymbolTableCollection &symbolTables);
 
 /// Returns true when `info` is a constant expression whose roots are inline
 /// constants or loads of immutable globals that only loads use and that have

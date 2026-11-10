@@ -13,7 +13,7 @@
 
 namespace mlir::iree_compiler::GlobalOptimization::detail {
 
-static std::optional<QuantizedOperandRanges>
+std::optional<QuantizedOperandRanges>
 getOperandRanges(DequantizeAffineOp dequantize) {
   unsigned bitWidth =
       cast<IntegerType>(dequantize.getInputType().getElementType()).getWidth();

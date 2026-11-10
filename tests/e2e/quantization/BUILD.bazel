@@ -65,3 +65,16 @@ iree_check_single_backend_test_suite(
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
+
+iree_check_single_backend_test_suite(
+    name = "check_signedness_rebase_llvm-cpu_local-task",
+    srcs = [
+        "signedness_rebase.mlir",
+    ],
+    compiler_flags = [
+        "--iree-llvmcpu-target-cpu=generic",
+        "--iree-opt-data-tiling",
+    ],
+    driver = "local-task",
+    target_backend = "llvm-cpu",
+)

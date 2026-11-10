@@ -244,36 +244,39 @@ static Attribute getConstantAttr(Value value, const SymbolUserMap &symbolUsers,
   return globalOp.getGlobalInitialValue();
 }
 
-/// Returns the integers in `attr`, read as unsigned if `isUnsigned`, or nullopt
-/// when `attr` holds no readable integers. A splat gives a single value.
-static std::optional<SmallVector<APSInt>> getIntegerValues(Attribute attr,
-                                                           bool isUnsigned) {
-  using Values = std::optional<SmallVector<APSInt>>;
-  auto toAPSInt = [&](const APInt &value) { return APSInt(value, isUnsigned); };
-  return llvm::TypeSwitch<Attribute, Values>(attr)
-      .Case([&](IntegerAttr intAttr) -> Values {
-        return SmallVector<APSInt>{toAPSInt(intAttr.getValue())};
+/// Calls `fn` on each integer in `attr`, read as unsigned if `isUnsigned`, and
+/// returns false when `attr` holds no readable integers. A splat gives a single
+/// value.
+static bool forEachIntegerValue(Attribute attr, bool isUnsigned,
+                                function_ref<void(const APSInt &)> fn) {
+  auto visit = [&](const APInt &value) { fn(APSInt(value, isUnsigned)); };
+  return llvm::TypeSwitch<Attribute, bool>(attr)
+      .Case([&](IntegerAttr intAttr) {
+        visit(intAttr.getValue());
+        return true;
       })
-      .Case([&](DenseIntElementsAttr denseAttr) -> Values {
+      .Case([&](DenseIntElementsAttr denseAttr) {
         if (denseAttr.isSplat()) {
-          return SmallVector<APSInt>{
-              toAPSInt(denseAttr.getSplatValue<APInt>())};
+          visit(denseAttr.getSplatValue<APInt>());
+        } else {
+          llvm::for_each(denseAttr.getValues<APInt>(), visit);
         }
-        return llvm::map_to_vector(denseAttr.getValues<APInt>(), toAPSInt);
+        return true;
       })
       .Case<DenseI8ResourceElementsAttr, DenseI16ResourceElementsAttr,
             DenseI32ResourceElementsAttr, DenseI64ResourceElementsAttr>(
-          [&](auto resourceAttr) -> Values {
+          [&](auto resourceAttr) {
             unsigned bitWidth = resourceAttr.getType().getElementTypeBitWidth();
             auto values = resourceAttr.tryGetAsArrayRef();
             if (!values) {
-              return std::nullopt;
+              return false;
             }
-            return llvm::map_to_vector(*values, [&](auto value) {
-              return toAPSInt(APInt(bitWidth, value, /*isSigned=*/true));
-            });
+            for (auto value : *values) {
+              visit(APInt(bitWidth, value, /*isSigned=*/true));
+            }
+            return true;
           })
-      .Default(std::nullopt);
+      .Default(false);
 }
 
 std::optional<SmallVector<APSInt>>
@@ -282,10 +285,29 @@ getConstantIntegerValues(Value value, bool isUnsigned,
                          SymbolTableCollection &symbolTables) {
   Attribute attr =
       getConstantAttr(getReshapeSource(value), symbolUsers, symbolTables);
-  if (!attr) {
+  SmallVector<APSInt> values;
+  if (!attr || !forEachIntegerValue(attr, isUnsigned, [&](const APSInt &v) {
+        values.push_back(v);
+      })) {
     return std::nullopt;
   }
-  return getIntegerValues(attr, isUnsigned);
+  return values;
+}
+
+std::optional<QuantMinMax>
+getConstantIntegerRange(Value value, bool isUnsigned,
+                        const SymbolUserMap &symbolUsers,
+                        SymbolTableCollection &symbolTables) {
+  Attribute attr =
+      getConstantAttr(getReshapeSource(value), symbolUsers, symbolTables);
+  std::optional<QuantMinMax> range;
+  if (!attr || !forEachIntegerValue(attr, isUnsigned, [&](const APSInt &v) {
+        QuantMinMax point{v.getExtValue(), v.getExtValue()};
+        range = range ? unionRanges(*range, point) : point;
+      })) {
+    return std::nullopt;
+  }
+  return range;
 }
 
 bool isComputedFromInlineData(

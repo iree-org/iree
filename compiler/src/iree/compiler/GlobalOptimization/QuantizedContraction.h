@@ -8,10 +8,12 @@
 #define IREE_COMPILER_GLOBALOPTIMIZATION_QUANTIZEDCONTRACTION_H_
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/GlobalOptimization/QuantizationUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/AffineMap.h"
 
-// Internal analysis support for ConvertQDQToIntegerMath.
+// Internal analysis support for ConvertQDQToIntegerMath and the passes that
+// prepare its input.
 namespace mlir::iree_compiler::GlobalOptimization::detail {
 
 using IREE::LinalgExt::DequantizeAffineOp;
@@ -54,6 +56,11 @@ struct QuantizedContraction {
     return !quant.isSymmetric();
   }
 };
+
+/// Returns the ranges of the values `dequantize` reads and of its zero point,
+/// which bound the integer intermediates of the contraction it feeds.
+std::optional<QuantizedOperandRanges>
+getOperandRanges(DequantizeAffineOp dequantize);
 
 /// Analyzes a verified contraction without modifying its IR. Fails when the
 /// contraction cannot be rewritten using a statically bounded integer

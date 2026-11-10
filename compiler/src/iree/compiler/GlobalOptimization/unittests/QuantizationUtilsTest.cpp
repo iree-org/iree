@@ -59,6 +59,21 @@ TEST(QuantizationUtilsTest, getStorageRange) {
   EXPECT_FALSE(getStorageRange(32, false));
 }
 
+TEST(QuantizationUtilsTest, GridBitWidth) {
+  EXPECT_EQ(getGridBitWidth({0, 15}, true, 8), 4u);
+  EXPECT_EQ(getGridBitWidth({-8, 7}, false, 8), 4u);
+  // Non-negative values on a signed grid need one more bit.
+  EXPECT_EQ(getGridBitWidth({0, 15}, false, 8), 5u);
+  // No grid up to maxBitWidth.
+  EXPECT_EQ(getGridBitWidth({0, 255}, true, 4), std::nullopt);
+  EXPECT_EQ(getGridBitWidth({-1, 0}, true, 8), std::nullopt);
+}
+
+TEST(QuantizationUtilsTest, SignednessFlipOffset) {
+  EXPECT_EQ(getSignednessFlipOffset(4, true), -8);
+  EXPECT_EQ(getSignednessFlipOffset(4, false), 8);
+}
+
 TEST(QuantizationUtilsTest, OperandRangesStorageGrid) {
   struct TestCase {
     unsigned bitWidth;
