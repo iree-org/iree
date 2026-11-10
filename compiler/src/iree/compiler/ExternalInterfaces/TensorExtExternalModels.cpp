@@ -28,7 +28,25 @@ struct DispatchTensorLoadOpInterface
                                        ValueBoundsConstraintSet &cstr) const {
     auto loadOp = cast<IREE::TensorExt::DispatchTensorLoadOp>(op);
     assert(value == loadOp.getResult() && "invalid value");
-    cstr.bound(value)[dim] == loadOp.getMixedSizes()[dim];
+    // A rank-reducing load drops unit sizes from the result type, so result
+    // dimensions index only the non-dropped sizes, e.g. sizes [1, %a, %b] ->
+    // tensor<?x?xf32> maps result dim 0 to %a and dim 1 to %b.
+    llvm::SmallBitVector droppedDims = loadOp.getDroppedDims();
+    const int64_t numSizes = droppedDims.size();
+    int64_t sizeIndex = 0;
+    int64_t numKeptSizes = 0;
+    while (sizeIndex < numSizes) {
+      if (!droppedDims.test(sizeIndex)) {
+        if (numKeptSizes == dim) {
+          break;
+        }
+        ++numKeptSizes;
+      }
+      ++sizeIndex;
+    }
+    assert(numKeptSizes == dim && "result dim out of range");
+    assert(sizeIndex < numSizes && "result dim out of range");
+    cstr.bound(value)[dim] == loadOp.getMixedSizes()[sizeIndex];
   }
 };
 
