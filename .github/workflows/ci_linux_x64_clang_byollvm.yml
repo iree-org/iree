@@ -33,6 +33,10 @@ jobs:
         run: python3 -m pip install -r ./build_tools/github_actions/ci_requirements.txt
       - name: "Building and testing with bring-your-own-LLVM"
         env:
+          SCCACHE_AZURE_CONNECTION_STRING: "${{ secrets.AZURE_CCACHE_CONNECTION_STRING }}"
+          SCCACHE_AZURE_BLOB_CONTAINER: ccache-container
+          SCCACHE_CACHE_ZSTD_LEVEL: 10
+          SCCACHE_AZURE_KEY_PREFIX: "ci_linux_x64_clang_byollvm"
           # TODO: Remove when the ubuntu-24.04 runner image has a kernel with
           # https://github.com/torvalds/linux/commit/4de32fd05ce9.
           # On kernel 7.0.0-1017-azure, AppArmor dereferences a NULL pointer
@@ -42,7 +46,9 @@ jobs:
           # until the ctest timeout.
           IREE_EXTRA_NEWLINE_SEPARATED_CTEST_TESTS_TO_EXCLUDE: |-
             iree/async/platform/posix/cts/socket_tests
-        run: ./build_tools/cmake/build_and_test_byo_llvm.sh
+        run: |
+          source ./build_tools/cmake/setup_sccache.sh
+          ./build_tools/cmake/build_and_test_byo_llvm.sh
 
       - name: Post to Discord on Failure
         uses: sarisia/actions-status-discord@eb045afee445dc055c18d3d90bd0f244fd062708 # v1.16.0

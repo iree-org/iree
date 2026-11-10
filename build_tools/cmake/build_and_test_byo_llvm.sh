@@ -10,7 +10,9 @@
 
 set -xeuo pipefail
 
-source build_tools/cmake/setup_ccache.sh
+if (( ${IREE_USE_SCCACHE:-0} != 1 )); then
+  source build_tools/cmake/setup_ccache.sh
+fi
 
 # Environment variables read by byo_llvm.sh.
 export IREE_BYOLLVM_BUILD_DIR="${1:-build-byo-llvm}"
@@ -42,6 +44,12 @@ build_tools/llvm/byo_llvm.sh build_llvm
 
 build_tools/llvm/byo_llvm.sh build_mlir
 build_tools/llvm/byo_llvm.sh build_iree
+
+if (( ${IREE_USE_SCCACHE:-0} == 1 )); then
+  sccache --show-stats
+elif (( ${IREE_USE_CCACHE:-0} == 1 )); then
+  ccache --show-stats
+fi
 
 echo "*********************** TESTING IREE **********************************"
 iree_build_dir="${IREE_BYOLLVM_BUILD_DIR}/iree"

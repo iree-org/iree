@@ -50,9 +50,11 @@ command="$1"
 shift
 
 # Detect commands.
-has_ccache=false
-if (command -v ccache &> /dev/null); then
-  has_ccache=true
+# A compiler launcher from the environment, such as the sccache launcher from
+# build_tools/cmake/setup_sccache.sh, takes precedence over ccache.
+compiler_launcher="${CMAKE_CXX_COMPILER_LAUNCHER:-}"
+if [[ -z "${compiler_launcher}" ]] && (command -v ccache &> /dev/null); then
+  compiler_launcher="ccache"
 fi
 has_clang=false
 if (command -v clang &> /dev/null) && (command -v clang++ &> /dev/null); then
@@ -72,8 +74,8 @@ fi
 set -euo pipefail
 
 print_toolchain_config() {
-  if $has_ccache; then
-    echo -n "-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache "
+  if [[ -n "${compiler_launcher}" ]]; then
+    echo -n "-DCMAKE_C_COMPILER_LAUNCHER=${compiler_launcher} -DCMAKE_CXX_COMPILER_LAUNCHER=${compiler_launcher} "
   fi
   if $has_clang; then
     echo "-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++"
