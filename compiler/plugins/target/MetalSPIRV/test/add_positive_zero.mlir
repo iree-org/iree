@@ -12,6 +12,11 @@
 // RUN: FileCheck %s --check-prefix=NEG --input-file=%t/module_negative_zero_metal0.metal
 // RUN: iree-opt %s --iree-hal-serialize-all-executables -o %t/compiled.mlir
 
+// x + (+0.0) is not an identity: for x = -0.0 it yields +0.0. The Metal
+// compiler may still fold it to x, so the addition must go through an
+// optnone helper. Adding -0.0 is an identity and needs no helper. Only the
+// marked additions use the helper; multiplications stay plain (RHS-NOT).
+
 // RHS: {{\[\[clang::optnone\]\]}} T spvFAdd(T l, T r)
 // RHS-LABEL: kernel void main0
 // RHS: spvFAdd(

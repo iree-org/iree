@@ -16,33 +16,12 @@ iree_lit_test_suite(
   SRCS
     "hal_target_device_attributes.mlir"
     "materialize_homogeneous_encodings.mlir"
-    "serialize_access_units.mlir"
     "smoketest.mlir"
     "target_device_features.mlir"
   TOOLS
-    ::dump_executable_metadata
     FileCheck
     iree-compile
     iree-opt
-)
-
-iree_cc_binary(
-  NAME
-    dump_executable_metadata
-  SRCS
-    "dump_executable_metadata.cc"
-  DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRParser
-    MLIRSupport
-    iree::base
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::hal::utils::executable_header
-    iree::schemas::executable_debug_info_c_fbs
-    iree::schemas::vulkan_executable_def_c_fbs
-  TESTONLY
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

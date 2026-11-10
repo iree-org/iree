@@ -468,17 +468,8 @@ struct EncodeTensorFillOp : OpRewritePattern<IREE::Stream::TensorFillOp> {
     // Dense:
     auto targetOffset = calculateElementByteOffset(
         op.getLoc(), targetType, targetDims, op.getStartIndices(), rewriter);
-    // Lengths describe the filled tensor's extents, not coordinates within the
-    // target. Linearizing them with the target strides overcounts even a
-    // single-element fill in a tensor with more than one dimension.
-    Value elementCount =
-        rewriter.createOrFold<arith::ConstantIndexOp>(op.getLoc(), 1);
-    for (Value length : op.getLengths()) {
-      elementCount = rewriter.createOrFold<arith::MulIOp>(op.getLoc(),
-                                                          elementCount, length);
-    }
-    auto targetLength = calculateStorageElementOffsetInBytes(
-        op.getLoc(), targetType, elementCount, rewriter);
+    auto targetLength = calculateElementByteOffset(
+        op.getLoc(), targetType, targetDims, op.getLengths(), rewriter);
     auto targetEnd = rewriter.createOrFold<arith::AddIOp>(
         op.getLoc(), targetOffset, targetLength);
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncFillOp>(

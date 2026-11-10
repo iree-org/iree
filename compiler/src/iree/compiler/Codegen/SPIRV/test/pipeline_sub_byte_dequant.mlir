@@ -35,10 +35,17 @@ func.func @i4_dequant() {
 
 //   CHECK-LABEL: spirv.func @i4_dequant
 
+//     CHECK-DAG: %[[CST255:.+]] = spirv.Constant dense<255> : vector<2xi32>
+
+// Each i8 is emulated in a 32-bit lane whose bits above the byte are
+// unspecified, so the byte is isolated before the shift moves those bits into
+// the high nibble.
 //         CHECK: %[[BYTE1:.+]] = spirv.VectorShuffle [0 : i32, 1 : i32] {{.*}} : vector<4xi32>, vector<4xi32> -> vector<2xi32>
 //         CHECK: %[[MASKED:.+]] = spirv.BitwiseAnd %[[BYTE1]]
-//         CHECK: %[[SHIFTED:.+]] = spirv.ShiftRightLogical %[[BYTE1]]
-//         CHECK: %[[COPIED:.+]] = spirv.VectorShuffle [0 : i32, 2 : i32, 1 : i32, 3 : i32] %[[MASKED]], %[[SHIFTED]] : vector<2xi32>, vector<2xi32> -> vector<4xi32>
+//         CHECK: %[[LOW_BYTE:.+]] = spirv.BitwiseAnd %[[BYTE1]], %[[CST255]]
+//         CHECK: %[[SHIFTED:.+]] = spirv.ShiftRightLogical %[[LOW_BYTE]]
+//         CHECK: %[[HIGH:.+]] = spirv.BitwiseAnd %[[SHIFTED]], %[[CST255]]
+//         CHECK: %[[COPIED:.+]] = spirv.VectorShuffle [0 : i32, 2 : i32, 1 : i32, 3 : i32] %[[MASKED]], %[[HIGH]] : vector<2xi32>, vector<2xi32> -> vector<4xi32>
 //         CHECK: spirv.BitwiseAnd %[[COPIED]]
 //         CHECK: spirv.ConvertUToF {{.+}} : vector<4xi32> to vector<4xf32>
 //         CHECK: spirv.VectorShuffle [2 : i32, 3 : i32] {{.*}} : vector<4xi32>, vector<4xi32> -> vector<2xi32>

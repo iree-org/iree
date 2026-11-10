@@ -655,7 +655,7 @@ func.func @reinterpret_cast_lowering_dynamic_zero_offset() -> f32 {
 
 #layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>
 // A rank-one identity layout still needs its binding offset carried into every
-// access. Offset 2 selects the second half; offset 4 selects the third.
+// access. Byte offsets 2 and 4 select f16 elements 1 and 2 of the buffer.
 // CHECK-DAG: #[[$INPUT_MAP:.+]] = affine_map<()[s0] -> (s0 + 1)>
 // CHECK-DAG: #[[$OUTPUT_MAP:.+]] = affine_map<()[s0] -> (s0 + 2)>
 // CHECK-LABEL: func.func @rank_one_identity_binding_offsets

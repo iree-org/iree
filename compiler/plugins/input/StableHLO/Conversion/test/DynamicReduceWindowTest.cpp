@@ -56,9 +56,11 @@ TEST(DynamicReduceWindowTest, ScanThroughDeepShapeProducerChain) {
 
     // Shape producers form an SSA chain, independent of region nesting. A scan
     // proof must reach its constant leaf without one stack frame per producer.
+    // A chain this long would overflow the stack of a recursive walk.
+    constexpr int kProducerChainLength = 40000;
     OpBuilder builder(call);
     Value ones = call.getOperand(3);
-    for (int i = 0; i < 40000; ++i) {
+    for (int i = 0; i < kProducerChainLength; ++i) {
       ones = mlir::stablehlo::ReshapeOp::create(builder, call.getLoc(),
                                                 ones.getType(), ones);
     }

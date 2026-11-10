@@ -212,7 +212,10 @@ func.func @scatter_i64_out_of_range_index() {
   return
 }
 
-// Preserve this private-call boundary until the preprocessing range proof.
+// The flag reaches the scatter through a private function with one call site,
+// so it is not folded to a constant before StableHLO preprocessing. The
+// scatter-to-dynamic-update-slice rewrite then derives the start's range by
+// following the argument to its only call site, which this test exercises.
 func.func private @scatter_bool_range_overwrite(%flag: tensor<i1>, %operand: tensor<2xi32>, %updates: tensor<2xi32>) -> tensor<2xi32> {
   %one = stablehlo.constant dense<1> : tensor<i32>
   %converted = stablehlo.convert %flag : (tensor<i1>) -> tensor<i32>

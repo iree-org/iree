@@ -6,9 +6,9 @@
 
 #include "iree/hal/utils/executable_header.h"
 
-iree_status_t iree_hal_read_executable_flatbuffer_header_versioned(
+iree_status_t iree_hal_read_executable_flatbuffer_header(
     iree_const_byte_span_t executable_data, bool unsafe_infer_size,
-    const char file_identifier[4], uint32_t max_supported_version,
+    const char file_identifier[4],
     iree_const_byte_span_t* out_flatbuffer_data) {
   iree_flatbuffer_file_header_t header = {0};
 
@@ -41,8 +41,10 @@ iree_status_t iree_hal_read_executable_flatbuffer_header_versioned(
                             "executable flatbuffer reported as zero-length");
   }
 
-  // Reject payload versions whose contracts the caller does not support.
-  if (header.version > max_supported_version) {
+  // Verify version. Today we have only a single "latest" version so this is
+  // just a guard for older builds with newer data that may differ in the
+  // future.
+  if (header.version != 0) {
     return iree_make_status(
         IREE_STATUS_INCOMPATIBLE,
         "executable version %u not compatible with this build", header.version);
@@ -67,13 +69,4 @@ iree_status_t iree_hal_read_executable_flatbuffer_header_versioned(
       executable_data.data + sizeof(header), header.content_size);
 
   return iree_ok_status();
-}
-
-iree_status_t iree_hal_read_executable_flatbuffer_header(
-    iree_const_byte_span_t executable_data, bool unsafe_infer_size,
-    const char file_identifier[4],
-    iree_const_byte_span_t* out_flatbuffer_data) {
-  return iree_hal_read_executable_flatbuffer_header_versioned(
-      executable_data, unsafe_infer_size, file_identifier,
-      /*max_supported_version=*/0, out_flatbuffer_data);
 }

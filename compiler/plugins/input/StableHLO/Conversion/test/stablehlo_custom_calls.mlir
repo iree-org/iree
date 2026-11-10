@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-stablehlo-legalize-custom-calls),cse)" \
-// RUN:   %s | FileCheck %s
+// RUN:   %s | FileCheck %s --implicit-check-not=util.status.check_ok --implicit-check-not="stablehlo.custom_call @shape_assertion"
 
 // CHECK-LABEL: @householder
 func.func public @householder(%arg0: tensor<4x3xf32>, %arg1: tensor<2xf32>) -> (tensor<4x3xf32>) {
@@ -31,6 +31,29 @@ func.func @evaluator_wrap(%arg0: tensor<2x?xi8>) -> tensor<2x?xi8> {
   stablehlo.custom_call @shape_assertion(%ok, %chosen) {error_message = "{0} > 100", has_side_effect = true} : (tensor<i1>, tensor<i32>) -> ()
   %sum = stablehlo.add %arg0, %arg0 : tensor<2x?xi8>
   return %sum : tensor<2x?xi8>
+}
+
+
+// -----
+
+// A comparison of unsigned constants without a comparison type is unsigned:
+// 255 > 1 holds, so the select picks 0 and the guard gives no bound. Reading
+// the constants as signed would pick the size instead.
+// CHECK-LABEL: func.func @evaluator_unsigned_compare
+// CHECK-NOT: util.assume.int
+// CHECK: return
+func.func @evaluator_unsigned_compare(%arg0: tensor<2x?xf32>) -> tensor<2x?xf32> {
+  %zero = stablehlo.constant dense<0> : tensor<i32>
+  %hundred = stablehlo.constant dense<100> : tensor<i32>
+  %max = stablehlo.constant dense<255> : tensor<ui8>
+  %one = stablehlo.constant dense<1> : tensor<ui8>
+  %size = stablehlo.get_dimension_size %arg0, dim = 1 : (tensor<2x?xf32>) -> tensor<i32>
+  %greater = stablehlo.compare GT, %max, %one : (tensor<ui8>, tensor<ui8>) -> tensor<i1>
+  %chosen = stablehlo.select %greater, %zero, %size : tensor<i1>, tensor<i32>
+  %ok = stablehlo.compare LE, %chosen, %hundred, SIGNED : (tensor<i32>, tensor<i32>) -> tensor<i1>
+  stablehlo.custom_call @shape_assertion(%ok, %chosen) {error_message = "{0} > 100", has_side_effect = true} : (tensor<i1>, tensor<i32>) -> ()
+  %sum = stablehlo.add %arg0, %arg0 : tensor<2x?xf32>
+  return %sum : tensor<2x?xf32>
 }
 
 
@@ -152,11 +175,11 @@ func.func @widened_after_i32_arithmetic(%arg0: tensor<3x?xf32>) -> tensor<3x?xf3
 
 // -----
 
-// Rewriting the operand of a widening must not change its canonical-size key.
+// Two widenings of one size after the assertion both read the bounded size.
+// Rewriting the first widening's operand must not stop the second from being
+// recognised as a widening of the same size, so both fold to one value.
 // CHECK-LABEL: func.func @widened_after_assertion
 // CHECK: %[[SIZE:.+]] = stablehlo.get_dimension_size
-// CHECK: stablehlo.compare GT, %[[SIZE]],
-// CHECK: util.status.check_ok
 // CHECK: %[[BOUNDED:.+]] = util.assume.int %{{.+}}<umin = 1> : i32
 // CHECK: %[[TENSOR:.+]] = tensor.from_elements %[[BOUNDED]] : tensor<i32>
 // CHECK: %[[WIDE:.+]] = stablehlo.convert %[[TENSOR]] : (tensor<i32>) -> tensor<i64>
@@ -176,8 +199,6 @@ func.func @widened_after_assertion(%arg0: tensor<?xf32>) -> (tensor<i64>, tensor
 
 // Negating INT64_MIN while matching a subtraction is not a valid proof step.
 // CHECK-LABEL: func.func @shape_subtract_minimum
-// CHECK: stablehlo.subtract
-// CHECK: util.status.check_ok %{{.+}}, "minimum subtraction"
 // CHECK-NOT: util.assume.int
 // CHECK-NOT: flow.tensor.tie_shape
 func.func @shape_subtract_minimum(%arg0: tensor<?xf32>) -> tensor<?xf32> {
@@ -196,7 +217,6 @@ func.func @shape_subtract_minimum(%arg0: tensor<?xf32>) -> tensor<?xf32> {
 
 // Strict-bound adjustment must not overflow before an unusable fact is dropped.
 // CHECK-LABEL: func.func @shape_strict_maximum
-// CHECK: util.status.check_ok %{{.+}}, "strict maximum"
 // CHECK-NOT: util.assume.int
 func.func @shape_strict_maximum(%arg0: tensor<?xf32>) -> tensor<?xf32> {
   %maximum = stablehlo.constant dense<9223372036854775807> : tensor<i64>
@@ -212,7 +232,6 @@ func.func @shape_strict_maximum(%arg0: tensor<?xf32>) -> tensor<?xf32> {
 
 // Neither reversing a minimum bound nor subtracting an offset may overflow.
 // CHECK-LABEL: func.func @shape_minimum_bound
-// CHECK: util.status.check_ok %{{.+}}, "minimum bound"
 // CHECK-NOT: util.assume.int
 func.func @shape_minimum_bound(%arg0: tensor<?xf32>) -> tensor<?xf32> {
   %minimum = stablehlo.constant dense<-9223372036854775808> : tensor<i64>
@@ -232,7 +251,6 @@ func.func @shape_minimum_bound(%arg0: tensor<?xf32>) -> tensor<?xf32> {
 // CHECK-LABEL: func.func @shape_assertion_nested_scope
 // CHECK: %[[SIZE:.+]] = stablehlo.get_dimension_size
 // CHECK: %[[BRANCH:.+]] = scf.if
-// CHECK: util.status.check_ok
 // CHECK: util.assume.int %{{.+}}<umin = 1> : i32
 // CHECK: } else {
 // CHECK-NEXT: scf.yield %[[SIZE]] : tensor<i32>
@@ -256,9 +274,6 @@ func.func @shape_assertion_nested_scope(%arg0: tensor<?xf32>, %choose: i1) -> (t
 
 // Contradictory ranges suppress the assumption without discarding equalities.
 // CHECK-LABEL: func.func @shape_contradictory_range_with_equality
-// CHECK: util.status.check_ok %{{.+}}, "equal"
-// CHECK: util.status.check_ok %{{.+}}, "lower"
-// CHECK: util.status.check_ok %{{.+}}, "upper"
 // CHECK-NOT: util.assume.int
 // CHECK: flow.tensor.tie_shape
 // CHECK: flow.tensor.tie_shape
@@ -280,13 +295,11 @@ func.func @shape_contradictory_range_with_equality(%a: tensor<?xf32>, %b: tensor
 
 // -----
 
-// Other effects cannot be moved past the caller-visible assertion failure.
-// Declining the status-dataflow rewrite must leave the original scatter intact.
+// Dropping shape assertions leaves other effects and the original scatter intact.
 // CHECK-LABEL: func.func @scatter_with_other_effect
 // CHECK-NOT: linalg.fill
 // CHECK: %[[RESULT:.*]] = "stablehlo.scatter"
 // CHECK: stablehlo.custom_call @other_effect
-// CHECK: util.status.check_ok {{.*}}"negative current"
 // CHECK: stablehlo.return
 // CHECK-NOT: stablehlo.reduce
 // CHECK: return %[[RESULT]]
@@ -306,11 +319,8 @@ func.func @scatter_with_other_effect(%operand: tensor<4xf32>, %indices: tensor<2
 
 // CHECK-LABEL: @shape_assertion
 // CHECK-SAME: %[[PRED:.*]]: tensor<i1>
-// CHECK-DAG: %[[OK:.*]] = arith.constant 0 : i32
-// CHECK-DAG: %[[FAILED_PRECONDITION:.*]] = arith.constant 9 : i32
-// CHECK-DAG: %[[SCALAR:.*]] = tensor.extract %[[PRED]][] : tensor<i1>
-// CHECK: %[[STATUS:.*]] = arith.select %[[SCALAR]], %[[OK]], %[[FAILED_PRECONDITION]] : i32
-// CHECK: util.status.check_ok %[[STATUS]], "expected a positive dimension"
+// CHECK-NOT: tensor.extract
+// CHECK: return
 // CHECK-NOT: stablehlo.custom_call
 func.func @shape_assertion(%predicate: tensor<i1>, %dimension: tensor<i32>) {
   stablehlo.custom_call @shape_assertion(%predicate, %dimension) {
@@ -321,9 +331,11 @@ func.func @shape_assertion(%predicate: tensor<i1>, %dimension: tensor<i32>) {
 
 // -----
 
-// A malformed predicate must not be silently discarded.
+// A vector predicate supplies no scalar shape facts; like every shape
+// assertion, it is dropped without a runtime check, as upstream StableHLO
+// lowering does.
 // CHECK-LABEL: @shape_assertion_vector
-// CHECK: stablehlo.custom_call @shape_assertion
+// CHECK: return
 func.func @shape_assertion_vector(%predicate: tensor<4xi1>) {
   stablehlo.custom_call @shape_assertion(%predicate) {
     error_message = "expected a scalar predicate", has_side_effect = true
@@ -333,8 +345,9 @@ func.func @shape_assertion_vector(%predicate: tensor<4xi1>) {
 
 // -----
 
+// Missing predicates and messages supply no facts and do not prevent dropping.
 // CHECK-LABEL: @shape_assertion_missing_predicate
-// CHECK: stablehlo.custom_call @shape_assertion
+// CHECK: return
 func.func @shape_assertion_missing_predicate() {
   stablehlo.custom_call @shape_assertion() {
     error_message = "missing predicate", has_side_effect = true
@@ -345,7 +358,7 @@ func.func @shape_assertion_missing_predicate() {
 // -----
 
 // CHECK-LABEL: @shape_assertion_missing_message
-// CHECK: stablehlo.custom_call @shape_assertion
+// CHECK: return
 func.func @shape_assertion_missing_message(%predicate: tensor<i1>) {
   stablehlo.custom_call @shape_assertion(%predicate) {
     has_side_effect = true

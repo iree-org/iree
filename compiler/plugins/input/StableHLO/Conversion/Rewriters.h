@@ -39,8 +39,10 @@ void populateStableHloCollectivesConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
     RewritePatternSet *patterns);
 
-/// Populates patterns for the StableHLO ops whose shapes are known only at
-/// runtime.
+/// Populates patterns that take precedence over the upstream
+/// StableHLO-to-Linalg lowerings: ops whose shapes are known only at runtime,
+/// pads with negative or interior padding, and gathers and slices with wide or
+/// unsigned indices.
 void populateDynamicShapeConversionPatterns(MLIRContext *context,
                                             TypeConverter &typeConverter,
                                             RewritePatternSet *patterns);

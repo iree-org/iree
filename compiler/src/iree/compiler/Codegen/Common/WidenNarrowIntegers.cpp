@@ -34,21 +34,45 @@ static Type getWideIntegerType(Type type, unsigned wideWidthInBits) {
   return wide;
 }
 
-template <typename OpTy, typename ExtOpTy, bool preserveProperties = true>
-struct WidenNarrowIntegerOp final : OpRewritePattern<OpTy> {
-  WidenNarrowIntegerOp(MLIRContext *context, unsigned wideWidthInBits,
+// Copies the discardable attributes of `from` to `to`.
+static void copyDiscardableAttrs(PatternRewriter &rewriter, Operation *from,
+                                 Operation *to) {
+  rewriter.modifyOpInPlace(to, [from, to] {
+    to->setDiscardableAttrs(from->getDiscardableAttrDictionary());
+  });
+}
+
+// The state shared by the widening patterns: the wide width in bits and the
+// predicate selecting the narrow types to widen.
+template <typename OpTy>
+struct NarrowIntegerPattern : OpRewritePattern<OpTy> {
+  NarrowIntegerPattern(MLIRContext *context, unsigned wideWidthInBits,
                        IsNarrowFn isNarrow)
       : OpRewritePattern<OpTy>(context), wideWidthInBits(wideWidthInBits),
         isNarrow(std::move(isNarrow)) {}
 
+  // Returns the wide integer or vector type for `type` if it is a selected
+  // narrow integer type narrower than the wide width, otherwise null.
+  Type getSelectedWideType(Type type) const {
+    return isNarrow(type) ? getWideIntegerType(type, wideWidthInBits) : Type();
+  }
+
+  unsigned wideWidthInBits;
+  IsNarrowFn isNarrow;
+};
+
+template <typename OpTy, typename ExtOpTy, bool preserveProperties = true>
+struct WidenNarrowIntegerOp final : NarrowIntegerPattern<OpTy> {
+  using NarrowIntegerPattern<OpTy>::NarrowIntegerPattern;
+
   LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
     Type type = op.getType();
-    if (!isNarrow(type) || !getWideIntegerType(type, wideWidthInBits)) {
+    Type wide = this->getSelectedWideType(type);
+    if (!wide) {
       return rewriter.notifyMatchFailure(op, "not a selected narrow integer");
     }
     Location loc = op.getLoc();
-    Type wide = getWideIntegerType(type, wideWidthInBits);
     Value lhs = ExtOpTy::create(rewriter, loc, wide, op.getLhs());
     Value rhs = ExtOpTy::create(rewriter, loc, wide, op.getRhs());
     auto widened = OpTy::create(rewriter, loc, lhs, rhs);
@@ -63,21 +87,15 @@ struct WidenNarrowIntegerOp final : OpRewritePattern<OpTy> {
     rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, type, widened);
     return success();
   }
-
-  unsigned wideWidthInBits;
-  IsNarrowFn isNarrow;
 };
 
-struct WidenNarrowCmpI final : OpRewritePattern<arith::CmpIOp> {
-  WidenNarrowCmpI(MLIRContext *context, unsigned wideWidthInBits,
-                  IsNarrowFn isNarrow)
-      : OpRewritePattern(context), wideWidthInBits(wideWidthInBits),
-        isNarrow(std::move(isNarrow)) {}
+struct WidenNarrowCmpI final : NarrowIntegerPattern<arith::CmpIOp> {
+  using NarrowIntegerPattern::NarrowIntegerPattern;
 
   LogicalResult matchAndRewrite(arith::CmpIOp op,
                                 PatternRewriter &rewriter) const override {
-    Type type = op.getLhs().getType();
-    if (!isNarrow(type) || !getWideIntegerType(type, wideWidthInBits)) {
+    Type wide = getSelectedWideType(op.getLhs().getType());
+    if (!wide) {
       return rewriter.notifyMatchFailure(op, "not a selected narrow integer");
     }
     bool isSigned = false;
@@ -92,7 +110,6 @@ struct WidenNarrowCmpI final : OpRewritePattern<arith::CmpIOp> {
       break;
     }
     Location loc = op.getLoc();
-    Type wide = getWideIntegerType(type, wideWidthInBits);
     auto extend = [&rewriter, loc, wide, isSigned](Value value) -> Value {
       if (isSigned) {
         return arith::ExtSIOp::create(rewriter, loc, wide, value);
@@ -103,9 +120,6 @@ struct WidenNarrowCmpI final : OpRewritePattern<arith::CmpIOp> {
         op, op.getPredicate(), extend(op.getLhs()), extend(op.getRhs()));
     return success();
   }
-
-  unsigned wideWidthInBits;
-  IsNarrowFn isNarrow;
 };
 
 // Extensions involving emulated integers first use the wide type to recover
@@ -115,47 +129,38 @@ struct WidenNarrowCmpI final : OpRewritePattern<arith::CmpIOp> {
 //   %wide = arith.extui %value : i4 to i32
 //   %result = arith.trunci %wide : i32 to i8
 template <typename ExtensionOp>
-struct WidenNarrowExtension final : OpRewritePattern<ExtensionOp> {
-  WidenNarrowExtension(MLIRContext *context, unsigned wideWidthInBits,
-                       IsNarrowFn isNarrow)
-      : OpRewritePattern<ExtensionOp>(context),
-        wideWidthInBits(wideWidthInBits), isNarrow(std::move(isNarrow)) {}
+struct WidenNarrowExtension final : NarrowIntegerPattern<ExtensionOp> {
+  using NarrowIntegerPattern<ExtensionOp>::NarrowIntegerPattern;
 
   LogicalResult matchAndRewrite(ExtensionOp op,
                                 PatternRewriter &rewriter) const override {
     Type type = op.getType();
-    if ((!isNarrow(type) && !isNarrow(op.getIn().getType())) ||
-        !getWideIntegerType(type, wideWidthInBits)) {
+    Type wide = getWideIntegerType(type, this->wideWidthInBits);
+    if ((!this->isNarrow(type) && !this->isNarrow(op.getIn().getType())) ||
+        !wide) {
       return rewriter.notifyMatchFailure(op, "not a selected narrow integer");
     }
-    Value wide = ExtensionOp::create(rewriter, op.getLoc(),
-                                     getWideIntegerType(type, wideWidthInBits),
-                                     op.getIn());
-    rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, type, wide);
+    Value result = ExtensionOp::create(rewriter, op.getLoc(), wide, op.getIn());
+    rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, type, result);
     return success();
   }
-
-  unsigned wideWidthInBits;
-  IsNarrowFn isNarrow;
 };
 
 // Bit counts run on the zero-extended value; leading zeros drop the
 // extension, trailing zeros stop at the logical width.
 template <typename OpTy>
-struct WidenNarrowBitCount final : OpRewritePattern<OpTy> {
-  WidenNarrowBitCount(MLIRContext *context, unsigned wideWidthInBits,
-                      IsNarrowFn isNarrow)
-      : OpRewritePattern<OpTy>(context), wideWidthInBits(wideWidthInBits),
-        isNarrow(std::move(isNarrow)) {}
+struct WidenNarrowBitCount final : NarrowIntegerPattern<OpTy> {
+  using NarrowIntegerPattern<OpTy>::NarrowIntegerPattern;
 
   LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
     Type type = op.getType();
-    if (!isNarrow(type) || !getWideIntegerType(type, wideWidthInBits)) {
+    Type wide = this->getSelectedWideType(type);
+    if (!wide) {
       return rewriter.notifyMatchFailure(op, "not a selected narrow integer");
     }
     Location loc = op.getLoc();
-    Type wide = getWideIntegerType(type, wideWidthInBits);
+    unsigned wideWidthInBits = this->wideWidthInBits;
     int64_t widthInBits = getElementTypeOrSelf(type).getIntOrFloatBitWidth();
     Value operand =
         arith::ExtUIOp::create(rewriter, loc, wide, op.getOperand());
@@ -175,64 +180,49 @@ struct WidenNarrowBitCount final : OpRewritePattern<OpTy> {
     rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, type, count);
     return success();
   }
-
-  unsigned wideWidthInBits;
-  IsNarrowFn isNarrow;
 };
 
 // Ops with one narrow operand, such as index and float conversions or an
 // absolute value, read it extended; a narrow result is truncated back.
 template <typename OpTy, typename ExtOpTy>
-struct WidenNarrowOperand final : OpRewritePattern<OpTy> {
-  WidenNarrowOperand(MLIRContext *context, unsigned wideWidthInBits,
-                     IsNarrowFn isNarrow)
-      : OpRewritePattern<OpTy>(context), wideWidthInBits(wideWidthInBits),
-        isNarrow(std::move(isNarrow)) {}
+struct WidenNarrowOperand final : NarrowIntegerPattern<OpTy> {
+  using NarrowIntegerPattern<OpTy>::NarrowIntegerPattern;
 
   LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
     Value in = op->getOperand(0);
-    if (!isNarrow(in.getType()) ||
-        !getWideIntegerType(in.getType(), wideWidthInBits)) {
+    Type wide = this->getSelectedWideType(in.getType());
+    if (!wide) {
       return rewriter.notifyMatchFailure(op, "not a selected narrow integer");
     }
     Location loc = op.getLoc();
-    Value wideIn = ExtOpTy::create(
-        rewriter, loc, getWideIntegerType(in.getType(), wideWidthInBits), in);
+    Value wideIn = ExtOpTy::create(rewriter, loc, wide, in);
+    // A result of the operand's narrow type is computed wide and truncated.
     Type type = op.getType();
-    if (type != in.getType()) {
-      auto widened = OpTy::create(rewriter, loc, type, wideIn);
-      rewriter.modifyOpInPlace(widened, [widened, op]() mutable {
-        widened.getProperties() = op.getProperties();
-        widened->setDiscardableAttrs(op->getDiscardableAttrDictionary());
-      });
-      rewriter.replaceOp(op, widened);
-      return success();
-    }
-    auto widened = OpTy::create(rewriter, loc, wideIn.getType(), wideIn);
+    bool truncatesResult = type == in.getType();
+    auto widened =
+        OpTy::create(rewriter, loc, truncatesResult ? wide : type, wideIn);
     rewriter.modifyOpInPlace(widened, [widened, op]() mutable {
       widened.getProperties() = op.getProperties();
       widened->setDiscardableAttrs(op->getDiscardableAttrDictionary());
     });
-    rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, type, widened);
+    if (truncatesResult) {
+      rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, type, widened);
+    } else {
+      rewriter.replaceOp(op, widened);
+    }
     return success();
   }
-
-  unsigned wideWidthInBits;
-  IsNarrowFn isNarrow;
 };
 
 struct WidenNarrowMinMaxReduction final
-    : OpRewritePattern<vector::ReductionOp> {
-  WidenNarrowMinMaxReduction(MLIRContext *context, unsigned wideWidthInBits,
-                             IsNarrowFn isNarrow)
-      : OpRewritePattern(context), wideWidthInBits(wideWidthInBits),
-        isNarrow(std::move(isNarrow)) {}
+    : NarrowIntegerPattern<vector::ReductionOp> {
+  using NarrowIntegerPattern::NarrowIntegerPattern;
 
   LogicalResult matchAndRewrite(vector::ReductionOp op,
                                 PatternRewriter &rewriter) const override {
     Type type = op.getType();
-    if (!isNarrow(type) || !getWideIntegerType(type, wideWidthInBits)) {
+    if (!getSelectedWideType(type)) {
       return rewriter.notifyMatchFailure(op, "not a selected narrow integer");
     }
     bool isSigned = false;
@@ -262,71 +252,49 @@ struct WidenNarrowMinMaxReduction final
     rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, type, result);
     return success();
   }
-
-  unsigned wideWidthInBits;
-  IsNarrowFn isNarrow;
 };
 
 // A float conversion into a narrow type converts into the wide type, whose
 // low bits hold the narrow result.
 template <typename OpTy>
-struct WidenNarrowFloatToInt final : OpRewritePattern<OpTy> {
-  WidenNarrowFloatToInt(MLIRContext *context, unsigned wideWidthInBits,
-                        IsNarrowFn isNarrow)
-      : OpRewritePattern<OpTy>(context), wideWidthInBits(wideWidthInBits),
-        isNarrow(std::move(isNarrow)) {}
+struct WidenNarrowFloatToInt final : NarrowIntegerPattern<OpTy> {
+  using NarrowIntegerPattern<OpTy>::NarrowIntegerPattern;
 
   LogicalResult matchAndRewrite(OpTy op,
                                 PatternRewriter &rewriter) const override {
     Type type = op.getType();
-    if (!isNarrow(type) || !getWideIntegerType(type, wideWidthInBits)) {
+    Type wide = this->getSelectedWideType(type);
+    if (!wide) {
       return rewriter.notifyMatchFailure(op, "not a selected narrow integer");
     }
-    Value result =
-        OpTy::create(rewriter, op.getLoc(),
-                     getWideIntegerType(type, wideWidthInBits), op.getIn());
-    rewriter.modifyOpInPlace(result.getDefiningOp(), [result, op] {
-      result.getDefiningOp()->setDiscardableAttrs(
-          op->getDiscardableAttrDictionary());
-    });
+    Value result = OpTy::create(rewriter, op.getLoc(), wide, op.getIn());
+    copyDiscardableAttrs(rewriter, op, result.getDefiningOp());
     rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, type, result);
     return success();
   }
-
-  unsigned wideWidthInBits;
-  IsNarrowFn isNarrow;
 };
 
-struct WidenNarrowSelect final : OpRewritePattern<arith::SelectOp> {
-  WidenNarrowSelect(MLIRContext *context, unsigned wideWidthInBits,
-                    IsNarrowFn isNarrow)
-      : OpRewritePattern(context), wideWidthInBits(wideWidthInBits),
-        isNarrow(std::move(isNarrow)) {}
+struct WidenNarrowSelect final : NarrowIntegerPattern<arith::SelectOp> {
+  using NarrowIntegerPattern::NarrowIntegerPattern;
 
   LogicalResult matchAndRewrite(arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
     Type type = op.getType();
-    if (!isNarrow(type) || !getWideIntegerType(type, wideWidthInBits)) {
+    Type wide = getSelectedWideType(type);
+    if (!wide) {
       return rewriter.notifyMatchFailure(op, "not a selected narrow integer");
     }
     Location loc = op.getLoc();
-    Type wide = getWideIntegerType(type, wideWidthInBits);
     Value trueValue =
         arith::ExtUIOp::create(rewriter, loc, wide, op.getTrueValue());
     Value falseValue =
         arith::ExtUIOp::create(rewriter, loc, wide, op.getFalseValue());
     Value result = arith::SelectOp::create(rewriter, loc, op.getCondition(),
                                            trueValue, falseValue);
-    rewriter.modifyOpInPlace(result.getDefiningOp(), [result, op] {
-      result.getDefiningOp()->setDiscardableAttrs(
-          op->getDiscardableAttrDictionary());
-    });
+    copyDiscardableAttrs(rewriter, op, result.getDefiningOp());
     rewriter.replaceOpWithNewOp<arith::TruncIOp>(op, type, result);
     return success();
   }
-
-  unsigned wideWidthInBits;
-  IsNarrowFn isNarrow;
 };
 
 } // namespace

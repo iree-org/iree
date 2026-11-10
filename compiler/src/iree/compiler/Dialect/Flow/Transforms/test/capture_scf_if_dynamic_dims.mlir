@@ -1,6 +1,9 @@
 // RUN: iree-opt --split-input-file --iree-flow-capture-dynamic-dims %s | FileCheck %s
 // RUN: iree-opt --split-input-file --iree-flow-capture-dynamic-dims --iree-flow-capture-dynamic-dims %s | FileCheck %s
 
+// The second RUN line captures twice: capturing already captured dimensions
+// must change nothing.
+
 // CHECK-LABEL: @captureIfDims
 // CHECK-SAME: %[[COND:[[:alnum:]]+]]
 // CHECK-SAME: %[[A:[[:alnum:]]+]]

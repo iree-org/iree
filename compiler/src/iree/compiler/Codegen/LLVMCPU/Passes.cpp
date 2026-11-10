@@ -618,7 +618,6 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       return createConvertArmSMEToLLVMPass();
     });
   }
-  modulePassManager.addPass(createLLVMCPUPropagateDispatchStatusPass());
   modulePassManager.addPass(
       createConvertToLLVMPass(cpuOpts.reassociateFpReductions));
   modulePassManager.addPass(createReconcileUnrealizedCastsPass());

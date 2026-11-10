@@ -101,6 +101,22 @@ struct SPIRVEmulateF16StoragePass final
         .getDependentDialects(registry);
   }
 
+  // Returns whether `function`, which holds no f16 values, still needs its
+  // 16-bit storage emulated in 32-bit words: it uses 16-bit storage and the
+  // target lacks native 16-bit storage or 16-bit integer arithmetic. Byte
+  // storage alone needs no emulation; its subbyte atomic updates are widened
+  // by SPIR-V conversion, not by narrow-type emulation again.
+  static bool needsWordStorageEmulation(IREE::GPU::TargetAttr target,
+                                        FunctionOpInterface function) {
+    bool nativeStorage =
+        IREE::GPU::bitEnumContainsAll(target.getWgp().getStorage().getValue(),
+                                      IREE::GPU::StorageBitwidths::B16);
+    bool nativeInteger =
+        IREE::GPU::bitEnumContainsAll(target.getWgp().getCompute().getValue(),
+                                      IREE::GPU::ComputeBitwidths::Int16);
+    return !(nativeInteger && nativeStorage) && has16BitStorage(function);
+  }
+
   void runOnOperation() override {
     FunctionOpInterface function = getOperation();
     IREE::GPU::TargetAttr target = getGPUTargetAttr(function);
@@ -110,17 +126,8 @@ struct SPIRVEmulateF16StoragePass final
     if (supportsNativeSPIRVF16(target)) {
       return;
     }
-    auto compute = target.getWgp().getCompute().getValue();
-    bool nativeStorage =
-        IREE::GPU::bitEnumContainsAll(target.getWgp().getStorage().getValue(),
-                                      IREE::GPU::StorageBitwidths::B16);
     bool emulateHalf = hasHalfValues(function);
-    bool nativeInteger = IREE::GPU::bitEnumContainsAll(
-        compute, IREE::GPU::ComputeBitwidths::Int16);
-    // Byte storage alone needs no half emulation. Its subbyte atomic updates
-    // are widened by SPIR-V conversion, not by narrow-type emulation again.
-    if (!emulateHalf &&
-        ((nativeInteger && nativeStorage) || !has16BitStorage(function))) {
+    if (!emulateHalf && !needsWordStorageEmulation(target, function)) {
       return;
     }
     OpPassManager pipeline = buildHalfEmulationPipeline(

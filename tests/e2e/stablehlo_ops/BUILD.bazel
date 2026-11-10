@@ -261,6 +261,7 @@ iree_check_single_backend_test_suite(
             "concatenate.mlir",
             "constant.mlir",
             "convert.mlir",
+            "convolution.mlir",
             "convolution_window.mlir",
             "cosine.mlir",
             "divide.mlir",
@@ -283,9 +284,12 @@ iree_check_single_backend_test_suite(
             "minimum.mlir",
             "multiply.mlir",
             "negate.mlir",
+            "pad.mlir",
+            "pad_dynamic.mlir",
             "philox.mlir",
             "pow.mlir",
             "reduce.mlir",
+            "reduce_window.mlir",
             "remainder.mlir",
             "reshape.mlir",
             "reverse.mlir",
@@ -312,13 +316,9 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "convolution.mlir",
             "exponential_fp16.mlir",
             "fft.mlir",  # TODO(#9583)
             "fft_complex.mlir",
-            "pad.mlir",
-            "pad_dynamic.mlir",
-            "reduce_window.mlir",
             "scatter_general.mlir",
             "scatter_general_complex.mlir",
         ],
@@ -327,27 +327,6 @@ iree_check_single_backend_test_suite(
         "--iree-input-demote-f64-to-f32",
     ],
     driver = "vulkan",
-    target_backend = "vulkan-spirv",
-)
-
-# Padding and window calculations retain i64 division in device code.
-iree_check_single_backend_test_suite(
-    name = "check_vulkan-spirv_vulkan_i64",
-    srcs = [
-        "convolution.mlir",
-        "pad.mlir",
-        "pad_dynamic.mlir",
-        "reduce_window.mlir",
-    ],
-    compiler_flags = [
-        "--iree-input-demote-f64-to-f32",
-        "--iree-vulkan-target=rdna3",
-    ],
-    driver = "vulkan",
-    tags = [
-        "requires-gpu-rdna3",
-        "vulkan_uses_shader_int64",
-    ],
     target_backend = "vulkan-spirv",
 )
 

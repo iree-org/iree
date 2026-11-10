@@ -40,6 +40,7 @@ iree_lit_test_suite(
     "config_user.mlir"
     "convert_gpu_target.mlir"
     "convert_to_spirv.mlir"
+    "convert_to_spirv_narrow_integers.mlir"
     "custom_pass_pipeline.mlir"
     "emulate_f16_storage.mlir"
     "emulate_f16_storage_to_spirv.mlir"

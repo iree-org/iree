@@ -34,10 +34,10 @@ class UnaryArithmeticOpConversion final : public OpConversionPattern<SrcOpTy> {
       return failure();
     }
 
-    if (isa<FloatType>(srcOp.getType()) &&
-        !isa<FloatType>(adaptor.getOperand().getType())) {
-      return rewriter.notifyMatchFailure(
-          srcOp, "unsupported floating-point arithmetic type");
+    if (!IREE::VM::isVMArithmeticType(srcOp.getType(),
+                                      adaptor.getOperand().getType())) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "unsupported scalar arithmetic type");
     }
     switch (adaptor.getOperand().getType().getIntOrFloatBitWidth()) {
     case 32:
@@ -67,10 +67,10 @@ class BinaryArithmeticOpConversion final : public OpConversionPattern<SrcOpTy> {
       return failure();
     }
 
-    if (isa<FloatType>(srcOp.getType()) &&
-        !isa<FloatType>(adaptor.getLhs().getType())) {
-      return rewriter.notifyMatchFailure(
-          srcOp, "unsupported floating-point arithmetic type");
+    if (!IREE::VM::isVMArithmeticType(srcOp.getType(),
+                                      adaptor.getLhs().getType())) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "unsupported scalar arithmetic type");
     }
     switch (adaptor.getLhs().getType().getIntOrFloatBitWidth()) {
     case 32:
@@ -103,10 +103,10 @@ class TernaryArithmeticOpConversion final
     }
 
     Type type = adaptor.getA().getType();
-    if (isa<FloatType>(srcOp.getType()) &&
-        !isa<FloatType>(adaptor.getA().getType())) {
-      return rewriter.notifyMatchFailure(
-          srcOp, "unsupported floating-point arithmetic type");
+    if (!IREE::VM::isVMArithmeticType(srcOp.getType(),
+                                      adaptor.getA().getType())) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "unsupported scalar arithmetic type");
     }
     switch (type.getIntOrFloatBitWidth()) {
     case 32:

@@ -48,7 +48,6 @@
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/ArmSVE/IR/ArmSVEDialect.h"
 #include "mlir/Dialect/ArmSVE/Transforms/Transforms.h"
-#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -58,7 +57,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
-#include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -77,8 +75,6 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h.inc"
 
 namespace {
-
-constexpr StringLiteral kReturnsStatusAttr = "iree.returns_status";
 
 template <typename OpT>
 struct ConvertOpToLLVMWithABIPattern : ConvertOpToLLVMPattern<OpT> {
@@ -127,14 +123,9 @@ struct ConvertHALEntryPointFuncOp
       return failure();
     }
     FunctionType fnType = stdFuncOp.getFunctionType();
-    bool returnsStatus = stdFuncOp->hasAttr(kReturnsStatusAttr);
-    if (fnType.getNumInputs() != 0 ||
-        (returnsStatus
-             ? fnType.getNumResults() != 1 || !fnType.getResult(0).isInteger(32)
-             : fnType.getNumResults() != 0)) {
+    if (fnType.getNumInputs() != 0 || fnType.getNumResults() != 0) {
       stdFuncOp->emitWarning()
-          << "public functions on executables must be () -> () (or () -> i32 "
-             "with iree.returns_status)";
+          << "public functions on executables must be () -> ()";
       return failure();
     }
 
@@ -155,9 +146,6 @@ struct ConvertHALEntryPointFuncOp
     SmallVector<NamedAttribute> funcAttrs;
     SmallVector<NamedAttribute> llvmAttrs;
     for (auto attr : stdFuncOp->getDiscardableAttrs()) {
-      if (attr.getName() == kReturnsStatusAttr) {
-        continue;
-      }
       StringRef name = attr.getName().strref();
       StringRef stripped = name;
       if (stripped.consume_front("llvm.") && odsAttrNames.contains(stripped)) {
@@ -192,14 +180,6 @@ struct ConvertHALEntryPointFuncOp
     if (auto noInline = stdFuncOp.getNoInlineAttr()) {
       llvmFuncOp.setNoInlineAttr(noInline);
     }
-    if (returnsStatus) {
-      SmallVector<Attribute> attributes;
-      if (auto passthrough = llvmFuncOp.getPassthroughAttr()) {
-        llvm::append_range(attributes, passthrough);
-      }
-      attributes.push_back(rewriter.getStringAttr("iree-returns-status"));
-      llvmFuncOp.setPassthroughAttr(rewriter.getArrayAttr(attributes));
-    }
     rewriter.inlineRegionBefore(stdFuncOp.getFunctionBody(),
                                 llvmFuncOp.getFunctionBody(), llvmFuncOp.end());
     if (failed(rewriter.convertRegionTypes(&llvmFuncOp.getFunctionBody(),
@@ -222,13 +202,10 @@ struct ConvertHALEntryPointFuncOp
     }
 
     // Add default zero return value.
-    // Entry points without semantic failure paths return success; non-zero
-    // will have the runtime bail out with an error.
+    // TODO(ataei): do something meaningful with the return value; non-zero will
+    // have the runtime bail out with an error.
     for (auto returnOp : llvm::make_early_inc_range(
              llvmFuncOp.getOps<mlir::func::ReturnOp>())) {
-      if (returnsStatus) {
-        continue;
-      }
       rewriter.setInsertionPoint(returnOp);
       auto returnValue = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
           returnOp.getLoc(), 0, 32);
@@ -1052,7 +1029,7 @@ public:
                     memref::MemRefDialect, linalg::LinalgDialect,
                     tosa::TosaDialect, scf::SCFDialect, vector::VectorDialect,
                     arm_neon::ArmNeonDialect, arm_sve::ArmSVEDialect,
-                    LLVM::LLVMDialect, cf::ControlFlowDialect, ub::UBDialect>();
+                    LLVM::LLVMDialect>();
   }
   void runOnOperation() override;
 };

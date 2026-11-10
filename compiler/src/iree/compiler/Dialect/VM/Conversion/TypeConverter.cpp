@@ -113,4 +113,9 @@ TypeConverter::TypeConverter(TargetOptions targetOptions)
          Location loc) -> Value { return inputs.front(); });
 }
 
+bool isVMArithmeticType(Type sourceType, Type convertedType) {
+  return isa<IntegerType, FloatType>(convertedType) &&
+         (!isa<FloatType>(sourceType) || isa<FloatType>(convertedType));
+}
+
 } // namespace mlir::iree_compiler::IREE::VM

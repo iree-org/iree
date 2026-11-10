@@ -18,7 +18,6 @@ iree_lit_test_suite(
     "early_data_tiling_convolution_x86_64.mlir"
     "early_data_tiling_dynamic_x86_64.mlir"
     "early_data_tiling_x86_64.mlir"
-    "executable_library_version.mlir"
     "executable_object_data.mlir"
     "hal_target_device_attributes.mlir"
     "materialize_homogeneous_encodings.mlir"

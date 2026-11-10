@@ -40,44 +40,13 @@ typedef struct iree_hal_vulkan_builtins_t {
 
   // Compute pipeline patching partial dwords for unaligned updates.
   VkPipeline update_pipeline;
-
-  // Descriptor range limits of the physical device.
-  VkDeviceSize max_storage_buffer_range;
-  VkDeviceSize max_uniform_buffer_range;
-
-  // One device-local word bound in place of an empty descriptor range, which
-  // Vulkan does not allow.
-  VkBuffer empty_binding_buffer;
-  VkDeviceMemory empty_binding_memory;
-  // The word's device address under the BDA dispatch ABI, or 0 without it.
-  VkDeviceAddress empty_binding_address;
 } iree_hal_vulkan_builtins_t;
 
 // Initializes built-in Vulkan pipelines for |logical_device|.
-// |device_addresses| is true when the device enables the BDA dispatch ABI.
 iree_status_t iree_hal_vulkan_builtins_initialize(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
-    bool device_addresses, iree_hal_vulkan_builtins_t* out_builtins);
-
-// Returns in |out_length| the descriptor range length for [|offset|,
-// |offset| + |length|) of |buffer|, extended to whole units of
-// |minimum_access_bytes| within the bytes the range owns. Needs no backing, so
-// queue submissions may check bindings of buffers not yet allocated.
-iree_status_t iree_hal_vulkan_builtins_resolve_descriptor_length(
-    const iree_hal_vulkan_builtins_t* builtins,
-    VkDescriptorType descriptor_type, uint32_t minimum_access_bytes,
-    iree_hal_buffer_t* buffer, iree_device_size_t offset,
-    iree_device_size_t length, iree_device_size_t* out_length);
-
-// Resolves the descriptor for [|offset|, |offset| + |length|) of |buffer|.
-// The range extends to whole units of |minimum_access_bytes| within the bytes
-// the range owns; an empty range binds the empty-binding buffer.
-iree_status_t iree_hal_vulkan_builtins_resolve_buffer_descriptor(
-    const iree_hal_vulkan_builtins_t* builtins,
-    VkDescriptorType descriptor_type, uint32_t minimum_access_bytes,
-    iree_hal_buffer_t* buffer, iree_device_size_t offset,
-    iree_device_size_t length, VkDescriptorBufferInfo* out_buffer_info);
+    iree_hal_vulkan_builtins_t* out_builtins);
 
 // Deinitializes built-in Vulkan pipelines and releases device handles.
 void iree_hal_vulkan_builtins_deinitialize(

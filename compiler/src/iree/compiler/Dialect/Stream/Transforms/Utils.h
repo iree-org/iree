@@ -8,21 +8,11 @@
 #define IREE_COMPILER_DIALECT_STREAM_TRANSFORMS_UTILS_H_
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "llvm/ADT/STLFunctionalExtras.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler::IREE::Stream {
-
-/// Runs |callback| on each direct func.func, util.func, and util.initializer in
-/// |moduleOp|, in parallel when threading is enabled. Returns failure if any
-/// callback fails. The calling pass must own |moduleOp|.
-/// Callbacks may read device global attributes, but may modify
-/// only descendants of their supplied operation; module symbols stay stable.
-LogicalResult
-runOnFunctionLikeOps(ModuleOp moduleOp,
-                     llvm::function_ref<LogicalResult(Operation *)> callback);
 
 //===----------------------------------------------------------------------===//
 // Dialect Interface Utilities

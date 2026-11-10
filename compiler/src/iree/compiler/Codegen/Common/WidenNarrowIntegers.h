@@ -13,13 +13,17 @@
 
 namespace mlir::iree_compiler {
 
-// Selectors are copied into the patterns; their captures must remain valid
-// while the patterns run. Only scalar/vector integer types below the requested
-// width are widened.
-//
-// Populates patterns that run ops reading the high bits of integers matching
-// `isNarrow` at `wideWidthInBits` bits, on operands extended by their
-// signedness.
+// The populate functions below add patterns that compute operations on narrow
+// integers in a wider integer type. A narrow integer is a scalar or vector
+// integer type that matches `isNarrow` and is narrower than `wideWidthInBits`.
+// Emulated storage may hold such a value in the low bits of a wider word, with
+// undefined high bits. `isNarrow` is copied into the patterns; values it
+// captures must remain valid while the patterns run.
+
+// Populates patterns for operations whose result depends on the high bits of
+// their operands, such as division, right shifts, minimum, maximum and signed
+// comparisons. Each operand is first extended to `wideWidthInBits` bits by the
+// operation's signedness; a narrow result is truncated back.
 void populateWidenNarrowIntegerHighBitOpPatterns(
     RewritePatternSet &patterns, unsigned wideWidthInBits,
     const std::function<bool(Type)> &isNarrow);
@@ -30,8 +34,10 @@ void populateWidenNarrowIntegerBitCountPatterns(
     RewritePatternSet &patterns, unsigned wideWidthInBits,
     const std::function<bool(Type)> &isNarrow);
 
-// Populates operations whose low bits give the narrow result. Widened integer
-// arithmetic drops narrow overflow flags, which do not describe its operands.
+// Populates patterns for operations whose low bits give the narrow result,
+// such as addition and multiplication, computed at `wideWidthInBits` bits.
+// Widened integer arithmetic drops narrow overflow flags, which do not
+// describe its operands.
 void populateWidenNarrowIntegerLowBitOpPatterns(
     RewritePatternSet &patterns, unsigned wideWidthInBits,
     const std::function<bool(Type)> &isNarrow);

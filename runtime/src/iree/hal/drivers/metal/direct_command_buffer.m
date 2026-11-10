@@ -1021,8 +1021,8 @@ static iree_status_t iree_hal_metal_command_segment_record_arguments(
   // TODO(antiagainst): Use a cache layer to cache and reuse argument buffers with the same
   // content, to avoid duplicating overhead.
   id<MTLBuffer> argument_buffer = command_buffer->staging_buffer->metal_buffer;
-  id<MTLArgumentEncoder> argument_encoder =
-      [segment->pipeline->function newArgumentEncoderWithBufferIndex:0];  // +1
+  id<MTLArgumentEncoder> argument_encoder = [segment->pipeline->function
+      newArgumentEncoderWithBufferIndex:IREE_HAL_METAL_ARGUMENT_BUFFER_INDEX];  // +1
   IREE_ASSERT(argument_encoder != nil);
 
   // Reserve space for the argument buffer from shared staging buffer.
@@ -1053,7 +1053,9 @@ static iree_status_t iree_hal_metal_command_segment_record_arguments(
     [compute_encoder useResource:current_buffer usage:descriptors[i].usage];
   }
   // Record the argument buffer.
-  [compute_encoder setBuffer:argument_buffer offset:argument_buffer_offset atIndex:0];
+  [compute_encoder setBuffer:argument_buffer
+                      offset:argument_buffer_offset
+                     atIndex:IREE_HAL_METAL_ARGUMENT_BUFFER_INDEX];
 
   [argument_encoder release];  // -1
 

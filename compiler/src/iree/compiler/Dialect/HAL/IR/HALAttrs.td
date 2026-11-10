@@ -851,16 +851,6 @@ def HAL_DeviceTargetAttr : HAL_AttrDef<"DeviceTarget", [
     by the runtime (such as `cpu`, `vulkan`, etc). Target devices may support
     several target executable formats specified with `#hal.executable.target`.
     An optional configuration dictionary allows for overriding backend defaults.
-    The `stream.min_access_granularity`, `stream.min_fill_granularity`, and
-    `stream.min_copy_granularity` settings specify storage access units in bytes.
-    Each must be a positive power of two representable in a signed 64-bit integer.
-    These units constrain independent storage slices and their binding ranges.
-    Default target construction supplies minima required by registered device
-    and executable providers. Explicit targets and alias overrides must declare
-    units at least as large as those requirements; device verification diagnoses
-    smaller or omitted units before resource scheduling. Larger units are
-    preserved. Providers may leave a unit at one when they impose no additional
-    constraint in that category.
 
     If used to initialize a device global returns the first device matching the
     target requirements or null if no devices match. An optional `ordinal`
@@ -919,7 +909,6 @@ def HAL_DeviceTargetAttr : HAL_AttrDef<"DeviceTarget", [
         OpBuilder &builder);
   }];
 
-  let genVerifyDecl = 1;
   let hasCustomAssemblyFormat = 1;
 }
 
@@ -1034,7 +1023,6 @@ def HAL_DeviceSelectAttr : HAL_AttrDef<"DeviceSelect", [
 
 def HAL_DeviceAffinityAttr : HAL_AttrDef<"DeviceAffinity", [
   DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
-    "lookupResourceConfigAttr",
     "isExecutableWith",
     "joinOR",
     "joinAND",
@@ -1121,7 +1109,6 @@ def HAL_DevicePromiseAttr : HAL_AttrDef<"DevicePromise", [
 
 def HAL_DeviceOptimalAttr : HAL_AttrDef<"DeviceOptimal", [
   DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
-    "lookupResourceConfigAttr",
     "isExecutableWith",
     "joinOR",
     "joinAND",

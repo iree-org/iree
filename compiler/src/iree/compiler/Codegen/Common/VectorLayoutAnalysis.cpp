@@ -564,6 +564,30 @@ static bool isCheapToClone(Operation *op) {
 /// leaves, constants, or non-vector operands. Returns true if the entire
 /// chain is safe to clone. Shared intermediates (with multiple uses) are
 /// allowed because all ops in the chain are cheap to duplicate.
+/// Returns whether |op| is in |block| or in a block of a region enclosing it.
+/// Producers in an enclosing block dominate every op of |block|; producers in
+/// a sibling block of the same region do not.
+static bool isInBlockOrEnclosingBlock(Operation *op, Block *block) {
+  Block *opBlock = op->getBlock();
+  if (opBlock == block) {
+    return true;
+  }
+  Region *opRegion = opBlock->getParent();
+  return opRegion != block->getParent() &&
+         opRegion->isAncestor(block->getParent());
+}
+
+/// Returns where to clone |chain| for the use |val|: before its first op when
+/// the chain is in one block, otherwise at the use, where all operands of a
+/// chain spanning enclosing blocks are available.
+static Operation *getChainCloneInsertionPoint(ArrayRef<Operation *> chain,
+                                              OpOperand *val) {
+  Block *firstBlock = chain.front()->getBlock();
+  bool inOneBlock = llvm::all_of(
+      chain, [&](Operation *op) { return op->getBlock() == firstBlock; });
+  return inOneBlock ? chain.front() : val->getOwner();
+}
+
 static bool collectDuplicatableChain(Operation *op,
                                      SmallVectorImpl<Operation *> &chain) {
   // The chain is built bottom-up (from consumer toward producers).
@@ -605,11 +629,7 @@ static bool collectDuplicatableChain(Operation *op,
       if (defOp->hasTrait<OpTrait::ConstantLike>()) {
         continue;
       }
-      // Producers in an enclosing block dominate every op of |block|.
-      Block *defBlock = defOp->getBlock();
-      if (defBlock != block &&
-          (defBlock->getParent() == block->getParent() ||
-           !defBlock->getParent()->isAncestor(block->getParent()))) {
+      if (!isInBlockOrEnclosingBlock(defOp, block)) {
         return false;
       }
       worklist.push(defOp);
@@ -650,12 +670,7 @@ void LayoutAnalysis::setLayoutOrClone(OpOperand *val,
         // Sort so cloning visits producers before consumers.
         computeTopologicalSorting(chain);
         IRMapping mapping;
-        // A chain spanning enclosing blocks is cloned at the use, where all of
-        // its operands are available.
-        bool oneBlock = llvm::all_of(chain, [&](Operation *op) {
-          return op->getBlock() == chain.front()->getBlock();
-        });
-        b.setInsertionPoint(oneBlock ? chain.front() : val->getOwner());
+        b.setInsertionPoint(getChainCloneInsertionPoint(chain, val));
         for (Operation *op : chain) {
           b.clone(*op, mapping);
         }

@@ -326,8 +326,15 @@ static iree_status_t iree_hal_metal_collect_used_bindings(MTLComputePipelineRefl
                                                           iree_host_size_t binding_count,
                                                           uint64_t* out_binding_used_bits) {
   *out_binding_used_bits = 0;
+  if (!reflection) {
+    // Without reflection every binding would be skipped at dispatch.
+    return iree_make_status(IREE_STATUS_INTERNAL,
+                            "Metal returned no reflection for the compute pipeline");
+  }
   for (id<MTLBinding> binding in reflection.bindings) {
-    if (binding.type != MTLBindingTypeBuffer || binding.index != 0) {
+    // Only the argument buffer holds bindings; other buffers hold constants.
+    if (binding.type != MTLBindingTypeBuffer ||
+        binding.index != IREE_HAL_METAL_ARGUMENT_BUFFER_INDEX) {
       continue;
     }
     id<MTLBufferBinding> buffer_binding = (id<MTLBufferBinding>)binding;
@@ -376,7 +383,8 @@ static iree_status_t iree_hal_metal_create_pipeline(id<MTLDevice> device, id<MTL
         [descriptor setThreadGroupSizeIsMultipleOfThreadExecutionWidth:
                         iree_hal_metal_PipelineDef_threadgroup_size_aligned_get(pipeline_def)];
       }
-      [[[descriptor buffers] objectAtIndexedSubscript:0] setMutability:MTLMutabilityImmutable];
+      [[[descriptor buffers] objectAtIndexedSubscript:IREE_HAL_METAL_ARGUMENT_BUFFER_INDEX]
+          setMutability:MTLMutabilityImmutable];
       [[[descriptor buffers] objectAtIndexedSubscript:IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX]
           setMutability:MTLMutabilityImmutable];
 
