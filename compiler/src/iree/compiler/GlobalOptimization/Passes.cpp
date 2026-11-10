@@ -240,6 +240,10 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(mlir::createCSEPass);
   mainPassManager.addPass(
       GlobalOptimization::createConvertStridedContractionToContractionPass());
+  // After transposes have been folded into their consumers, so an oversized
+  // constant is read by the op that indexes it, and before constant
+  // expressions are hoisted and evaluated into new globals.
+  mainPassManager.addPass(GlobalOptimization::createSplitLargeConstantsPass());
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.earlyDataTiling) {
