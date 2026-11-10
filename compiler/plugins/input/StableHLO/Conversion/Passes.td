@@ -64,12 +64,13 @@ def LegalizeStableHLOCustomCalls :
     InterfacePass<"iree-stablehlo-legalize-custom-calls", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes specialized custom calls to decomposed implementations";
   let description = [{
-    Lowers supported custom calls, including shape assertions, to their IREE
-    implementations. Shape assertions remain runtime status checks. Supported
-    dimension equalities, affine ties, bounds and divisibility facts are analyzed
-    without modifying IR, then materialized after the assertions establishing
-    them. Only dominated original uses are rewritten; assertion predicates retain
-    their original operands. Unsupported or overflowing proofs add no facts.
+    Lowers supported custom calls to their IREE implementations. Shape assertions
+    describe the export's supported input domain and are dropped after extracting
+    supported dimension equalities, affine ties, bounds and divisibility facts.
+    Facts are analyzed without modifying IR, then materialized after the
+    assertions establishing them. Only dominated original uses are rewritten.
+    Unsupported or overflowing proofs add no facts. Callers must satisfy the
+    exported shape constraints; this pass does not add runtime validation.
   }];
 }
 

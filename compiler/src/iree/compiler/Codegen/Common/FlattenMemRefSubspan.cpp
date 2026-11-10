@@ -103,6 +103,12 @@ getBindingForPreservedView(Value value) {
   return {};
 }
 
+// Returns whether `binding` has no byte offset or a constant zero one.
+static bool hasZeroByteOffset(IREE::HAL::InterfaceBindingSubspanOp binding) {
+  Value byteOffset = binding.getByteOffset();
+  return !byteOffset || matchPattern(byteOffset, m_Zero());
+}
+
 // A binding offset is part of the logical view even when its rank is already
 // zero or one. Its consumers must adopt the replacement view's layout before
 // the alias-folding patterns move that offset into their indices.
@@ -111,8 +117,7 @@ static bool isFlattenedMemRef(Value value) {
     return false;
   }
   auto binding = getBindingForPreservedView(value);
-  return !binding || !binding.getByteOffset() ||
-         matchPattern(binding.getByteOffset(), m_Zero());
+  return !binding || hasZeroByteOffset(binding);
 }
 
 // A nonzero binding offset becomes a subview of the zero-offset base. Match
@@ -120,8 +125,7 @@ static bool isFlattenedMemRef(Value value) {
 // requesting a cast back to the original identity layout.
 static std::optional<Type> getFlattenedBindingViewType(Value value) {
   auto binding = getBindingForPreservedView(value);
-  if (!binding || !binding.getByteOffset() ||
-      matchPattern(binding.getByteOffset(), m_Zero())) {
+  if (!binding || hasZeroByteOffset(binding)) {
     return std::nullopt;
   }
   auto type = dyn_cast<MemRefType>(value.getType());
@@ -325,7 +329,7 @@ struct FlattenBindingSubspan final
     auto byteOffset = subspanOp.getByteOffset();
     Location loc = subspanOp.getLoc();
     OpFoldResult elementOffset = rewriter.getIndexAttr(0);
-    if (byteOffset && !matchPattern(byteOffset, m_Zero())) {
+    if (!hasZeroByteOffset(subspanOp)) {
       elementOffset = convertByteOffsetToElementOffset(
           rewriter, loc, byteOffset, oldType.getElementType());
       // The element offset needs to look dynamic.
@@ -913,11 +917,7 @@ struct FlattenMemRefSubspanPass final
             });
     target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp>(
         [&](IREE::HAL::InterfaceBindingSubspanOp op) {
-          if (!isRankZeroOrOneMemRef(op.getType())) {
-            return false;
-          }
-          auto byteOffset = op.getByteOffset();
-          return !byteOffset || matchPattern(byteOffset, m_Zero());
+          return isRankZeroOrOneMemRef(op.getType()) && hasZeroByteOffset(op);
         });
     target.addDynamicallyLegalOp<memref::GlobalOp>([](memref::GlobalOp op) {
       return isRankZeroOrOneMemRef(op.getType());

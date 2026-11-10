@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// Lowers supported StableHLO custom calls and preserves runtime shape
-// assertions. Assertion analysis and IR materialization have separate mutation
-// boundaries.
+// Lowers supported StableHLO custom calls, preserves usable shape facts, and
+// drops runtime shape assertions. Assertion analysis and IR materialization
+// have separate mutation boundaries.
 
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Rewriters.h"
-#include "compiler/plugins/input/StableHLO/Conversion/StableHLOStatusCheck.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -26,12 +25,10 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
-#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
-#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Interfaces/Utils/InferIntRangeCommon.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -369,6 +366,20 @@ static std::optional<DimensionSize> matchDimensionSize(Value value,
   return DimensionSize{{sizeOp.getOperand(), dim}, sizeOp};
 }
 
+// Returns whether `call` is a shape assertion as JAX exports it: a predicate
+// operand, optional error-message arguments, an error message and no results.
+// Only such assertions contribute facts.
+static bool isWellFormedShapeAssertion(mlir::stablehlo::CustomCallOp call) {
+  return call.getCallTargetName() == "shape_assertion" &&
+         call.getNumOperands() != 0 && call.getNumResults() == 0 &&
+         call->getAttrOfType<StringAttr>("error_message");
+}
+
+// Returns whether `value` is a boolean or a tensor of booleans.
+static bool isI1(Value value) {
+  return getElementTypeOrSelf(value).isInteger(1);
+}
+
 static std::optional<int64_t> matchIntegerConstant(Value value) {
   APInt constant;
   if (!matchPattern(value, m_ConstantInt(&constant))) {
@@ -380,6 +391,149 @@ static std::optional<int64_t> matchIntegerConstant(Value value) {
   // An i1 true is 1, not -1.
   return constant.getBitWidth() == 1 ? constant.getZExtValue()
                                      : constant.getSExtValue();
+}
+
+// `factor * term + addend` for one constant arithmetic step.
+struct AffineStep {
+  int64_t factor;
+  int64_t addend;
+};
+
+// Returns the step of `op`, an add, subtract or multiply with exactly one
+// constant operand, and sets `term` to the other operand.
+static std::optional<AffineStep> matchConstantStep(Operation *op, Value &term) {
+  if (op->getNumOperands() != 2) {
+    return std::nullopt;
+  }
+  Value lhs = op->getOperand(0);
+  Value rhs = op->getOperand(1);
+  std::optional<int64_t> lhsConstant = matchIntegerConstant(lhs);
+  std::optional<int64_t> rhsConstant = matchIntegerConstant(rhs);
+  if (lhsConstant.has_value() == rhsConstant.has_value()) {
+    return std::nullopt;
+  }
+  int64_t constant = lhsConstant ? *lhsConstant : *rhsConstant;
+  term = lhsConstant ? rhs : lhs;
+  if (isa<mlir::stablehlo::AddOp>(op)) {
+    return AffineStep{1, constant};
+  }
+  if (isa<mlir::stablehlo::SubtractOp>(op)) {
+    if (lhsConstant) {
+      return AffineStep{-1, constant};
+    }
+    std::optional<int64_t> negated = llvm::checkedSub(int64_t{0}, constant);
+    return negated ? std::optional(AffineStep{1, *negated}) : std::nullopt;
+  }
+  if (isa<mlir::stablehlo::MulOp>(op) && constant != 0) {
+    return AffineStep{constant, 0};
+  }
+  return std::nullopt;
+}
+
+// Returns `affine` after multiplying by the step's factor and adding its
+// addend, or nullopt on int64 overflow. Keeps scale / divisor in lowest terms,
+// so an integer multiple of the quotient reads as a multiple of the size.
+static std::optional<AffineSizeExpression>
+applyAffineStep(const AffineSizeExpression &affine, AffineStep step) {
+  std::optional<int64_t> scale = llvm::checkedMul(affine.scale, step.factor);
+  std::optional<int64_t> offset = llvm::checkedMul(affine.offset, step.factor);
+  std::optional<int64_t> low = llvm::checkedMul(affine.low, step.factor);
+  std::optional<int64_t> high = llvm::checkedMul(affine.high, step.factor);
+  if (!scale || !offset || !low || !high) {
+    return std::nullopt;
+  }
+  if (step.factor < 0) {
+    std::swap(low, high);
+  }
+  offset = llvm::checkedAdd(*offset, step.addend);
+  low = llvm::checkedAdd(*low, step.addend);
+  high = llvm::checkedAdd(*high, step.addend);
+  if (!offset || !low || !high) {
+    return std::nullopt;
+  }
+  if (affine.divisor == 1) {
+    return AffineSizeExpression{affine.dim, *scale, *offset,
+                                *low,       *high,  affine.divisor};
+  }
+  // std::gcd requires the signed magnitude to be representable.
+  if (*scale == std::numeric_limits<int64_t>::min()) {
+    return std::nullopt;
+  }
+  int64_t common = std::gcd(*scale, affine.divisor);
+  return AffineSizeExpression{affine.dim, *scale / common,        *offset, *low,
+                              *high,      affine.divisor / common};
+}
+
+// Returns `direction` with both sides swapped or negated.
+static mlir::stablehlo::ComparisonDirection
+mirrorDirection(mlir::stablehlo::ComparisonDirection direction) {
+  using mlir::stablehlo::ComparisonDirection;
+  switch (direction) {
+  case ComparisonDirection::GE:
+    return ComparisonDirection::LE;
+  case ComparisonDirection::GT:
+    return ComparisonDirection::LT;
+  case ComparisonDirection::LE:
+    return ComparisonDirection::GE;
+  case ComparisonDirection::LT:
+    return ComparisonDirection::GT;
+  default:
+    return direction;
+  }
+}
+
+// Returns the range of sizes `size <direction> bound` admits, or nullopt for
+// an equality direction or an overflowing strict bound.
+static std::optional<DimensionRange>
+getRangeForBound(mlir::stablehlo::ComparisonDirection direction,
+                 int64_t bound) {
+  using mlir::stablehlo::ComparisonDirection;
+  DimensionRange range;
+  switch (direction) {
+  case ComparisonDirection::GE:
+    range.umin = bound;
+    return range;
+  case ComparisonDirection::GT:
+    range.umin = llvm::checkedAdd(bound, int64_t{1});
+    return range.umin ? std::optional(range) : std::nullopt;
+  case ComparisonDirection::LE:
+    range.umax = bound;
+    return range;
+  case ComparisonDirection::LT:
+    range.umax = llvm::checkedSub(bound, int64_t{1});
+    return range.umax ? std::optional(range) : std::nullopt;
+  default:
+    return std::nullopt;
+  }
+}
+
+// Scales the ends of `range`, a bound on a quotient, by `divisor` to bound
+// the size it exactly divides. Returns false on overflow.
+static bool scaleRangeToDividend(DimensionRange &range, int64_t divisor) {
+  for (std::optional<int64_t> *end : {&range.umin, &range.umax}) {
+    if (!*end) {
+      continue;
+    }
+    *end = llvm::checkedMul(**end, divisor);
+    if (!*end) {
+      return false;
+    }
+  }
+  if (divisor > 1) {
+    range.udiv = divisor;
+  }
+  return true;
+}
+
+// Returns whether `range` excludes some sizes: every size meets a lower bound
+// of at most 0 or an upper bound of INT32_MAX, and none meets a negative
+// upper bound.
+static bool isInformativeSizeRange(const DimensionRange &range) {
+  if (range.umin && *range.umin <= 0) {
+    return false;
+  }
+  return !range.umax || (*range.umax >= 0 &&
+                         *range.umax < std::numeric_limits<int32_t>::max());
 }
 // Evaluates predicates over one dimension without modifying IR. Caches belong
 // to a single block/range evaluation; zero and positive evaluations share only
@@ -442,94 +596,103 @@ private:
 
   std::optional<Interval>
   evaluateUncached(Value value, EvaluationContext &context, int depth) {
-    Block *block = context.block;
-    Interval sizes = context.sizes;
-    auto &key = context.dimension;
+    // Intervals hold signed values; unsigned arithmetic and NOTYPE comparisons
+    // on unsigned types would need unsigned semantics.
+    if (getElementTypeOrSelf(value).isUnsignedInteger()) {
+      return std::nullopt;
+    }
     if (std::optional<int64_t> constant = matchIntegerConstant(value)) {
       return Interval{*constant, *constant};
     }
-    if (std::optional<DimensionSize> dim = matchDimensionSize(value, block)) {
-      if (key && !(*key == dim->key)) {
-        return std::nullopt;
-      }
-      key = dim->key;
-      return sizes;
+    if (std::optional<DimensionSize> dim =
+            matchDimensionSize(value, context.block)) {
+      return evaluateDimension(*dim, context);
     }
     Operation *op = value.getDefiningOp();
-    if (!op || op->getBlock() != block || depth > 32) {
+    if (!op || op->getBlock() != context.block || depth > 32) {
       return std::nullopt;
     }
+    return evaluateOperation(op, value, context, depth);
+  }
+
+  // Evaluates `value`, a result of `op`, from its operands' intervals.
+  std::optional<Interval> evaluateOperation(Operation *op, Value value,
+                                            EvaluationContext &context,
+                                            int depth) {
     auto operand = [&](unsigned i) {
       return evaluate(op->getOperand(i), context, depth + 1);
     };
-    auto isI1 = [](Value v) { return getElementTypeOrSelf(v).isInteger(1); };
-    if (auto convert = dyn_cast<mlir::stablehlo::ConvertOp>(op)) {
-      if (convert.getOperand().getType() != convert.getType()) {
-        return std::nullopt;
-      }
-      return operand(0);
-    }
     if (isa<mlir::stablehlo::SignOp>(op)) {
-      std::optional<Interval> x = operand(0);
-      if (!x) {
-        return std::nullopt;
-      }
-      auto sign = [](int64_t v) -> int64_t { return (v > 0) - (v < 0); };
-      return Interval{sign(x->lo), sign(x->hi)};
+      return evaluateSign(operand(0));
     }
-    if (isa<mlir::stablehlo::NotOp>(op) && isI1(value)) {
-      std::optional<Interval> x = operand(0);
-      if (!x) {
-        return std::nullopt;
-      }
-      return Interval{1 - x->hi, 1 - x->lo};
+    if (isa<mlir::stablehlo::NotOp>(op)) {
+      return isI1(value) ? evaluateBooleanNot(operand(0)) : std::nullopt;
     }
-    if (auto select = dyn_cast<mlir::stablehlo::SelectOp>(op)) {
-      std::optional<Interval> pred = operand(0);
-      std::optional<Interval> onTrue = operand(1);
-      std::optional<Interval> onFalse = operand(2);
-      if (!pred || !onTrue || !onFalse) {
-        return std::nullopt;
-      }
-      if (pred->lo == pred->hi) {
-        return pred->lo ? onTrue : onFalse;
-      }
-      return Interval{std::min(onTrue->lo, onFalse->lo),
-                      std::max(onTrue->hi, onFalse->hi)};
+    if (isa<mlir::stablehlo::SelectOp>(op)) {
+      return evaluateSelect(operand(0), operand(1), operand(2));
+    }
+    if (auto convert = dyn_cast<mlir::stablehlo::ConvertOp>(op)) {
+      bool keepsType = convert.getOperand().getType() == convert.getType();
+      return keepsType ? operand(0) : std::nullopt;
     }
     if (op->getNumOperands() != 2) {
       return std::nullopt;
     }
-    auto lhs = operand(0);
-    auto rhs = operand(1);
+    std::optional<Interval> lhs = operand(0);
+    std::optional<Interval> rhs = operand(1);
     if (!lhs || !rhs) {
       return std::nullopt;
     }
     return evaluateBinary(op, value, *lhs, *rhs);
   }
 
-  static std::optional<Interval> evaluateBinary(Operation *op, Value value,
-                                                Interval lhs, Interval rhs) {
-    auto isI1 = [](Value v) { return getElementTypeOrSelf(v).isInteger(1); };
-    if (isI1(value) && isa<mlir::stablehlo::AndOp, mlir::stablehlo::OrOp>(op)) {
-      if (isa<mlir::stablehlo::AndOp>(op)) {
-        return Interval{lhs.lo & rhs.lo, lhs.hi & rhs.hi};
-      }
-      return Interval{lhs.lo | rhs.lo, lhs.hi | rhs.hi};
-    }
-    // Arithmetic on i1 is logical, not modelled here.
-    if (isI1(value) && !isa<mlir::stablehlo::CompareOp>(op)) {
+  static std::optional<Interval> evaluateSign(std::optional<Interval> x) {
+    if (!x) {
       return std::nullopt;
     }
+    auto sign = [](int64_t v) -> int64_t { return (v > 0) - (v < 0); };
+    return Interval{sign(x->lo), sign(x->hi)};
+  }
+
+  static std::optional<Interval> evaluateBooleanNot(std::optional<Interval> x) {
+    if (!x) {
+      return std::nullopt;
+    }
+    return Interval{1 - x->hi, 1 - x->lo};
+  }
+
+  // Returns the size interval of `dim`, which must be the dimension this
+  // evaluation tracks; the first dimension met becomes the tracked one.
+  static std::optional<Interval> evaluateDimension(const DimensionSize &dim,
+                                                   EvaluationContext &context) {
+    if (context.dimension && !(*context.dimension == dim.key)) {
+      return std::nullopt;
+    }
+    context.dimension = dim.key;
+    return context.sizes;
+  }
+
+  // A decided predicate selects one arm; otherwise either arm is possible.
+  static std::optional<Interval>
+  evaluateSelect(std::optional<Interval> pred, std::optional<Interval> onTrue,
+                 std::optional<Interval> onFalse) {
+    if (!pred || !onTrue || !onFalse) {
+      return std::nullopt;
+    }
+    if (pred->lo == pred->hi) {
+      return pred->lo ? onTrue : onFalse;
+    }
+    return Interval{std::min(onTrue->lo, onFalse->lo),
+                    std::max(onTrue->hi, onFalse->hi)};
+  }
+
+  static std::optional<Interval> evaluateBinary(Operation *op, Value value,
+                                                Interval lhs, Interval rhs) {
+    if (isI1(value)) {
+      return evaluateBoolean(op, lhs, rhs);
+    }
     if (isa<mlir::stablehlo::DivOp, mlir::stablehlo::RemOp>(op)) {
-      // Only non-negative values by a positive constant.
-      if (rhs.lo != rhs.hi || rhs.lo <= 0 || lhs.lo < 0) {
-        return std::nullopt;
-      }
-      if (isa<mlir::stablehlo::DivOp>(op)) {
-        return Interval{lhs.lo / rhs.lo, lhs.hi / rhs.lo};
-      }
-      return lhs.hi < rhs.lo ? lhs : Interval{0, rhs.lo - 1};
+      return evaluateDivision(op, lhs, rhs);
     }
     if (isa<mlir::stablehlo::AddOp, mlir::stablehlo::SubtractOp,
             mlir::stablehlo::MulOp>(op)) {
@@ -537,6 +700,35 @@ private:
           op, lhs, rhs, getElementTypeOrSelf(value).getIntOrFloatBitWidth());
     }
     return evaluateComparison(op, lhs, rhs);
+  }
+
+  // Evaluates an op with an i1 result: and, or and comparisons. Other i1
+  // arithmetic is logical, not modelled here.
+  static std::optional<Interval> evaluateBoolean(Operation *op, Interval lhs,
+                                                 Interval rhs) {
+    if (isa<mlir::stablehlo::AndOp>(op)) {
+      return Interval{lhs.lo & rhs.lo, lhs.hi & rhs.hi};
+    }
+    if (isa<mlir::stablehlo::OrOp>(op)) {
+      return Interval{lhs.lo | rhs.lo, lhs.hi | rhs.hi};
+    }
+    if (isa<mlir::stablehlo::CompareOp>(op)) {
+      return evaluateComparison(op, lhs, rhs);
+    }
+    return std::nullopt;
+  }
+
+  // Evaluates a quotient or remainder of non-negative values by a positive
+  // constant.
+  static std::optional<Interval> evaluateDivision(Operation *op, Interval lhs,
+                                                  Interval rhs) {
+    if (rhs.lo != rhs.hi || rhs.lo <= 0 || lhs.lo < 0) {
+      return std::nullopt;
+    }
+    if (isa<mlir::stablehlo::DivOp>(op)) {
+      return Interval{lhs.lo / rhs.lo, lhs.hi / rhs.lo};
+    }
+    return lhs.hi < rhs.lo ? lhs : Interval{0, rhs.lo - 1};
   }
 
   static std::optional<Interval> evaluateArithmetic(Operation *op, Interval lhs,
@@ -683,123 +875,82 @@ private:
     });
   }
 
-  // Iterative recognition of constant arithmetic steps avoids native-stack
-  // growth with expression depth. Checked accumulation declines unsafe proofs.
-  std::optional<AffineSizeExpression> matchAffineExpression(Value value,
-                                                            Block *block) {
-    // `factor * term + addend` for one step.
-    struct Step {
-      int64_t factor;
-      int64_t addend;
-    };
-    SmallVector<Step> steps;
-    std::optional<DimensionSize> dim;
-    int64_t divisor = 1;
-    while (!(dim = matchDimensionSize(
-                 value = predicates.peelDecidedValue(value, block), block))) {
+  // A dimension size, or its quotient by a divisor an assertion proves, at the
+  // root of an affine expression.
+  struct AffineRoot {
+    DimensionSize dim;
+    int64_t divisor;
+  };
+
+  // Follows constant arithmetic steps from `value` to a dimension size or a
+  // proven exact quotient of one, appending each step outermost first.
+  // Iterating instead of recursing avoids native-stack growth with expression
+  // depth.
+  std::optional<AffineRoot>
+  collectAffineSteps(Value value, Block *block,
+                     SmallVectorImpl<AffineStep> &steps) {
+    while (true) {
+      value = predicates.peelDecidedValue(value, block);
+      if (std::optional<DimensionSize> dim = matchDimensionSize(value, block)) {
+        return AffineRoot{*dim, 1};
+      }
       Operation *op = value.getDefiningOp();
       if (!op || op->getBlock() != block) {
         return std::nullopt;
       }
-      // A quotient of the size by a constant an assertion proves divides it.
       if (auto divide = dyn_cast<mlir::stablehlo::DivOp>(op)) {
-        std::optional<int64_t> constant = matchIntegerConstant(divide.getRhs());
-        dim = matchDimensionSize(
-            predicates.peelDecidedValue(divide.getLhs(), block), block);
-        if (!constant || *constant <= 0 || !dim ||
-            !isDivisible(dim->key, *constant, block)) {
-          return std::nullopt;
-        }
-        divisor = *constant;
-        break;
+        return matchDivisibleQuotient(divide, block);
       }
-      if (op->getNumOperands() != 2) {
+      std::optional<AffineStep> step = matchConstantStep(op, value);
+      if (!step) {
         return std::nullopt;
       }
-      Value lhs = op->getOperand(0);
-      Value rhs = op->getOperand(1);
-      std::optional<int64_t> lhsConstant = matchIntegerConstant(lhs);
-      std::optional<int64_t> rhsConstant = matchIntegerConstant(rhs);
-      if (lhsConstant.has_value() == rhsConstant.has_value()) {
-        return std::nullopt;
-      }
-      int64_t constant = lhsConstant ? *lhsConstant : *rhsConstant;
-      if (isa<mlir::stablehlo::AddOp>(op)) {
-        steps.push_back({1, constant});
-      } else if (isa<mlir::stablehlo::SubtractOp>(op)) {
-        if (lhsConstant) {
-          steps.push_back({-1, constant});
-        } else {
-          auto negated = llvm::checkedSub(int64_t{0}, constant);
-          if (!negated) {
-            return std::nullopt;
-          }
-          steps.push_back({1, *negated});
-        }
-      } else if (isa<mlir::stablehlo::MulOp>(op) && constant != 0) {
-        steps.push_back({constant, 0});
-      } else {
-        return std::nullopt;
-      }
-      value = lhsConstant ? rhs : lhs;
+      steps.push_back(*step);
     }
-    AffineSizeExpression affine{
-        *dim, 1, 0, 0, std::numeric_limits<int32_t>::max() / divisor, divisor};
-    for (const Step &step : llvm::reverse(steps)) {
-      // Multiplies by the factor, then adds the addend, failing on int64
-      // overflow.
-      std::optional<int64_t> scale =
-          llvm::checkedMul(affine.scale, step.factor);
-      std::optional<int64_t> offset =
-          llvm::checkedMul(affine.offset, step.factor);
-      std::optional<int64_t> low = llvm::checkedMul(affine.low, step.factor);
-      std::optional<int64_t> high = llvm::checkedMul(affine.high, step.factor);
-      if (!scale || !offset || !low || !high) {
+  }
+
+  // Matches a quotient of a size by a constant an assertion proves divides it.
+  std::optional<AffineRoot>
+  matchDivisibleQuotient(mlir::stablehlo::DivOp divide, Block *block) {
+    std::optional<int64_t> divisor = matchIntegerConstant(divide.getRhs());
+    std::optional<DimensionSize> dim = matchDimensionSize(
+        predicates.peelDecidedValue(divide.getLhs(), block), block);
+    if (!divisor || *divisor <= 0 || !dim ||
+        !isDivisible(dim->key, *divisor, block)) {
+      return std::nullopt;
+    }
+    return AffineRoot{*dim, *divisor};
+  }
+
+  // Matches `value` as an affine expression of one dimension size. Checked
+  // accumulation declines unsafe proofs.
+  std::optional<AffineSizeExpression> matchAffineExpression(Value value,
+                                                            Block *block) {
+    SmallVector<AffineStep> steps;
+    std::optional<AffineRoot> root = collectAffineSteps(value, block, steps);
+    if (!root) {
+      return std::nullopt;
+    }
+    std::optional<AffineSizeExpression> affine = AffineSizeExpression{
+        root->dim,
+        1,
+        0,
+        0,
+        std::numeric_limits<int32_t>::max() / root->divisor,
+        root->divisor};
+    for (const AffineStep &step : llvm::reverse(steps)) {
+      affine = applyAffineStep(*affine, step);
+      if (!affine) {
         return std::nullopt;
       }
-      if (step.factor < 0) {
-        std::swap(low, high);
-      }
-      offset = llvm::checkedAdd(*offset, step.addend);
-      low = llvm::checkedAdd(*low, step.addend);
-      high = llvm::checkedAdd(*high, step.addend);
-      if (!offset || !low || !high) {
-        return std::nullopt;
-      }
-      // Keeps scale / divisor in lowest terms, so an integer multiple of the
-      // quotient reads as a multiple of the size.
-      // std::gcd requires the signed magnitude to be representable.
-      if (affine.divisor != 1 &&
-          *scale == std::numeric_limits<int64_t>::min()) {
-        return std::nullopt;
-      }
-      int64_t common =
-          affine.divisor == 1 ? 1 : std::gcd(*scale, affine.divisor);
-      affine = AffineSizeExpression{affine.dim, *scale / common,
-                                    *offset,    *low,
-                                    *high,      affine.divisor / common};
     }
     return affine;
   }
 
+  // Matches a signed comparison of an affine size expression with a constant
+  // as an informative range of that size.
   std::optional<AssertionFact> matchBound(mlir::stablehlo::CompareOp compare,
                                           Block *block) {
-    using mlir::stablehlo::ComparisonDirection;
-    // The direction once both sides swap or change sign.
-    auto mirror = [](ComparisonDirection direction) {
-      switch (direction) {
-      case ComparisonDirection::GE:
-        return ComparisonDirection::LE;
-      case ComparisonDirection::GT:
-        return ComparisonDirection::LT;
-      case ComparisonDirection::LE:
-        return ComparisonDirection::GE;
-      case ComparisonDirection::LT:
-        return ComparisonDirection::GT;
-      default:
-        return direction;
-      }
-    };
     std::optional<mlir::stablehlo::ComparisonType> compareType =
         compare.getCompareType();
     if (compareType &&
@@ -807,7 +958,8 @@ private:
         *compareType != mlir::stablehlo::ComparisonType::NOTYPE) {
       return std::nullopt;
     }
-    ComparisonDirection direction = compare.getComparisonDirection();
+    mlir::stablehlo::ComparisonDirection direction =
+        compare.getComparisonDirection();
     std::optional<int64_t> limit = matchIntegerConstant(compare.getRhs());
     std::optional<AffineSizeExpression> affine =
         matchAffineExpression(compare.getLhs(), block);
@@ -815,7 +967,7 @@ private:
       // Puts the constant on the right.
       limit = matchIntegerConstant(compare.getLhs());
       affine = matchAffineExpression(compare.getRhs(), block);
-      direction = mirror(direction);
+      direction = mirrorDirection(direction);
     }
     // Bounds read the i32 value as exact, so it must not wrap.
     if (!limit || !affine || (affine->scale != 1 && affine->scale != -1) ||
@@ -824,59 +976,18 @@ private:
       return std::nullopt;
     }
     // `scale * size + offset <dir> limit` is `size <dir'> bound`.
-    auto bound = llvm::checkedSub(*limit, affine->offset);
-    if (!bound) {
-      return std::nullopt;
-    }
-    if (affine->scale < 0) {
+    std::optional<int64_t> bound = llvm::checkedSub(*limit, affine->offset);
+    if (bound && affine->scale < 0) {
       bound = llvm::checkedSub(int64_t{0}, *bound);
-      if (!bound) {
-        return std::nullopt;
-      }
-      direction = mirror(direction);
+      direction = mirrorDirection(direction);
     }
-    DimensionRange range;
-    if (affine->divisor > 1) {
-      range.udiv = affine->divisor;
-    }
-    switch (direction) {
-    case ComparisonDirection::GE:
-      range.umin = *bound;
-      break;
-    case ComparisonDirection::GT:
-      range.umin = llvm::checkedAdd(*bound, int64_t{1});
-      if (!range.umin) {
-        return std::nullopt;
-      }
-      break;
-    case ComparisonDirection::LE:
-      range.umax = *bound;
-      break;
-    case ComparisonDirection::LT:
-      range.umax = llvm::checkedSub(*bound, int64_t{1});
-      if (!range.umax) {
-        return std::nullopt;
-      }
-      break;
-    default:
+    std::optional<DimensionRange> range =
+        bound ? getRangeForBound(direction, *bound) : std::nullopt;
+    if (!range || !scaleRangeToDividend(*range, affine->divisor) ||
+        !isInformativeSizeRange(*range)) {
       return std::nullopt;
     }
-    // A bound on the quotient bounds the size it exactly divides.
-    for (std::optional<int64_t> *end : {&range.umin, &range.umax}) {
-      if (*end && !(*end = llvm::checkedMul(**end, affine->divisor))) {
-        return std::nullopt;
-      }
-    }
-    // Every size meets a lower bound of at most 0 or an upper bound of
-    // INT32_MAX; none meets a negative upper bound.
-    if (range.umin && *range.umin <= 0) {
-      return std::nullopt;
-    }
-    if (range.umax && (*range.umax < 0 ||
-                       *range.umax >= std::numeric_limits<int32_t>::max())) {
-      return std::nullopt;
-    }
-    return AssertionFact{{affine->dim}, range, std::nullopt, nullptr};
+    return AssertionFact{{affine->dim}, *range, std::nullopt, nullptr};
   }
 
   // An i32 expression in [-2^31, 2^32) congruent to a nonnegative i32 size
@@ -900,56 +1011,67 @@ private:
         nullptr};
   }
 
-  std::optional<AssertionFact>
-  matchAssertionFact(mlir::stablehlo::CustomCallOp call) {
-    if (call.getCallTargetName() != "shape_assertion" ||
-        call.getNumOperands() == 0 || call.getNumResults() != 0) {
-      return std::nullopt;
-    }
-    if (!call->getAttrOfType<StringAttr>("error_message")) {
-      return std::nullopt;
-    }
-    auto predicateType =
-        dyn_cast<RankedTensorType>(call.getOperand(0).getType());
-    auto compare =
-        call.getOperand(0).getDefiningOp<mlir::stablehlo::CompareOp>();
-    Block *block = call->getBlock();
+  // Returns the comparison that `call` asserts: a scalar i1 predicate computed
+  // by a compare earlier in the same block.
+  static mlir::stablehlo::CompareOp
+  getAssertedComparison(mlir::stablehlo::CustomCallOp call) {
+    Value predicate = call.getOperand(0);
+    auto predicateType = dyn_cast<RankedTensorType>(predicate.getType());
+    auto compare = predicate.getDefiningOp<mlir::stablehlo::CompareOp>();
     if (!predicateType || predicateType.getRank() != 0 ||
         !predicateType.getElementType().isInteger(1) || !compare ||
-        compare->getBlock() != block || !compare->isBeforeInBlock(call)) {
+        compare->getBlock() != call->getBlock() ||
+        !compare->isBeforeInBlock(call)) {
+      return {};
+    }
+    return compare;
+  }
+
+  // Matches an asserted equality: of two sizes, of a size and an affine
+  // expression of another size, or of a remainder of a size and zero.
+  std::optional<AssertionFact>
+  matchEqualityFact(mlir::stablehlo::CompareOp compare, Block *block) {
+    std::optional<DimensionSize> lhs =
+        matchDimensionSize(compare.getLhs(), block);
+    std::optional<DimensionSize> rhs =
+        matchDimensionSize(compare.getRhs(), block);
+    std::optional<AssertionFact> fact;
+    if (lhs && rhs) {
+      fact =
+          AssertionFact{{*lhs, *rhs}, DimensionRange{}, std::nullopt, nullptr};
+    } else if (lhs) {
+      fact = matchExpressionEquality(compare.getLhs(), compare.getRhs(), block);
+    } else if (rhs) {
+      fact = matchExpressionEquality(compare.getRhs(), compare.getLhs(), block);
+    }
+    if (fact) {
+      return fact;
+    }
+    std::optional<Divisibility> divides = matchDivisibility(compare, block);
+    if (!divides) {
       return std::nullopt;
     }
+    return AssertionFact{
+        {divides->dim},
+        DimensionRange{std::nullopt, std::nullopt, divides->divisor},
+        std::nullopt,
+        nullptr};
+  }
 
-    std::optional<AssertionFact> fact;
-    if (compare.getComparisonDirection() ==
-        mlir::stablehlo::ComparisonDirection::EQ) {
-      std::optional<DimensionSize> lhs =
-          matchDimensionSize(compare.getLhs(), block);
-      std::optional<DimensionSize> rhs =
-          matchDimensionSize(compare.getRhs(), block);
-      if (lhs && rhs) {
-        fact = AssertionFact{
-            {*lhs, *rhs}, DimensionRange{}, std::nullopt, nullptr};
-      } else if (lhs) {
-        fact =
-            matchExpressionEquality(compare.getLhs(), compare.getRhs(), block);
-      } else if (rhs) {
-        fact =
-            matchExpressionEquality(compare.getRhs(), compare.getLhs(), block);
-      }
-      if (!fact) {
-        if (std::optional<Divisibility> divides =
-                matchDivisibility(compare, block)) {
-          fact = AssertionFact{
-              {divides->dim},
-              DimensionRange{std::nullopt, std::nullopt, divides->divisor},
-              std::nullopt,
-              nullptr};
-        }
-      }
-    } else {
-      fact = matchBound(compare, block);
+  std::optional<AssertionFact>
+  matchAssertionFact(mlir::stablehlo::CustomCallOp call) {
+    if (!isWellFormedShapeAssertion(call)) {
+      return std::nullopt;
     }
+    mlir::stablehlo::CompareOp compare = getAssertedComparison(call);
+    if (!compare) {
+      return std::nullopt;
+    }
+    std::optional<AssertionFact> fact =
+        compare.getComparisonDirection() ==
+                mlir::stablehlo::ComparisonDirection::EQ
+            ? matchEqualityFact(compare, call->getBlock())
+            : matchBound(compare, call->getBlock());
     if (fact) {
       fact->assertion = call;
     }
@@ -958,9 +1080,7 @@ private:
 
   void collectDivisibility(FunctionOpInterface function) {
     function->walk([&](mlir::stablehlo::CustomCallOp call) {
-      if (call.getCallTargetName() != "shape_assertion" ||
-          call.getNumOperands() == 0 || call.getNumResults() != 0 ||
-          !call->getAttrOfType<StringAttr>("error_message")) {
+      if (!isWellFormedShapeAssertion(call)) {
         return;
       }
       auto compare =
@@ -1041,12 +1161,14 @@ static SmallVector<const AssertionFact *> selectExpressionTies(
   return result;
 }
 
-static BlockShapeAssertionFacts
-mergeBlockFacts(const BlockAssertionFacts &block) {
+namespace {
+// Equivalence classes of the dimensions that asserted size equalities join.
+struct DimensionEqualities {
   SmallVector<DimensionKey> keys;
   llvm::DenseMap<std::pair<Value, int64_t>, unsigned> keyIndex;
   llvm::IntEqClasses classes;
-  auto getOrAddKeyIndex = [&](DimensionKey key) {
+
+  unsigned getOrAddIndex(DimensionKey key) {
     auto [it, inserted] =
         keyIndex.try_emplace({key.tensor, key.dimension}, keys.size());
     if (inserted) {
@@ -1054,37 +1176,70 @@ mergeBlockFacts(const BlockAssertionFacts &block) {
       classes.grow(keys.size());
     }
     return it->second;
-  };
-  for (const AssertionFact &fact : block.facts) {
+  }
+
+  // Returns the class leader of `key`, which must have been added.
+  unsigned getLeader(DimensionKey key) const {
+    return classes.findLeader(keyIndex.lookup({key.tensor, key.dimension}));
+  }
+};
+} // namespace
+
+// Joins the dimensions of every non-expression fact, an equality or a range
+// of a single dimension, into classes.
+static DimensionEqualities groupEqualDimensions(ArrayRef<AssertionFact> facts) {
+  DimensionEqualities equalities;
+  for (const AssertionFact &fact : facts) {
     if (!fact.expression) {
-      unsigned lhs = getOrAddKeyIndex(fact.dims.front().key);
-      unsigned rhs = getOrAddKeyIndex(fact.dims.back().key);
-      classes.join(lhs, rhs);
+      unsigned lhs = equalities.getOrAddIndex(fact.dims.front().key);
+      unsigned rhs = equalities.getOrAddIndex(fact.dims.back().key);
+      equalities.classes.join(lhs, rhs);
     }
   }
-  llvm::MapVector<unsigned, DimensionClassFacts> merged;
-  for (auto [index, key] : llvm::enumerate(keys)) {
-    merged[classes.findLeader(index)].members.push_back(key);
-  }
-  Operation *lastAssertion = block.facts.front().assertion;
-  for (const AssertionFact &fact : block.facts) {
+  return equalities;
+}
+
+// Returns the assertion that comes last in the block.
+static Operation *getLastAssertion(ArrayRef<AssertionFact> facts) {
+  Operation *lastAssertion = facts.front().assertion;
+  for (const AssertionFact &fact : facts) {
     if (lastAssertion->isBeforeInBlock(fact.assertion)) {
       lastAssertion = fact.assertion;
     }
+  }
+  return lastAssertion;
+}
+
+// Returns, per class leader, the members, size queries and merged range of
+// each equality class.
+static llvm::MapVector<unsigned, DimensionClassFacts>
+mergeClassFacts(ArrayRef<AssertionFact> facts,
+                const DimensionEqualities &equalities) {
+  llvm::MapVector<unsigned, DimensionClassFacts> merged;
+  for (auto [index, key] : llvm::enumerate(equalities.keys)) {
+    merged[equalities.classes.findLeader(index)].members.push_back(key);
+  }
+  for (const AssertionFact &fact : facts) {
     if (fact.expression) {
       continue;
     }
-    DimensionKey key = fact.dims.front().key;
-    auto &dimensionClass = merged[classes.findLeader(
-        keyIndex.lookup({key.tensor, key.dimension}))];
+    auto &dimensionClass = merged[equalities.getLeader(fact.dims.front().key)];
     for (const DimensionSize &dim : fact.dims) {
       dimensionClass.sizeQueries.push_back(dim.size);
     }
     mergeRange(dimensionClass.range, fact.range);
   }
+  return merged;
+}
+
+static BlockShapeAssertionFacts
+mergeBlockFacts(const BlockAssertionFacts &block) {
+  DimensionEqualities equalities = groupEqualDimensions(block.facts);
+  llvm::MapVector<unsigned, DimensionClassFacts> merged =
+      mergeClassFacts(block.facts, equalities);
   // Materialize only classes with an equality or usable assumption. Inactive
   // singleton sources remain available to expression ties through their query.
-  BlockShapeAssertionFacts result{lastAssertion, {}, {}};
+  BlockShapeAssertionFacts result{getLastAssertion(block.facts), {}, {}};
   llvm::DenseMap<unsigned, unsigned> activeClasses;
   for (auto &[root, dimensionClass] : merged) {
     if (dimensionClass.members.size() > 1 ||
@@ -1094,12 +1249,11 @@ mergeBlockFacts(const BlockAssertionFacts &block) {
     }
   }
   for (const AssertionFact *fact :
-       selectExpressionTies(block.facts, keyIndex)) {
+       selectExpressionTies(block.facts, equalities.keyIndex)) {
     ExpressionTieFact tie{fact->dims.front(), *fact->expression, std::nullopt};
     DimensionKey source = tie.expression.source.key;
-    auto sourceIt = keyIndex.find({source.tensor, source.dimension});
-    if (sourceIt != keyIndex.end()) {
-      auto active = activeClasses.find(classes.findLeader(sourceIt->second));
+    if (equalities.keyIndex.contains({source.tensor, source.dimension})) {
+      auto active = activeClasses.find(equalities.getLeader(source));
       if (active != activeClasses.end()) {
         tie.sourceClass = active->second;
       }
@@ -1251,34 +1405,41 @@ private:
     }
   }
 
-  void buildTensorTies() {
-    auto lookupTiedDim = [&](DimensionKey key) -> Value {
-      for (const auto &[tiedKey, dim] : tiedDims) {
-        if (tiedKey == key) {
-          return dim;
-        }
+  // Returns the dimension value tied to `key`, or null.
+  Value lookupTiedDim(DimensionKey key) const {
+    for (const auto &[tiedKey, dim] : tiedDims) {
+      if (tiedKey == key) {
+        return dim;
       }
-      return {};
-    };
+    }
+    return {};
+  }
+
+  // Ties the shape of every tensor with a tied dimension, using the tied
+  // values where they exist and tensor.dim otherwise.
+  void buildTensorTies() {
     for (const auto &[key, dim] : tiedDims) {
       Value tensorValue = key.tensor;
-      if (tiedTensors.count(tensorValue)) {
+      if (!tiedTensors.count(tensorValue)) {
+        tiedTensors[tensorValue] = createTensorTie(tensorValue);
+      }
+    }
+  }
+
+  Value createTensorTie(Value tensorValue) {
+    auto tensorType = cast<RankedTensorType>(tensorValue.getType());
+    SmallVector<Value> dynamicDims;
+    for (int64_t i = 0; i < tensorType.getRank(); ++i) {
+      if (!tensorType.isDynamicDim(i)) {
         continue;
       }
-      auto tensorType = cast<RankedTensorType>(tensorValue.getType());
-      SmallVector<Value> dynamicDims;
-      for (int64_t i = 0; i < tensorType.getRank(); ++i) {
-        if (!tensorType.isDynamicDim(i)) {
-          continue;
-        }
-        Value tiedDim = lookupTiedDim({tensorValue, i});
-        dynamicDims.push_back(
-            tiedDim ? tiedDim
-                    : tensor::DimOp::create(rewriter, loc, tensorValue, i));
-      }
-      tiedTensors[tensorValue] = IREE::Flow::TensorTieShapeOp::create(
-          rewriter, loc, tensorType, tensorValue, dynamicDims);
+      Value tiedDim = lookupTiedDim({tensorValue, i});
+      dynamicDims.push_back(
+          tiedDim ? tiedDim
+                  : tensor::DimOp::create(rewriter, loc, tensorValue, i));
     }
+    return IREE::Flow::TensorTieShapeOp::create(rewriter, loc, tensorType,
+                                                tensorValue, dynamicDims);
   }
 
   void replaceTensorUses() {
@@ -1298,6 +1459,17 @@ private:
     SmallVector<OpOperand *> uses;
   };
 
+  // Returns the uses of `value` that the last assertion properly dominates.
+  SmallVector<OpOperand *> getUsesAfterAssertions(Value value) const {
+    SmallVector<OpOperand *> later;
+    for (OpOperand &use : value.getUses()) {
+      if (dominance.properlyDominates(facts.lastAssertion, use.getOwner())) {
+        later.push_back(&use);
+      }
+    }
+    return later;
+  }
+
   // Snapshot widening uses and their resolved replacements before changing any
   // size operands. This covers widenings both before and after the assertions.
   SmallVector<WidenedSizeUses> snapshotWidenedUses() {
@@ -1308,18 +1480,14 @@ private:
         if (!widen || !isWidenedSize(widen)) {
           continue;
         }
-        SmallVector<OpOperand *> later;
-        for (OpOperand &widenUse : widen.getResult().getUses()) {
-          if (dominance.properlyDominates(facts.lastAssertion,
-                                          widenUse.getOwner())) {
-            later.push_back(&widenUse);
-          }
+        SmallVector<OpOperand *> later =
+            getUsesAfterAssertions(widen.getResult());
+        if (later.empty()) {
+          continue;
         }
-        if (!later.empty()) {
-          Value canonicalSize = canonicalSizeTensorForQuery.lookup(sizeValue);
-          assert(canonicalSize && "expected a canonical size for every query");
-          widenedUses.push_back({widen.getType(), canonicalSize, later});
-        }
+        Value canonicalSize = canonicalSizeTensorForQuery.lookup(sizeValue);
+        assert(canonicalSize && "expected a canonical size for every query");
+        widenedUses.push_back({widen.getType(), canonicalSize, later});
       }
     }
     return widenedUses;
@@ -1347,8 +1515,9 @@ private:
 };
 } // namespace shape_assertions
 
-// Facts apply only after their assertions. Finish analysis before constructing
-// ties so neither proof queries nor recorded original keys observe mutated IR.
+// Export preconditions apply only after their assertions. Finish analysis
+// before constructing ties so proof queries and original keys observe unchanged
+// IR.
 static void propagateShapeAssertionFacts(FunctionOpInterface function) {
   shape_assertions::ShapeAssertionFactAnalysis analysis;
   const auto facts = analysis.run(function);
@@ -1359,244 +1528,25 @@ static void propagateShapeAssertionFacts(FunctionOpInterface function) {
         .run();
   }
 }
-static const char *getShapeAssertionBlocker(mlir::stablehlo::CustomCallOp op) {
-  if (op.getNumOperands() == 0 || op.getNumResults() != 0) {
-    return "expected a predicate and no results";
-  }
-  auto predicateType = dyn_cast<RankedTensorType>(op.getOperand(0).getType());
-  if (!predicateType || predicateType.getRank() != 0 ||
-      !predicateType.getElementType().isInteger(1)) {
-    return "expected a scalar i1 predicate";
-  }
-  auto message = op->getAttrOfType<StringAttr>("error_message");
-  if (!message) {
-    return "expected an error_message string";
-  }
-  return nullptr;
-}
-
-static LogicalResult rewriteShapeAssertion(mlir::stablehlo::CustomCallOp op,
-                                           PatternRewriter &rewriter) {
-  if (const char *blocker = getShapeAssertionBlocker(op)) {
-    return rewriter.notifyMatchFailure(op, blocker);
-  }
-  auto message = op->getAttrOfType<StringAttr>("error_message");
-  Value predicate = tensor::ExtractOp::create(rewriter, op.getLoc(),
-                                              op.getOperand(0), ValueRange{});
-  // Semantic assertions must survive executable debug stripping.
-  emitStatusCheck(rewriter, op.getLoc(), predicate, message.getValue());
-  rewriter.eraseOp(op);
-  return success();
-}
-
-// A coupled status component uses the same scatter geometry as the data. It
-// records the first failing assertion at each destination, including across
-// repeated indices. Reducing it afterwards keeps the failure check on the host
-// without introducing shader status ABI requirements.
-static Value createScatterStatusTensor(Value shapedValue,
-                                       PatternRewriter &rewriter,
-                                       Location loc) {
-  Value empty = tensor::EmptyOp::create(
-      rewriter, loc, tensor::getMixedSizes(rewriter, loc, shapedValue),
-      rewriter.getI32Type());
-  Value zero = arith::ConstantIntOp::create(rewriter, loc, 0, 32);
-  return linalg::FillOp::create(rewriter, loc, zero, empty).getResult(0);
-}
-
-// The failure branch retains the current data and status. Building the reducer
-// continuation in the success branch prevents subsequent operations (such as a
-// division protected by the assertion) from running after a failed check.
-static scf::IfOp createScatterAssertionGuard(Value condition,
-                                             ValueRange currentValues,
-                                             Value failureStatus,
-                                             PatternRewriter &rewriter,
-                                             Location loc) {
-  SmallVector<Value> failureValues(currentValues);
-  failureValues.push_back(failureStatus);
-  auto guard = scf::IfOp::create(
-      rewriter, loc, ValueRange(failureValues).getTypes(), condition,
-      /*addThenBlock=*/true, /*addElseBlock=*/true);
-  OpBuilder::InsertionGuard insertionGuard(rewriter);
-  rewriter.setInsertionPointToStart(guard.elseBlock());
-  scf::YieldOp::create(rewriter, loc, failureValues);
-  return guard;
-}
-
-static void buildCheckedScatterReducer(mlir::stablehlo::ScatterOp source,
-                                       mlir::stablehlo::ScatterOp target,
-                                       PatternRewriter &rewriter) {
-  OpBuilder::InsertionGuard insertionGuard(rewriter);
-  Block &sourceBlock = source.getUpdateComputation().front();
-  int64_t inputCount = source.getInputs().size();
-  SmallVector<Type> argumentTypes(sourceBlock.getArgumentTypes());
-  auto statusType = RankedTensorType::get({}, rewriter.getI32Type());
-  argumentTypes.insert(argumentTypes.begin() + inputCount, statusType);
-  argumentTypes.push_back(statusType);
-  SmallVector<Location> locations(argumentTypes.size(), source.getLoc());
-  Block *block = rewriter.createBlock(&target.getUpdateComputation(), {},
-                                      argumentTypes, locations);
-  IRMapping mapping;
-  mapping.map(sourceBlock.getArguments().take_front(inputCount),
-              block->getArguments().take_front(inputCount));
-  mapping.map(sourceBlock.getArguments().drop_front(inputCount),
-              block->getArguments().slice(inputCount + 1, inputCount));
-  ValueRange currentValues = block->getArguments().take_front(inputCount);
-  Value previousStatus = block->getArgument(inputCount);
-  Location loc = source.getLoc();
-  Value zero = arith::ConstantIntOp::create(rewriter, loc, 0, 32);
-  Value scalarStatus = tensor::ExtractOp::create(rewriter, loc, previousStatus);
-  Value wasSuccessful = arith::CmpIOp::create(
-      rewriter, loc, arith::CmpIPredicate::eq, scalarStatus, zero);
-  auto guard = createScatterAssertionGuard(wasSuccessful, currentValues,
-                                           previousStatus, rewriter, loc);
-  mlir::stablehlo::ReturnOp::create(rewriter, loc, guard.getResults());
-  rewriter.setInsertionPointToStart(guard.thenBlock());
-  Value successStatus = tensor::FromElementsOp::create(
-      rewriter, loc, statusType, ValueRange{zero});
-  int64_t assertionIndex = 0;
-  for (Operation &operation : sourceBlock.without_terminator()) {
-    auto assertion = dyn_cast<mlir::stablehlo::CustomCallOp>(operation);
-    if (!assertion || assertion.getCallTargetName() != "shape_assertion") {
-      rewriter.clone(operation, mapping);
-      continue;
-    }
-    Value predicate = tensor::ExtractOp::create(
-        rewriter, assertion.getLoc(),
-        mapping.lookupOrDefault(assertion.getOperand(0)));
-    Value failureStatus = arith::ConstantIntOp::create(
-        rewriter, assertion.getLoc(), ++assertionIndex, 32);
-    failureStatus = tensor::FromElementsOp::create(
-        rewriter, assertion.getLoc(), statusType, ValueRange{failureStatus});
-    auto continuation = createScatterAssertionGuard(
-        predicate, currentValues, failureStatus, rewriter, assertion.getLoc());
-    scf::YieldOp::create(rewriter, assertion.getLoc(),
-                         continuation.getResults());
-    rewriter.setInsertionPointToStart(continuation.thenBlock());
-  }
-  SmallVector<Value> results;
-  for (Value result : sourceBlock.getTerminator()->getOperands()) {
-    results.push_back(mapping.lookupOrDefault(result));
-  }
-  results.push_back(successStatus);
-  scf::YieldOp::create(rewriter, loc, results);
-}
-
-static Value createScatterFailureReduction(Value status,
-                                           PatternRewriter &rewriter,
-                                           Location loc) {
-  auto type = cast<RankedTensorType>(status.getType());
-  auto scalarType = RankedTensorType::get({}, rewriter.getI32Type());
-  Value zero = mlir::stablehlo::ConstantOp::create(
-      rewriter, loc, DenseIntElementsAttr::get(scalarType, {0}));
-  SmallVector<int64_t> dimensions(type.getRank());
-  std::iota(dimensions.begin(), dimensions.end(), 0);
-  auto reduce = mlir::stablehlo::ReduceOp::create(
-      rewriter, loc, TypeRange{scalarType}, ValueRange{status},
-      ValueRange{zero}, rewriter.getDenseI64ArrayAttr(dimensions));
-  {
-    OpBuilder::InsertionGuard insertionGuard(rewriter);
-    Block *block = rewriter.createBlock(&reduce.getBody(), {},
-                                        {scalarType, scalarType}, {loc, loc});
-    Value maximum = mlir::stablehlo::MaxOp::create(
-        rewriter, loc, block->getArgument(0), block->getArgument(1));
-    mlir::stablehlo::ReturnOp::create(rewriter, loc, maximum);
-  }
-  return tensor::ExtractOp::create(rewriter, loc, reduce.getResult(0));
-}
-
-// Before (inside the update computation):
-//   stablehlo.custom_call @shape_assertion(%predicate) ...
-//   stablehlo.return %updated
-// After adding a coupled status component:
-//   %next:2 = scf.if %predicate -> (tensor<T>, tensor<i32>) {
-//     scf.yield %updated, %success : tensor<T>, tensor<i32>
-//   } else {
-//     scf.yield %current, %failure : tensor<T>, tensor<i32>
-//   }
-//   stablehlo.return %next#0, %next#1
-// A reduction selects a failed check for the host to report. Scatter does not
-// specify an update order, so independent failing destinations need not report
-// the same message. Other effects and nested checks retain the existing
-// lowering.
-struct ScatterShapeAssertionLowering final
-    : OpRewritePattern<mlir::stablehlo::ScatterOp> {
-  using Base::Base;
-
-  LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
-                                PatternRewriter &rewriter) const override {
-    Block &block = op.getUpdateComputation().front();
-    SmallVector<mlir::stablehlo::CustomCallOp> assertions;
-    for (Operation &operation : block.without_terminator()) {
-      auto assertion = dyn_cast<mlir::stablehlo::CustomCallOp>(operation);
-      if (!assertion || assertion.getCallTargetName() != "shape_assertion") {
-        if (!isMemoryEffectFree(&operation)) {
-          return rewriter.notifyMatchFailure(
-              op, "expected pure computation between direct shape assertions");
-        }
-        continue;
-      }
-      if (const char *blocker = getShapeAssertionBlocker(assertion)) {
-        return rewriter.notifyMatchFailure(op, blocker);
-      }
-      assertions.push_back(assertion);
-    }
-    if (assertions.empty()) {
-      return failure();
-    }
-    if (assertions.size() > std::numeric_limits<int32_t>::max()) {
-      return rewriter.notifyMatchFailure(op,
-                                         "too many scatter shape assertions");
-    }
-    TypeRange currentTypes(
-        block.getArguments().take_front(op.getInputs().size()));
-    if (!llvm::equal(currentTypes, block.getTerminator()->getOperandTypes())) {
-      return rewriter.notifyMatchFailure(
-          op, "scatter input promotion must precede assertion lifting");
-    }
-
-    Location loc = op.getLoc();
-    SmallVector<Value> inputs(op.getInputs());
-    inputs.push_back(createScatterStatusTensor(inputs.front(), rewriter, loc));
-    SmallVector<Value> updates(op.getUpdates());
-    // The status update argument is never read. Initialising it would introduce
-    // a dynamic temporary inside the scatter dispatch after producer fusion.
-    updates.push_back(tensor::EmptyOp::create(
-        rewriter, loc, tensor::getMixedSizes(rewriter, loc, updates.front()),
-        rewriter.getI32Type()));
-    SmallVector<Type> resultTypes(op.getResultTypes());
-    resultTypes.push_back(inputs.back().getType());
-    auto scatter = mlir::stablehlo::ScatterOp::create(
-        rewriter, loc, resultTypes, inputs, op.getScatterIndices(), updates,
-        op.getScatterDimensionNumbers(), op.getIndicesAreSorted(),
-        op.getUniqueIndices());
-    scatter->setDiscardableAttrs(op->getDiscardableAttrDictionary());
-    buildCheckedScatterReducer(op, scatter, rewriter);
-    Value failure = createScatterFailureReduction(scatter.getResults().back(),
-                                                  rewriter, loc);
-    for (auto [index, assertion] : llvm::enumerate(assertions)) {
-      Value code = arith::ConstantIntOp::create(rewriter, assertion.getLoc(),
-                                                index + 1, 32);
-      Value passed =
-          arith::CmpIOp::create(rewriter, assertion.getLoc(),
-                                arith::CmpIPredicate::ne, failure, code);
-      emitStatusCheck(
-          rewriter, assertion.getLoc(), passed,
-          assertion->getAttrOfType<StringAttr>("error_message").getValue());
-    }
-    rewriter.replaceOp(op, scatter.getResults().drop_back());
-    return success();
-  }
-};
-
-struct ShapeAssertionLowering final
+// Shape assertions describe the export's supported input domain. Preserve
+// their usable shape facts above, then drop runtime validation as upstream
+// does. Every shape assertion without results is dropped, including those
+// not well formed enough to contribute facts.
+struct ShapeAssertionDrop final
     : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
   using Base::Base;
+
   LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
                                 PatternRewriter &rewriter) const override {
     if (op.getCallTargetName() != "shape_assertion") {
-      return failure();
+      return rewriter.notifyMatchFailure(op, "not shape_assertion");
     }
-    return rewriteShapeAssertion(op, rewriter);
+    if (op.getNumResults() != 0) {
+      return rewriter.notifyMatchFailure(
+          op, "shape_assertion must not return values");
+    }
+    rewriter.eraseOp(op);
+    return success();
   }
 };
 
@@ -1618,16 +1568,8 @@ struct LegalizeStableHLOCustomCalls final
 
     propagateShapeAssertionFacts(f);
 
-    // Lift reducer checks before lowering individual custom calls. Otherwise
-    // the status checks would become device effects inside the scatter body.
-    RewritePatternSet scatterPatterns(ctx);
-    scatterPatterns.add<ScatterShapeAssertionLowering>(ctx);
-    if (failed(applyPatternsGreedily(f, std::move(scatterPatterns)))) {
-      return signalPassFailure();
-    }
-
     RewritePatternSet patterns(ctx);
-    patterns.add<HouseholderReflectorRewriter, ShapeAssertionLowering>(ctx);
+    patterns.add<HouseholderReflectorRewriter, ShapeAssertionDrop>(ctx);
     if (failed(applyPatternsGreedily(f, std::move(patterns)))) {
       signalPassFailure();
     }

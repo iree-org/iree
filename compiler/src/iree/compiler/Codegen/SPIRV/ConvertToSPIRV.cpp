@@ -770,6 +770,62 @@ private:
 };
 } // namespace
 
+// Sets the SPIR-V entry point ABI of each function with a dispatch config
+// from its workgroup and subgroup sizes. Functions with an ABI keep it. Fails
+// when a config has no workgroup size.
+static LogicalResult setEntryPointABIs(ModuleOp moduleOp) {
+  MLIRContext *context = moduleOp.getContext();
+  DenseMap<StringRef, IREE::Codegen::DispatchConfigOp> configMap;
+  for (auto configOp : moduleOp.getOps<IREE::Codegen::DispatchConfigOp>()) {
+    configMap[configOp.getFunctionRef()] = configOp;
+  }
+  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
+    IREE::Codegen::DispatchConfigOp configOp =
+        configMap.lookup(funcOp.getName());
+    if (!configOp || funcOp->hasAttr(spirv::getEntryPointABIAttrName())) {
+      continue;
+    }
+    std::optional<ArrayRef<int64_t>> wgSize = configOp.getWorkgroupSize();
+    if (!wgSize || wgSize->empty()) {
+      return funcOp->emitOpError(
+          "expected workgroup_size to be set for SPIR-V lowering");
+    }
+    SmallVector<int> workgroupSize =
+        llvm::map_to_vector(*wgSize, [](int64_t v) -> int { return v; });
+    std::optional<int> subgroupSize;
+    if (std::optional<uint64_t> sg = configOp.getSubgroupSize()) {
+      subgroupSize = sg.value();
+    }
+    funcOp->setAttr(
+        spirv::getEntryPointABIAttrName(),
+        spirv::getEntryPointABIAttr(context, workgroupSize, subgroupSize));
+  }
+  return success();
+}
+
+// Packed loads preserve only the logical low bits of integers that the type
+// converter emulates in 32-bit words. Extends their operands and computes at
+// 32 bits every operation whose result depends on the logical integer width.
+// Ceil and floor divisions are expanded first: the widening patterns handle
+// the divisions, remainders and comparisons the expansion produces, but not
+// the ceil and floor division ops themselves.
+static LogicalResult
+widenEmulatedNarrowIntegerOps(ModuleOp moduleOp,
+                              const SPIRVTypeConverter &typeConverter) {
+  auto isEmulated = [&typeConverter](Type type) {
+    auto integer = dyn_cast<IntegerType>(getElementTypeOrSelf(type));
+    if (!integer || integer.getWidth() == 1 || integer.getWidth() >= 32) {
+      return false;
+    }
+    Type converted = typeConverter.convertType(integer);
+    return converted && converted != integer;
+  };
+  RewritePatternSet narrowPatterns(moduleOp.getContext());
+  arith::populateCeilFloorDivExpandOpsPatterns(narrowPatterns);
+  populateWidenNarrowIntegerHighBitOpPatterns(narrowPatterns, 32, isEmulated);
+  return applyPatternsGreedily(moduleOp, std::move(narrowPatterns));
+}
+
 void ConvertToSPIRVPass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp moduleOp = getOperation();
@@ -781,38 +837,8 @@ void ConvertToSPIRVPass::runOnOperation() {
   bool useIndirectBindings = usesIndirectBindingsAttr(moduleOp);
   bool useBdaRootBindings = usesBdaRootDispatchAbiAttr(moduleOp);
 
-  // Build a map from function name to dispatch_config for workgroup_size
-  // and subgroup_size lookup.
-  DenseMap<StringRef, IREE::Codegen::DispatchConfigOp> configMap;
-  for (auto configOp : moduleOp.getOps<IREE::Codegen::DispatchConfigOp>()) {
-    configMap[configOp.getFunctionRef()] = configOp;
-  }
-
-  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    if (!configMap.contains(funcOp.getName())) {
-      continue;
-    }
-    IREE::Codegen::DispatchConfigOp configOp = configMap[funcOp.getName()];
-    if (funcOp->hasAttr(spirv::getEntryPointABIAttrName())) {
-      continue;
-    }
-    SmallVector<int> workgroupSize;
-    if (std::optional<ArrayRef<int64_t>> wgSize = configOp.getWorkgroupSize()) {
-      workgroupSize = llvm::map_to_vector(wgSize.value(),
-                                          [](int64_t v) -> int { return v; });
-    }
-    if (workgroupSize.empty()) {
-      funcOp->emitOpError(
-          "expected workgroup_size to be set for SPIR-V lowering");
-      return signalPassFailure();
-    }
-    std::optional<int> subgroupSize;
-    if (std::optional<uint64_t> sg = configOp.getSubgroupSize()) {
-      subgroupSize = sg.value();
-    }
-    funcOp->setAttr(
-        spirv::getEntryPointABIAttrName(),
-        spirv::getEntryPointABIAttr(context, workgroupSize, subgroupSize));
+  if (failed(setEntryPointABIs(moduleOp))) {
+    return signalPassFailure();
   }
 
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
@@ -897,23 +923,9 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   SPIRVTypeConverter typeConverter(targetAttr, options);
 
-  // Packed loads preserve only the logical low bits. Extend operands before
-  // widening operations whose result depends on the logical integer width.
-  {
-    auto isEmulated = [&typeConverter](Type type) {
-      auto integer = dyn_cast<IntegerType>(getElementTypeOrSelf(type));
-      if (!integer || integer.getWidth() == 1 || integer.getWidth() >= 32) {
-        return false;
-      }
-      Type converted = typeConverter.convertType(integer);
-      return converted && converted != integer;
-    };
-    RewritePatternSet narrowPatterns(context);
-    arith::populateCeilFloorDivExpandOpsPatterns(narrowPatterns);
-    populateWidenNarrowIntegerHighBitOpPatterns(narrowPatterns, 32, isEmulated);
-    if (failed(applyPatternsGreedily(moduleOp, std::move(narrowPatterns)))) {
-      return signalPassFailure();
-    }
+  if (failed(widenEmulatedNarrowIntegerOps(moduleOp, typeConverter))) {
+    moduleOp.emitOpError() << "failed widening emulated narrow integer ops";
+    return signalPassFailure();
   }
 
   // Additionally pull in conversion rules for GPU subgroup MMA ops.

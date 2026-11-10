@@ -210,12 +210,12 @@ func.func @clamp_unsigned_index_select_indices() {
 
 func.func @clamp_narrow_index_select_indices() {
   %input = stablehlo.iota dim = 0 : tensor<256x1xi32>
-  %indices = util.unfoldable_constant dense<[[-128], [0], [127]]> : tensor<3x1xi8>
+  %indices = util.unfoldable_constant dense<[[-128], [0], [127], [5]]> : tensor<4x1xi8>
   %result = "stablehlo.gather"(%input, %indices) {
     dimension_numbers = #stablehlo.gather<collapsed_slice_dims = [0], index_vector_dim = 1, offset_dims = [1], start_index_map = [0]>,
     slice_sizes = array<i64: 1, 1>
-  } : (tensor<256x1xi32>, tensor<3x1xi8>) -> tensor<3x1xi32>
-  check.expect_eq_const(%result, dense<[[0], [0], [127]]> : tensor<3x1xi32>) : tensor<3x1xi32>
+  } : (tensor<256x1xi32>, tensor<4x1xi8>) -> tensor<4x1xi32>
+  check.expect_eq_const(%result, dense<[[0], [0], [127], [5]]> : tensor<4x1xi32>) : tensor<4x1xi32>
   return
 }
 
@@ -253,13 +253,13 @@ func.func @dynamic_gather_unsigned_i64_max_clamps_high() {
 
 func.func @dynamic_gather_narrow_i8_indices_on_large_operand() {
   %operand = stablehlo.iota dim = 0 : tensor<256x1xi32>
-  %indices = util.unfoldable_constant dense<[[-128], [127]]> : tensor<2x1xi8>
+  %indices = util.unfoldable_constant dense<[[-128], [127], [0], [5]]> : tensor<4x1xi8>
   %slice_sizes = util.unfoldable_constant dense<[1, 1]> : tensor<2xi64>
   %result = "stablehlo.dynamic_gather"(%operand, %indices, %slice_sizes) {
     dimension_numbers = #stablehlo.gather<offset_dims = [1], collapsed_slice_dims = [0], start_index_map = [0], index_vector_dim = 1>,
     indices_are_sorted = false
-  } : (tensor<256x1xi32>, tensor<2x1xi8>, tensor<2xi64>) -> tensor<2x1xi32>
-  check.expect_eq_const(%result, dense<[[0], [127]]> : tensor<2x1xi32>) : tensor<2x1xi32>
+  } : (tensor<256x1xi32>, tensor<4x1xi8>, tensor<2xi64>) -> tensor<4x1xi32>
+  check.expect_eq_const(%result, dense<[[0], [127], [0], [5]]> : tensor<4x1xi32>) : tensor<4x1xi32>
   return
 }
 

@@ -19,13 +19,13 @@ struct PaddedDimension {
 // Builds max(size + max(size - 1, 0) * interior + low + high, 0), preserving
 // cancellation even when the dilated intermediate exceeds 64 bits. `size` is
 // an index; padding operands are signless i64 storage with the given logical
-// signedness. A negative signed interior or a positive result exceeding the
-// signed index/i64 dimension range fails the invocation. `isNegative` lets a
-// caller distinguish a fully cropped convolution from an invalid dynamic pad.
+// signedness. The input is trusted: the interior must be nonnegative and a
+// nonnegative result must fit the index type, and no runtime check enforces
+// either. `isNegative` lets a caller distinguish a fully cropped convolution
+// from a valid pad.
 PaddedDimension buildPaddedDimension(OpBuilder &builder, Location loc,
                                      Value size, Value low, Value high,
-                                     Value interior, bool isUnsignedPadding,
-                                     unsigned indexWidthInBits);
+                                     Value interior, bool isUnsignedPadding);
 
 } // namespace mlir::iree_compiler::stablehlo
 

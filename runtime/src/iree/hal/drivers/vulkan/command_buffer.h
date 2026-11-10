@@ -19,7 +19,6 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_arena_block_pool_t iree_arena_block_pool_t;
-typedef struct iree_hal_vulkan_pipeline_t iree_hal_vulkan_pipeline_t;
 
 // Creates a Vulkan HAL command buffer.
 iree_status_t iree_hal_vulkan_command_buffer_create(
@@ -91,10 +90,6 @@ typedef struct iree_hal_vulkan_command_buffer_bda_binding_slot_t {
 
   // Byte length of the bound buffer range after the binding-table offset.
   iree_device_size_t length;
-
-  // Bytes owned from device_address, including reserved allocation padding.
-  // A narrowed binding-table range cannot borrow neighbouring storage.
-  iree_device_size_t owned_length;
 } iree_hal_vulkan_command_buffer_bda_binding_slot_t;
 
 // Per-submit BDA binding-table cache used while publishing replay tables.
@@ -106,11 +101,11 @@ typedef struct iree_hal_vulkan_command_buffer_bda_binding_cache_t {
   iree_host_size_t slot_count;
 } iree_hal_vulkan_command_buffer_bda_binding_cache_t;
 
-// Resolves one HAL binding table slot to its BDA address and range ownership.
+// Resolves one HAL binding table slot to its BDA device address and length.
 //
+// An empty slot resolves to |empty_binding_address| with length 0.
 // |bda_binding_cache| may be NULL. When present and the slot is within cache
-// bounds, the resolved properties are cached for the caller. An empty
-// slot resolves to |empty_binding_address| with length 0.
+// bounds, the resolved address and length are cached for the caller.
 iree_status_t iree_hal_vulkan_command_buffer_resolve_bda_binding_table_slot(
     iree_hal_buffer_binding_table_t binding_table, uint32_t buffer_slot,
     VkDeviceAddress empty_binding_address,
@@ -123,17 +118,6 @@ iree_status_t iree_hal_vulkan_command_buffer_resolve_bda_binding_table_slot(
 // binding table because republishing only refreshes dispatch binding tables.
 bool iree_hal_vulkan_command_buffer_has_binding_table_dependent_commands(
     iree_hal_command_buffer_t* command_buffer);
-
-// Resolves a dispatch binding and validates shader access and range ownership.
-// Shared by recorded command buffers and direct queue dispatch. The optional
-// cache belongs to one submission and stores whole binding-table slot ranges.
-iree_status_t iree_hal_vulkan_command_buffer_resolve_bda_binding(
-    iree_hal_buffer_binding_table_t binding_table,
-    iree_hal_buffer_ref_t buffer_ref, iree_host_size_t binding_ordinal,
-    const iree_hal_vulkan_pipeline_t* pipeline,
-    VkDeviceAddress empty_binding_address,
-    iree_hal_vulkan_command_buffer_bda_binding_cache_t* bda_binding_cache,
-    VkDeviceAddress* out_device_address);
 
 // Returns host-published BDA table bytes required to replay |command_buffer|
 // once into a native VkCommandBuffer.

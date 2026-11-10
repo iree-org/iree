@@ -8,7 +8,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -665,46 +664,48 @@ static Value generateUploads(Value awaitTimepoint,
 // --iree-stream-pack-constants
 //===----------------------------------------------------------------------===//
 
-// Each constant pool is packed independently. Equal slices in separate pools
-// are not deduplicated, including pools serving different device affinities.
-// Per-callable workers only replace pools inside their own bodies.
+// NOTE: this pass currently produces suboptimal packing when multiple constant
+// pools exist within the module. Each pool is packed independently even if
+// there is overlap in subelement spans - as often is the case in multi-device
+// partitioning where a constant may be used on multiple devices. By being
+// purely local here we would pack those constants for each use into the final
+// binary. A global pass for gathering constants from the whole program and
+// splitting into dedicated target-agnostic staging buffers that we bake once
+// would be much nicer. For now, though, we don't do multi-device so there's
+// never a case where this matters by construction; which is a feature :P
 
-static LogicalResult packConstantsInCallable(Operation *op) {
-  auto parentOp = cast<CallableOpInterface>(op);
-  if (!parentOp.getCallableRegion() || parentOp.getCallableRegion()->empty()) {
-    return success();
-  }
-
-  parentOp.walk([](IREE::Stream::ResourceConstantsOp constantsOp) {
-    // Derive resource constraints based on pack affinity.
-    auto resourceConfig = IREE::Stream::ResourceConfigAttr::lookup(constantsOp);
-
-    // Packing creates a lot of index values given that all the sizes are
-    // statically-known - CSE would collapse them but we use an IndexSet to
-    // reduce the IR churn.
-    OpBuilder builder(constantsOp);
-    IntegerSet<int64_t> i64Set(constantsOp.getLoc(), builder);
-    IndexSet indexSet(constantsOp.getLoc(), builder);
-    indexSet.populate(constantsOp.getResultSizes());
-
-    // Perform upload/processing for immutable and mutable constants.
-    Value awaitTimepoint = IREE::Stream::TimepointImmediateOp::create(
-        builder, constantsOp.getLoc());
-    auto uploadTimepoint = generateUploads(
-        awaitTimepoint, constantsOp, resourceConfig, i64Set, indexSet, builder);
-    constantsOp.getResultTimepoint().replaceAllUsesWith(uploadTimepoint);
-
-    constantsOp.erase();
-  });
-  return success();
-}
-
-struct PackConstantsPass final
+struct PackConstantsPass
     : IREE::Stream::impl::PackConstantsPassBase<PackConstantsPass> {
   void runOnOperation() override {
-    if (failed(runOnFunctionLikeOps(getOperation(), packConstantsInCallable))) {
-      signalPassFailure();
+    mlir::CallableOpInterface parentOp = getOperation();
+    if (!parentOp || !parentOp.getCallableRegion() ||
+        parentOp.getCallableRegion()->empty()) {
+      return;
     }
+
+    parentOp.walk([&](IREE::Stream::ResourceConstantsOp constantsOp) {
+      // Derive resource constraints based on pack affinity.
+      auto resourceConfig =
+          IREE::Stream::ResourceConfigAttr::lookup(constantsOp);
+
+      // Packing creates a lot of index values given that all the sizes are
+      // statically-known - CSE would collapse them but we use an IndexSet to
+      // reduce the IR churn.
+      OpBuilder builder(constantsOp);
+      IntegerSet<int64_t> i64Set(constantsOp.getLoc(), builder);
+      IndexSet indexSet(constantsOp.getLoc(), builder);
+      indexSet.populate(constantsOp.getResultSizes());
+
+      // Perform upload/processing for immutable and mutable constants.
+      Value awaitTimepoint = IREE::Stream::TimepointImmediateOp::create(
+          builder, constantsOp.getLoc());
+      auto uploadTimepoint =
+          generateUploads(awaitTimepoint, constantsOp, resourceConfig, i64Set,
+                          indexSet, builder);
+      constantsOp.getResultTimepoint().replaceAllUsesWith(uploadTimepoint);
+
+      constantsOp.erase();
+    });
   }
 };
 

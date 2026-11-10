@@ -97,8 +97,9 @@ public:
       }
       const auto &childInfo = helpers.at(child);
       if (childInfo.state != ShapeHelperInfo::State::Accepted) {
-        // A visiting child is a back edge. Reject this dependency and let
-        // rejection propagate to every caller on the explicit stack.
+        // The child is rejected, or still visiting because this call is a
+        // back edge. Reject this helper and let rejection propagate to every
+        // caller on the explicit stack.
         info.state = ShapeHelperInfo::State::Rejected;
         continue;
       }
@@ -117,39 +118,57 @@ public:
   ArrayRef<func::FuncOp> getPostorder() const { return postorder; }
 
 private:
+  // Records `function` as a candidate helper, or as rejected unless it is a
+  // private, single-block, inlinable function of shape scalars whose body only
+  // holds pure operations and calls to other candidate helpers.
   void inspectBody(func::FuncOp function) {
     ShapeHelperInfo info;
-    bool eligible = function.isPrivate() && !function.isExternal() &&
-                    function.getBody().hasOneBlock() &&
-                    !isMarkedNoInline(function) &&
-                    llvm::all_of(function.getArgumentTypes(), isShapeScalar) &&
-                    llvm::all_of(function.getResultTypes(), isShapeScalar);
-    if (eligible) {
-      function.walk([&](Operation *op) {
-        if (op == function) {
-          return WalkResult::advance();
-        }
-        ++info.expandedOperations;
-        if (isa<func::ReturnOp>(op)) {
-          return WalkResult::advance();
-        }
-        if (auto call = dyn_cast<func::CallOp>(op)) {
-          if (func::FuncOp callee = resolveShapeHelper(call, symbolTables)) {
-            info.calls.push_back(call);
-            info.callees.push_back(callee);
-            return WalkResult::advance();
-          }
-        } else if (isPure(op)) {
-          return WalkResult::advance();
-        }
-        eligible = false;
-        return WalkResult::interrupt();
-      });
-    }
+    bool eligible =
+        hasShapeHelperSignature(function) && recordBody(function, info);
     if (!eligible) {
       info.state = ShapeHelperInfo::State::Rejected;
     }
     helpers.try_emplace(function, std::move(info));
+  }
+
+  static bool hasShapeHelperSignature(func::FuncOp function) {
+    return function.isPrivate() && !function.isExternal() &&
+           function.getBody().hasOneBlock() && !isMarkedNoInline(function) &&
+           llvm::all_of(function.getArgumentTypes(), isShapeScalar) &&
+           llvm::all_of(function.getResultTypes(), isShapeScalar);
+  }
+
+  // Counts the operations of `function` into `info` and records its helper
+  // calls. Returns false at the first operation a helper may not contain.
+  bool recordBody(func::FuncOp function, ShapeHelperInfo &info) {
+    WalkResult result = function.walk([&](Operation *op) {
+      if (op == function) {
+        return WalkResult::advance();
+      }
+      ++info.expandedOperations;
+      return recordBodyOperation(op, info) ? WalkResult::advance()
+                                           : WalkResult::interrupt();
+    });
+    return !result.wasInterrupted();
+  }
+
+  // Returns whether a helper may contain `op`, recording it in `info` if it is
+  // a call to another candidate helper.
+  bool recordBodyOperation(Operation *op, ShapeHelperInfo &info) {
+    if (isa<func::ReturnOp>(op)) {
+      return true;
+    }
+    auto call = dyn_cast<func::CallOp>(op);
+    if (!call) {
+      return isPure(op);
+    }
+    func::FuncOp callee = resolveShapeHelper(call, symbolTables);
+    if (!callee) {
+      return false;
+    }
+    info.calls.push_back(call);
+    info.callees.push_back(callee);
+    return true;
   }
 
   SymbolTableCollection &symbolTables;
@@ -160,7 +179,7 @@ private:
 // Capture producer calls before mutation. Keep slice order and nearest-symbol
 // lookup, and deduplicate calls shared by multiple assertion operands.
 SmallVector<func::CallOp> collectAssertionProducerCalls(ModuleOp module) {
-  llvm::SetVector<Operation *> calls;
+  llvm::SetVector<func::CallOp> calls;
   module.walk([&](mlir::stablehlo::CustomCallOp assertion) {
     if (assertion.getCallTargetName() != "shape_assertion") {
       return;
@@ -171,34 +190,37 @@ SmallVector<func::CallOp> collectAssertionProducerCalls(ModuleOp module) {
     SetVector<Operation *> slice;
     (void)getBackwardSlice(assertion, &slice, options);
     for (Operation *producer : slice) {
-      if (isa<func::CallOp>(producer)) {
-        calls.insert(producer);
+      if (auto call = dyn_cast<func::CallOp>(producer)) {
+        calls.insert(call);
       }
     }
   });
-  SmallVector<func::CallOp> result;
-  for (Operation *call : calls) {
-    result.push_back(cast<func::CallOp>(call));
-  }
-  return result;
+  return calls.takeVector();
 }
 
-// Apply the immutable postorder plan under a pass-wide cloning allowance.
-// A declined/failed inline leaves its call and runtime assertion intact.
-void inlineShapeHelperPlan(ModuleOp module,
-                           ArrayRef<func::CallOp> producerCalls,
-                           SymbolTableCollection &symbolTables,
-                           const ShapeHelperAnalysis &analysis) {
-  uint64_t originalOperations = 0;
-  module.walk([&](Operation *) { ++originalOperations; });
-  // Permit ordinary small helpers while bounding repeated-call DAG expansion.
-  // This is an optimization allowance, not a semantic limit on valid programs.
-  const uint64_t cloningAllowance = llvm::SaturatingMultiplyAdd(
-      originalOperations, uint64_t{8}, uint64_t{4096});
-  uint64_t remainingOperations = cloningAllowance;
-  InlinerInterface interface(module.getContext());
-  InlinerConfig config;
-  auto inlineCallWithinBudget = [&](func::CallOp call, func::FuncOp callee) {
+// Inlines accepted shape helpers while a pass-wide cloning allowance lasts.
+// A declined or failed inline leaves its call and runtime assertion intact.
+class BudgetedShapeHelperInliner {
+public:
+  BudgetedShapeHelperInliner(ModuleOp module,
+                             const ShapeHelperAnalysis &analysis)
+      : analysis(analysis), interface(module.getContext()) {
+    uint64_t originalOperations = 0;
+    module.walk([&](Operation *) { ++originalOperations; });
+    // Permit ordinary small helpers while bounding repeated-call DAG
+    // expansion. This is an optimization allowance, not a semantic limit on
+    // valid programs.
+    cloningAllowance = llvm::SaturatingMultiplyAdd(originalOperations,
+                                                   uint64_t{8}, uint64_t{4096});
+    remainingOperations = cloningAllowance;
+  }
+
+  // Inlines `callee` at `call` if the helper is accepted and its body fits
+  // the remaining allowance, and erases the call on success.
+  void inlineCallWithinBudget(func::CallOp call, func::FuncOp callee) {
+    if (remainingOperations == 0) {
+      return;
+    }
     const auto &info = analysis.get(callee);
     if (info.state != ShapeHelperInfo::State::Accepted ||
         info.expandedOperations > cloningAllowance) {
@@ -207,8 +229,7 @@ void inlineShapeHelperPlan(ModuleOp module,
     // Reserve the current body, including nested regions, before cloning.
     // Counting the body avoids repeatedly charging already-erased calls along
     // long helper chains. The expansion estimate separately limits admission.
-    uint64_t cloneCost = 0;
-    callee.getBody().walk([&](Operation *) { ++cloneCost; });
+    uint64_t cloneCost = getCloneCost(callee);
     if (cloneCost > remainingOperations) {
       return;
     }
@@ -217,16 +238,44 @@ void inlineShapeHelperPlan(ModuleOp module,
                              &callee.getBody()))) {
       call.erase();
     }
-  };
+  }
+
+private:
+  // Returns the number of operations in the body of `callee`. The postorder
+  // inlines into a helper before any call to it, so a callee's body is final
+  // when it is first charged and its count can be reused.
+  uint64_t getCloneCost(func::FuncOp callee) {
+    auto [it, inserted] = bodyOperationCounts.try_emplace(callee, 0);
+    if (inserted) {
+      callee.getBody().walk([&](Operation *) { ++it->second; });
+    }
+    return it->second;
+  }
+
+  const ShapeHelperAnalysis &analysis;
+  InlinerInterface interface;
+  InlinerConfig config;
+  uint64_t cloningAllowance = 0;
+  uint64_t remainingOperations = 0;
+  DenseMap<Operation *, uint64_t> bodyOperationCounts;
+};
+
+// Apply the immutable postorder plan: inline into each helper before any call
+// to it, then inline the assertion producers' calls.
+void inlineShapeHelperPlan(ModuleOp module,
+                           ArrayRef<func::CallOp> producerCalls,
+                           SymbolTableCollection &symbolTables,
+                           const ShapeHelperAnalysis &analysis) {
+  BudgetedShapeHelperInliner inliner(module, analysis);
   for (func::FuncOp function : analysis.getPostorder()) {
     const auto &info = analysis.get(function);
     for (auto [call, callee] : llvm::zip_equal(info.calls, info.callees)) {
-      inlineCallWithinBudget(call, callee);
+      inliner.inlineCallWithinBudget(call, callee);
     }
   }
   for (func::CallOp call : producerCalls) {
     if (func::FuncOp callee = resolveShapeHelper(call, symbolTables)) {
-      inlineCallWithinBudget(call, callee);
+      inliner.inlineCallWithinBudget(call, callee);
     }
   }
 }

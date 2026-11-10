@@ -15,7 +15,6 @@ iree_lit_test_suite(
     lit
   SRCS
     "channel_ops.mlir"
-    "cmd_dispatch_access_granularity.mlir"
     "cmd_ops.mlir"
     "context_ops.mlir"
     "debug_ops.mlir"

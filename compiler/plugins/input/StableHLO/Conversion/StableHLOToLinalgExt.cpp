@@ -243,81 +243,74 @@ struct ScatterOpConversion final
     : OpConversionPattern<mlir::stablehlo::ScatterOp> {
   using Base::Base;
 
-  /// Returns true if the `dimensionNumbers` from the stablehlo.scatter op
-  /// follows a canonical form:
+  /// Returns whether `dims` is 0, 1, ..., n - 1 shifted by `start`.
+  static bool isConsecutiveFrom(ArrayRef<int64_t> dims, int64_t start) {
+    return llvm::equal(dims, llvm::seq<int64_t>(start, start + dims.size()));
+  }
+
+  /// Returns whether the indices are one batch axis of index vectors that
+  /// address, in order, the leading operand dimensions, which the update
+  /// inserts:
   ///
-  /// * The rank of indices is two.
-  /// * The index_vector_dim is the last dim of indices.
-  /// * Scatter dims to operand dims order: (0, ... , n)
-  /// * Inserted window dims order: (0, ... , d)
-  /// * Update window dims order: (d + 1, ... , m)
-  static bool hasCanonicalDimensionNumbers(mlir::stablehlo::ScatterOp op) {
+  /// * The original has rank at least one; the local type converter scalarizes
+  ///   rank-zero originals.
+  /// * The indices have rank two, with index_vector_dim last.
+  /// * There are no batching dimensions.
+  /// * scatter_dims_to_operand_dims and inserted_window_dims are both
+  ///   (0, ..., d - 1) for index depth d.
+  static bool hasCanonicalIndexing(mlir::stablehlo::ScatterOp op) {
     auto dimNumbers = op.getScatterDimensionNumbers();
     auto indicesType = cast<ShapedType>(op.getScatterIndices().getType());
-    auto indicesRank = indicesType.getRank();
-    auto indexVectorDim = dimNumbers.getIndexVectorDim();
-    auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
-
-    // The local type converter scalarizes rank-zero originals.
-    if (cast<ShapedType>(op.getInputs().front().getType()).getRank() == 0) {
-      return false;
-    }
-    if (indicesRank != 2) {
-      return false;
-    }
-    int64_t indexDepth = indicesType.getDimSize(indicesRank - 1);
-    if (!dimNumbers.getInputBatchingDims().empty() ||
+    if (cast<ShapedType>(op.getInputs().front().getType()).getRank() == 0 ||
+        indicesType.getRank() != 2 ||
+        dimNumbers.getIndexVectorDim() != indicesType.getRank() - 1 ||
+        !dimNumbers.getInputBatchingDims().empty() ||
         !dimNumbers.getScatterIndicesBatchingDims().empty()) {
       return false;
     }
-    if (indexVectorDim != indicesRank - 1) {
-      return false;
-    }
-    if (scatterDimsToOperandDims.size() != indexDepth) {
-      return false;
-    }
-    for (auto [idx, dim] : llvm::enumerate(scatterDimsToOperandDims)) {
-      if (idx != dim) {
-        return false;
-      }
-    }
+    int64_t indexDepth = indicesType.getDimSize(1);
+    ArrayRef<int64_t> scatterDims = dimNumbers.getScatterDimsToOperandDims();
+    ArrayRef<int64_t> insertedDims = dimNumbers.getInsertedWindowDims();
+    return static_cast<int64_t>(scatterDims.size()) == indexDepth &&
+           static_cast<int64_t>(insertedDims.size()) == indexDepth &&
+           isConsecutiveFrom(scatterDims, 0) &&
+           isConsecutiveFrom(insertedDims, 0);
+  }
 
-    auto insertedWindowDims = dimNumbers.getInsertedWindowDims();
-    if (static_cast<int64_t>(insertedWindowDims.size()) != indexDepth) {
-      return false;
-    }
-    for (auto [idx, dim] : llvm::enumerate(insertedWindowDims)) {
-      if (idx != dim) {
-        return false;
-      }
-    }
-
-    // The update is one batch axis followed by the unindexed window axes.
+  /// Returns whether each update is one batch axis followed by whole windows
+  /// over the unindexed operand dimensions:
+  ///
+  /// * update_window_dims is (1, ..., w) and the update has rank w + 1.
+  /// * The original has rank d + w.
+  /// * No static window extent differs from its static operand extent;
+  ///   LinalgExt scatter writes whole windows, and narrower ones take the
+  ///   general lowering.
+  static bool hasWholeWindowUpdates(mlir::stablehlo::ScatterOp op) {
+    auto dimNumbers = op.getScatterDimensionNumbers();
+    int64_t indexDepth = dimNumbers.getScatterDimsToOperandDims().size();
     auto updateType = cast<ShapedType>(op.getUpdates().front().getType());
     auto originalType = cast<ShapedType>(op.getInputs().front().getType());
-    int64_t windowRank = dimNumbers.getUpdateWindowDims().size();
+    ArrayRef<int64_t> windowDims = dimNumbers.getUpdateWindowDims();
+    int64_t windowRank = windowDims.size();
     if (updateType.getRank() != windowRank + 1 ||
-        originalType.getRank() != indexDepth + windowRank) {
+        originalType.getRank() != indexDepth + windowRank ||
+        !isConsecutiveFrom(windowDims, 1)) {
       return false;
     }
-    // Check that there is only one batch dimension in the updates.
-    for (auto [idx, dim] : llvm::enumerate(dimNumbers.getUpdateWindowDims())) {
-      if (idx + 1 != dim) {
-        return false;
-      }
-    }
-    // LinalgExt scatter writes whole windows; narrower ones take the general
-    // lowering.
-    for (int64_t dim = 0; dim < windowRank; ++dim) {
+    return llvm::all_of(llvm::seq<int64_t>(windowRank), [&](int64_t dim) {
       int64_t updateSize = updateType.getDimSize(dim + 1);
       int64_t originalSize = originalType.getDimSize(indexDepth + dim);
-      if (ShapedType::isStatic(updateSize) &&
-          ShapedType::isStatic(originalSize) && updateSize != originalSize) {
-        return false;
-      }
-    }
+      return ShapedType::isDynamic(updateSize) ||
+             ShapedType::isDynamic(originalSize) || updateSize == originalSize;
+    });
+  }
 
-    return true;
+  /// Returns true if the scatter has the canonical form that
+  /// iree_linalg_ext.scatter represents directly: canonical indexing (see
+  /// hasCanonicalIndexing) and whole-window updates (see
+  /// hasWholeWindowUpdates).
+  static bool hasCanonicalDimensionNumbers(mlir::stablehlo::ScatterOp op) {
+    return hasCanonicalIndexing(op) && hasWholeWindowUpdates(op);
   }
 
   /// Returns the window axes, as (update dim, operand dim), whose extents may
@@ -644,53 +637,47 @@ static bool checkUnary(const ArrayRef<int64_t> &values) {
 
 enum class ScanInitHandling { Unsupported, Identity, SeedFirstElement };
 
-// Classifies the initial value of a supported scalar reducer. Inclusive scans
-// skip their initial value, so +0 must be combined with the first element:
-// unlike -0, it is not an identity for addition of a negative zero.
-static ScanInitHandling getScanInitHandling(Block &body, Value init) {
-  auto initType = cast<RankedTensorType>(init.getType());
-  if (initType.getRank() != 0 || body.getArgument(0).getType() != initType ||
-      body.getArgument(1).getType() != initType) {
-    return ScanInitHandling::Unsupported;
-  }
+// Returns the single binary operation of `body` that combines two distinct
+// block arguments and is returned, or null.
+static Operation *getSingleArgumentCombiner(Block &body) {
   Operation *reduceOp = body.getTerminator()->getOperand(0).getDefiningOp();
   if (!reduceOp || !llvm::hasSingleElement(body.without_terminator()) ||
       reduceOp->getBlock() != &body || &body.front() != reduceOp ||
-      reduceOp->getNumOperands() != 2 ||
-      !llvm::is_contained(body.getArguments(), reduceOp->getOperand(0)) ||
-      !llvm::is_contained(body.getArguments(), reduceOp->getOperand(1)) ||
-      reduceOp->getOperand(0) == reduceOp->getOperand(1)) {
-    return ScanInitHandling::Unsupported;
+      reduceOp->getNumOperands() != 2) {
+    return nullptr;
   }
-  DenseElementsAttr value;
-  if (!matchPattern(init, m_Constant(&value)) || !value.isSplat()) {
-    return ScanInitHandling::Unsupported;
+  Value lhs = reduceOp->getOperand(0);
+  Value rhs = reduceOp->getOperand(1);
+  bool combinesArguments = llvm::is_contained(body.getArguments(), lhs) &&
+                           llvm::is_contained(body.getArguments(), rhs) &&
+                           lhs != rhs;
+  return combinesArguments ? reduceOp : nullptr;
+}
+
+// Classifies a floating-point initial value of `reduceOp`.
+static ScanInitHandling classifyFloatInit(Operation *reduceOp,
+                                          const APFloat &x) {
+  if (isa<mlir::stablehlo::AddOp>(reduceOp) && x.isPosZero()) {
+    return ScanInitHandling::SeedFirstElement;
   }
-  if (isa<FloatType>(value.getElementType())) {
-    APFloat x = value.getSplatValue<APFloat>();
-    if (isa<mlir::stablehlo::AddOp>(reduceOp) && x.isZero() &&
-        !x.isNegative()) {
-      return ScanInitHandling::SeedFirstElement;
-    }
-    bool isIdentity =
-        TypeSwitch<Operation *, bool>(reduceOp)
-            .Case([&](mlir::stablehlo::AddOp) { return x.isZero(); })
-            .Case([&](mlir::stablehlo::MulOp) { return x.isExactlyValue(1.0); })
-            .Case([&](mlir::stablehlo::MaxOp) {
-              return x.isInfinity() && x.isNegative();
-            })
-            .Case([&](mlir::stablehlo::MinOp) {
-              return x.isInfinity() && !x.isNegative();
-            })
-            .Default(false);
-    return isIdentity ? ScanInitHandling::Identity
-                      : ScanInitHandling::Unsupported;
-  }
-  if (!value.getElementType().isIntOrIndex()) {
-    return ScanInitHandling::Unsupported;
-  }
-  APInt x = value.getSplatValue<APInt>();
-  bool isUnsigned = value.getElementType().isUnsignedInteger();
+  bool isIdentity =
+      TypeSwitch<Operation *, bool>(reduceOp)
+          .Case([&](mlir::stablehlo::AddOp) { return x.isZero(); })
+          .Case([&](mlir::stablehlo::MulOp) { return x.isExactlyValue(1.0); })
+          .Case([&](mlir::stablehlo::MaxOp) {
+            return x.isInfinity() && x.isNegative();
+          })
+          .Case([&](mlir::stablehlo::MinOp) {
+            return x.isInfinity() && !x.isNegative();
+          })
+          .Default(false);
+  return isIdentity ? ScanInitHandling::Identity
+                    : ScanInitHandling::Unsupported;
+}
+
+// Classifies an integer initial value of `reduceOp`.
+static ScanInitHandling classifyIntegerInit(Operation *reduceOp, const APInt &x,
+                                            bool isUnsigned) {
   bool isIdentity =
       TypeSwitch<Operation *, bool>(reduceOp)
           .Case<mlir::stablehlo::AddOp, mlir::stablehlo::OrOp,
@@ -706,6 +693,32 @@ static ScanInitHandling getScanInitHandling(Block &body, Value init) {
           .Default(false);
   return isIdentity ? ScanInitHandling::Identity
                     : ScanInitHandling::Unsupported;
+}
+
+// Classifies the initial value of a supported scalar reducer. Inclusive scans
+// skip their initial value, so +0 must be combined with the first element:
+// unlike -0, it is not an identity for addition of a negative zero.
+static ScanInitHandling getScanInitHandling(Block &body, Value init) {
+  auto initType = cast<RankedTensorType>(init.getType());
+  if (initType.getRank() != 0 || body.getArgument(0).getType() != initType ||
+      body.getArgument(1).getType() != initType) {
+    return ScanInitHandling::Unsupported;
+  }
+  Operation *reduceOp = getSingleArgumentCombiner(body);
+  DenseElementsAttr value;
+  if (!reduceOp || !matchPattern(init, m_Constant(&value)) ||
+      !value.isSplat()) {
+    return ScanInitHandling::Unsupported;
+  }
+  Type elementType = value.getElementType();
+  if (isa<FloatType>(elementType)) {
+    return classifyFloatInit(reduceOp, value.getSplatValue<APFloat>());
+  }
+  if (!elementType.isIntOrIndex()) {
+    return ScanInitHandling::Unsupported;
+  }
+  return classifyIntegerInit(reduceOp, value.getSplatValue<APInt>(),
+                             elementType.isUnsignedInteger());
 }
 
 // Combines a +0 initializer with the first slice along the scan axis. Limiting
@@ -962,6 +975,59 @@ struct ShapeElement {
   Value value;
 };
 
+// Returns element `linear` of `tensor` if a constant or from_elements builds
+// it, or nullopt for any other producer.
+static std::optional<ShapeElement> readLeafShapeElement(Value tensor,
+                                                        int64_t linear) {
+  DenseIntElementsAttr constant;
+  if (matchPattern(tensor, m_Constant(&constant))) {
+    return ShapeElement{constant.getValues<APInt>()[linear].getSExtValue(), {}};
+  }
+  auto fromElements = tensor.getDefiningOp<tensor::FromElementsOp>();
+  if (!fromElements) {
+    return std::nullopt;
+  }
+  Value scalar = fromElements.getElements()[linear];
+  APInt value;
+  if (matchPattern(scalar, m_ConstantInt(&value))) {
+    return ShapeElement{value.getSExtValue(), {}};
+  }
+  return ShapeElement{std::nullopt, scalar};
+}
+
+// Moves `tensor` and `index` to the same element in the operand of a
+// concatenate or reshape producer. Returns false for any other producer or a
+// dynamic operand shape.
+static bool stepToShapeSource(Value &tensor, SmallVectorImpl<int64_t> &index,
+                              int64_t linear) {
+  if (auto concat = tensor.getDefiningOp<mlir::stablehlo::ConcatenateOp>()) {
+    int64_t dim = concat.getDimension();
+    for (Value input : concat.getInputs()) {
+      int64_t size = cast<ShapedType>(input.getType()).getDimSize(dim);
+      if (ShapedType::isDynamic(size)) {
+        return false;
+      }
+      if (index[dim] < size) {
+        tensor = input;
+        return true;
+      }
+      index[dim] -= size;
+    }
+    return false;
+  }
+  auto reshape = tensor.getDefiningOp<mlir::stablehlo::ReshapeOp>();
+  if (!reshape) {
+    return false;
+  }
+  tensor = reshape.getOperand();
+  auto operandType = cast<RankedTensorType>(tensor.getType());
+  if (!operandType.hasStaticShape()) {
+    return false;
+  }
+  index.assign(delinearize(linear, computeStrides(operandType.getShape())));
+  return true;
+}
+
 // Returns element `index` of the integer tensor `tensor` when only constants
 // and data movement build it. Follow the producer chain iteratively because
 // its length is independent of the IR's region nesting depth.
@@ -974,49 +1040,13 @@ static std::optional<ShapeElement> getShapeElement(Value tensor,
       return std::nullopt;
     }
     int64_t linear = linearize(index, computeStrides(type.getShape()));
-    DenseIntElementsAttr constant;
-    if (matchPattern(tensor, m_Constant(&constant))) {
-      return ShapeElement{constant.getValues<APInt>()[linear].getSExtValue(),
-                          {}};
+    if (std::optional<ShapeElement> element =
+            readLeafShapeElement(tensor, linear)) {
+      return element;
     }
-    if (auto fromElements = tensor.getDefiningOp<tensor::FromElementsOp>()) {
-      Value scalar = fromElements.getElements()[linear];
-      APInt value;
-      if (matchPattern(scalar, m_ConstantInt(&value))) {
-        return ShapeElement{value.getSExtValue(), {}};
-      }
-      return ShapeElement{std::nullopt, scalar};
+    if (!stepToShapeSource(tensor, index, linear)) {
+      return std::nullopt;
     }
-    if (auto concat = tensor.getDefiningOp<mlir::stablehlo::ConcatenateOp>()) {
-      int64_t dim = concat.getDimension();
-      Value source;
-      for (Value input : concat.getInputs()) {
-        int64_t size = cast<ShapedType>(input.getType()).getDimSize(dim);
-        if (ShapedType::isDynamic(size)) {
-          return std::nullopt;
-        }
-        if (index[dim] < size) {
-          source = input;
-          break;
-        }
-        index[dim] -= size;
-      }
-      if (!source) {
-        return std::nullopt;
-      }
-      tensor = source;
-      continue;
-    }
-    if (auto reshape = tensor.getDefiningOp<mlir::stablehlo::ReshapeOp>()) {
-      tensor = reshape.getOperand();
-      auto operandType = cast<RankedTensorType>(tensor.getType());
-      if (!operandType.hasStaticShape()) {
-        return std::nullopt;
-      }
-      index = delinearize(linear, computeStrides(operandType.getShape()));
-      continue;
-    }
-    return std::nullopt;
   }
 }
 
@@ -1098,6 +1128,96 @@ struct DynamicReduceWindowScan {
   ScanInitHandling initHandling;
 };
 
+// Returns whether `element` is the constant `value`.
+static bool isConstantShapeElement(std::optional<ShapeElement> element,
+                                   int64_t value) {
+  return element && element->constant == value;
+}
+
+// Returns the scalar reducer `op` calls when it combines two values of
+// `initType` in one block.
+static func::FuncOp getScalarReducer(mlir::stablehlo::CustomCallOp op,
+                                     RankedTensorType initType) {
+  auto reducer = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+      op, cast<FlatSymbolRefAttr>(op.getCalledComputations()[0]));
+  if (!reducer || reducer.isExternal() || !reducer.getBody().hasOneBlock() ||
+      reducer.getFunctionType() != FunctionType::get(op.getContext(),
+                                                     {initType, initType},
+                                                     {initType})) {
+    return {};
+  }
+  return reducer;
+}
+
+// Returns whether the window dimension, stride and dilation operands are
+// signless integer vectors of `rank` elements and the padding a `rank`x2
+// matrix of them.
+static bool hasWindowOperandShapes(mlir::stablehlo::CustomCallOp op,
+                                   int64_t rank) {
+  auto hasShape = [](Value value, ArrayRef<int64_t> shape) {
+    auto type = dyn_cast<RankedTensorType>(value.getType());
+    return type && type.getShape() == shape &&
+           type.getElementType().isSignlessInteger();
+  };
+  return llvm::all_of(op->getOperands().slice(2, 4),
+                      [&](Value value) { return hasShape(value, {rank}); }) &&
+         hasShape(op.getOperand(6), {rank, 2});
+}
+
+// Returns whether every element of the `rank`-element vector `shape` is 1.
+static bool isAllOnesShape(Value shape, int64_t rank) {
+  return llvm::all_of(llvm::seq<int64_t>(rank), [&](int64_t i) {
+    return isConstantShapeElement(getShapeElement(shape, {i}), 1);
+  });
+}
+
+// Returns the only axis whose window is not 1, if that window spans the whole
+// extent of `input` along it.
+static std::optional<int64_t> getFullWindowAxis(Value window, Value input) {
+  std::optional<int64_t> axis;
+  for (int64_t i = 0, rank = cast<RankedTensorType>(input.getType()).getRank();
+       i < rank; ++i) {
+    std::optional<ShapeElement> size = getShapeElement(window, {i});
+    if (isConstantShapeElement(size, 1)) {
+      continue;
+    }
+    if (axis || !size || !isDimSize(*size, input, i)) {
+      return std::nullopt;
+    }
+    axis = i;
+  }
+  return axis;
+}
+
+// Returns whether `padding` is zero on both sides of every axis except
+// `axis`.
+static bool isUnpaddedOutside(Value padding, int64_t axis, int64_t rank) {
+  return llvm::all_of(llvm::seq<int64_t>(rank), [&](int64_t i) {
+    return i == axis ||
+           (isConstantShapeElement(getShapeElement(padding, {i, 0}), 0) &&
+            isConstantShapeElement(getShapeElement(padding, {i, 1}), 0));
+  });
+}
+
+// Returns whether the scan along `axis` runs from the end, given `size - 1`
+// padding on exactly one side: low padding makes a prefix scan, high padding
+// a postfix scan.
+static std::optional<bool> matchScanDirection(Value padding, Value input,
+                                              int64_t axis) {
+  std::optional<ShapeElement> low = getShapeElement(padding, {axis, 0});
+  std::optional<ShapeElement> high = getShapeElement(padding, {axis, 1});
+  if (!low || !high) {
+    return std::nullopt;
+  }
+  if (isDimSizeMinusOne(*low, input, axis) && isConstantShapeElement(high, 0)) {
+    return false;
+  }
+  if (isConstantShapeElement(low, 0) && isDimSizeMinusOne(*high, input, axis)) {
+    return true;
+  }
+  return std::nullopt;
+}
+
 // Matches one input with unit strides and dilations, a window spanning one
 // axis and of size one elsewhere, and `size - 1` padding on one side of that
 // axis only.
@@ -1116,74 +1236,29 @@ matchDynamicReduceWindowScan(mlir::stablehlo::CustomCallOp op) {
       op.getResult(0).getType() != inputType) {
     return std::nullopt;
   }
-  auto reducer = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
-      op, cast<FlatSymbolRefAttr>(op.getCalledComputations()[0]));
-  if (!reducer || reducer.isExternal() || !reducer.getBody().hasOneBlock() ||
-      reducer.getFunctionType() != FunctionType::get(op.getContext(),
-                                                     {initType, initType},
-                                                     {initType})) {
+  func::FuncOp reducer = getScalarReducer(op, initType);
+  if (!reducer) {
     return std::nullopt;
   }
-
   int64_t rank = inputType.getRank();
-  auto hasShape = [](Value value, ArrayRef<int64_t> shape) {
-    auto type = dyn_cast<RankedTensorType>(value.getType());
-    return type && type.getShape() == shape &&
-           type.getElementType().isSignlessInteger();
-  };
   ScanInitHandling initHandling =
       getScanInitHandling(reducer.getBody().front(), op.getOperand(1));
-  if (!llvm::all_of(op->getOperands().slice(2, 4),
-                    [&](Value value) { return hasShape(value, {rank}); }) ||
-      !hasShape(op.getOperand(6), {rank, 2}) ||
-      initHandling == ScanInitHandling::Unsupported) {
+  if (initHandling == ScanInitHandling::Unsupported ||
+      !hasWindowOperandShapes(op, rank) ||
+      !llvm::all_of(op->getOperands().slice(3, 3),
+                    [&](Value shape) { return isAllOnesShape(shape, rank); })) {
     return std::nullopt;
   }
-  auto isConstant = [](std::optional<ShapeElement> element, int64_t value) {
-    return element && element->constant == value;
-  };
-  for (unsigned operand : {3, 4, 5}) {
-    for (int64_t i = 0; i < rank; ++i) {
-      if (!isConstant(getShapeElement(op.getOperand(operand), {i}), 1)) {
-        return std::nullopt;
-      }
-    }
-  }
-  std::optional<int64_t> axis;
-  for (int64_t i = 0; i < rank; ++i) {
-    std::optional<ShapeElement> window = getShapeElement(op.getOperand(2), {i});
-    if (isConstant(window, 1)) {
-      continue;
-    }
-    if (axis || !window || !isDimSize(*window, input, i)) {
-      return std::nullopt;
-    }
-    axis = i;
-  }
-  if (!axis) {
+  std::optional<int64_t> axis = getFullWindowAxis(op.getOperand(2), input);
+  if (!axis || !isUnpaddedOutside(op.getOperand(6), *axis, rank)) {
     return std::nullopt;
   }
-  Value padding = op.getOperand(6);
-  for (int64_t i = 0; i < rank; ++i) {
-    if (i != *axis && !(isConstant(getShapeElement(padding, {i, 0}), 0) &&
-                        isConstant(getShapeElement(padding, {i, 1}), 0))) {
-      return std::nullopt;
-    }
-  }
-  std::optional<ShapeElement> low = getShapeElement(padding, {*axis, 0});
-  std::optional<ShapeElement> high = getShapeElement(padding, {*axis, 1});
-  if (!low || !high) {
+  std::optional<bool> isPostfix =
+      matchScanDirection(op.getOperand(6), input, *axis);
+  if (!isPostfix) {
     return std::nullopt;
   }
-  if (isDimSizeMinusOne(*low, input, *axis) && isConstant(high, 0)) {
-    return DynamicReduceWindowScan{*axis, /*isPostfix=*/false, reducer,
-                                   initHandling};
-  }
-  if (isConstant(low, 0) && isDimSizeMinusOne(*high, input, *axis)) {
-    return DynamicReduceWindowScan{*axis, /*isPostfix=*/true, reducer,
-                                   initHandling};
-  }
-  return std::nullopt;
+  return DynamicReduceWindowScan{*axis, *isPostfix, reducer, initHandling};
 }
 
 struct DynamicReduceWindowScanConversion final
@@ -1428,10 +1503,8 @@ struct ConvertStableHloToLinalgExt final
           }
           return typeConverter.isLegal(op.getOperands());
         });
-    // TODO: Scatter is not marked as illegal to allow falling back to the
-    // generic LinAlg lowering, the generic lowering is not always performant
-    // and even though only used in fallback here, may hide performance
-    // issues and we'd rather know when the optimized lowering fails.
+    // Scatter is not marked illegal: ScatterOpConversion converts every
+    // scatter, and the walk above fails the pass for those it must reject.
     // Other supported operations must use their dedicated lowering.
     target.addIllegalOp<mlir::stablehlo::SortOp, mlir::stablehlo::FftOp,
                         mlir::stablehlo::ReverseOp>();

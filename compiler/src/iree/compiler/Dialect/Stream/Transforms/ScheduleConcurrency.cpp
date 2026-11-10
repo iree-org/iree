@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -185,111 +184,103 @@ struct WavePartitionBuilder {
 // --iree-stream-schedule-concurrency
 //===----------------------------------------------------------------------===//
 
-static LogicalResult
-scheduleConcurrencyInRegion(IREE::Stream::AsyncExecuteOp parentOp) {
-  if (parentOp.getBody().empty()) {
-    return success();
-  }
-  auto *block = &parentOp.getBody().front();
-
-  // Lookup the optional config used to control partitioning.
-  auto configAttr = IREE::Stream::PartitioningConfigAttr::lookup(parentOp);
-
-  // Compute a set of partitions covering all of the streamable ops in the
-  // execution region.
-  auto waveSet = partitionRegionConcurrency(configAttr, block);
-  if (waveSet.empty()) {
-    return success();
-  }
-  if (failed(waveSet.verify(parentOp.getLoc()))) {
-    return failure();
-  }
-
-  // Create partition builders for each partition.
-  // We'll clone ops into each and insert them into the block at the
-  // appropriate position (first use... probably).
-  IRMapping mapping;
-  SmallVector<WavePartitionBuilder> partitionBuilders;
-  partitionBuilders.reserve(waveSet.size());
-  for (auto partition : llvm::enumerate(waveSet.partitions)) {
-    if (partition.value().ops.size() == 1) {
-      continue;
-    }
-    partitionBuilders.push_back(
-        WavePartitionBuilder(block, partition.index(), &partition.value(),
-                             mapping, parentOp.getContext()));
-  }
-
-  // Walk over each op in the original block and find those that need to be
-  // partitioned. Each partition builder may clone the op into itself. The
-  // op will always be left in the original block and we'll rely on DCE to
-  // remove the ones no longer required. This is not a good approach as it
-  // creates a lot of new IR (up to O(op*partitions)).
-  SetVector<Operation *> deadOps;
-  for (auto &op : *block) {
-    if (op.hasTrait<OpTrait::IsTerminator>()) {
-      continue;
-    }
-    bool handled = false;
-    for (auto &partitionBuilder : partitionBuilders) {
-      handled = partitionBuilder.visit(&op) || handled;
-    }
-    if (handled) {
-      deadOps.insert(&op);
-    }
-  }
-
-  // Apply remapping for values captured/escaping partitions.
-  // We must do this per block as we'll be updating dominated block values.
-  for (auto &partitionBuilder : partitionBuilders) {
-    for (auto [oldResult, newResult] :
-         llvm::zip_equal(partitionBuilder.partition->outs,
-                         partitionBuilder.concurrentOp.getResults())) {
-      // Explicitly copy the Value since the original is marked as const.
-      Value toBeDeleted = oldResult;
-
-      toBeDeleted.replaceAllUsesWith(newResult);
-      deadOps.insert(oldResult.getDefiningOp());
-    }
-    partitionBuilder.finish();
-  }
-  for (auto *deadOp : llvm::reverse(deadOps)) {
-    deadOp->erase();
-  }
-
-  // Sort the ops in the execution region as they may have gotten out of order
-  // during partitioning. This is safe because we are still unaliased and SSA
-  // values imply ordering.
-  mlir::sortTopologically(block);
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "\nWaves constructed:\n";
-    block->dump();
-  });
-  return success();
-}
-
-static LogicalResult scheduleConcurrencyInCallable(Operation *op) {
-  auto parentOp = cast<CallableOpInterface>(op);
-  if (!parentOp.getCallableRegion() || parentOp.getCallableRegion()->empty()) {
-    return success();
-  }
-  for (auto executeOp :
-       parentOp.getCallableRegion()->getOps<IREE::Stream::AsyncExecuteOp>()) {
-    if (failed(scheduleConcurrencyInRegion(executeOp))) {
-      return failure();
-    }
-  }
-  return success();
-}
-
-struct ScheduleConcurrencyPass final
+struct ScheduleConcurrencyPass
     : IREE::Stream::impl::ScheduleConcurrencyPassBase<ScheduleConcurrencyPass> {
   void runOnOperation() override {
-    if (failed(runOnFunctionLikeOps(getOperation(),
-                                    scheduleConcurrencyInCallable))) {
-      signalPassFailure();
+    mlir::CallableOpInterface parentOp = getOperation();
+    if (!parentOp.getCallableRegion() ||
+        parentOp.getCallableRegion()->empty()) {
+      return;
     }
+    for (auto executeOp :
+         parentOp.getCallableRegion()->getOps<IREE::Stream::AsyncExecuteOp>()) {
+      if (failed(runOnRegion(executeOp))) {
+        return signalPassFailure();
+      }
+    }
+  }
+
+  LogicalResult runOnRegion(IREE::Stream::AsyncExecuteOp parentOp) {
+    if (parentOp.getBody().empty()) {
+      return success();
+    }
+    auto *block = &parentOp.getBody().front();
+
+    // Lookup the optional config used to control partitioning.
+    auto configAttr = IREE::Stream::PartitioningConfigAttr::lookup(parentOp);
+
+    // Compute a set of partitions covering all of the streamable ops in the
+    // execution region.
+    auto waveSet = partitionRegionConcurrency(configAttr, block);
+    if (waveSet.empty()) {
+      return success();
+    }
+    if (failed(waveSet.verify(parentOp.getLoc()))) {
+      return failure();
+    }
+
+    // Create partition builders for each partition.
+    // We'll clone ops into each and insert them into the block at the
+    // appropriate position (first use... probably).
+    IRMapping mapping;
+    SmallVector<WavePartitionBuilder> partitionBuilders;
+    partitionBuilders.reserve(waveSet.size());
+    for (auto partition : llvm::enumerate(waveSet.partitions)) {
+      if (partition.value().ops.size() == 1) {
+        continue;
+      }
+      partitionBuilders.push_back(WavePartitionBuilder(block, partition.index(),
+                                                       &partition.value(),
+                                                       mapping, &getContext()));
+    }
+
+    // Walk over each op in the original block and find those that need to be
+    // partitioned. Each partition builder may clone the op into itself. The
+    // op will always be left in the original block and we'll rely on DCE to
+    // remove the ones no longer required. This is not a good approach as it
+    // creates a lot of new IR (up to O(op*partitions)).
+    SetVector<Operation *> deadOps;
+    for (auto &op : *block) {
+      if (op.hasTrait<OpTrait::IsTerminator>()) {
+        continue;
+      }
+      bool handled = false;
+      for (auto &partitionBuilder : partitionBuilders) {
+        handled = partitionBuilder.visit(&op) || handled;
+      }
+      if (handled) {
+        deadOps.insert(&op);
+      }
+    }
+
+    // Apply remapping for values captured/escaping partitions.
+    // We must do this per block as we'll be updating dominated block values.
+    for (auto &partitionBuilder : partitionBuilders) {
+      for (auto [oldResult, newResult] :
+           llvm::zip_equal(partitionBuilder.partition->outs,
+                           partitionBuilder.concurrentOp.getResults())) {
+        // Explicitly copy the Value since the original is marked as const.
+        Value toBeDeleted = oldResult;
+
+        toBeDeleted.replaceAllUsesWith(newResult);
+        deadOps.insert(oldResult.getDefiningOp());
+      }
+      partitionBuilder.finish();
+    }
+    for (auto *deadOp : llvm::reverse(deadOps)) {
+      deadOp->erase();
+    }
+
+    // Sort the ops in the execution region as they may have gotten out of order
+    // during partitioning. This is safe because we are still unaliased and SSA
+    // values imply ordering.
+    mlir::sortTopologically(block);
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "\nWaves constructed:\n";
+      block->dump();
+    });
+    return success();
   }
 };
 

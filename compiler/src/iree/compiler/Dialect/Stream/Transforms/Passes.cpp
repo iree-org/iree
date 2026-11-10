@@ -203,7 +203,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // to support using the layout utilities earlier if the encodings need them.
   // Having the arithmetic baked out allows for better propagation (resource
   // offsets and sizes can be detected as constant if statically packed, etc).
-  passManager.addPass(IREE::Stream::createLayoutSlicesPass());
+  FunctionLikeNest(passManager).addPass(IREE::Stream::createLayoutSlicesPass);
 
   buildStreamCleanupPassPipeline(passManager, transformOptions);
 
@@ -261,8 +261,9 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
       .addPass(IREE::Stream::createMaterializeCopyOnWritePass)
       .addPass(mlir::createCanonicalizerPass);
   passManager.addPass(IREE::Stream::createElideAsyncCopiesPass());
-  FunctionLikeNest(passManager).addPass(mlir::createCanonicalizerPass);
-  passManager.addPass(IREE::Stream::createEmplaceAllocationsPass());
+  FunctionLikeNest(passManager)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Stream::createEmplaceAllocationsPass);
 
   // Refine lifetime of all resources across the module.
   // We do this after scheduling execution so that we know how the resources
@@ -295,11 +296,11 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
 
   passManager.addPass(IREE::Stream::createPlaceTransferExecutionsPass());
 
-  // Combine async work into execution regions.
   FunctionLikeNest(passManager)
-      .addPass(IREE::Stream::createScheduleExecutionPass);
-  // Group concurrently executable work into waves.
-  passManager.addPass(IREE::Stream::createScheduleConcurrencyPass());
+      // Combine async work into execution regions.
+      .addPass(IREE::Stream::createScheduleExecutionPass)
+      // Group concurrently executable work into waves.
+      .addPass(IREE::Stream::createScheduleConcurrencyPass);
 
   // When synchronous initialization is requested we need to separate any work
   // behind a timepoint in the initializer from the consumers of that timepoint.
@@ -349,14 +350,20 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   passManager.addPass(
       IREE::Stream::createMaterializeTransientSizeQueriesPass());
 
-  // Allocate backing storage for fused constant resources. This expands
-  // packed constants into explicit forms with partitioned storage and uploads.
-  passManager.addPass(IREE::Stream::createPackConstantsPass());
+  FunctionLikeNest(passManager)
+      // Allocate backing storage for fused constant resources.
+      // This expands packed constants into explicit forms with partitioned
+      // storage buffers and upload logic.
+      .addPass(IREE::Stream::createPackConstantsPass)
 
-  // Layout packed slices to expose resource offsets before propagating
-  // subviews.
-  passManager.addPass(IREE::Stream::createLayoutSlicesPass());
-  FunctionLikeNest(passManager).addPass(mlir::createCanonicalizerPass);
+      // Layout packed slices to emit the arithmetic required for all resource
+      // offsets. This enables us to propagate the subviews across the program
+      // below.
+      .addPass(IREE::Stream::createLayoutSlicesPass)
+
+      // Apply canonicalization patterns to clean up subview ops prior to
+      // propagating subranges.
+      .addPass(mlir::createCanonicalizerPass);
 
   // Propagate subviews throughout the program to unify resource storage access.
   // After propagation many resource SSA values can be deduped or folded by the
