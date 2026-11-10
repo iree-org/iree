@@ -14,6 +14,9 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "early_data_tiling.mlir"
+    "early_data_tiling_convolution.mlir"
+    "early_data_tiling_dynamic.mlir"
     "executable_object_data.mlir"
     "hal_target_device_attributes.mlir"
     "materialize_homogeneous_encodings.mlir"
@@ -36,9 +39,9 @@ iree_lit_test_suite(
   NAME
     lit_aarch64
   SRCS
-    "early_data_tiling.mlir"
-    "early_data_tiling_convolution.mlir"
-    "early_data_tiling_dynamic.mlir"
+    "early_data_tiling_aarch64.mlir"
+    "early_data_tiling_convolution_aarch64.mlir"
+    "early_data_tiling_dynamic_aarch64.mlir"
     "roundeven_native_aarch64.mlir"
   TOOLS
     ${IREE_LLD_TARGET}

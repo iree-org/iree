@@ -18,6 +18,9 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "early_data_tiling.mlir",
+            "early_data_tiling_convolution.mlir",
+            "early_data_tiling_dynamic.mlir",
             "executable_object_data.mlir",
             "hal_target_device_attributes.mlir",
             "materialize_homogeneous_encodings.mlir",
@@ -28,9 +31,9 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "early_data_tiling.mlir",
-            "early_data_tiling_convolution.mlir",
-            "early_data_tiling_dynamic.mlir",
+            "early_data_tiling_aarch64.mlir",
+            "early_data_tiling_convolution_aarch64.mlir",
+            "early_data_tiling_dynamic_aarch64.mlir",
             "roundeven_native_aarch64.mlir",
             "roundeven_native_riscv64.mlir",
         ],
@@ -60,9 +63,9 @@ if(_IREE_COMPILER_TARGETING_ARM_64)
 iree_lit_test_suite(
     name = "lit_aarch64",
     srcs = [
-        "early_data_tiling.mlir",
-        "early_data_tiling_convolution.mlir",
-        "early_data_tiling_dynamic.mlir",
+        "early_data_tiling_aarch64.mlir",
+        "early_data_tiling_convolution_aarch64.mlir",
+        "early_data_tiling_dynamic_aarch64.mlir",
         "roundeven_native_aarch64.mlir",
     ],
     cfg = "//compiler:lit.cfg.py",
