@@ -459,6 +459,8 @@ static LogicalResult splitOperandUse(RewriterBase &rewriter,
 /// the clamped, rebased index and keeps the previous op's element unless the
 /// index falls into shard k. Elementwise fusion may merge the chain into one
 /// dispatch again; each shard stays a binding within the allocation limit.
+/// Targets that also limit the bytes a single dispatch binds can stop that
+/// with --iree-dispatch-creation-max-dispatch-binding-bytes.
 static void splitGatherUse(RewriterBase &rewriter, GatherUse use,
                            const SplitPlan &plan, ArrayRef<Value> shards) {
   linalg::GenericOp op = use.op;

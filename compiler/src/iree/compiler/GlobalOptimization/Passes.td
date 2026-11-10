@@ -373,6 +373,9 @@ def SplitLargeConstantsPass :
         element unless the index lies in its shard.
 
     A constant with any other use is left unchanged with a warning.
+
+    To keep fusion from binding all shards in one dispatch, see
+    `--iree-dispatch-creation-max-dispatch-binding-bytes`.
   }];
   let dependentDialects = [
     "mlir::arith::ArithDialect",
