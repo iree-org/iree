@@ -8,8 +8,6 @@
 
 #include <string.h>
 
-#include "iree/hal/drivers/vulkan/buffer.h"
-#include "iree/hal/drivers/vulkan/descriptor_range.h"
 #include "iree/hal/drivers/vulkan/physical_device.h"
 
 typedef struct iree_hal_vulkan_fill_unaligned_push_constants_t {
@@ -261,141 +259,10 @@ static iree_status_t iree_hal_vulkan_builtins_create_compute_pipeline(
   return status;
 }
 
-// Creates the device-local word bound for empty descriptor ranges.
-static iree_status_t iree_hal_vulkan_builtins_create_empty_binding_buffer(
-    const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
-    bool device_addresses, iree_hal_vulkan_builtins_t* builtins) {
-  VkBufferCreateInfo buffer_create_info = {
-      .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-      .size = sizeof(uint32_t),
-      .usage =
-          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-          (device_addresses ? VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT : 0),
-      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-  };
-  IREE_RETURN_IF_ERROR(iree_vkCreateBuffer(
-      IREE_VULKAN_DEVICE(&builtins->syms), builtins->logical_device,
-      &buffer_create_info, /*pAllocator=*/NULL,
-      &builtins->empty_binding_buffer));
-  VkMemoryRequirements requirements;
-  iree_vkGetBufferMemoryRequirements(
-      IREE_VULKAN_DEVICE(&builtins->syms), builtins->logical_device,
-      builtins->empty_binding_buffer, &requirements);
-  const VkPhysicalDeviceMemoryProperties* memory_properties =
-      &physical_device->memory_properties2.memoryProperties;
-  uint32_t memory_type_index = UINT32_MAX;
-  for (uint32_t i = 0; i < memory_properties->memoryTypeCount; ++i) {
-    if (!(requirements.memoryTypeBits & (1u << i))) continue;
-    if (memory_type_index == UINT32_MAX) memory_type_index = i;
-    if (memory_properties->memoryTypes[i].propertyFlags &
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
-      memory_type_index = i;
-      break;
-    }
-  }
-  if (memory_type_index == UINT32_MAX) {
-    return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                            "no memory type can back the empty-binding buffer");
-  }
-  VkMemoryAllocateFlagsInfo allocate_flags_info = {
-      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
-      .flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT,
-  };
-  VkMemoryAllocateInfo allocate_info = {
-      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-      .pNext = device_addresses ? &allocate_flags_info : NULL,
-      .allocationSize = requirements.size,
-      .memoryTypeIndex = memory_type_index,
-  };
-  IREE_RETURN_IF_ERROR(iree_vkAllocateMemory(
-      IREE_VULKAN_DEVICE(&builtins->syms), builtins->logical_device,
-      &allocate_info, /*pAllocator=*/NULL, &builtins->empty_binding_memory));
-  IREE_RETURN_IF_ERROR(iree_vkBindBufferMemory(
-      IREE_VULKAN_DEVICE(&builtins->syms), builtins->logical_device,
-      builtins->empty_binding_buffer, builtins->empty_binding_memory,
-      /*memoryOffset=*/0));
-  if (device_addresses) {
-    VkBufferDeviceAddressInfo address_info = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
-        .buffer = builtins->empty_binding_buffer,
-    };
-    builtins->empty_binding_address =
-        iree_vkGetBufferDeviceAddress(IREE_VULKAN_DEVICE(&builtins->syms),
-                                      builtins->logical_device, &address_info);
-    if (builtins->empty_binding_address == 0) {
-      return iree_make_status(
-          IREE_STATUS_FAILED_PRECONDITION,
-          "Vulkan empty binding buffer has no device address");
-    }
-  }
-  return iree_ok_status();
-}
-
-iree_status_t iree_hal_vulkan_builtins_resolve_descriptor_length(
-    const iree_hal_vulkan_builtins_t* builtins,
-    VkDescriptorType descriptor_type, uint32_t minimum_access_bytes,
-    iree_hal_buffer_t* buffer, iree_device_size_t offset,
-    iree_device_size_t length, iree_device_size_t* out_length) {
-  const iree_device_size_t view_length = iree_hal_buffer_byte_length(buffer);
-  const iree_device_size_t owned_length =
-      iree_hal_vulkan_buffer_owned_byte_length(buffer);
-  const VkDeviceSize max_range =
-      descriptor_type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
-          ? builtins->max_uniform_buffer_range
-          : builtins->max_storage_buffer_range;
-  return iree_hal_vulkan_resolve_descriptor_range(
-      view_length, owned_length, offset, length, minimum_access_bytes,
-      max_range, out_length);
-}
-
-iree_status_t iree_hal_vulkan_builtins_resolve_buffer_descriptor(
-    const iree_hal_vulkan_builtins_t* builtins,
-    VkDescriptorType descriptor_type, uint32_t minimum_access_bytes,
-    iree_hal_buffer_t* buffer, iree_device_size_t offset,
-    iree_device_size_t length, VkDescriptorBufferInfo* out_buffer_info) {
-  iree_device_size_t physical_length = 0;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_builtins_resolve_descriptor_length(
-      builtins, descriptor_type, minimum_access_bytes, buffer, offset, length,
-      &physical_length));
-  if (physical_length == 0) {
-    *out_buffer_info = (VkDescriptorBufferInfo){
-        .buffer = builtins->empty_binding_buffer,
-        .offset = 0,
-        .range = sizeof(uint32_t),
-    };
-    return iree_ok_status();
-  }
-
-  iree_hal_buffer_t* backing_buffer = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_vulkan_buffer_resolve_backing(buffer, &backing_buffer));
-  iree_device_size_t backing_offset = 0;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_buffer_resolve_backing_offset(
-      buffer, backing_buffer, offset, &backing_offset));
-  if (minimum_access_bytes > 1 && backing_offset % minimum_access_bytes != 0) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "Vulkan descriptor offset %" PRIu64
-        " is not aligned to its %u-byte storage access unit",
-        (uint64_t)backing_offset, minimum_access_bytes);
-  }
-  VkDeviceMemory memory = VK_NULL_HANDLE;
-  VkBuffer handle = VK_NULL_HANDLE;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_vulkan_buffer_handle(backing_buffer, &memory, &handle));
-  *out_buffer_info = (VkDescriptorBufferInfo){
-      .buffer = handle,
-      .offset = (VkDeviceSize)backing_offset,
-      .range = (VkDeviceSize)physical_length,
-  };
-  return iree_ok_status();
-}
-
 iree_status_t iree_hal_vulkan_builtins_initialize(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
-    bool device_addresses, iree_hal_vulkan_builtins_t* out_builtins) {
+    iree_hal_vulkan_builtins_t* out_builtins) {
   IREE_ASSERT_ARGUMENT(syms);
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(physical_device);
@@ -419,10 +286,6 @@ iree_status_t iree_hal_vulkan_builtins_initialize(
   }
   out_builtins->min_storage_buffer_offset_alignment =
       min_storage_buffer_offset_alignment;
-  out_builtins->max_storage_buffer_range =
-      physical_device->properties2.properties.limits.maxStorageBufferRange;
-  out_builtins->max_uniform_buffer_range =
-      physical_device->properties2.properties.limits.maxUniformBufferRange;
 
   VkDescriptorSetLayoutBinding fill_layout_binding = {
       .binding = 0,
@@ -472,10 +335,6 @@ iree_status_t iree_hal_vulkan_builtins_initialize(
         sizeof(iree_hal_vulkan_update_unaligned_spirv),
         &out_builtins->update_pipeline);
   }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_vulkan_builtins_create_empty_binding_buffer(
-        physical_device, device_addresses, out_builtins);
-  }
   if (!iree_status_is_ok(status)) {
     iree_hal_vulkan_builtins_deinitialize(out_builtins);
   }
@@ -485,16 +344,6 @@ iree_status_t iree_hal_vulkan_builtins_initialize(
 void iree_hal_vulkan_builtins_deinitialize(
     iree_hal_vulkan_builtins_t* builtins) {
   if (!builtins || !builtins->logical_device) return;
-  if (builtins->empty_binding_buffer) {
-    iree_vkDestroyBuffer(IREE_VULKAN_DEVICE(&builtins->syms),
-                         builtins->logical_device,
-                         builtins->empty_binding_buffer, /*pAllocator=*/NULL);
-  }
-  if (builtins->empty_binding_memory) {
-    iree_vkFreeMemory(IREE_VULKAN_DEVICE(&builtins->syms),
-                      builtins->logical_device, builtins->empty_binding_memory,
-                      /*pAllocator=*/NULL);
-  }
   if (builtins->update_pipeline) {
     iree_vkDestroyPipeline(IREE_VULKAN_DEVICE(&builtins->syms),
                            builtins->logical_device, builtins->update_pipeline,

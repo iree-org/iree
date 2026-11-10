@@ -42,22 +42,4 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_test(
-  NAME
-    ResourceUsageTest
-  SRCS
-    "ResourceUsageTest.cpp"
-  DEPS
-    ::Analysis
-    LLVMSupport
-    MLIRArithDialect
-    MLIRIR
-    MLIRParser
-    gmock
-    gtest
-    iree::compiler::Dialect::Stream::IR
-    iree::compiler::Dialect::Util::IR
-    iree::testing::gtest_main
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

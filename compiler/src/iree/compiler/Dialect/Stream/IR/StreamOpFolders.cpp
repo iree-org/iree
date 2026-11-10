@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/Repeated.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1068,55 +1067,12 @@ struct SinkSubviewAcrossSelectOps : OpRewritePattern<mlir::arith::SelectOp> {
   }
 };
 
-// Keep the resource opaque while exposing the backing allocation and offset
-// so dispatch bindings can include the padding reserved for a subview.
-//   barrier(subview(resource, offset, length))
-//     -> subview(barrier(resource), offset, length)
-struct SinkSubviewsAcrossOptimizationBarrier final
-    : OpRewritePattern<IREE::Util::OptimizationBarrierOp> {
-  using Base::Base;
-  LogicalResult matchAndRewrite(IREE::Util::OptimizationBarrierOp op,
-                                PatternRewriter &rewriter) const override {
-    SmallVector<Value> operands(op.getOperands());
-    SmallVector<ResourceSubviewOp> subviews(op.getNumOperands());
-    bool hasSubview = false;
-    for (auto [i, result] : llvm::enumerate(op.getResults())) {
-      if (result.use_empty()) {
-        continue;
-      }
-      auto subview = operands[i].getDefiningOp<ResourceSubviewOp>();
-      if (!subview) {
-        continue;
-      }
-      operands[i] = subview.getSource();
-      subviews[i] = subview;
-      hasSubview = true;
-    }
-    if (!hasSubview) {
-      return rewriter.notifyMatchFailure(op, "no used resource subviews");
-    }
-    auto barrier = IREE::Util::OptimizationBarrierOp::create(
-        rewriter, op.getLoc(), operands, op->getAttrs());
-    SmallVector<Value> results(barrier.getResults());
-    for (auto [i, subview] : llvm::enumerate(subviews)) {
-      if (subview) {
-        results[i] = ResourceSubviewOp::create(
-            rewriter, subview.getLoc(), results[i], subview.getSourceSize(),
-            subview.getSourceOffset(), subview.getResultSize());
-      }
-    }
-    rewriter.replaceOp(op, results);
-    return success();
-  }
-};
-
 } // namespace
 
 void ResourceSubviewOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                     MLIRContext *context) {
   results.insert<FoldResourceSubviewOps>(context);
   results.insert<SinkSubviewAcrossSelectOps>(context);
-  results.insert<SinkSubviewsAcrossOptimizationBarrier>(context);
 }
 
 //===----------------------------------------------------------------------===//

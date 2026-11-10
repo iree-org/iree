@@ -222,19 +222,27 @@ struct GeneralDotConvert final
   // replaced with the standard Dot operator.
   //
   // Note: This requires an empty list of batch dimensions.
-  LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
-                                PatternRewriter &rewriter) const override {
+  static LogicalResult matchUnbatchedPlainDot(mlir::stablehlo::DotGeneralOp op,
+                                              PatternRewriter &rewriter) {
     if (op.getAlgorithm()) {
       return rewriter.notifyMatchFailure(
           op, "dot algorithm cannot be represented by stablehlo.dot");
     }
-    Location loc = op.getLoc();
-
     auto dotNumbers = op.getDotDimensionNumbers();
     if (!dotNumbers.getLhsBatchingDimensions().empty() ||
         !dotNumbers.getRhsBatchingDimensions().empty()) {
+      return rewriter.notifyMatchFailure(op, "has batching dimensions");
+    }
+    return success();
+  }
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
+                                PatternRewriter &rewriter) const override {
+    if (failed(matchUnbatchedPlainDot(op, rewriter))) {
       return failure();
     }
+    Location loc = op.getLoc();
+    auto dotNumbers = op.getDotDimensionNumbers();
 
     ArrayAttr precisionConfig;
     auto opPrecisionConfig = op.getPrecisionConfig();

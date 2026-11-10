@@ -14,6 +14,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/InterleavedRange.h"
@@ -164,6 +165,21 @@ static bool isSupportedMaskElementType(Type type) {
 /// is written from the perspective of `scatter` op. For gather, `updateType`
 /// maps to the type of the output and `originalType` maps to the type of the
 /// `source`.
+// Returns the first of the leading `rank` dimensions where `lhs` and `rhs`
+// have different static extents. Dynamic dimensions are compatible with static
+// dimensions; the runtime shapes are required to agree.
+static std::optional<int64_t>
+getFirstStaticDimMismatch(ShapedType lhs, ShapedType rhs, int64_t rank) {
+  for (int64_t dim : llvm::seq<int64_t>(0, rank)) {
+    if (ShapedType::isStatic(lhs.getDimSize(dim)) &&
+        ShapedType::isStatic(rhs.getDimSize(dim)) &&
+        lhs.getDimSize(dim) != rhs.getDimSize(dim)) {
+      return dim;
+    }
+  }
+  return std::nullopt;
+}
+
 template <typename OpTy>
 static LogicalResult
 verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
@@ -219,17 +235,11 @@ verifyGatherScatter(OpTy op, int64_t sliceRank, ShapedType originalType,
 
   // Validate the shape of indices and update value match for the first
   // `batchRank` dims.
-  // Dynamic dimensions are compatible with static dimensions; the runtime
-  // shapes are required to agree. Reject only known, unequal extents.
-  for (auto dim : llvm::seq<int64_t>(0, batchRank)) {
-    if (indicesType.isDynamicDim(dim) || updateType.isDynamicDim(dim)) {
-      continue;
-    }
-    if (indicesType.getDimSize(dim) != updateType.getDimSize(dim)) {
-      return op->emitOpError("mismatch in shape of indices and " + updateName +
-                             " value at dim#")
-             << dim;
-    }
+  if (std::optional<int64_t> dim =
+          getFirstStaticDimMismatch(indicesType, updateType, batchRank)) {
+    return op->emitOpError("mismatch in shape of indices and " + updateName +
+                           " value at dim#")
+           << *dim;
   }
   if (batchRank + 1 < indicesType.getShape().size() &&
       dimMap.size() != indicesType.getShape().back()) {
@@ -534,28 +544,35 @@ LogicalResult GeneralScatterOp::fold(FoldAdaptor adaptor,
   return success();
 }
 
-LogicalResult GeneralScatterOp::verify() {
-  auto op = *this;
-  if (getUpdates().empty() || getUpdates().size() != getOriginals().size()) {
+// Verifies that updates and originals pair up, all use the tensor form or all
+// the memref form, and that only the tensor form has results.
+static LogicalResult verifyGeneralScatterForms(GeneralScatterOp op) {
+  if (op.getUpdates().empty() ||
+      op.getUpdates().size() != op.getOriginals().size()) {
     return op->emitOpError(
         "expects the same non-zero number of updates and originals");
   }
-  bool tensorForm = isa<TensorType>(getOriginals().front().getType());
-  if (!llvm::all_of(getOriginals(), [&](Value original) {
-        return isa<TensorType>(original.getType()) == tensorForm;
-      })) {
+  bool tensorForm = isa<TensorType>(op.getOriginals().front().getType());
+  auto hasForm = [&](Value value) {
+    return isa<TensorType>(value.getType()) == tensorForm;
+  };
+  if (!llvm::all_of(op.getOriginals(), hasForm)) {
     return op->emitOpError("cannot mix tensor and memref originals");
   }
-  if (!llvm::all_of(getUpdates(), [&](Value update) {
-        return isa<TensorType>(update.getType()) == tensorForm;
-      })) {
+  if (!llvm::all_of(op.getUpdates(), hasForm)) {
     return op->emitOpError("updates and originals must use the same form");
   }
-  if (getNumResults() != (tensorForm ? getOriginals().size() : 0)) {
+  if (op.getNumResults() != (tensorForm ? op.getOriginals().size() : 0)) {
     return op->emitOpError("tensor form must return one result per original; "
                            "memref form has no results");
   }
-  auto indicesType = dyn_cast<ShapedType>(getIndices().getType());
+  return success();
+}
+
+// Verifies that the indices are a ranked tensor of signless integers of at
+// most 64 bits.
+static LogicalResult verifyGeneralScatterIndicesType(GeneralScatterOp op) {
+  auto indicesType = dyn_cast<ShapedType>(op.getIndices().getType());
   if (!indicesType || !indicesType.hasRank()) {
     return op->emitOpError("expects ranked scatter indices");
   }
@@ -565,9 +582,17 @@ LogicalResult GeneralScatterOp::verify() {
     return op->emitOpError(
         "expects signless integer indices of at most 64 bits");
   }
-  auto firstUpdateType = cast<ShapedType>(getUpdates().front().getType());
-  auto firstOriginalType = cast<ShapedType>(getOriginals().front().getType());
-  for (auto [update, original] : llvm::zip(getUpdates(), getOriginals())) {
+  return success();
+}
+
+// Verifies that every update and original matches the first pair's rank and
+// shape, and that each update has its original's element type.
+static LogicalResult verifyGeneralScatterOperandTypes(GeneralScatterOp op) {
+  auto firstUpdateType = cast<ShapedType>(op.getUpdates().front().getType());
+  auto firstOriginalType =
+      cast<ShapedType>(op.getOriginals().front().getType());
+  for (auto [update, original] :
+       llvm::zip_equal(op.getUpdates(), op.getOriginals())) {
     auto updateType = dyn_cast<ShapedType>(update.getType());
     auto originalType = dyn_cast<ShapedType>(original.getType());
     if (!updateType || !updateType.hasRank() || !originalType ||
@@ -590,144 +615,181 @@ LogicalResult GeneralScatterOp::verify() {
           "all updates and originals must have compatible shapes");
     }
   }
+  return success();
+}
 
-  int64_t indexVectorDim = getIndexVectorDim();
-  if (indexVectorDim < 0 || indexVectorDim > indicesType.getRank()) {
+// Returns whether `dims` are distinct axes of a value of rank `rank`.
+static bool areDistinctAxes(ArrayRef<int64_t> dims, int64_t rank) {
+  llvm::SmallDenseSet<int64_t> seen;
+  return llvm::all_of(dims, [&](int64_t dim) {
+    return dim >= 0 && dim < rank && seen.insert(dim).second;
+  });
+}
+
+// Verifies the index vector dimension and its size, and that every
+// dimension-number attribute names distinct, in-range axes in the required
+// order.
+static LogicalResult verifyGeneralScatterAxes(GeneralScatterOp op) {
+  auto indicesType = cast<ShapedType>(op.getIndices().getType());
+  int64_t indicesRank = indicesType.getRank();
+  int64_t indexVectorDim = op.getIndexVectorDim();
+  if (indexVectorDim < 0 || indexVectorDim > indicesRank) {
     return op->emitOpError("index_vector_dim is outside the indices rank");
   }
-  int64_t vectorSize = 1;
-  if (indexVectorDim < indicesType.getRank()) {
-    vectorSize = indicesType.getDimSize(indexVectorDim);
-  }
-  if (!ShapedType::isDynamic(vectorSize) &&
+  int64_t vectorSize =
+      indexVectorDim < indicesRank ? indicesType.getDimSize(indexVectorDim) : 1;
+  if (ShapedType::isStatic(vectorSize) &&
       vectorSize !=
-          static_cast<int64_t>(getScatterDimsToOperandDims().size())) {
+          static_cast<int64_t>(op.getScatterDimsToOperandDims().size())) {
     return op->emitOpError(
         "index vector size must match scatter_dims_to_operand_dims");
   }
-  if (getInputBatchingDims().size() != getScatterIndicesBatchingDims().size()) {
+  if (op.getInputBatchingDims().size() !=
+      op.getScatterIndicesBatchingDims().size()) {
     return op->emitOpError("input and indices batching dimensions must pair");
   }
-  int64_t inputRank = firstOriginalType.getRank();
-  int64_t updateRank = firstUpdateType.getRank();
-  auto allInRange = [](ArrayRef<int64_t> dims, int64_t rank) {
-    llvm::SmallDenseSet<int64_t> seen;
-    return llvm::all_of(dims, [&](int64_t dim) {
-      return dim >= 0 && dim < rank && seen.insert(dim).second;
-    });
-  };
-  if (!allInRange(getUpdateWindowDims(), updateRank) ||
-      !allInRange(getInsertedWindowDims(), inputRank) ||
-      !allInRange(getInputBatchingDims(), inputRank) ||
-      !allInRange(getScatterDimsToOperandDims(), inputRank)) {
+  int64_t inputRank =
+      cast<ShapedType>(op.getOriginals().front().getType()).getRank();
+  int64_t updateRank =
+      cast<ShapedType>(op.getUpdates().front().getType()).getRank();
+  if (!areDistinctAxes(op.getUpdateWindowDims(), updateRank) ||
+      !areDistinctAxes(op.getInsertedWindowDims(), inputRank) ||
+      !areDistinctAxes(op.getInputBatchingDims(), inputRank) ||
+      !areDistinctAxes(op.getScatterDimsToOperandDims(), inputRank)) {
     return op->emitOpError("dimension-number attributes contain invalid axes");
   }
-  auto isSorted = [](ArrayRef<int64_t> dims) { return llvm::is_sorted(dims); };
-  if (!isSorted(getUpdateWindowDims()) || !isSorted(getInsertedWindowDims()) ||
-      !isSorted(getInputBatchingDims())) {
+  if (!llvm::is_sorted(op.getUpdateWindowDims()) ||
+      !llvm::is_sorted(op.getInsertedWindowDims()) ||
+      !llvm::is_sorted(op.getInputBatchingDims())) {
     return op->emitOpError("update window, inserted window, and input batching "
                            "dimensions must be sorted");
   }
-  SmallVector<int64_t> indexBatchDims(getScatterIndicesBatchingDims().begin(),
-                                      getScatterIndicesBatchingDims().end());
-  if (indexVectorDim < indicesType.getRank()) {
+  SmallVector<int64_t> indexBatchDims(op.getScatterIndicesBatchingDims());
+  if (indexVectorDim < indicesRank) {
     indexBatchDims.push_back(indexVectorDim);
   }
-  if (!allInRange(indexBatchDims, indicesType.getRank())) {
+  if (!areDistinctAxes(indexBatchDims, indicesRank)) {
     return op->emitOpError(
         "scatter_indices_batching_dims contain invalid axes");
   }
-  for (int64_t dim : getScatterDimsToOperandDims()) {
-    if (llvm::is_contained(getInputBatchingDims(), dim)) {
+  return success();
+}
+
+// Verifies that scattered, batching, inserted and window input dimensions do
+// not overlap and that the window dimensions cover the rest of the input.
+static LogicalResult verifyGeneralScatterInputDimRoles(GeneralScatterOp op) {
+  for (int64_t dim : op.getScatterDimsToOperandDims()) {
+    if (llvm::is_contained(op.getInputBatchingDims(), dim)) {
       return op->emitOpError("scatter dimension mappings cannot overlap input "
                              "batching dimensions");
     }
   }
-  for (int64_t dim : getInputBatchingDims()) {
-    if (llvm::is_contained(getInsertedWindowDims(), dim)) {
+  for (int64_t dim : op.getInputBatchingDims()) {
+    if (llvm::is_contained(op.getInsertedWindowDims(), dim)) {
       return op->emitOpError(
           "input batching dimensions cannot be inserted window dimensions");
     }
   }
-  if (static_cast<int64_t>(getUpdateWindowDims().size()) !=
-      inputRank - static_cast<int64_t>(getInsertedWindowDims().size()) -
-          static_cast<int64_t>(getInputBatchingDims().size())) {
+  int64_t inputRank =
+      cast<ShapedType>(op.getOriginals().front().getType()).getRank();
+  if (static_cast<int64_t>(op.getUpdateWindowDims().size()) !=
+      inputRank - static_cast<int64_t>(op.getInsertedWindowDims().size()) -
+          static_cast<int64_t>(op.getInputBatchingDims().size())) {
     return op->emitOpError("update window dimensions must map to non-batching, "
                            "non-inserted input dimensions");
   }
-  SmallVector<int64_t> updateScatterDims;
-  for (int64_t dim = 0; dim < firstUpdateType.getRank(); ++dim) {
-    if (!llvm::is_contained(getUpdateWindowDims(), dim)) {
-      updateScatterDims.push_back(dim);
-    }
-  }
-  int64_t indicesNonVectorRank =
-      indicesType.getRank() - (indexVectorDim < indicesType.getRank() ? 1 : 0);
-  SmallVector<int64_t> indicesNonVectorDims;
-  for (int64_t dim = 0; dim < indicesType.getRank(); ++dim) {
-    if (dim != indexVectorDim) {
-      indicesNonVectorDims.push_back(dim);
-    }
-  }
-  if (static_cast<int64_t>(updateScatterDims.size()) != indicesNonVectorRank) {
+  return success();
+}
+
+// Verifies that update scatter dimensions match the indices dimensions other
+// than the index vector, and that paired batching dimensions agree in size.
+static LogicalResult verifyGeneralScatterIndexedDims(GeneralScatterOp op) {
+  auto updateType = cast<ShapedType>(op.getUpdates().front().getType());
+  auto originalType = cast<ShapedType>(op.getOriginals().front().getType());
+  auto indicesType = cast<ShapedType>(op.getIndices().getType());
+  int64_t indexVectorDim = op.getIndexVectorDim();
+  SmallVector<int64_t> updateScatterDims = llvm::filter_to_vector(
+      llvm::seq<int64_t>(updateType.getRank()), [&](int64_t dim) {
+        return !llvm::is_contained(op.getUpdateWindowDims(), dim);
+      });
+  SmallVector<int64_t> indicesNonVectorDims = llvm::filter_to_vector(
+      llvm::seq<int64_t>(indicesType.getRank()),
+      [&](int64_t dim) { return dim != indexVectorDim; });
+  if (updateScatterDims.size() != indicesNonVectorDims.size()) {
     return op->emitOpError("update scatter dimensions must match indices "
                            "dimensions excluding the index vector");
   }
   for (auto [updateDim, indicesDim] :
-       llvm::zip(updateScatterDims, indicesNonVectorDims)) {
-    if (failed(verifyCompatibleDims({firstUpdateType.getDimSize(updateDim),
+       llvm::zip_equal(updateScatterDims, indicesNonVectorDims)) {
+    if (failed(verifyCompatibleDims({updateType.getDimSize(updateDim),
                                      indicesType.getDimSize(indicesDim)}))) {
       return op->emitOpError(
           "update scatter dimensions must match non-vector indices dimensions");
     }
   }
-  for (auto [inputBatchDim, indicesBatchDim] :
-       llvm::zip(getInputBatchingDims(), getScatterIndicesBatchingDims())) {
+  for (auto [inputBatchDim, indicesBatchDim] : llvm::zip_equal(
+           op.getInputBatchingDims(), op.getScatterIndicesBatchingDims())) {
     if (failed(
-            verifyCompatibleDims({firstOriginalType.getDimSize(inputBatchDim),
+            verifyCompatibleDims({originalType.getDimSize(inputBatchDim),
                                   indicesType.getDimSize(indicesBatchDim)}))) {
       return op->emitOpError("paired input and indices batching dimensions "
                              "must have compatible sizes");
     }
   }
+  return success();
+}
 
-  SmallVector<int64_t> windowInputDims;
-  for (int64_t dim = 0; dim < inputRank; ++dim) {
-    if (!llvm::is_contained(getInsertedWindowDims(), dim) &&
-        !llvm::is_contained(getInputBatchingDims(), dim)) {
-      windowInputDims.push_back(dim);
-    }
-  }
+// Verifies that no static update window exceeds its static input dimension.
+static LogicalResult verifyGeneralScatterWindowSizes(GeneralScatterOp op) {
+  auto updateType = cast<ShapedType>(op.getUpdates().front().getType());
+  auto originalType = cast<ShapedType>(op.getOriginals().front().getType());
+  SmallVector<int64_t> windowInputDims = llvm::filter_to_vector(
+      llvm::seq<int64_t>(originalType.getRank()), [&](int64_t dim) {
+        return !llvm::is_contained(op.getInsertedWindowDims(), dim) &&
+               !llvm::is_contained(op.getInputBatchingDims(), dim);
+      });
   for (auto [updateDim, inputDim] :
-       llvm::zip(getUpdateWindowDims(), windowInputDims)) {
-    int64_t updateSize = firstUpdateType.getDimSize(updateDim);
-    int64_t inputSize = firstOriginalType.getDimSize(inputDim);
-    if (!ShapedType::isDynamic(updateSize) &&
-        !ShapedType::isDynamic(inputSize) && updateSize > inputSize) {
+       llvm::zip_equal(op.getUpdateWindowDims(), windowInputDims)) {
+    int64_t updateSize = updateType.getDimSize(updateDim);
+    int64_t inputSize = originalType.getDimSize(inputDim);
+    if (ShapedType::isStatic(updateSize) && ShapedType::isStatic(inputSize) &&
+        updateSize > inputSize) {
       return op->emitOpError("static update window dimension exceeds the "
                              "corresponding input dimension");
     }
   }
+  return success();
+}
 
-  if (tensorForm) {
-    for (auto [result, original] : llvm::zip(getResults(), getOriginals())) {
-      auto resultType = cast<ShapedType>(result.getType());
-      auto originalType = cast<ShapedType>(original.getType());
-      if (resultType.getElementType() != originalType.getElementType() ||
-          failed(verifyCompatibleShape(resultType.getShape(),
-                                       originalType.getShape()))) {
-        return op->emitOpError(
-            "tensor results must match their corresponding original types");
-      }
+// Verifies that each tensor result has its original's type.
+static LogicalResult verifyGeneralScatterResults(GeneralScatterOp op) {
+  if (op.getNumResults() == 0) {
+    return success();
+  }
+  for (auto [result, original] :
+       llvm::zip_equal(op.getResults(), op.getOriginals())) {
+    auto resultType = cast<ShapedType>(result.getType());
+    auto originalType = cast<ShapedType>(original.getType());
+    if (resultType.getElementType() != originalType.getElementType() ||
+        failed(verifyCompatibleShape(resultType.getShape(),
+                                     originalType.getShape()))) {
+      return op->emitOpError(
+          "tensor results must match their corresponding original types");
     }
   }
+  return success();
+}
 
-  if (getRegion().empty() || getRegion().getBlocks().size() != 1 ||
-      getRegion().front().empty()) {
+// Verifies that the reducer takes the original scalars followed by the update
+// scalars and yields one original scalar per pair.
+static LogicalResult verifyGeneralScatterReducer(GeneralScatterOp op) {
+  Region &region = op.getRegion();
+  if (region.empty() || region.getBlocks().size() != 1 ||
+      region.front().empty()) {
     return op->emitOpError("expects a non-empty single-block reducer region");
   }
-  Block &body = getRegion().front();
-  int64_t numPairs = getUpdates().size();
+  Block &body = region.front();
+  int64_t numPairs = op.getUpdates().size();
   if (body.getNumArguments() != 2 * numPairs) {
     return op->emitOpError("reducer region must have twice the variadic arity")
            << " (expected " << 2 * numPairs << " arguments)";
@@ -742,9 +804,9 @@ LogicalResult GeneralScatterOp::verify() {
   }
   for (auto i : llvm::seq<int64_t>(0, numPairs)) {
     Type elementType =
-        cast<ShapedType>(getOriginals()[i].getType()).getElementType();
+        cast<ShapedType>(op.getOriginals()[i].getType()).getElementType();
     Type updateElementType =
-        cast<ShapedType>(getUpdates()[i].getType()).getElementType();
+        cast<ShapedType>(op.getUpdates()[i].getType()).getElementType();
     if (body.getArgument(i).getType() != elementType ||
         body.getArgument(i + numPairs).getType() != updateElementType ||
         yieldOp->getOperand(i).getType() != elementType) {
@@ -752,6 +814,19 @@ LogicalResult GeneralScatterOp::verify() {
     }
   }
   return success();
+}
+
+LogicalResult GeneralScatterOp::verify() {
+  // Later checks rely on the forms, types and axes the earlier ones establish.
+  return success(succeeded(verifyGeneralScatterForms(*this)) &&
+                 succeeded(verifyGeneralScatterIndicesType(*this)) &&
+                 succeeded(verifyGeneralScatterOperandTypes(*this)) &&
+                 succeeded(verifyGeneralScatterAxes(*this)) &&
+                 succeeded(verifyGeneralScatterInputDimRoles(*this)) &&
+                 succeeded(verifyGeneralScatterIndexedDims(*this)) &&
+                 succeeded(verifyGeneralScatterWindowSizes(*this)) &&
+                 succeeded(verifyGeneralScatterResults(*this)) &&
+                 succeeded(verifyGeneralScatterReducer(*this)));
 }
 
 LogicalResult GeneralScatterOp::reifyResultShapes(
@@ -1384,6 +1459,31 @@ LogicalResult GroupMmt4DOp::verify() {
 // SortOp
 //===----------------------------------------------------------------------===//
 
+// Verifies that sort output `index` of type `outputType` has the rank, a
+// shape compatible with both `shape` and its input, and the element type of
+// input `operandType`.
+static LogicalResult verifySortOutput(Operation *op, int64_t index,
+                                      Type outputType, ShapedType operandType,
+                                      ArrayRef<int64_t> shape) {
+  auto outputShapedType = cast<ShapedType>(outputType);
+  int64_t rank = shape.size();
+  if (outputShapedType.getRank() != rank) {
+    return op->emitOpError("expected output ")
+           << index << " to be rank " << rank << ", same as inputs";
+  }
+  if (failed(verifyCompatibleShape(outputShapedType.getShape(), shape)) ||
+      failed(verifyCompatibleShape(outputShapedType.getShape(),
+                                   operandType.getShape()))) {
+    return op->emitOpError("expected output ")
+           << index << " to have same shape as inputs";
+  }
+  if (outputShapedType.getElementType() != operandType.getElementType()) {
+    return op->emitOpError("expected output ")
+           << index << " to have the same element type as input " << index;
+  }
+  return success();
+}
+
 LogicalResult SortOp::verify() {
   Operation *op = getOperation();
   if (getNumDpsInputs() == 0) {
@@ -1434,20 +1534,9 @@ LogicalResult SortOp::verify() {
       }
     }
 
-    auto outputType = cast<ShapedType>(getOutputs()[index].getType());
-    if (outputType.getRank() != rank) {
-      return op->emitOpError("expected output ")
-             << index << " to be rank " << rank << ", same as inputs";
-    }
-    if (failed(verifyCompatibleShape(outputType.getShape(), shape)) ||
-        failed(verifyCompatibleShape(outputType.getShape(),
-                                     operandType.getShape()))) {
-      return op->emitOpError("expected output ")
-             << index << " to have same shape as inputs";
-    }
-    if (outputType.getElementType() != operandType.getElementType()) {
-      return op->emitOpError("expected output ")
-             << index << " to have the same element type as input " << index;
+    if (failed(verifySortOutput(op, index, getOutputs()[index].getType(),
+                                operandType, shape))) {
+      return failure();
     }
   }
 

@@ -98,3 +98,42 @@ func.func @copy_sign_fp8_unsigned_zero(%magnitude: f8E5M2FNUZ, %sign: f8E5M2FNUZ
   %result = math.copysign %magnitude, %sign : f8E5M2FNUZ
   return %result : f8E5M2FNUZ
 }
+
+// i32 to bf16 through f32 rounds twice: 1077936129 becomes 1077936128 in f32,
+// a bf16 tie that rounds to 1073741824 instead of 1082130432. Keep the direct
+// conversion.
+// EMULATED-LABEL: func.func @sitofp_i32_bfloat(
+// EMULATED-NEXT: %[[CAST:.+]] = arith.sitofp %arg0 : i32 to bf16
+// EMULATED-NEXT: return %[[CAST]] : bf16
+func.func @sitofp_i32_bfloat(%input: i32) -> bf16 {
+  %result = arith.sitofp %input : i32 to bf16
+  return %result : bf16
+}
+
+// EMULATED-LABEL: func.func @uitofp_i32_bfloat_vector(
+// EMULATED-NEXT: %[[CAST:.+]] = arith.uitofp %arg0 : vector<2xi32> to vector<2xbf16>
+// EMULATED-NEXT: return %[[CAST]] : vector<2xbf16>
+func.func @uitofp_i32_bfloat_vector(%input: vector<2xi32>) -> vector<2xbf16> {
+  %result = arith.uitofp %input : vector<2xi32> to vector<2xbf16>
+  return %result : vector<2xbf16>
+}
+
+// A 16-bit integer converts to f32 exactly, so one rounding remains.
+// EMULATED-LABEL: func.func @sitofp_i16_bfloat(
+// EMULATED: arith.sitofp %arg0 : i16 to f32
+// EMULATED-NOT: arith.sitofp
+// EMULATED: return %{{.+}} : bf16
+func.func @sitofp_i16_bfloat(%input: i16) -> bf16 {
+  %result = arith.sitofp %input : i16 to bf16
+  return %result : bf16
+}
+
+// Every i32 that f32 rounds overflows f16 on both paths.
+// EMULATED-LABEL: func.func @sitofp_i32_half(
+// EMULATED: arith.sitofp %arg0 : i32 to f32
+// EMULATED-NOT: arith.sitofp
+// EMULATED: return %{{.+}} : f16
+func.func @sitofp_i32_half(%input: i32) -> f16 {
+  %result = arith.sitofp %input : i32 to f16
+  return %result : f16
+}

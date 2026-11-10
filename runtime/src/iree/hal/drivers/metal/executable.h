@@ -38,6 +38,11 @@ extern "C" {
 // with it.
 #define IREE_HAL_METAL_MAX_DESCRIPTOR_SET_COUNT 4
 
+// The [[buffer(N)]] index of the argument buffer holding all bindings. The
+// compiler places the single descriptor set there when cross compiling SPIR-V
+// to MSL.
+#define IREE_HAL_METAL_ARGUMENT_BUFFER_INDEX 0
+
 // The [[buffer(N)]] index for push constants.
 //
 // This depends on the general descriptor set planning in IREE and should adjust

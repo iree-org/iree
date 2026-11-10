@@ -23,10 +23,6 @@ typedef struct iree_hal_local_executable_t {
   // local memory requirements). NULL if the executable has no dispatch attrs.
   const iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs;
 
-  // Version of the library providing the exports. Dispatch flags that v0.7
-  // introduced are reserved before it and never read.
-  iree_hal_executable_library_version_t library_version;
-
   // Per-entry point native function pointers. NULL for backends that don't
   // support direct dispatch (e.g., VMVX which dispatches through the VM).
   // Enables recording-time function resolution for the block ISA command
@@ -78,20 +74,12 @@ iree_string_view_t iree_hal_local_executable_export_name(
     const iree_hal_local_executable_t* executable,
     iree_hal_executable_function_t function);
 
-// Converts a native dispatch return value to an IREE status. Only executables
-// with the status-return flag enabled may return status codes directly.
-iree_status_t iree_hal_local_executable_status_from_ret(
-    const iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
-    int ret);
-
 iree_status_t iree_hal_local_executable_issue_call(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
     const iree_hal_executable_workgroup_state_v0_t* workgroup_state,
     uint32_t worker_id);
 
-// Issues workgroups synchronously in x/y/z order and returns the first failure
-// without issuing subsequent workgroups. The caller owns |local_memory|.
 iree_status_t iree_hal_local_executable_issue_dispatch_inline(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,

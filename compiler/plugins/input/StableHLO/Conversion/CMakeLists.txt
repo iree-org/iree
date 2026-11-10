@@ -36,29 +36,12 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    StatusCheck
-  HDRS
-    "StableHLOStatusCheck.h"
-  SRCS
-    "StableHLOStatusCheck.cpp"
-  DEPS
-    LLVMSupport
-    MLIRArithDialect
-    MLIRIR
-    iree::compiler::Dialect::Util::IR
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     PaddingUtils
   HDRS
     "StableHLOPaddingUtils.h"
   SRCS
     "StableHLOPaddingUtils.cpp"
   DEPS
-    ::StatusCheck
-    LLVMSupport
     MLIRArithDialect
     MLIRIR
   PUBLIC
@@ -84,7 +67,6 @@ iree_cc_library(
   DEPS
     ::PaddingUtils
     ::PassHeaders
-    ::StatusCheck
     ChloOps
     LLVMSupport
     MLIRAffineDialect
@@ -94,7 +76,6 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRComplexDialect
     MLIRControlFlowDialect
-    MLIRDataLayoutInterfaces
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR

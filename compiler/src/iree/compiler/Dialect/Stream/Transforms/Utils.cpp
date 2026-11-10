@@ -9,30 +9,14 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/Utils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/Threading.h"
 
 #define DEBUG_TYPE "iree-stream-transforms-utils"
 
 namespace mlir::iree_compiler::IREE::Stream {
-
-LogicalResult
-runOnFunctionLikeOps(ModuleOp moduleOp,
-                     llvm::function_ref<LogicalResult(Operation *)> callback) {
-  SmallVector<Operation *> functionLikeOps;
-  for (Operation &op : moduleOp.getBody()->getOperations()) {
-    if (isa<func::FuncOp, IREE::Util::FuncOp, IREE::Util::InitializerOp>(op)) {
-      functionLikeOps.push_back(&op);
-    }
-  }
-  return failableParallelForEach(moduleOp.getContext(), functionLikeOps,
-                                 callback);
-}
 
 SmallVector<Attribute> getBindingLayoutAttrs(TensorDispatchOp dispatchOp) {
   SmallVector<int64_t> tiedOperands(dispatchOp.getNumResults(),

@@ -63,20 +63,21 @@ func.func @dynamic_conv_lhs_dilation(%a: tensor<1x4x4x1xf32>, %k: tensor<3x3x1x1
 // CHECK-DAG: %[[PAD:.+]] = tensor.extract %[[VAL]]
 // CHECK-DAG: %[[LOW:.+]] = tensor.extract %[[LO]]
 // CHECK-DAG: %[[INTERIOR:.+]] = tensor.extract %[[IN]]
-// CHECK: util.status.check_ok {{.*}}, "interior padding must be nonnegative"
-// CHECK: util.status.check_ok {{.*}}, "padded dimension exceeds the index range"
+// CHECK-NOT: util.status.check_ok
+// The 64-bit phase of the low and interior padding is derived on the host;
+// the generated loop body uses only index arithmetic bounded by the result.
 // CHECK: %[[IF:.+]] = scf.if
 // CHECK: %[[EMPTY:.+]] = tensor.empty(%[[SIZE:.+]]) : tensor<?xf32>
-// CHECK: %[[GENERATED:.+]] = linalg.generic {{.*}} outs(%[[EMPTY]] : tensor<?xf32>)
-// CHECK: %[[INDEX:.+]] = linalg.index 0
-// CHECK: %[[I64:.+]] = arith.index_castui %[[INDEX]] : index to i64
-// CHECK: arith.cmpi sge, %[[I64]], %[[LOW]]
-// CHECK: %[[OFFSET:.+]] = arith.subi %[[I64]], %[[LOW]]
 // CHECK: %[[STRIDE:.+]] = arith.addi %[[INTERIOR]],
 // CHECK: %[[DIVISOR:.+]] = arith.select {{.*}}, %[[STRIDE]] : i64
-// CHECK: arith.divui %[[OFFSET]], %[[DIVISOR]]
-// CHECK: arith.remui %[[OFFSET]], %[[DIVISOR]]
-// CHECK: arith.cmpi ult
+// CHECK: arith.divui %{{.+}}, %[[DIVISOR]] : i64
+// CHECK: arith.remui %{{.+}}, %[[DIVISOR]] : i64
+// CHECK: %[[GENERATED:.+]] = linalg.generic {{.*}} outs(%[[EMPTY]] : tensor<?xf32>)
+// CHECK: %[[INDEX:.+]] = linalg.index 0
+// CHECK-NOT: i64
+// CHECK: arith.divui %{{.+}}, %{{.+}} : index
+// CHECK: arith.remui %{{.+}}, %{{.+}} : index
+// CHECK-NOT: i64
 // CHECK: %[[ELEMENT:.+]] = scf.if {{.*}} -> (f32) {
 // CHECK-NEXT: %[[SOURCE:.+]] = tensor.extract %[[ARG0]][%{{.+}}]
 // CHECK-NEXT: scf.yield %[[SOURCE]]
@@ -148,10 +149,13 @@ func.func @dynamic_pad_dynamic_operand(%a: tensor<?x3x?xf32>, %v: tensor<f32>, %
 
 // -----
 
-// Constant zero interior with runtime edges: the fold needs all three
-// constant, so this pattern runs and the strides fold to 1.
+// Constant zero interior with runtime edges, which may be negative: the kept
+// window is a slice and the remaining edges a pad, with no per-element branch.
 // CHECK-LABEL: @dynamic_pad_constant_interior
-// CHECK: tensor.insert_slice %{{.+}} into %{{.+}}[%{{.+}}, %{{.+}}, %{{.+}}] [2, 3, 5] [1, 1, 1]
+// CHECK-NOT: scf.if
+// CHECK: %[[KEPT:.+]] = tensor.extract_slice %arg0[%{{.+}}, %{{.+}}, %{{.+}}] [%{{.+}}, %{{.+}}, %{{.+}}] [1, 1, 1] : tensor<2x3x5xf32> to tensor<?x?x?xf32>
+// CHECK: tensor.pad %[[KEPT]] low[%{{.+}}, %{{.+}}, %{{.+}}] high[%{{.+}}, %{{.+}}, %{{.+}}]
+// CHECK-NOT: linalg.generic
 func.func @dynamic_pad_constant_interior(%a: tensor<2x3x5xf32>, %v: tensor<f32>, %lo: tensor<3xi64>, %hi: tensor<3xi64>) -> tensor<?x?x?xf32> {
   %in = stablehlo.constant dense<0> : tensor<3xi64>
   %r = "stablehlo.dynamic_pad"(%a, %v, %lo, %hi, %in) : (tensor<2x3x5xf32>, tensor<f32>, tensor<3xi64>, tensor<3xi64>, tensor<3xi64>) -> tensor<?x?x?xf32>
@@ -174,7 +178,8 @@ func.func @dynamic_pad_i32_amounts(%a: tensor<4x7xf32>, %v: tensor<f32>, %lo: te
 // -----
 
 // CHECK-LABEL: @dynamic_conv
-// CHECK: tensor.insert_slice
+// CHECK: tensor.extract_slice
+// CHECK: tensor.pad
 // CHECK: linalg.conv_2d_nhwc_hwcf
 // CHECK: return %{{.+}} : tensor<1x8x8x1xf32>
 func.func @dynamic_conv(%a: tensor<1x8x8x1xf32>, %k: tensor<3x3x1x1xf32>, %p: tensor<2x2xi64>) -> tensor<1x8x8x1xf32> {
@@ -190,7 +195,8 @@ func.func @dynamic_conv(%a: tensor<1x8x8x1xf32>, %k: tensor<3x3x1x1xf32>, %p: te
 
 // NHWC with distinct dimensions: batch and feature sizes remain static.
 // CHECK-LABEL: @dynamic_conv_nhwc
-// CHECK: %[[INS:.+]] = tensor.insert_slice %{{.+}} into %{{.+}}[0, %{{.+}}, %{{.+}}, 0] [2, 8, 6, 3] [1, 1, 1, 1] : tensor<2x8x6x3xf32> into tensor<2x?x?x3xf32>
+// CHECK: %[[KEPT:.+]] = tensor.extract_slice %arg0[0, %{{.+}}, %{{.+}}, 0] [2, %{{.+}}, %{{.+}}, 3] [1, 1, 1, 1] : tensor<2x8x6x3xf32> to tensor<2x?x?x3xf32>
+// CHECK: tensor.pad %[[KEPT]] low[0, %{{.+}}, %{{.+}}, 0] high[0, %{{.+}}, %{{.+}}, 0]
 // CHECK: linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME: ins(%{{.+}}, %{{.+}} : tensor<2x?x?x3xf32>, tensor<3x2x3x4xf32>)
 // CHECK: return %{{.+}} : tensor<2x8x6x4xf32>
@@ -270,7 +276,7 @@ func.func @dynamic_broadcast_partial_annotation(%a: tensor<?x?xf32>, %s: tensor<
 // -----
 
 // An i8 truncation of n says nothing about n: n = 257 ties the operand to one
-// element, which broadcasts to 257. The runtime check stays.
+// element, which broadcasts to 257. The runtime expansion choice stays.
 // CHECK-LABEL: @dynamic_broadcast_truncated_size
 // CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
 // CHECK: linalg.generic
@@ -288,47 +294,49 @@ func.func @dynamic_broadcast_truncated_size(%a: tensor<?x3xf32>, %n: index) -> t
 
 // -----
 
-// Thirty squarings of n form a small graph whose product has 2^30 factors. The
-// proof gives up within its budget and the runtime check stays.
+// Thirty squarings of n make n^(2^30). The product keeps one factor with a
+// power instead of 2^30 repeated factors, so the proof that the operand has
+// the target size succeeds and the broadcast folds away.
 // CHECK-LABEL: @dynamic_broadcast_squaring_chain
-// CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
-// CHECK: linalg.generic
-// CHECK: arith.select %[[EXPANDS]]
-func.func @dynamic_broadcast_squaring_chain(%a: tensor<?x2xf32>, %n: tensor<i32>) -> tensor<?x2xf32> {
-  %p0 = stablehlo.multiply %n, %n : tensor<i32>
-  %p1 = stablehlo.multiply %p0, %p0 : tensor<i32>
-  %p2 = stablehlo.multiply %p1, %p1 : tensor<i32>
-  %p3 = stablehlo.multiply %p2, %p2 : tensor<i32>
-  %p4 = stablehlo.multiply %p3, %p3 : tensor<i32>
-  %p5 = stablehlo.multiply %p4, %p4 : tensor<i32>
-  %p6 = stablehlo.multiply %p5, %p5 : tensor<i32>
-  %p7 = stablehlo.multiply %p6, %p6 : tensor<i32>
-  %p8 = stablehlo.multiply %p7, %p7 : tensor<i32>
-  %p9 = stablehlo.multiply %p8, %p8 : tensor<i32>
-  %p10 = stablehlo.multiply %p9, %p9 : tensor<i32>
-  %p11 = stablehlo.multiply %p10, %p10 : tensor<i32>
-  %p12 = stablehlo.multiply %p11, %p11 : tensor<i32>
-  %p13 = stablehlo.multiply %p12, %p12 : tensor<i32>
-  %p14 = stablehlo.multiply %p13, %p13 : tensor<i32>
-  %p15 = stablehlo.multiply %p14, %p14 : tensor<i32>
-  %p16 = stablehlo.multiply %p15, %p15 : tensor<i32>
-  %p17 = stablehlo.multiply %p16, %p16 : tensor<i32>
-  %p18 = stablehlo.multiply %p17, %p17 : tensor<i32>
-  %p19 = stablehlo.multiply %p18, %p18 : tensor<i32>
-  %p20 = stablehlo.multiply %p19, %p19 : tensor<i32>
-  %p21 = stablehlo.multiply %p20, %p20 : tensor<i32>
-  %p22 = stablehlo.multiply %p21, %p21 : tensor<i32>
-  %p23 = stablehlo.multiply %p22, %p22 : tensor<i32>
-  %p24 = stablehlo.multiply %p23, %p23 : tensor<i32>
-  %p25 = stablehlo.multiply %p24, %p24 : tensor<i32>
-  %p26 = stablehlo.multiply %p25, %p25 : tensor<i32>
-  %p27 = stablehlo.multiply %p26, %p26 : tensor<i32>
-  %p28 = stablehlo.multiply %p27, %p27 : tensor<i32>
-  %p29 = stablehlo.multiply %p28, %p28 : tensor<i32>
-  %size = stablehlo.reshape %p29 : (tensor<i32>) -> tensor<1xi32>
-  %two = stablehlo.constant dense<2> : tensor<1xi32>
-  %shape = stablehlo.concatenate %size, %two, dim = 0 : (tensor<1xi32>, tensor<1xi32>) -> tensor<2xi32>
-  %r = stablehlo.dynamic_broadcast_in_dim %a, %shape, dims = [0, 1] : (tensor<?x2xf32>, tensor<2xi32>) -> tensor<?x2xf32>
+// CHECK: %[[TIED:.+]] = flow.tensor.tie_shape %arg0
+// CHECK-NOT: linalg.generic
+// CHECK: return %[[TIED]] : tensor<?x2xf32>
+func.func @dynamic_broadcast_squaring_chain(%a: tensor<?x2xf32>, %n: i64) -> tensor<?x2xf32> {
+  %p0 = arith.muli %n, %n : i64
+  %p1 = arith.muli %p0, %p0 : i64
+  %p2 = arith.muli %p1, %p1 : i64
+  %p3 = arith.muli %p2, %p2 : i64
+  %p4 = arith.muli %p3, %p3 : i64
+  %p5 = arith.muli %p4, %p4 : i64
+  %p6 = arith.muli %p5, %p5 : i64
+  %p7 = arith.muli %p6, %p6 : i64
+  %p8 = arith.muli %p7, %p7 : i64
+  %p9 = arith.muli %p8, %p8 : i64
+  %p10 = arith.muli %p9, %p9 : i64
+  %p11 = arith.muli %p10, %p10 : i64
+  %p12 = arith.muli %p11, %p11 : i64
+  %p13 = arith.muli %p12, %p12 : i64
+  %p14 = arith.muli %p13, %p13 : i64
+  %p15 = arith.muli %p14, %p14 : i64
+  %p16 = arith.muli %p15, %p15 : i64
+  %p17 = arith.muli %p16, %p16 : i64
+  %p18 = arith.muli %p17, %p17 : i64
+  %p19 = arith.muli %p18, %p18 : i64
+  %p20 = arith.muli %p19, %p19 : i64
+  %p21 = arith.muli %p20, %p20 : i64
+  %p22 = arith.muli %p21, %p21 : i64
+  %p23 = arith.muli %p22, %p22 : i64
+  %p24 = arith.muli %p23, %p23 : i64
+  %p25 = arith.muli %p24, %p24 : i64
+  %p26 = arith.muli %p25, %p25 : i64
+  %p27 = arith.muli %p26, %p26 : i64
+  %p28 = arith.muli %p27, %p27 : i64
+  %p29 = arith.muli %p28, %p28 : i64
+  %rows = arith.index_cast %p29 : i64 to index
+  %tied = flow.tensor.tie_shape %a : tensor<?x2xf32>{%rows}
+  %two = arith.constant 2 : i64
+  %shape = tensor.from_elements %p29, %two : tensor<2xi64>
+  %r = stablehlo.dynamic_broadcast_in_dim %tied, %shape, dims = [0, 1] : (tensor<?x2xf32>, tensor<2xi64>) -> tensor<?x2xf32>
   return %r : tensor<?x2xf32>
 }
 
@@ -376,7 +384,7 @@ func.func @dynamic_broadcast_inferred_nonexpanding(%a: tensor<?x?xf32>, %n: inde
 
 // A cache of s rows grown by one, against a shape vector holding s + 1 in i64
 // truncated to i32: s is at most 1024, so the truncation is exact and the
-// broadcast needs no runtime check.
+// broadcast needs no runtime expansion choice.
 // CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
 // CHECK-LABEL: @dynamic_broadcast_bounded_sum
 // CHECK-NOT: arith.select
@@ -405,8 +413,31 @@ func.func @dynamic_broadcast_bounded_sum(%cache: tensor<2x4x?x16xf32>, %row: ten
 
 // -----
 
+// s + INT64_MAX truncated to i32 is out of range for every s >= 1. Checking
+// the range must not overflow while adding the offset to the smallest value;
+// the sum stays unproven and the runtime expansion choice stays.
+// CHECK-LABEL: @dynamic_broadcast_extreme_offset
+// CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
+// CHECK: linalg.generic
+// CHECK: arith.select %[[EXPANDS]]
+func.func @dynamic_broadcast_extreme_offset(%cache: tensor<?x16xf32>, %s: i32) -> tensor<?x16xf32> {
+  %length = util.assume.int %s<umin = 1, umax = 1024> : i32
+  %rows = arith.index_cast %length : i32 to index
+  %tied = flow.tensor.tie_shape %cache : tensor<?x16xf32>{%rows}
+  %wide = arith.extsi %length : i32 to i64
+  %offset = arith.constant 9223372036854775807 : i64
+  %sum = arith.addi %wide, %offset : i64
+  %size = arith.trunci %sum : i64 to i32
+  %c16 = arith.constant 16 : i32
+  %shape = tensor.from_elements %size, %c16 : tensor<2xi32>
+  %r = stablehlo.dynamic_broadcast_in_dim %tied, %shape, dims = [0, 1] : (tensor<?x16xf32>, tensor<2xi32>) -> tensor<?x16xf32>
+  return %r : tensor<?x16xf32>
+}
+
+// -----
+
 // Without an upper bound on s, s + 1 truncated to i32 may wrap to a size of
-// one, which broadcasts. The runtime check stays.
+// one, which broadcasts. The runtime expansion choice stays.
 // CHECK-LABEL: @dynamic_broadcast_unbounded_sum
 // CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
 // CHECK: linalg.generic
@@ -429,7 +460,7 @@ func.func @dynamic_broadcast_unbounded_sum(%cache: tensor<2x?x16xf32>, %row: ten
 // -----
 
 // An i32 product of x and y may wrap: 641 * 6700417 = 2^32 + 1 gives one row,
-// which broadcasts to the exact product. The runtime check stays.
+// which broadcasts to the exact product. The runtime expansion choice stays.
 // CHECK-LABEL: @dynamic_broadcast_wrapped_product
 // CHECK: %[[EXPANDS:.+]] = arith.cmpi eq
 // CHECK: linalg.generic
@@ -824,6 +855,23 @@ func.func @dynamic_slice_unsigned_start(%operand: tensor<5x3xi32>, %row: tensor<
 
 // -----
 
+// A ui32 start index of 2^31 or more reads as negative in a 32-bit index, so
+// it is clamped as unsigned after zero extension, whatever the index width.
+// CHECK-LABEL: @dynamic_slice_ui32_start
+// CHECK-SAME: (%[[OPERAND:[a-zA-Z0-9]+]]: tensor<5x3xi32>, %[[ROW:[a-zA-Z0-9]+]]: tensor<i32>
+// CHECK: %[[RAW:.+]] = tensor.extract %[[ROW]][] : tensor<i32>
+// CHECK: %[[INDEX:.+]] = arith.index_castui %[[RAW]] : i32 to index
+// CHECK-NOT: arith.maxsi
+// CHECK-NOT: arith.minsi
+// CHECK: %[[START:.+]] = arith.minui %[[INDEX]], %c3 : index
+// CHECK: tensor.extract_slice %[[OPERAND]][%[[START]], 0] [2, 3] [1, 1]
+func.func @dynamic_slice_ui32_start(%operand: tensor<5x3xi32>, %row: tensor<ui32>, %col: tensor<ui32>) -> tensor<2x3xi32> {
+  %r = stablehlo.dynamic_slice %operand, %row, %col, sizes = [2, 3] : (tensor<5x3xi32>, tensor<ui32>, tensor<ui32>) -> tensor<2x3xi32>
+  return %r : tensor<2x3xi32>
+}
+
+// -----
+
 // A runtime-shaped crop with interior padding uses only the final shape.
 // CHECK-LABEL: @pad_dynamic_negative_interior
 // CHECK-SAME: (%[[ARG:.+]]: tensor<?x5xf32>
@@ -843,12 +891,22 @@ func.func @pad_dynamic_negative_interior(%arg0: tensor<?x5xf32>, %pad: tensor<f3
 
 // Dilation exceeds i64 before cropping. Lower the declared three-element
 // result directly, without constructing an invalid dilated insert or scratch.
+// The phase folds to small index values: output 2 is the first aligned
+// position, the stride is clamped to the result size 3, and two aligned steps
+// read operand elements from 1 on, so only output 2 reads element 1.
 // CHECK-LABEL: @pad_extreme_crop_static
 // CHECK-SAME: (%[[ARG:.+]]: tensor<3xi32>,
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
 // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<3xi32>
 // CHECK: %[[RESULT:.+]] = linalg.generic {{.*}} outs(%[[EMPTY]] : tensor<3xi32>)
+// CHECK: arith.subi %{{.+}}, %[[C2]] : index
+// CHECK: %[[STEP:.+]] = arith.divui %{{.+}}, %[[C3]] : index
+// CHECK: arith.cmpi ult, %[[STEP]], %[[C2]] : index
+// CHECK: %[[SOURCE:.+]] = arith.addi %[[STEP]], %[[C1]] : index
 // CHECK: scf.if {{.*}} -> (i32)
-// CHECK-NEXT: tensor.extract %[[ARG]][%{{.+}}]
+// CHECK-NEXT: tensor.extract %[[ARG]][%[[SOURCE]]]
 // CHECK-NOT: tensor.insert_slice
 // CHECK-NOT: tensor.extract_slice
 // CHECK: return %[[RESULT]] : tensor<3xi32>
@@ -863,13 +921,14 @@ func.func @pad_extreme_crop_static(%input: tensor<3xi32>, %value: tensor<i32>) -
 // 2^64. The safe divisor guards the wrapped-zero stride before div/rem.
 // CHECK-LABEL: @dynamic_pad_unsigned
 // CHECK-SAME: (%[[ARG:.+]]: tensor<?xi32>,
-// CHECK: linalg.generic
-// CHECK: arith.cmpi uge
-// CHECK: %[[STRIDE:.+]] = arith.addi
-// CHECK: %[[WRAPPED:.+]] = arith.cmpi eq, %[[STRIDE]],
+// CHECK: %[[STRIDE:.+]] = arith.addi %{{.+}}, %c1_i64 : i64
+// CHECK-NEXT: %[[WRAPPED:.+]] = arith.cmpi eq, %[[STRIDE]],
 // CHECK: %[[DIVISOR:.+]] = arith.select %[[WRAPPED]], %{{.+}}, %[[STRIDE]]
-// CHECK: arith.divui %{{.+}}, %[[DIVISOR]]
-// CHECK: arith.remui %{{.+}}, %[[DIVISOR]]
+// CHECK: arith.divui %{{.+}}, %[[DIVISOR]] : i64
+// CHECK: arith.remui %{{.+}}, %[[DIVISOR]] : i64
+// CHECK: linalg.generic
+// CHECK-NOT: i64
+// CHECK: arith.divui %{{.+}}, %{{.+}} : index
 // CHECK: scf.if {{.*}} -> (i32)
 // CHECK-NEXT: tensor.extract %[[ARG]][%{{.+}}]
 func.func @dynamic_pad_unsigned(%input: tensor<?xi32>, %value: tensor<i32>, %lo: tensor<1xui64>, %hi: tensor<1xui64>, %interior: tensor<1xui64>) -> tensor<?xi32> {

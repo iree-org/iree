@@ -133,12 +133,10 @@ compatibility version numbers. The supplied version string identifies the
 plugin's own release; it is not checked for compatibility.
 
 `IREE_COMPILER_PLUGIN_ABI_HASH` is the single compatibility ID. The build
-calculates it from `Client.h`, `PluginEntryPoint.h`, `Pipelines/Options.h`,
-`Utils/OptionUtils.h`, and the HAL target interfaces `TargetBackend.h`,
-`TargetDevice.h`, and `ResourceAccess.h`, covering both the entry-point layout
-and the selected C++ API headers. Changes to target virtual methods or resource
-requirements require rebuilding compiler plugins. There is no manual API or ABI
-version to bump. IREE maintainers must keep the registration contract in `PluginEntryPoint.h` current so contract
+calculates it from `Client.h`, `PluginEntryPoint.h`, `Pipelines/Options.h`, and
+`Utils/OptionUtils.h`, covering both the entry-point layout and the selected
+C++ API headers. There is no manual API or ABI version to bump. IREE maintainers
+must keep the registration contract in `PluginEntryPoint.h` current so contract
 changes also change the ID.
 
 `IREE_COMPILER_ABI_PREFIX` is a symbol namespace, not a compatibility version.

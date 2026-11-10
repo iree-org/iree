@@ -265,7 +265,7 @@ def ElideAsyncCopiesPass :
 }
 
 def EmplaceAllocationsPass :
-    Pass<"iree-stream-emplace-allocations", "mlir::ModuleOp"> {
+    Pass<"iree-stream-emplace-allocations", ""> {
   let summary = "Emplaces transient tensor allocations to remove copies.";
   let description = [{
     Identifies opportunities for placing operation results directly into
@@ -336,7 +336,7 @@ def ScheduleExecutionPass :
 }
 
 def ScheduleConcurrencyPass :
-    Pass<"iree-stream-schedule-concurrency", "mlir::ModuleOp"> {
+    InterfacePass<"iree-stream-schedule-concurrency", "mlir::CallableOpInterface"> {
   let summary = "Identifies and groups asynchronous operations within executable regions that can run concurrently and groups them into streams.";
   let description = [{
     Partitions operations that can execute concurrently within
@@ -464,7 +464,7 @@ def AutomaticReferenceCountingPass :
 }
 
 def PackConstantsPass :
-    Pass<"iree-stream-pack-constants", "mlir::ModuleOp"> {
+    InterfacePass<"iree-stream-pack-constants", "mlir::CallableOpInterface"> {
   let summary = "Packs and allocates backing storage for fused constant resources.";
   let description = [{
     Packs slices of `stream.resource.constants` ops and materializes operations
@@ -485,7 +485,7 @@ def PackConstantsPass :
 }
 
 def LayoutSlicesPass :
-    Pass<"iree-stream-layout-slices", "mlir::ModuleOp"> {
+    InterfacePass<"iree-stream-layout-slices", "mlir::CallableOpInterface"> {
   let summary = "Lays out packed slices and produces arithmetic required for all offsets.";
   let description = [{
     Performs target-aware layout of packed slices in `stream.resource.pack` ops.

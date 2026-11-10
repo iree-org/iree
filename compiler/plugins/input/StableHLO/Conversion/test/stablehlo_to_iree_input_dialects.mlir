@@ -150,3 +150,31 @@ func.func @select_conversion(%arg0: tensor<i1>, %arg1: tensor<?xui16>, %arg2: te
   %0 = arith.select %extracted, %arg1, %arg2 : tensor<?xui16>
   return %0 : tensor<?xui16>
 }
+
+// -----
+
+// The verifier accepts a result refined differently from the operand. The
+// elementwise op keeps the operand shape and casts to the declared result.
+// CHECK-LABEL: func.func @reduce_precision_refined_result
+// CHECK-SAME:    (%[[ARG:.+]]: tensor<?x?xf32>) -> tensor<4x?xf32>
+// CHECK:         %[[EMPTY:.+]] = tensor.empty(%{{.+}}, %{{.+}}) : tensor<?x?xf32>
+// CHECK:         %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:      ins(%[[ARG]] : tensor<?x?xf32>) outs(%[[EMPTY]] : tensor<?x?xf32>)
+// CHECK:         %[[CAST:.+]] = tensor.cast %[[GENERIC]] : tensor<?x?xf32> to tensor<4x?xf32>
+// CHECK:         return %[[CAST]]
+func.func @reduce_precision_refined_result(%arg0: tensor<?x?xf32>) -> tensor<4x?xf32> {
+  %0 = stablehlo.reduce_precision %arg0, format = e5m10 : (tensor<?x?xf32>) -> tensor<4x?xf32>
+  return %0 : tensor<4x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @reduce_precision_dynamic
+// CHECK:         %[[GENERIC:.+]] = linalg.generic
+// CHECK:         } -> tensor<?xf32>
+// CHECK-NOT:     tensor.cast
+// CHECK:         return %[[GENERIC]]
+func.func @reduce_precision_dynamic(%arg0: tensor<?xf32>) -> tensor<?xf32> {
+  %0 = stablehlo.reduce_precision %arg0, format = e5m10 : (tensor<?xf32>) -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}

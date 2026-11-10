@@ -34,25 +34,15 @@ func.func @dynamic_pad_interior(%arg0: tensor<2x3x5xf32>, %arg1: tensor<f32>) ->
 
 // -----
 
-// Negative edges generate the final shape without materialising cropped padding.
+// Negative edges without interior padding crop with a slice; the remaining
+// positive edges pad the kept window.
 // CHECK-LABEL: @dynamic_pad_negative_edges
-// CHECK-DAG: %[[ONE_INDEX:.+]] = arith.constant 1 : index
-// CHECK-DAG: %[[ONE:.+]] = arith.constant 1 : i64
-// CHECK-DAG: %[[THREE:.+]] = arith.constant 3 : i64
-// CHECK-DAG: %[[PAD:.+]] = tensor.extract %arg1[] : tensor<f32>
-// CHECK: %[[RESULT:.+]] = linalg.generic {{.*}} outs(%{{.+}} : tensor<1x5x4xf32>)
-// CHECK: arith.cmpi ult, %{{.+}}, %[[THREE]] : i64
-// CHECK: %[[COL:.+]] = linalg.index 2 : index
-// CHECK: %[[COL64:.+]] = arith.index_castui %[[COL]] : index to i64
-// CHECK: arith.cmpi sge, %[[COL64]], %[[ONE]] : i64
-// CHECK: %[[OFFSET:.+]] = arith.subi %[[COL64]], %[[ONE]] : i64
-// CHECK: %[[SOURCE_COL:.+]] = arith.index_castui %[[OFFSET]] : i64 to index
-// CHECK: %[[VALUE:.+]] = scf.if %{{.+}} -> (f32) {
-// CHECK-NEXT: %[[ELEMENT:.+]] = tensor.extract %arg0[%[[ONE_INDEX]], %{{.+}}, %[[SOURCE_COL]]]
-// CHECK-NEXT: scf.yield %[[ELEMENT]] : f32
-// CHECK: } else {
-// CHECK-NEXT: scf.yield %[[PAD]] : f32
-// CHECK: linalg.yield %[[VALUE]] : f32
+// CHECK: %[[PAD:.+]] = tensor.extract %arg1[] : tensor<f32>
+// CHECK: %[[KEPT:.+]] = tensor.extract_slice %arg0[1, 0, 0] [1, 3, 3] [1, 1, 1] : tensor<2x3x5xf32> to tensor<1x3x3xf32>
+// CHECK: %[[RESULT:.+]] = tensor.pad %[[KEPT]] low[0, 0, 1] high[0, 2, 0]
+// CHECK: tensor.yield %[[PAD]] : f32
+// CHECK: } : tensor<1x3x3xf32> to tensor<1x5x4xf32>
+// CHECK-NOT: linalg.generic
 // CHECK: return %[[RESULT]] : tensor<1x5x4xf32>
 func.func @dynamic_pad_negative_edges(%arg0: tensor<2x3x5xf32>, %arg1: tensor<f32>) -> tensor<1x5x4xf32> {
   %low = stablehlo.constant dense<[-1, 0, 1]> : tensor<3xi64>
@@ -68,19 +58,17 @@ func.func @dynamic_pad_negative_edges(%arg0: tensor<2x3x5xf32>, %arg1: tensor<f3
 
 // A crop with interior padding maps output coordinates through the stride.
 // CHECK-LABEL: @dynamic_pad_negative_high_interior
-// CHECK-DAG: %[[ZERO_INDEX:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[ZERO:.+]] = arith.constant 0 : i64
-// CHECK-DAG: %[[THREE:.+]] = arith.constant 3 : i64
+// CHECK-DAG: %[[ZERO:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[THREE:.+]] = arith.constant 3 : index
 // CHECK-DAG: %[[PAD:.+]] = tensor.extract %arg1[] : tensor<f32>
 // CHECK: %[[RESULT:.+]] = linalg.generic {{.*}} outs(%{{.+}} : tensor<1x4x13xf32>)
 // CHECK: %[[COL:.+]] = linalg.index 2 : index
-// CHECK: %[[COL64:.+]] = arith.index_castui %[[COL]] : index to i64
-// CHECK: %[[SOURCE_COL64:.+]] = arith.divui %[[COL64]], %[[THREE]] : i64
-// CHECK: %[[REMAINDER:.+]] = arith.remui %[[COL64]], %[[THREE]] : i64
-// CHECK: arith.cmpi eq, %[[REMAINDER]], %[[ZERO]] : i64
-// CHECK: %[[SOURCE_COL:.+]] = arith.index_castui %[[SOURCE_COL64]] : i64 to index
+// CHECK-NOT: i64
+// CHECK: %[[SOURCE_COL:.+]] = arith.divui %[[COL]], %[[THREE]] : index
+// CHECK: %[[REMAINDER:.+]] = arith.remui %[[COL]], %[[THREE]] : index
+// CHECK: arith.cmpi eq, %[[REMAINDER]], %[[ZERO]] : index
 // CHECK: %[[VALUE:.+]] = scf.if %{{.+}} -> (f32) {
-// CHECK-NEXT: %[[ELEMENT:.+]] = tensor.extract %arg0[%[[ZERO_INDEX]], %{{.+}}, %[[SOURCE_COL]]]
+// CHECK-NEXT: %[[ELEMENT:.+]] = tensor.extract %arg0[%[[ZERO]], %{{.+}}, %[[SOURCE_COL]]]
 // CHECK-NEXT: scf.yield %[[ELEMENT]] : f32
 // CHECK: } else {
 // CHECK-NEXT: scf.yield %[[PAD]] : f32
@@ -222,21 +210,30 @@ func.func @dynamic_conv_constant(%arg0: tensor<2x8x6x3xf32>,
 
 // -----
 
-// Negative padding crops the input before the convolution.
+// A crop may pass the whole operand and remove padding from the other edge:
+// [a, b, c] with low 5 and high -6 is two padding elements, and with low -5
+// and high 10 it is eight. Nothing is kept, so the empty slice starts at 0.
+// CHECK-LABEL: @pad_crop_past_operand
+// CHECK: %[[PAD:.+]] = tensor.extract %arg1[] : tensor<f32>
+// CHECK: %[[NONE:.+]] = tensor.extract_slice %arg0[0] [0] [1] : tensor<3xf32> to tensor<0xf32>
+// CHECK: %[[LOW_KEPT:.+]] = tensor.pad %[[NONE]] low[2] high[0]
+// CHECK: } : tensor<0xf32> to tensor<2xf32>
+// CHECK: %[[NONE_2:.+]] = tensor.extract_slice %arg0[0] [0] [1] : tensor<3xf32> to tensor<0xf32>
+// CHECK: %[[HIGH_KEPT:.+]] = tensor.pad %[[NONE_2]] low[0] high[8]
+// CHECK: } : tensor<0xf32> to tensor<8xf32>
+// CHECK: return %[[LOW_KEPT]], %[[HIGH_KEPT]] : tensor<2xf32>, tensor<8xf32>
+func.func @pad_crop_past_operand(%a: tensor<3xf32>, %v: tensor<f32>) -> (tensor<2xf32>, tensor<8xf32>) {
+  %low_kept = stablehlo.pad %a, %v, low = [5], high = [-6], interior = [0] : (tensor<3xf32>, tensor<f32>) -> tensor<2xf32>
+  %high_kept = stablehlo.pad %a, %v, low = [-5], high = [10], interior = [0] : (tensor<3xf32>, tensor<f32>) -> tensor<8xf32>
+  return %low_kept, %high_kept : tensor<2xf32>, tensor<8xf32>
+}
+
+// -----
+
+// Negative padding crops the input with a slice before the convolution.
 // CHECK-LABEL: @dynamic_conv_negative_padding
-// CHECK-DAG: %[[NEGATIVE_ONE:.+]] = arith.constant -1 : i64
-// CHECK-DAG: %[[PAD:.+]] = arith.constant 0.000000e+00 : f32
-// CHECK: %[[CROPPED:.+]] = linalg.generic {{.*}} outs(%{{.+}} : tensor<2x7x4x3xf32>)
-// CHECK: %[[ROW:.+]] = linalg.index 1 : index
-// CHECK: %[[ROW64:.+]] = arith.index_castui %[[ROW]] : index to i64
-// CHECK: %[[SOURCE_ROW64:.+]] = arith.subi %[[ROW64]], %[[NEGATIVE_ONE]] : i64
-// CHECK: %[[SOURCE_ROW:.+]] = arith.index_castui %[[SOURCE_ROW64]] : i64 to index
-// CHECK: %[[VALUE:.+]] = scf.if %{{.+}} -> (f32) {
-// CHECK-NEXT: %[[ELEMENT:.+]] = tensor.extract %arg0[%{{.+}}, %[[SOURCE_ROW]], %{{.+}}, %{{.+}}]
-// CHECK-NEXT: scf.yield %[[ELEMENT]] : f32
-// CHECK: } else {
-// CHECK-NEXT: scf.yield %[[PAD]] : f32
-// CHECK: linalg.yield %[[VALUE]] : f32
+// CHECK: %[[CROPPED:.+]] = tensor.extract_slice %arg0[0, 1, 0, 0] [2, 7, 4, 3] [1, 1, 1, 1] : tensor<2x8x6x3xf32> to tensor<2x7x4x3xf32>
+// CHECK-NOT: tensor.pad
 // CHECK: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME: ins(%[[CROPPED]], %arg1 : tensor<2x7x4x3xf32>, tensor<3x2x3x4xf32>)
 // CHECK: return %[[CONV]] : tensor<2x5x3x4xf32>

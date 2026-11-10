@@ -353,3 +353,104 @@ func.func @negative_collapse_extract_index(%a: tensor<?x?x?xf32>, %s0: i64, %s1:
   %result = stablehlo.dynamic_reshape %a, %shape : (tensor<?x?x?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
   return %result : tensor<?x?xf32>
 }
+
+// -----
+
+// Reshaping [a, b, c * d] to [a * b, c, d] collapses a and b and expands
+// c * d, through the intermediate shape [a, b, c, d].
+// CHECK-LABEL: @collapse_and_expand
+// CHECK: tensor.collapse_shape %{{.+}} {{\[}}[0], [1], [2, 3]] : tensor<?x?x?x?xf32> into tensor<?x?x?xf32>
+// CHECK: %[[EXPANDED:.+]] = tensor.expand_shape %{{.+}} {{\[}}[0], [1], [2, 3]] output_shape [%{{.+}}, %{{.+}}, %{{.+}}, %{{.+}}] : tensor<?x?x?xf32> into tensor<?x?x?x?xf32>
+// CHECK: tensor.collapse_shape %[[EXPANDED]] {{\[}}[0, 1], [2], [3]] : tensor<?x?x?x?xf32> into tensor<?x?x?xf32>
+// CHECK-NOT: tensor.reshape
+func.func @collapse_and_expand(%a: tensor<?x?x?x?xf32>) -> tensor<?x?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %d0 = tensor.dim %a, %c0 : tensor<?x?x?x?xf32>
+  %d1 = tensor.dim %a, %c1 : tensor<?x?x?x?xf32>
+  %d2 = tensor.dim %a, %c2 : tensor<?x?x?x?xf32>
+  %d3 = tensor.dim %a, %c3 : tensor<?x?x?x?xf32>
+  %ab = arith.muli %d0, %d1 : index
+  %cd = arith.muli %d2, %d3 : index
+  %a64 = arith.index_cast %d0 : index to i64
+  %b64 = arith.index_cast %d1 : index to i64
+  %c64 = arith.index_cast %d2 : index to i64
+  %d64 = arith.index_cast %d3 : index to i64
+  %ab64 = arith.index_cast %ab : index to i64
+  %cd64 = arith.index_cast %cd : index to i64
+  %flat_shape = tensor.from_elements %a64, %b64, %cd64 : tensor<3xi64>
+  %flat = stablehlo.dynamic_reshape %a, %flat_shape : (tensor<?x?x?x?xf32>, tensor<3xi64>) -> tensor<?x?x?xf32>
+  %exp = stablehlo.exponential %flat : tensor<?x?x?xf32>
+  %shape = tensor.from_elements %ab64, %c64, %d64 : tensor<3xi64>
+  %r = stablehlo.dynamic_reshape %exp, %shape : (tensor<?x?x?xf32>, tensor<3xi64>) -> tensor<?x?x?xf32>
+  return %r : tensor<?x?x?xf32>
+}
+
+// -----
+
+// A reshape whose sizes are proven equal changes only the type.
+// CHECK-LABEL: @refine_static_size
+// CHECK-SAME: %[[A:.+]]: tensor<?x4xf32>
+// CHECK: %[[CAST:.+]] = tensor.cast %[[A]] : tensor<?x4xf32> to tensor<?x?xf32>
+// CHECK-NOT: tensor.reshape
+// CHECK: return %[[CAST]]
+func.func @refine_static_size(%a: tensor<?x4xf32>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %four = arith.constant 4 : i64
+  %d0 = tensor.dim %a, %c0 : tensor<?x4xf32>
+  %d64 = arith.index_cast %d0 : index to i64
+  %shape = tensor.from_elements %d64, %four : tensor<2xi64>
+  %r = stablehlo.dynamic_reshape %a, %shape : (tensor<?x4xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  return %r : tensor<?x?xf32>
+}
+
+// -----
+
+// [a * b, c] to [a, b * c] needs a group that both collapses and expands,
+// which expand_shape followed by collapse_shape cannot express.
+// CHECK-LABEL: @negative_crossing_groups
+// CHECK: tensor.collapse_shape
+// CHECK: tensor.reshape
+// CHECK-NOT: tensor.expand_shape
+func.func @negative_crossing_groups(%a: tensor<?x?x?xf32>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %d0 = tensor.dim %a, %c0 : tensor<?x?x?xf32>
+  %d1 = tensor.dim %a, %c1 : tensor<?x?x?xf32>
+  %d2 = tensor.dim %a, %c2 : tensor<?x?x?xf32>
+  %ab = arith.muli %d0, %d1 : index
+  %bc = arith.muli %d1, %d2 : index
+  %a64 = arith.index_cast %d0 : index to i64
+  %c64 = arith.index_cast %d2 : index to i64
+  %ab64 = arith.index_cast %ab : index to i64
+  %bc64 = arith.index_cast %bc : index to i64
+  %flat_shape = tensor.from_elements %ab64, %c64 : tensor<2xi64>
+  %flat = stablehlo.dynamic_reshape %a, %flat_shape : (tensor<?x?x?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  %exp = stablehlo.exponential %flat : tensor<?x?xf32>
+  %shape = tensor.from_elements %a64, %bc64 : tensor<2xi64>
+  %r = stablehlo.dynamic_reshape %exp, %shape : (tensor<?x?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  return %r : tensor<?x?xf32>
+}
+
+// -----
+
+// A trailing result unit dimension cannot join a collapsing group, since the
+// group would then both collapse and expand.
+// CHECK-LABEL: @negative_collapse_then_trailing_unit
+// CHECK: tensor.reshape
+// CHECK-NOT: tensor.collapse_shape
+func.func @negative_collapse_then_trailing_unit(%a: tensor<?x?xf32>) -> tensor<?x1xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %one = arith.constant 1 : i64
+  %d0 = tensor.dim %a, %c0 : tensor<?x?xf32>
+  %d1 = tensor.dim %a, %c1 : tensor<?x?xf32>
+  %ab = arith.muli %d0, %d1 : index
+  %ab64 = arith.index_cast %ab : index to i64
+  %shape = tensor.from_elements %ab64, %one : tensor<2xi64>
+  %r = stablehlo.dynamic_reshape %a, %shape : (tensor<?x?xf32>, tensor<2xi64>) -> tensor<?x1xf32>
+  return %r : tensor<?x1xf32>
+}

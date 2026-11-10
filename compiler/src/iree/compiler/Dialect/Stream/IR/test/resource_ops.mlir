@@ -162,32 +162,6 @@ util.func private @resourceTransientsAffinity(%arg0: !stream.resource<*>, %arg1:
 
 // -----
 
-// CHECK-LABEL: @resource_config_access_granularity
-// CHECK-SAME: stream.resources = #stream.resource_config<{max_allocation_size = 4096, min_buffer_offset_alignment = 64, max_buffer_range = 2048, min_buffer_range_alignment = 16, index_bits = 32, alias_mutable_bindings = false, memory_model = Discrete, min_access_granularity = 4}>
-util.func private @resource_config_access_granularity() attributes {
-  stream.resources = #stream.resource_config<{max_allocation_size = 4096, min_buffer_offset_alignment = 64, max_buffer_range = 2048, min_buffer_range_alignment = 16, index_bits = 32, min_access_granularity = 4}>
-}
-
-// CHECK-LABEL: @resource_config_fill_granularity
-// CHECK-SAME: memory_model = Discrete, min_fill_granularity = 4}>
-util.func private @resource_config_fill_granularity() attributes {
-  stream.resources = #stream.resource_config<{max_allocation_size = 4096, min_buffer_offset_alignment = 64, max_buffer_range = 2048, min_buffer_range_alignment = 16, index_bits = 32, min_fill_granularity = 4}>
-}
-
-// CHECK-LABEL: @resource_config_copy_granularity
-// CHECK-SAME: memory_model = Discrete, min_fill_granularity = 4, min_copy_granularity = 4}>
-util.func private @resource_config_copy_granularity() attributes {
-  stream.resources = #stream.resource_config<{max_allocation_size = 4096, min_buffer_offset_alignment = 64, max_buffer_range = 2048, min_buffer_range_alignment = 16, index_bits = 32, min_fill_granularity = 4, min_copy_granularity = 4}>
-}
-
-// CHECK-LABEL: @resource_config_byte_granularity
-// CHECK-SAME: memory_model = Discrete}>
-util.func private @resource_config_byte_granularity() attributes {
-  stream.resources = #stream.resource_config<{max_allocation_size = 4096, min_buffer_offset_alignment = 64, max_buffer_range = 2048, min_buffer_range_alignment = 16, index_bits = 32}>
-}
-
-// -----
-
 // CHECK-LABEL: module @resourceConfigFalse
 // CHECK-SAME: alias_mutable_bindings = false
 module @resourceConfigFalse attributes {

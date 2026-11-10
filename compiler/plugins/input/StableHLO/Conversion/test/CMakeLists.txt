@@ -163,7 +163,6 @@ iree_cc_test(
     MLIRIR
     gmock
     gtest
-    iree::compiler::Dialect::Util::IR
     iree::compiler::plugins::input::StableHLO::Conversion::PaddingUtils
     iree::testing::gtest_main
 )

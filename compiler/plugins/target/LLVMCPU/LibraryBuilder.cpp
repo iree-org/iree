@@ -478,17 +478,6 @@ static llvm::Constant *createArrayConstant(StringRef name,
 // Builder interface
 //===----------------------------------------------------------------------===//
 
-// A library is v0.6 unless an export returns a status, which needs v0.7.
-LibraryBuilder::Version LibraryBuilder::getRequiredVersion() const {
-  for (const Dispatch &dispatch : exports) {
-    if (static_cast<uint64_t>(dispatch.attrs.flags) &
-        static_cast<uint64_t>(DispatchFlags::RETURNS_STATUS)) {
-      return Version::V_0_7;
-    }
-  }
-  return Version::V_0_6;
-}
-
 llvm::Function *LibraryBuilder::build(StringRef queryFuncName) {
   auto &context = module->getContext();
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
@@ -510,14 +499,13 @@ llvm::Function *LibraryBuilder::build(StringRef queryFuncName) {
   llvm::IRBuilder<> builder(entryBlock);
 
   // Build out the header for each version and select it at runtime.
-  // NOTE: one v0 layout serves every supported version, so this is simple:
-  //   return max_version >= required_version ? &library : NULL;
+  // NOTE: today there is just one version so this is rather simple:
+  //   return max_version == 0 ? &library : NULL;
   auto *v0 = buildLibraryV0((queryFuncName + "_v0").str());
   builder.CreateRet(builder.CreateSelect(
-      builder.CreateICmpUGE(
-          func->getArg(0),
-          llvm::ConstantInt::get(i32Type,
-                                 static_cast<int64_t>(getRequiredVersion()))),
+      builder.CreateICmpEQ(func->getArg(0),
+                           llvm::ConstantInt::get(
+                               i32Type, static_cast<int64_t>(Version::LATEST))),
       builder.CreatePointerCast(v0, ptrType),
       llvm::ConstantPointerNull::get(ptrType)));
 
@@ -876,8 +864,8 @@ llvm::Constant *LibraryBuilder::buildLibraryV0(std::string libraryName) {
           libraryHeaderType,
           {
               // version=
-              llvm::ConstantInt::get(
-                  i32Type, static_cast<int64_t>(getRequiredVersion())),
+              llvm::ConstantInt::get(i32Type,
+                                     static_cast<int64_t>(Version::LATEST)),
               // name=
               createStringConstant(module->getName(), module),
               // features=

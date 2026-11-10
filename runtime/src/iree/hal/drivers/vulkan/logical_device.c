@@ -2025,8 +2025,6 @@ static iree_status_t iree_hal_vulkan_logical_device_initialize_from_plan(
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_builtins_initialize(
         &device->syms, device->logical_device, &device->physical_device,
-        iree_all_bits_set(device->enabled_dispatch_abis,
-                          IREE_HAL_VULKAN_DISPATCH_ABI_BDA),
         &device->builtins);
   }
   if (iree_status_is_ok(status)) {

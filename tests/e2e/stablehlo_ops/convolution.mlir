@@ -889,8 +889,7 @@ func.func @conv_static_window_reversal() {
   %d2 = stablehlo.get_dimension_size %r, dim = 2 : (tensor<1x4x1xf32>) -> tensor<i32>
   check.expect_eq_const(%d2, dense<1> : tensor<i32>) : tensor<i32>
   %expected = arith.constant dense<[[[-6.0], [-10.0], [-14.0], [0.0]]]> : tensor<1x4x1xf32>
-  %rs = tensor.cast %r : tensor<1x4x1xf32> to tensor<1x4x1xf32>
-  check.expect_eq(%rs, %expected) : tensor<1x4x1xf32>
+  check.expect_eq(%r, %expected) : tensor<1x4x1xf32>
   return
 }
 
@@ -898,7 +897,9 @@ func.func @conv_static_window_reversal() {
 func.func @dynamic_conv_i8_padding_dilated() {
   %a = util.unfoldable_constant dense<[[[1.0], [2.0]]]> : tensor<1x2x1xf32>
   %k = util.unfoldable_constant dense<1.0> : tensor<1x1x1xf32>
-  %p = util.unfoldable_constant dense<0> : tensor<1x2xi8>
+  // The padding row is sliced from whole 32-bit words of i8 storage.
+  %p_words = util.unfoldable_constant dense<0> : tensor<2x2xi8>
+  %p = stablehlo.slice %p_words [0:1, 0:2] : (tensor<2x2xi8>) -> tensor<1x2xi8>
   %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
     dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
     feature_group_count = 1 : i64, batch_group_count = 1 : i64,
@@ -920,7 +921,9 @@ func.func @dynamic_conv_i8_padding_dilated() {
 func.func @dynamic_conv_ui8_runtime_padding() {
   %a = util.unfoldable_constant dense<[[[1.0], [2.0]]]> : tensor<1x2x1xf32>
   %k = util.unfoldable_constant dense<1.0> : tensor<1x1x1xf32>
-  %bits = util.unfoldable_constant dense<[[-128, 0]]> : tensor<1x2xi8>
+  // The padding row is sliced from whole 32-bit words of i8 storage.
+  %words = util.unfoldable_constant dense<[[-128, 0], [0, 0]]> : tensor<2x2xi8>
+  %bits = stablehlo.slice %words [0:1, 0:2] : (tensor<2x2xi8>) -> tensor<1x2xi8>
   %p = stablehlo.convert %bits : (tensor<1x2xi8>) -> tensor<1x2xui8>
   %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
     dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,

@@ -23,6 +23,67 @@ namespace mlir::iree_compiler::stablehlo {
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Passes.h.inc"
 
 namespace {
+// Returns whether a clamped index of `indexType` may still fall outside a
+// 32-bit target index type: unsigned and 64-bit indices are only safe when
+// every valid index, below the static `indexedSize`, fits int32.
+static bool mayClampedIndexExceedI32(IntegerType indexType,
+                                     int64_t indexedSize) {
+  bool isWideOrUnsigned =
+      indexType.isUnsignedInteger() || indexType.getWidth() >= 64;
+  bool fitsI32 = ShapedType::isStatic(indexedSize) && indexedSize > 0 &&
+                 indexedSize - 1 <= std::numeric_limits<int32_t>::max();
+  return isWideOrUnsigned && !fitsI32;
+}
+
+// Returns `indices` clamped to [0, size - 1] of the first dimension of
+// `operand`. Gather clamps indices while torch_index_select requires them in
+// bounds. The indices are widened to 64 bits first, so the dimension size fits
+// even for narrow indices.
+static Value clampToIndexedRange(PatternRewriter &rewriter, Location loc,
+                                 Value operand, Value indices) {
+  auto operandTy = cast<RankedTensorType>(operand.getType());
+  auto indicesTy = cast<RankedTensorType>(indices.getType());
+  auto indexType = cast<IntegerType>(indicesTy.getElementType());
+  auto wideIndexType =
+      IntegerType::get(rewriter.getContext(), 64, indexType.getSignedness());
+  auto scalarType = RankedTensorType::get({}, wideIndexType);
+  Value zero = mlir::stablehlo::ConstantOp::create(
+      rewriter, loc, DenseIntElementsAttr::get(scalarType, APInt(64, 0)));
+  Value upperBound;
+  if (operandTy.isDynamicDim(0)) {
+    Value size = tensor::DimOp::create(rewriter, loc, operand, 0);
+    size =
+        arith::IndexCastOp::create(rewriter, loc, rewriter.getI64Type(), size);
+    size = tensor::FromElementsOp::create(
+        rewriter, loc, RankedTensorType::get({}, rewriter.getI64Type()), size);
+    size = mlir::stablehlo::ConvertOp::create(rewriter, loc, scalarType, size);
+    Value one = mlir::stablehlo::ConstantOp::create(
+        rewriter, loc, DenseIntElementsAttr::get(scalarType, APInt(64, 1)));
+    upperBound = mlir::stablehlo::SubtractOp::create(rewriter, loc, size, one);
+  } else {
+    upperBound = mlir::stablehlo::ConstantOp::create(
+        rewriter, loc,
+        DenseIntElementsAttr::get(scalarType,
+                                  APInt(64, operandTy.getDimSize(0) - 1)));
+  }
+  if (indexType != wideIndexType) {
+    indices = mlir::stablehlo::ConvertOp::create(
+        rewriter, loc,
+        RankedTensorType::get(indicesTy.getShape(), wideIndexType), indices);
+  }
+  return mlir::stablehlo::ClampOp::create(rewriter, loc, zero, indices,
+                                          upperBound);
+}
+
+// Returns whether a gather slice is one element of the first operand
+// dimension and the entire extent of every other dimension.
+static bool selectsWholeRows(ArrayRef<int64_t> sliceSizes,
+                             ShapedType operandTy) {
+  return !sliceSizes.empty() && sliceSizes.front() == 1 &&
+         llvm::equal(sliceSizes.drop_front(),
+                     operandTy.getShape().drop_front());
+}
+
 struct GatherIsTorchIndexSelectPattern final
     : OpRewritePattern<mlir::stablehlo::GatherOp> {
   using Base::Base;
@@ -69,13 +130,8 @@ struct GatherIsTorchIndexSelectPattern final
       return rewriter.notifyMatchFailure(gather, "unranked result");
     }
 
-    // Clamping makes wide indices safe for index_select when every valid
-    // index fits even a 32-bit target index type.
     auto indexType = cast<IntegerType>(startIndicesTy.getElementType());
-    int64_t indexedSize = operandTy.getDimSize(0);
-    if ((indexType.isUnsignedInteger() || indexType.getWidth() >= 64) &&
-        (ShapedType::isDynamic(indexedSize) || indexedSize <= 0 ||
-         indexedSize - 1 > std::numeric_limits<int32_t>::max())) {
+    if (mayClampedIndexExceedI32(indexType, operandTy.getDimSize(0))) {
       return rewriter.notifyMatchFailure(
           gather, "clamped indices may exceed signed 32-bit range");
     }
@@ -99,20 +155,9 @@ struct GatherIsTorchIndexSelectPattern final
       }
     }
 
-    for (auto [idx, value] : llvm::enumerate(gather.getSliceSizes())) {
-      // First shape value must be 1.
-      if (idx == 0) {
-        if (value != 1) {
-          return rewriter.notifyMatchFailure(gather, "slice_size[0] != 1");
-        }
-        continue;
-      }
-
-      // The gather needs to index the entire slice for each other dimension.
-      if (value != operandTy.getDimSize(idx)) {
-        return rewriter.notifyMatchFailure(
-            gather, "slice_size doesn't match operand dimension");
-      }
+    if (!selectsWholeRows(gather.getSliceSizes(), operandTy)) {
+      return rewriter.notifyMatchFailure(
+          gather, "slice sizes are not 1 followed by the operand dimensions");
     }
 
     auto indexSelectShape = llvm::to_vector(startIndicesTy.getShape());
@@ -126,43 +171,8 @@ struct GatherIsTorchIndexSelectPattern final
       return rewriter.notifyMatchFailure(gather, "collapsed_slice_dims != [0]");
     }
 
-    // Gather clamps indices; torch_index_select requires them to be in bounds.
-    // Widen before clamping so the dimension size fits even for narrow indices.
-    Location loc = gather.getLoc();
-    auto wideIndexType =
-        IntegerType::get(rewriter.getContext(), 64, indexType.getSignedness());
-    auto scalarType = RankedTensorType::get({}, wideIndexType);
-    Value zero = mlir::stablehlo::ConstantOp::create(
-        rewriter, loc, DenseIntElementsAttr::get(scalarType, APInt(64, 0)));
-    Value upperBound;
-    if (operandTy.isDynamicDim(0)) {
-      Value size = tensor::DimOp::create(rewriter, loc, operand, 0);
-      size = arith::IndexCastOp::create(rewriter, loc, rewriter.getI64Type(),
-                                        size);
-      size = tensor::FromElementsOp::create(
-          rewriter, loc, RankedTensorType::get({}, rewriter.getI64Type()),
-          size);
-      size =
-          mlir::stablehlo::ConvertOp::create(rewriter, loc, scalarType, size);
-      Value one = mlir::stablehlo::ConstantOp::create(
-          rewriter, loc, DenseIntElementsAttr::get(scalarType, APInt(64, 1)));
-      upperBound =
-          mlir::stablehlo::SubtractOp::create(rewriter, loc, size, one);
-    } else {
-      upperBound = mlir::stablehlo::ConstantOp::create(
-          rewriter, loc,
-          DenseIntElementsAttr::get(scalarType,
-                                    APInt(64, operandTy.getDimSize(0) - 1)));
-    }
-    Value indices = startIndices;
-    if (indexType != wideIndexType) {
-      indices = mlir::stablehlo::ConvertOp::create(
-          rewriter, loc,
-          RankedTensorType::get(startIndicesTy.getShape(), wideIndexType),
-          indices);
-    }
-    indices = mlir::stablehlo::ClampOp::create(rewriter, loc, zero, indices,
-                                               upperBound);
+    Value indices =
+        clampToIndexedRange(rewriter, gather.getLoc(), operand, startIndices);
 
     auto torchIndexSelect = mlir::stablehlo::TorchIndexSelectOp::create(
         rewriter, gather.getLoc(),

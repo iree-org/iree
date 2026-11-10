@@ -1627,9 +1627,10 @@ func.func @dynamic_conv_ui8_padding(%a: tensor<1x2x1xf32>, %k: tensor<1x1x1xf32>
 
 // -----
 
-// Preserve unsigned padding values in signless shape storage.
+// Preserve unsigned padding values in signless shape storage. The input is
+// trusted to keep them within the signed range, so no runtime check is emitted.
 // CHECK-LABEL: @dynamic_conv_ui64_padding
-// CHECK-COUNT-2: util.status.check_ok {{.*}}, "convolution padding exceeds the signed 64-bit dimension range"
+// CHECK-NOT: util.status.check_ok
 // CHECK: stablehlo.dynamic_pad
 // CHECK: stablehlo.convolution
 func.func @dynamic_conv_ui64_padding(%a: tensor<1x2x1xf32>, %k: tensor<1x1x1xf32>, %p: tensor<1x2xui64>) -> tensor<1x?x1xf32> {
@@ -1654,24 +1655,6 @@ func.func @dynamic_conv_ui8_constant_padding(%a: tensor<1x2x1xf32>, %k: tensor<1
     feature_group_count = 1 : i64, batch_group_count = 1 : i64,
     window_strides = array<i64: 1>, lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>
   } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xui8>) -> tensor<1x?x1xf32>
-  return %r : tensor<1x?x1xf32>
-}
-
-// -----
-
-// A value unknown when matched is checked at runtime even if a producer later
-// folds to a constant. This must not depend on greedy rewrite order.
-// CHECK-LABEL: @dynamic_conv_unsigned_padding_folded
-// CHECK: util.status.check_ok {{.*}}, "convolution padding exceeds the signed 64-bit dimension range"
-func.func @dynamic_conv_unsigned_padding_folded(%a: tensor<1x2x1xf32>, %k: tensor<1x1x1xf32>) -> tensor<1x?x1xf32> {
-  %large = stablehlo.constant dense<[[0, 18446744073709551615]]> : tensor<1x2xui64>
-  %zero = stablehlo.constant dense<0> : tensor<1x2xui64>
-  %p = stablehlo.add %large, %zero : tensor<1x2xui64>
-  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
-    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
-    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
-    window_strides = array<i64: 1>, lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>
-  } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xui64>) -> tensor<1x?x1xf32>
   return %r : tensor<1x?x1xf32>
 }
 

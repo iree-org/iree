@@ -46,20 +46,6 @@ def Stream_AffinityAttr : Stream_AttrInterface<"AffinityAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns the resource configuration of the placement as seen from
-        |fromOp|, which placements naming symbols resolve against. Defaults
-        to getResourceConfigAttr.
-      }],
-      /*retTy=*/"IREE::Stream::ResourceConfigAttr",
-      /*methodName=*/"lookupResourceConfigAttr",
-      /*args=*/(ins "Operation *":$fromOp),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        return $_attr.getResourceConfigAttr();
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
         Returns true if executable operations with this affinity specified may
         be executed together with executable operations with another affinity.
         When true operations will be submitted to the same execution queues.

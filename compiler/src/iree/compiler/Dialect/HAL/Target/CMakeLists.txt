@@ -14,13 +14,11 @@ iree_cc_library(
   NAME
     Target
   HDRS
-    "ResourceAccess.h"
     "TargetBackend.h"
     "TargetDevice.h"
     "TargetOptions.h"
     "TargetRegistry.h"
   SRCS
-    "ResourceAccess.cpp"
     "TargetBackend.cpp"
     "TargetDevice.cpp"
     "TargetOptions.cpp"

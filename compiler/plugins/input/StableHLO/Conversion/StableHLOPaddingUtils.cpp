@@ -6,13 +6,8 @@
 
 #include "compiler/plugins/input/StableHLO/Conversion/StableHLOPaddingUtils.h"
 
-#include <algorithm>
-
-#include "compiler/plugins/input/StableHLO/Conversion/StableHLOStatusCheck.h"
-#include "llvm/ADT/APInt.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
-#include "mlir/IR/Matchers.h"
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
@@ -65,28 +60,15 @@ static WideInteger addPadding(ImplicitLocOpBuilder &b, WideInteger value,
   return {low, high};
 }
 
-static void buildPaddingCheck(ImplicitLocOpBuilder &b, Value condition,
-                              StringRef message) {
-  if (!matchPattern(condition, m_One())) {
-    emitStatusCheck(b, b.getLoc(), condition, message);
-  }
-}
-
 } // namespace
 
 PaddedDimension buildPaddedDimension(OpBuilder &builder, Location loc,
                                      Value size, Value low, Value high,
-                                     Value interior, bool isUnsignedPadding,
-                                     unsigned indexWidthInBits) {
+                                     Value interior, bool isUnsignedPadding) {
   ImplicitLocOpBuilder b(loc, builder);
   Value zero = b.create<arith::ConstantIntOp>(0, 64);
   Value one = b.create<arith::ConstantIntOp>(1, 64);
   Value sizeInI64 = b.createOrFold<arith::IndexCastUIOp>(b.getI64Type(), size);
-  if (!isUnsignedPadding) {
-    Value validInterior = b.createOrFold<arith::CmpIOp>(
-        arith::CmpIPredicate::sge, interior, zero);
-    buildPaddingCheck(b, validInterior, "interior padding must be nonnegative");
-  }
   Value span = b.createOrFold<arith::SubIOp>(sizeInI64, one);
   span = b.createOrFold<arith::MaxSIOp>(span, zero);
   // With size <= INT64_MAX, even unsigned64 interior and both unsigned64
@@ -99,20 +81,7 @@ PaddedDimension buildPaddedDimension(OpBuilder &builder, Location loc,
 
   Value negative = b.createOrFold<arith::CmpIOp>(arith::CmpIPredicate::slt,
                                                  total.high, zero);
-  Value highIsZero =
-      b.createOrFold<arith::CmpIOp>(arith::CmpIPredicate::eq, total.high, zero);
-  auto limit =
-      APInt::getSignedMaxValue(std::min(64U, indexWidthInBits)).zextOrTrunc(64);
-  Value maximum =
-      b.create<arith::ConstantOp>(b.getIntegerAttr(b.getI64Type(), limit));
-  Value lowFits = b.createOrFold<arith::CmpIOp>(arith::CmpIPredicate::ule,
-                                                total.low, maximum);
-  Value fits = b.createOrFold<arith::AndIOp>(highIsZero, lowFits);
-  Value valid = b.createOrFold<arith::OrIOp>(negative, fits);
-  buildPaddingCheck(b, valid, "padded dimension exceeds the index range");
-  // A rejected positive extent uses a harmless size until status propagation
-  // ends the invocation; it must not cause an overflowing allocation first.
-  Value bits = b.createOrFold<arith::SelectOp>(fits, total.low, zero);
+  Value bits = b.createOrFold<arith::SelectOp>(negative, zero, total.low);
   Value result = b.createOrFold<arith::IndexCastUIOp>(b.getIndexType(), bits);
   return {result, negative};
 }

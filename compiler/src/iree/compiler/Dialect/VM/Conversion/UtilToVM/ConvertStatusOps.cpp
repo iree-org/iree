@@ -20,9 +20,8 @@ public:
   LogicalResult
   matchAndRewrite(IREE::Util::StatusCheckOkOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    APInt status;
-    if (matchPattern(adaptor.getStatus(), m_ConstantInt(&status)) &&
-        status.isZero()) {
+    // A constant OK status needs no check.
+    if (matchPattern(adaptor.getStatus(), m_Zero())) {
       rewriter.eraseOp(op);
       return success();
     }

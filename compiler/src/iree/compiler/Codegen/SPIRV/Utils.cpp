@@ -29,17 +29,6 @@ bool supportsNativeSPIRVF16(IREE::GPU::TargetAttr target) {
                                        IREE::GPU::StorageBitwidths::B16);
 }
 
-int64_t getSPIRVNarrowStorageAccessGranularity(IREE::GPU::TargetAttr target) {
-  if (!supportsNativeSPIRVF16(target) ||
-      !IREE::GPU::bitEnumContainsAll(target.getWgp().getCompute().getValue(),
-                                     IREE::GPU::ComputeBitwidths::Int16) ||
-      !IREE::GPU::bitEnumContainsAll(target.getWgp().getStorage().getValue(),
-                                     IREE::GPU::StorageBitwidths::B8)) {
-    return 4;
-  }
-  return 1;
-}
-
 bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp) {
   if (variantOp.getObjects().has_value()) {
     // Variants containing external executables do not go through CodeGen.

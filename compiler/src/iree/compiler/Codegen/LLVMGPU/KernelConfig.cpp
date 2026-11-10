@@ -1857,11 +1857,20 @@ static LogicalResult setSingleThreadConfig(mlir::FunctionOpInterface entryPoint,
 }
 
 // Basic default properties for linalg ops that haven't been tuned.
+// Returns whether `op` must run on a single thread under the default
+// configuration: Distribute only distributes linalg ops, so others would run
+// on every thread, and an op without partitionable loops has nothing to
+// distribute.
+static bool needsSingleThread(Operation *op) {
+  return !isa<linalg::LinalgOp>(op) || cast<PartitionableLoopsInterface>(op)
+                                           .getPartitionableLoops(std::nullopt)
+                                           .empty();
+}
+
 static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
                                           mlir::FunctionOpInterface entryPoint,
                                           Operation *op) {
-  // Distribute only distributes linalg ops; others would run on every thread.
-  if (!isa<linalg::LinalgOp>(op)) {
+  if (needsSingleThread(op)) {
     return setSingleThreadConfig(entryPoint, op);
   }
   MLIRContext *context = op->getContext();
@@ -1869,13 +1878,6 @@ static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
   TileSizesListType tileSizes;
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops = interfaceOp.getPartitionableLoops(std::nullopt);
-  if (partitionedLoops.empty()) {
-    tileSizes.push_back({});
-    auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
-    return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, config,
-        getGPUTranslationInfo(context, passPipeline, {1, 1, 1}));
-  }
 
   const int preferredSubgroupSize = target.getPreferredSubgroupSize();
   size_t numLoops = partitionedLoops.back() + 1;

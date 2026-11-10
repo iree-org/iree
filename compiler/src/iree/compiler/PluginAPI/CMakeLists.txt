@@ -15,9 +15,6 @@ iree_genrule(
     PluginABIHash_h__generate
   SRCS
     "${PROJECT_SOURCE_DIR}/build_tools/scripts/gen_plugin_abi_hash.py"
-    "${PROJECT_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/HAL/Target/ResourceAccess.h"
-    "${PROJECT_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/HAL/Target/TargetBackend.h"
-    "${PROJECT_SOURCE_DIR}/compiler/src/iree/compiler/Dialect/HAL/Target/TargetDevice.h"
     "${PROJECT_SOURCE_DIR}/compiler/src/iree/compiler/Pipelines/Options.h"
     "${PROJECT_SOURCE_DIR}/compiler/src/iree/compiler/Utils/OptionUtils.h"
     "Client.h"
@@ -25,7 +22,7 @@ iree_genrule(
   OUTS
     PluginABIHash.h
   CMD
-    "python3 $(rootpath //build_tools/scripts:gen_plugin_abi_hash.py) --input $(rootpath Client.h) --input $(rootpath PluginEntryPoint.h) --input $(rootpath //compiler/src/iree/compiler/Dialect/HAL/Target:ResourceAccess.h) --input $(rootpath //compiler/src/iree/compiler/Dialect/HAL/Target:TargetBackend.h) --input $(rootpath //compiler/src/iree/compiler/Dialect/HAL/Target:TargetDevice.h) --input $(rootpath //compiler/src/iree/compiler/Pipelines:Options.h) --input $(rootpath //compiler/src/iree/compiler/Utils:OptionUtils.h) --out $(execpath PluginABIHash.h)"
+    "python3 $(rootpath //build_tools/scripts:gen_plugin_abi_hash.py) --input $(rootpath Client.h) --input $(rootpath PluginEntryPoint.h) --input $(rootpath //compiler/src/iree/compiler/Pipelines:Options.h) --input $(rootpath //compiler/src/iree/compiler/Utils:OptionUtils.h) --out $(execpath PluginABIHash.h)"
 )
 
 iree_cc_library(

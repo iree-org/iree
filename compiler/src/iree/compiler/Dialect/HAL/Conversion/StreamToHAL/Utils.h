@@ -68,8 +68,7 @@ public:
   BindingTable() = default;
   // TODO(benvanik): interface for execution regions so this can be reused.
   BindingTable(IREE::Stream::CmdExecuteOp executeOp, ValueRange bufferValues,
-               ValueRange bufferSizes, int64_t granularity, IndexSet &indexSet,
-               OpBuilder &builder);
+               ValueRange bufferSizes, IndexSet &indexSet);
 
   // True if binding tables are supported for the consumer.
   bool isSupported() const { return true; }
@@ -96,19 +95,11 @@ private:
 
 class CommandBufferConversionMapping {
 public:
-  CommandBufferConversionMapping(
-      Value handle, BindingTable bindingTable,
-      IREE::Stream::ResourceConfigAttr resourceConfig)
-      : handle(handle), bindingTable(std::move(bindingTable)),
-        resourceConfig(resourceConfig) {}
+  CommandBufferConversionMapping(Value handle, BindingTable bindingTable)
+      : handle(handle), bindingTable(std::move(bindingTable)) {}
 
   // Returns the handle to the !hal.command_buffer.
   Value getHandle() const { return handle; }
-
-  // Returns the resource configuration of the execution region's affinity.
-  IREE::Stream::ResourceConfigAttr getResourceConfig() const {
-    return resourceConfig;
-  }
 
   // Resolves a resource range to either a direct or indirect buffer reference.
   // The returned range may differ from the provided used range in cases where
@@ -118,15 +109,9 @@ public:
                                          Value bufferValue, Value useOffset,
                                          Value useLength, OpBuilder &builder);
 
-  // True if |resourceValue| is bound through a binding table slot.
-  bool hasSlot(Value resourceValue) {
-    return bindingTable.lookupResourceSlot(resourceValue).has_value();
-  }
-
 private:
   Value handle;
   BindingTable bindingTable;
-  IREE::Stream::ResourceConfigAttr resourceConfig;
 };
 
 class StreamConversionMapping {

@@ -888,6 +888,33 @@ getTypesNeedingConversionEmulationForGPU(MLIRContext *context,
   return types;
 }
 
+/// Returns true if converting the integer operand of `op` to its narrow float
+/// result through `wideType` can round twice. The wide conversion is exact
+/// only while the integer fits the wide mantissa. Larger integers are rounded
+/// to the wide type and again to the narrow type, which can differ from one
+/// direct rounding unless the narrow type overflows for all such integers.
+static bool roundsTwiceThroughWideType(Operation *op, FloatType wideType) {
+  auto intType =
+      dyn_cast<IntegerType>(getElementTypeOrSelf(op->getOperand(0).getType()));
+  auto narrowType =
+      dyn_cast<FloatType>(getElementTypeOrSelf(op->getResult(0).getType()));
+  if (!intType || !narrowType) {
+    return false;
+  }
+  int wideMantissaBits = wideType.getFPMantissaWidth();
+  bool narrowOverflowsAboveExactRange =
+      APFloat::semanticsMaxExponent(narrowType.getFloatSemantics()) <
+      wideMantissaBits;
+  if (narrowOverflowsAboveExactRange) {
+    return false;
+  }
+  // Unsigned conversions use every bit for magnitude; signed ones use one bit
+  // for the sign.
+  int magnitudeBits =
+      isa<arith::UIToFPOp>(op) ? intType.getWidth() : intType.getWidth() - 1;
+  return magnitudeBits > wideMantissaBits;
+}
+
 } // namespace
 
 void ConvertUnsupportedFloatArithPass::runOnOperation() {
@@ -949,14 +976,24 @@ void ConvertUnsupportedFloatArithPass::runOnOperation() {
     // We don't want to insert extf/truncf pairs around them.
     target.addLegalOp<arith::ScalingExtFOp, arith::ScalingTruncFOp>();
 
+    // Widening an integer-to-float conversion converts to f32 first and then
+    // truncates, which rounds twice once the integer exceeds f32's mantissa.
+    // Leave such conversions to later lowering instead of changing results.
+    target.addDynamicallyLegalOp<arith::SIToFPOp, arith::UIToFPOp>(
+        [&converter, targetType](Operation *op) {
+          return converter.isLegal(op) ||
+                 roundsTwiceThroughWideType(op, cast<FloatType>(targetType));
+        });
+
     if (failed(applyPartialConversion(funcOp, target, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
 
   // Determine which types need software conversion emulation. By default, all
-  // the small float types need the emulation. For GPU targets, some types may
-  // have hardware conversion support and can be skipped.
+  // the selected types need the emulation. GPU targets skip the 8- and 4-bit
+  // types that the chip converts in hardware; f16 is always converted in
+  // software when selected.
   SmallVector<Type> typesNeedingConversionEmulation = allSmallFloatTypes;
   if (IREE::GPU::TargetAttr gpuAttr = getGPUTargetAttr(funcOp)) {
     typesNeedingConversionEmulation =
@@ -970,18 +1007,21 @@ void ConvertUnsupportedFloatArithPass::runOnOperation() {
   // f32 subnormal values instead of treating them as underflow to zero.
   llvm::erase(typesNeedingConversionEmulation, BFloat16Type::get(context));
 
-  // Emulate extf/truncf to/from small float types using integer bit
-  // manipulation. Only for types without hardware conversion support.
-  // This is gated by the enableExtTruncEmulation flag.
-  if (enableExtTruncEmulation && !typesNeedingConversionEmulation.empty()) {
-    RewritePatternSet emulationPatterns(context);
-    if (includeBf16) {
-      arith::populateExpandBFloat16Patterns(emulationPatterns);
-    }
+  // Emulate extf/truncf to/from the selected types using integer bit
+  // manipulation when enableExtTruncEmulation is set; otherwise the
+  // conversions remain for later passes.
+  if (!enableExtTruncEmulation) {
+    return;
+  }
+  RewritePatternSet emulationPatterns(context);
+  if (includeBf16) {
+    arith::populateExpandBFloat16Patterns(emulationPatterns);
+  }
+  if (!typesNeedingConversionEmulation.empty()) {
     emulationPatterns.add<TruncFToSmallFloat, ExtFFromSmallFloat>(
         context, typesNeedingConversionEmulation);
-    walkAndApplyPatterns(funcOp, std::move(emulationPatterns));
   }
+  walkAndApplyPatterns(funcOp, std::move(emulationPatterns));
 }
 
 } // namespace mlir::iree_compiler

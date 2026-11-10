@@ -37,11 +37,3 @@ util.global private @device_select_unregistered = #hal.device.select<[
   #hal.device.alias<"local"> : !hal.device,
   #hal.device.alias<"__unregistered__"> : !hal.device
 ]> : !hal.device
-
-// -----
-
-// Alias overrides are validated after merging with the backend defaults.
-// expected-error@+1 {{stream.min_copy_granularity must be a positive power of two representable in i64}}
-util.global private @device_invalid_granularity = #hal.device.alias<"local", {
-  stream.min_copy_granularity = 3 : i64
-}> : !hal.device

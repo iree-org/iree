@@ -531,6 +531,26 @@ struct ConvertStableHloToIreeInputDialects final
                     complex::ComplexDialect, scf::SCFDialect>();
   }
 
+  // Returns whether `funcOp` has only valid argument and result attributes
+  // and legal argument, result and block argument types.
+  static bool isLegalFunction(func::FuncOp funcOp,
+                              const TypeConverter &typeConverter) {
+    auto hasValidAttrs = [](ArrayAttr attrs) {
+      return !attrs ||
+             llvm::all_of(attrs.getAsRange<DictionaryAttr>(), isValidFuncAttr);
+    };
+    auto isLegal = [&](Type type) { return typeConverter.isLegal(type); };
+    if (!hasValidAttrs(funcOp.getAllArgAttrs()) ||
+        !hasValidAttrs(funcOp.getAllResultAttrs()) ||
+        !llvm::all_of(funcOp.getFunctionType().getInputs(), isLegal) ||
+        !llvm::all_of(funcOp.getFunctionType().getResults(), isLegal)) {
+      return false;
+    }
+    return llvm::all_of(funcOp.getFunctionBody(), [&](Block &block) {
+      return llvm::all_of(block.getArgumentTypes(), isLegal);
+    });
+  }
+
   void runOnOperation() override {
     if (failed(verifyCustomCallsAreResolved(getOperation()))) {
       return signalPassFailure();
@@ -610,36 +630,7 @@ struct ConvertStableHloToIreeInputDialects final
 
     // Functions must have legal types.
     target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
-      if (auto attrs = funcOp.getAllArgAttrs()) {
-        if (!llvm::all_of(attrs.getAsRange<DictionaryAttr>(),
-                          isValidFuncAttr)) {
-          return false;
-        }
-      }
-      if (auto attrs = funcOp.getAllResultAttrs()) {
-        if (!llvm::all_of(attrs.getAsRange<DictionaryAttr>(),
-                          isValidFuncAttr)) {
-          return false;
-        }
-      }
-      for (Type type : funcOp.getFunctionType().getInputs()) {
-        if (isIllegalType(type)) {
-          return false;
-        }
-      }
-      for (Type type : funcOp.getFunctionType().getResults()) {
-        if (isIllegalType(type)) {
-          return false;
-        }
-      }
-      for (Block &block : funcOp.getFunctionBody()) {
-        for (Type type : block.getArgumentTypes()) {
-          if (isIllegalType(type)) {
-            return false;
-          }
-        }
-      }
-      return true;
+      return isLegalFunction(funcOp, *typeConverter);
     });
     target.addDynamicallyLegalOp<ml_program::GlobalOp>(
         [&](ml_program::GlobalOp op) {

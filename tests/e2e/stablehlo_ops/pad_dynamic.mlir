@@ -1,4 +1,5 @@
-// pad of dynamically shaped operands with negative edge padding.
+// pad and dynamic_pad with negative edge padding, interior padding, and
+// extreme or unsigned padding amounts, on dynamic and static operands.
 
 func.func @pad_negative_and_interior() {
   %a = flow.tensor.dynamic_constant dense<[[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0]]> : tensor<3x4xf32> -> tensor<?x?xf32>

@@ -34,7 +34,7 @@ static constexpr int64_t kMaxCost = INT64_MAX;
 static constexpr int64_t kReductionCost = 2;
 
 static int64_t saturatingMul(int64_t lhs, int64_t rhs) {
-  assert(lhs >= 0 && rhs >= 0);
+  assert(lhs >= 0 && rhs >= 0 && "costs are non-negative");
   if (lhs == 0 || rhs == 0) {
     return 0;
   }

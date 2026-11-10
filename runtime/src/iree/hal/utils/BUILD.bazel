@@ -104,18 +104,6 @@ iree_runtime_cc_library(
     ],
 )
 
-iree_runtime_cc_test(
-    name = "executable_header_test",
-    srcs = ["executable_header_test.cc"],
-    deps = [
-        ":executable_header",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal/flatcc:parsing",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-    ],
-)
-
 iree_runtime_cc_library(
     name = "elf_format",
     srcs = ["elf_format.c"],

@@ -160,8 +160,9 @@ def ConvertUnsupportedFloatArithPass
   let options = [
     Option<"enableExtTruncEmulation", "enable-ext-trunc-emulation",
            "bool", /*default=*/"true",
-           "Enable software emulation for conversions of selected float types. "
-           "When disabled, conversion operations remain for later passes.">,
+           "Enable software emulation for conversions of selected float types, "
+           "including the bf16 expansion when include-bf16 is set. When "
+           "disabled, conversion operations remain for later passes.">,
     Option<"includeF16", "include-f16", "bool", /*default=*/"false",
            "Emulate f16 arithmetic and conversions in f32">,
     Option<"includeBf16", "include-bf16", "bool", /*default=*/"false",

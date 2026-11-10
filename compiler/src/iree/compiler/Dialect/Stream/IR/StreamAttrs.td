@@ -183,8 +183,6 @@ def Stream_ResourceConfigAttr :
   let description = [{
     Defines resource storage constraints. These allow for packing and layout
     algorithms to ensure they are producing usable results on target devices.
-    An explicit configuration on an operation or scope remains constrained by
-    that operation's placement. It cannot weaken the device's access units.
   }];
 
   // TODO(benvanik): this was just copied from the HAL; probably good to make it
@@ -210,35 +208,8 @@ def Stream_ResourceConfigAttr :
     // Fuses bindings that are mutable instead of leaving them split.
     "bool":$aliasMutableBindings,
     // Memory model used for host-device memory access.
-    "IREE::Stream::MemoryModel":$memoryModel,
-    // The smallest unit, in bytes, that kernels read or write in storage.
-    // Independently live values must not share one.
-    DefaultValuedParameter<"int64_t", "1">:$minAccessGranularity,
-    // The unit, in bytes, in which fills write storage; an
-    // unaligned edge is read and written whole.
-    DefaultValuedParameter<"int64_t", "1">:$minFillGranularity,
-    // The unit, in bytes, in which copies and updates read and write
-    // storage; an unaligned edge is read and written whole.
-    DefaultValuedParameter<"int64_t", "1">:$minCopyGranularity
+    "IREE::Stream::MemoryModel":$memoryModel
   );
-
-  // Preserve construction with byte-granular constraints when no units are
-  // specified, including existing C++ callers.
-  let builders = [
-    AttrBuilder<(ins
-      "int64_t":$maxAllocationSize,
-      "int64_t":$minBufferOffsetAlignment,
-      "int64_t":$maxBufferRange,
-      "int64_t":$minBufferRangeAlignment,
-      "int64_t":$indexBits,
-      "bool":$aliasMutableBindings,
-      "IREE::Stream::MemoryModel":$memoryModel
-    ), [{
-      return $_get($_ctxt, maxAllocationSize, minBufferOffsetAlignment,
-                   maxBufferRange, minBufferRangeAlignment, indexBits,
-                   aliasMutableBindings, memoryModel, 1, 1, 1);
-    }]>,
-  ];
 
   let valueType = NoneType;
 
@@ -261,7 +232,6 @@ def Stream_ResourceConfigAttr :
   }];
 
   let hasCustomAssemblyFormat = 1;
-  let genVerifyDecl = 1;
 }
 
 def Stream_ResourceAccess_None : I32BitEnumAttrCase<"None", 0x0000>;

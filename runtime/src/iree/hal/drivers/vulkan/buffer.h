@@ -58,14 +58,6 @@ iree_status_t iree_hal_vulkan_buffer_create_borrowed(
     iree_hal_buffer_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
 
-// Wraps the first |byte_length| bytes of |reservation|, a Vulkan HAL buffer
-// that owns its whole extent, in a buffer that still owns the whole extent.
-// Descriptors may then extend the last partial access unit into the padding.
-// |reservation| is retained until the wrapper is destroyed.
-iree_status_t iree_hal_vulkan_buffer_create_from_reservation(
-    iree_hal_buffer_t* reservation, iree_device_size_t byte_length,
-    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
-
 // Returns true if |buffer| is a Vulkan HAL buffer.
 bool iree_hal_vulkan_buffer_isa(iree_hal_buffer_t* buffer);
 
@@ -87,11 +79,6 @@ iree_status_t iree_hal_vulkan_buffer_resolve_backing_offset(
     iree_hal_buffer_t* buffer, iree_hal_buffer_t* backing_buffer,
     iree_device_size_t local_byte_offset,
     iree_device_size_t* out_backing_byte_offset);
-
-// Returns bytes owned from the start of this view. Whole allocations own their
-// reserved padding; subspans and borrowed views own only their declared bytes.
-iree_device_size_t iree_hal_vulkan_buffer_owned_byte_length(
-    iree_hal_buffer_t* buffer);
 
 // Returns the Vulkan memory and buffer handles backing |buffer|.
 iree_status_t iree_hal_vulkan_buffer_handle(iree_hal_buffer_t* buffer,

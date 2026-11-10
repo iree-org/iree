@@ -1,10 +1,9 @@
-// RUN: iree-compile --iree-input-type=stablehlo --iree-hal-target-backends=vmvx --compile-to=flow %s | FileCheck %s
+// RUN: iree-compile --iree-input-type=stablehlo --iree-hal-target-backends=vmvx --compile-to=flow %s | FileCheck %s --implicit-check-not=util.status.check_ok --implicit-check-not=shape_assertion
 // RUN: iree-compile --iree-input-type=stablehlo --iree-hal-target-backends=vmvx %s -o /dev/null
 // RUN: iree-compile --iree-input-type=stablehlo --iree-hal-target-backends=llvm-cpu %s -o /dev/null
 
-// The assertion inside the scatter region must survive dispatch formation.
+// The assertion is dropped without adding a status result to the scatter.
 // CHECK: flow.executable
-// CHECK: util.status.check_ok {{.*}}"negative current"
 func.func @scatter_effect(%operand: tensor<4xf32>, %updates: tensor<2xf32>) -> tensor<4xf32> {
   %indices = stablehlo.constant dense<1> : tensor<1xi32>
   %result = "stablehlo.scatter"(%operand, %indices, %updates) ({
@@ -17,11 +16,9 @@ func.func @scatter_effect(%operand: tensor<4xf32>, %updates: tensor<2xf32>) -> t
   return %result : tensor<4xf32>
 }
 
-// Torchax's Dim(min=3, max=64) checks run on the host, before the one dispatch
+// Torchax's Dim(min=3, max=64) supplies bounds for the one dispatch
 // with one workload.
 // CHECK-LABEL: util.func public @bounded_batch
-// CHECK-NOT: flow.tensor.load
-// CHECK-COUNT-4: util.status.check_ok
 // CHECK-NOT: flow.tensor.load
 // CHECK: flow.dispatch @{{[A-Za-z0-9_]+}}::@{{[A-Za-z0-9_]+}}[%{{[a-z0-9_]+}}](
 // CHECK-NOT: flow.dispatch
@@ -53,7 +50,6 @@ func.func @bounded_batch(%arg0: tensor<?x7xf32>, %arg1: tensor<?x7xf32>) -> tens
 // JAX states that three arguments share one symbol only through assertions;
 // the dispatch then takes that symbol as its one workload.
 // CHECK-LABEL: util.func public @shared_symbol
-// CHECK-COUNT-2: util.status.check_ok
 // CHECK: flow.dispatch @{{[A-Za-z0-9_]+}}::@{{[A-Za-z0-9_]+}}[%{{[a-z0-9_]+}}](
 // CHECK-NOT: flow.dispatch
 // CHECK: util.return
@@ -72,10 +68,8 @@ func.func @shared_symbol(%arg0: tensor<?x5xf32>, %arg1: tensor<?x5xf32>, %arg2: 
 }
 
 // A derived dimension, 2*s, checks its remainder and quotient through JAX's
-// floor-division helpers; the checks still run on the host.
+// floor-division helpers; assertion computations are removed when unused.
 // CHECK-LABEL: util.func public @derived_dimension
-// CHECK-NOT: flow.tensor.load
-// CHECK-COUNT-2: util.status.check_ok
 // CHECK-NOT: flow.tensor.load
 // CHECK: util.return
 func.func @derived_dimension(%arg0: tensor<3x?x5xf32>) -> tensor<3x?x5xf32> {

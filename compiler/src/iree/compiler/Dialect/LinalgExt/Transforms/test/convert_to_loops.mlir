@@ -1580,3 +1580,48 @@ func.func @map_load_memref(
 //      CHECK:       scf.yield %[[PAD]] : f32
 //      CHECK:     }
 //      CHECK:     memref.store %[[IF_RESULT]], %[[OUTPUT]][%[[IV]]]
+
+// -----
+
+// Each update element goes to its loaded start plus its window offset. The
+// bounds check compares the start with bounds shifted by the offset, and the
+// reducer reads every original before any store.
+func.func @general_scatter_window(%updates0: memref<2x2xi32>, %updates1: memref<2x2xf32>, %indices: memref<2x1xi32>, %original0: memref<4xi32>, %original1: memref<4xf32>) {
+  iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [1], inserted_window_dims = [], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates0, %updates1 : memref<2x2xi32>, memref<2x2xf32>)
+    indices(%indices : memref<2x1xi32>)
+    outs(%original0, %original1 : memref<4xi32>, memref<4xf32>) {
+  ^bb0(%current0: i32, %current1: f32, %update0: i32, %update1: f32):
+    %sum = arith.addi %current0, %update0 : i32
+    iree_linalg_ext.yield %sum, %current1 : i32, f32
+  }
+  return
+}
+// CHECK-LABEL: func.func @general_scatter_window
+// CHECK-SAME:    %[[UPDATES0:[a-zA-Z0-9]+]]: memref<2x2xi32>
+// CHECK-SAME:    %[[UPDATES1:[a-zA-Z0-9]+]]: memref<2x2xf32>
+// CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]: memref<2x1xi32>
+// CHECK-SAME:    %[[ORIGINAL0:[a-zA-Z0-9]+]]: memref<4xi32>
+// CHECK-SAME:    %[[ORIGINAL1:[a-zA-Z0-9]+]]: memref<4xf32>
+// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : i64
+// CHECK-DAG:     %[[ZERO:.+]] = arith.constant 0 : i64
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         scf.for %[[I:.+]] =
+// CHECK:           scf.for %[[J:.+]] =
+// CHECK:             %[[RAW:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]]
+// CHECK:             %[[START:.+]] = arith.extsi %[[RAW]] : i32 to i64
+// CHECK:             %[[OFFSET:.+]] = arith.index_cast %[[J]] : index to i64
+// CHECK:             %[[LOWER:.+]] = arith.subi %[[ZERO]], %[[OFFSET]]
+// CHECK:             %[[UPPER:.+]] = arith.subi %[[C4]], %[[OFFSET]]
+// CHECK:             %[[GE:.+]] = arith.cmpi sge, %[[START]], %[[LOWER]]
+// CHECK:             %[[LT:.+]] = arith.cmpi slt, %[[START]], %[[UPPER]]
+// CHECK:             %[[IN:.+]] = arith.andi %[[GE]], %[[LT]]
+// CHECK:             scf.if %[[IN]] {
+// CHECK:               %[[SUM:.+]] = arith.addi %[[START]], %[[OFFSET]] : i64
+// CHECK:               %[[DEST:.+]] = arith.index_cast %[[SUM]] : i64 to index
+// CHECK:               %[[UPDATE:.+]] = memref.load %[[UPDATES0]][%[[I]], %[[J]]]
+// CHECK:               %[[CUR0:.+]] = memref.load %[[ORIGINAL0]][%[[DEST]]]
+// CHECK:               %[[CUR1:.+]] = memref.load %[[ORIGINAL1]][%[[DEST]]]
+// CHECK:               %[[NEW:.+]] = arith.addi %[[CUR0]], %[[UPDATE]] : i32
+// CHECK:               memref.store %[[NEW]], %[[ORIGINAL0]][%[[DEST]]]
+// CHECK:               memref.store %[[CUR1]], %[[ORIGINAL1]][%[[DEST]]]

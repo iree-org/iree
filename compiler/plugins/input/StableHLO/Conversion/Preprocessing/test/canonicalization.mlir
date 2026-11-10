@@ -529,8 +529,6 @@ func.func @dynamic_broadcast_in_dim_to_own_shape_requires_cast(%arg0: tensor<?x5
 // -----
 
 // A transposing broadcast to the operand's own shape is no identity.
-// -----
-
 // CHECK-LABEL: func @dynamic_broadcast_in_dim_to_own_shape_transposed
 func.func @dynamic_broadcast_in_dim_to_own_shape_transposed(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = shape.shape_of %arg0 : tensor<?x?xf32> -> tensor<2xindex>

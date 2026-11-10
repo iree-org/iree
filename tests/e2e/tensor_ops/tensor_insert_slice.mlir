@@ -31,31 +31,3 @@ func.func @tensor_insert_slice_small() {
       [90, 91, 92, 93, 94, 95, 96, 97, 98, 99]]> : tensor<10x10xi32>) : tensor<10x10xi32>
   return
 }
-
-// A scalar store must leave every other tensor element unchanged.
-func.func @tensor_insert_scalar_runtime() {
-  %input = util.unfoldable_constant dense<0.0> : tensor<2x3xf32>
-  %one = arith.constant 1.0 : f32
-  %two = arith.constant 2.0 : f32
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
-  %middle = tensor.insert %one into %input[%c0, %c1] : tensor<2x3xf32>
-  %last = tensor.insert %two into %middle[%c1, %c2] : tensor<2x3xf32>
-  check.expect_eq_const(%last, dense<[[0.0, 1.0, 0.0], [0.0, 0.0, 2.0]]> : tensor<2x3xf32>) : tensor<2x3xf32>
-  return
-}
-
-// Exercise the same stores through constant evaluation's imported buffers.
-func.func @tensor_insert_scalar_constants() {
-  %input = arith.constant dense<0.0> : tensor<2x3xf32>
-  %one = arith.constant 1.0 : f32
-  %two = arith.constant 2.0 : f32
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
-  %middle = tensor.insert %one into %input[%c0, %c1] : tensor<2x3xf32>
-  %last = tensor.insert %two into %middle[%c1, %c2] : tensor<2x3xf32>
-  check.expect_eq_const(%last, dense<[[0.0, 1.0, 0.0], [0.0, 0.0, 2.0]]> : tensor<2x3xf32>) : tensor<2x3xf32>
-  return
-}

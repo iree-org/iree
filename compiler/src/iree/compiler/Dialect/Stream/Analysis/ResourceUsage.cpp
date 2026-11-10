@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/Util/Analysis/DFX/State.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -38,7 +37,7 @@ namespace mlir::iree_compiler::IREE::Stream {
 // as transients instead of straight-line escaping results.
 static constexpr bool kFavorTransients = false;
 
-// Returns true if this use ties the resource to a mutating result. A tied
+// Returns true if |value| has any tied uses that mutate the resource. A tied
 // operand-result pair may be either a genuine in-place mutation (dispatch,
 // fill, copy) or a scheduling passthrough (barriers, timepoint ops). This
 // function distinguishes the two using interface and trait queries rather than
@@ -52,62 +51,51 @@ static constexpr bool kFavorTransients = false;
 //  - AsyncAccessOpInterface: if the op reports access ranges, check whether
 //    any range for this resource includes a write.
 //  - Conservative fallback: unknown tied ops are assumed to mutate.
-static bool isMutatingTiedUse(OpOperand &use) {
-  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner());
-  if (!tiedOp || !tiedOp.isOperandTied(use.getOperandNumber())) {
-    return false;
-  }
-  Operation *owner = use.getOwner();
-
-  // Ops that tie resources purely for scheduling/synchronization.
-  if (owner->hasTrait<OpTrait::IREE::Stream::TiedResourcePassthrough>()) {
-    return false;
-  }
-
-  // Streamable metadata ops pass resources through unchanged.
-  if (auto streamableOp =
-          dyn_cast<IREE::Stream::StreamableOpInterface>(owner)) {
-    if (streamableOp.isMetadata()) {
-      return false;
-    }
-  }
-
-  // If the op reports explicit access ranges, check for writes on this
-  // resource. No write → not a mutation.
-  if (auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(owner)) {
-    SmallVector<AsyncAccessRange> ranges;
-    accessOp.getAsyncAccessRanges(ranges);
-    return llvm::any_of(ranges, [&](const AsyncAccessRange &range) {
-      return range.resource == use.get() && !range.isReadOnly();
-    });
-  }
-
-  // Unknown tied op: conservatively assume mutation.
-  return true;
-}
-
-// Query tied uses through storage-preserving optimization barriers. Scheduling
-// passthrough results retain their existing policy and are not traversed here.
-bool hasMutatingTiedUses(Value value) {
-  // Follow each corresponding barrier result once, including shared diamonds.
-  // Keep traversal local because IR can change between usage-analysis runs.
-  llvm::DenseSet<Value> visited;
-  SmallVector<Value> worklist;
-  visited.insert(value);
-  worklist.push_back(value);
-  while (!worklist.empty()) {
-    Value current = worklist.pop_back_val();
-    for (OpOperand &use : current.getUses()) {
-      if (auto barrier =
-              dyn_cast<IREE::Util::OptimizationBarrierOp>(use.getOwner())) {
-        Value result = barrier.getResult(use.getOperandNumber());
-        if (visited.insert(result).second) {
-          worklist.push_back(result);
-        }
-      } else if (isMutatingTiedUse(use)) {
+static bool hasMutatingTiedUses(Value value) {
+  for (OpOperand &use : value.getUses()) {
+    // Barriers preserve storage identity without implementing TiedOpInterface.
+    if (auto barrier =
+            dyn_cast<IREE::Util::OptimizationBarrierOp>(use.getOwner())) {
+      if (hasMutatingTiedUses(barrier.getResult(use.getOperandNumber()))) {
         return true;
       }
+      continue;
     }
+    auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner());
+    if (!tiedOp || !tiedOp.isOperandTied(use.getOperandNumber())) {
+      continue;
+    }
+    Operation *owner = use.getOwner();
+
+    // Ops that tie resources purely for scheduling/synchronization.
+    if (owner->hasTrait<OpTrait::IREE::Stream::TiedResourcePassthrough>()) {
+      continue;
+    }
+
+    // Streamable metadata ops pass resources through unchanged.
+    if (auto streamableOp =
+            dyn_cast<IREE::Stream::StreamableOpInterface>(owner)) {
+      if (streamableOp.isMetadata()) {
+        continue;
+      }
+    }
+
+    // If the op reports explicit access ranges, check for writes on this
+    // resource. No write → not a mutation.
+    if (auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(owner)) {
+      SmallVector<AsyncAccessRange> ranges;
+      accessOp.getAsyncAccessRanges(ranges);
+      bool hasWrite = llvm::any_of(ranges, [&](const AsyncAccessRange &range) {
+        return range.resource == use.get() && !range.isReadOnly();
+      });
+      if (hasWrite) {
+        return true;
+      }
+      continue;
+    }
+
+    // Unknown tied op: conservatively assume mutation.
+    return true;
   }
   return false;
 }
@@ -355,8 +343,7 @@ private:
         })
         .Case([&](IREE::Util::OptimizationBarrierOp op) {
           auto &sourceUsage = solver.getElementFor<ValueResourceUsage>(
-              *this,
-              Position::forValue(op.getOperand(result.getResultNumber())),
+              *this, Position::forValue(op.getOperand(0)),
               DFX::Resolution::REQUIRED);
           getState() ^= sourceUsage.getState();
         })
@@ -789,7 +776,7 @@ private:
         })
         .Case([&](IREE::Util::OptimizationBarrierOp op) {
           auto &resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.getResult(operandIdx)),
+              *this, Position::forValue(op.getResult(0)),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })

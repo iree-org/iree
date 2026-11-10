@@ -1,16 +1,12 @@
-// RUN: iree-compile --compile-to=input %s | FileCheck %s --check-prefix=INPUT
+// RUN: iree-compile --compile-to=input %s | FileCheck %s --check-prefix=INPUT --implicit-check-not=util.status.check_ok --implicit-check-not=shape_assertion
 // RUN: iree-compile --iree-hal-target-backends=llvm-cpu --output-format=vm-asm %s | FileCheck %s --check-prefix=VM
-// RUN: iree-compile --iree-hal-target-backends=llvm-cpu --output-format=vm-asm --iree-opt-strip-assertions=true %s | FileCheck %s --check-prefix=STRIP
 
 // INPUT-LABEL: util.func public @check_shape
-// INPUT-DAG: %[[STATUS_OK:.*]] = arith.constant 0 : i32
-// INPUT-DAG: %[[STATUS_FAILED:.*]] = arith.constant 9 : i32
-// INPUT-DAG: %[[PREDICATE:.*]] = tensor.extract %arg0[] : tensor<i1>
-// INPUT: %[[STATUS:.*]] = arith.select %[[PREDICATE]], %[[STATUS_OK]], %[[STATUS_FAILED]] : i32
-// INPUT: util.status.check_ok %[[STATUS]], "expected a positive dimension"
-// VM: vm.fail %{{.+}}, "expected a positive dimension"
-// STRIP: vm.module
-// STRIP: vm.fail %{{.+}}, "expected a positive dimension"
+// INPUT-NOT: tensor.extract
+// INPUT: util.return
+// VM-LABEL: vm.func private @check_shape(
+// VM-NOT: vm.fail
+// VM: vm.return
 func.func @check_shape(%predicate: tensor<i1>) {
   stablehlo.custom_call @shape_assertion(%predicate) {
     error_message = "expected a positive dimension", has_side_effect = true
@@ -19,11 +15,8 @@ func.func @check_shape(%predicate: tensor<i1>) {
 }
 
 // Direct EQ checks over get_dimension_size values can share one runtime dim.
-// The original comparisons remain before their checks, and each tensor is tied
-// once after the last assertion.
+// The assertions are dropped after recording one shape tie per tensor.
 // INPUT-LABEL: util.func public @equal_argument_dims
-// INPUT-COUNT-2: arith.cmpi eq
-// INPUT-COUNT-2: util.status.check_ok
 // INPUT: flow.tensor.tie_shape
 // INPUT: flow.tensor.tie_shape
 // INPUT: flow.tensor.tie_shape
@@ -43,8 +36,6 @@ func.func @equal_argument_dims(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>, %arg2
 // Independent axes on the same tensor pair produce one combined tie per
 // tensor with both canonical dims.
 // INPUT-LABEL: util.func public @equal_two_axes
-// INPUT: util.status.check_ok
-// INPUT: util.status.check_ok
 // INPUT-COUNT-2: flow.tensor.tie_shape
 func.func @equal_two_axes(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>) -> tensor<?x?xf32> {
   %lhs0 = stablehlo.get_dimension_size %lhs, dim = 0 : (tensor<?x?xf32>) -> tensor<i32>
@@ -62,7 +53,6 @@ func.func @equal_two_axes(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>) -> tenso
 // A non-EQ assertion and an assertion in a non-dominating branch do not
 // establish shape equality for following operations.
 // INPUT-LABEL: util.func public @non_equal_predicate
-// INPUT: util.status.check_ok
 // INPUT-NOT: flow.tensor.tie_shape
 func.func @non_equal_predicate(%lhs: tensor<?xf32>, %rhs: tensor<?xf32>) -> tensor<?xf32> {
   %lhsDim = stablehlo.get_dimension_size %lhs, dim = 0 : (tensor<?xf32>) -> tensor<i32>
@@ -74,8 +64,6 @@ func.func @non_equal_predicate(%lhs: tensor<?xf32>, %rhs: tensor<?xf32>) -> tens
 }
 
 // INPUT-LABEL: util.func public @branch_local_assertion
-// INPUT: scf.if
-// INPUT: util.status.check_ok
 // INPUT-NOT: flow.tensor.tie_shape
 func.func @branch_local_assertion(%condition: i1, %lhs: tensor<?xf32>, %rhs: tensor<?xf32>) -> tensor<?xf32> {
   %lhsDim = stablehlo.get_dimension_size %lhs, dim = 0 : (tensor<?xf32>) -> tensor<i32>
@@ -88,10 +76,9 @@ func.func @branch_local_assertion(%condition: i1, %lhs: tensor<?xf32>, %rhs: ten
   return %sum : tensor<?xf32>
 }
 
-// The checked relation makes this dynamic broadcast non-expanding. Without
+// The asserted relation makes this dynamic broadcast non-expanding. Without
 // the assertion, the runtime-select path remains.
 // INPUT-LABEL: util.func public @broadcast_asserted
-// INPUT: util.status.check_ok
 // INPUT: flow.tensor.tie_shape
 // INPUT: flow.tensor.tie_shape
 // INPUT-NOT: arith.select
@@ -123,7 +110,10 @@ func.func @broadcast_unasserted(%lhs: tensor<?x8xf32>, %rhs: tensor<?xf32>) -> t
   return %sum : tensor<?x8xf32>
 }
 
-func.func @assertion_fails(%lhs: tensor<?xf32>, %rhs: tensor<?xf32>) -> tensor<?xf32> {
+// A constant false precondition is dropped like other runtime assertions.
+// INPUT-LABEL: util.func public @discarded_false_assertion
+// INPUT: util.return
+func.func @discarded_false_assertion(%lhs: tensor<?xf32>, %rhs: tensor<?xf32>) -> tensor<?xf32> {
   %lhsDim = stablehlo.get_dimension_size %lhs, dim = 0 : (tensor<?xf32>) -> tensor<i32>
   %rhsDim = stablehlo.get_dimension_size %rhs, dim = 0 : (tensor<?xf32>) -> tensor<i32>
   %equal = stablehlo.compare EQ, %lhsDim, %rhsDim : (tensor<i32>, tensor<i32>) -> tensor<i1>
@@ -133,7 +123,6 @@ func.func @assertion_fails(%lhs: tensor<?xf32>, %rhs: tensor<?xf32>) -> tensor<?
 
 // Torchax's Dim(min=3, max=64), as JAX asserts it.
 // INPUT-LABEL: util.func public @bounded_dim
-// INPUT-COUNT-3: util.status.check_ok
 // INPUT: %[[BOUNDED:.+]] = util.assume.int %{{.+}}<umin = 3, umax = 64> : i32
 // INPUT: %[[DIM:.+]] = arith.index_cast %[[BOUNDED]] : i32 to index
 // INPUT: flow.tensor.tie_shape %{{.+}} : tensor<?x7xf32>{%[[DIM]]}
@@ -236,7 +225,6 @@ func.func @jax_dimension_variable(%arg0: tensor<?x6xf32>) -> tensor<?x6xf32> {
 // Predicates that state no range, or one that wrapping or the comparison
 // type makes unsound, leave the dimension unbounded.
 // INPUT-LABEL: util.func public @unbounded_predicates
-// INPUT-COUNT-5: util.status.check_ok
 // INPUT-NOT: util.assume.int
 func.func @unbounded_predicates(%arg0: tensor<?x4xf32>) -> tensor<?x4xf32> {
   %zero = stablehlo.constant dense<0> : tensor<i32>
@@ -259,9 +247,8 @@ func.func @unbounded_predicates(%arg0: tensor<?x4xf32>) -> tensor<?x4xf32> {
   return %doubled : tensor<?x4xf32>
 }
 
-// Contradictory bounds always fail at run time and give no fact.
+// Contradictory bounds give no fact; their runtime assertions are dropped.
 // INPUT-LABEL: util.func public @empty_range
-// INPUT-COUNT-2: util.status.check_ok
 // INPUT-NOT: util.assume.int
 func.func @empty_range(%arg0: tensor<?x3xf32>) -> tensor<?x3xf32> {
   %four = stablehlo.constant dense<4> : tensor<i32>
@@ -276,8 +263,6 @@ func.func @empty_range(%arg0: tensor<?x3xf32>) -> tensor<?x3xf32> {
 }
 
 // INPUT-LABEL: util.func public @branch_local_bound
-// INPUT: scf.if
-// INPUT: util.status.check_ok
 // INPUT-NOT: util.assume.int
 func.func @branch_local_bound(%condition: i1, %arg0: tensor<?x2xf32>) -> tensor<?x2xf32> {
   %three = stablehlo.constant dense<3> : tensor<i32>
@@ -293,7 +278,6 @@ func.func @branch_local_bound(%condition: i1, %arg0: tensor<?x2xf32>) -> tensor<
 // Torchax's Dim 2*b on %arg1, as JAX asserts it.
 // INPUT-LABEL: util.func public @expression_dim
 // INPUT: %[[TWO:.+]] = arith.constant 2 : i32
-// INPUT-COUNT-2: util.status.check_ok
 // INPUT: %[[BATCH:.+]] = util.assume.int %{{.+}}<umin = 1> : i32
 // INPUT: %[[TWICE:.+]] = arith.muli %[[BATCH]], %[[TWO]] : i32
 // INPUT: %[[EVEN:.+]] = util.assume.int %[[TWICE]]<udiv = 2> : i32
@@ -315,7 +299,6 @@ func.func @expression_dim(%arg0: tensor<?x7xf32>, %arg1: tensor<?x7xf32>) -> ten
 }
 
 // INPUT-LABEL: util.func public @expression_offset
-// INPUT: util.status.check_ok
 // INPUT: %[[SHIFTED:.+]] = arith.addi %{{.+}}, %{{.+}} : i32
 // INPUT-NOT: udiv
 // INPUT: %[[DIM:.+]] = arith.index_cast %[[SHIFTED]] : i32 to index
@@ -333,7 +316,6 @@ func.func @expression_offset(%arg0: tensor<?x4xf32>, %arg1: tensor<?x4xf32>) -> 
 
 // 3 * b can wrap back onto a valid size, so it proves nothing.
 // INPUT-LABEL: util.func public @expression_wraps
-// INPUT: util.status.check_ok
 // INPUT-NOT: flow.tensor.tie_shape
 // INPUT: util.return
 func.func @expression_wraps(%arg0: tensor<?x6xf32>, %arg1: tensor<?x6xf32>) -> tensor<?x6xf32> {
@@ -349,8 +331,7 @@ func.func @expression_wraps(%arg0: tensor<?x6xf32>, %arg1: tensor<?x6xf32>) -> t
 
 // Dimensions of operation results take part like those of arguments.
 // INPUT-LABEL: util.func public @result_dims_equal
-// INPUT: util.status.check_ok
-// INPUT: %[[DIM:.+]] = arith.index_cast
+// INPUT: %[[DIM:.+]] = arith.index_cast %{{.+}} : i32 to index
 // INPUT-DAG: flow.tensor.tie_shape %{{.+}} : tensor<?x3xf32>{%[[DIM]]}
 // INPUT-DAG: flow.tensor.tie_shape %{{.+}} : tensor<?x3xf32>{%[[DIM]]}
 func.func @result_dims_equal(%arg0: tensor<?x3xf32>, %arg1: tensor<?x3xf32>) -> tensor<?x3xf32> {
@@ -366,7 +347,6 @@ func.func @result_dims_equal(%arg0: tensor<?x3xf32>, %arg1: tensor<?x3xf32>) -> 
 
 // The size of a dot result is its lhs batch; the asserted bias matches it.
 // INPUT-LABEL: util.func public @dot_result_broadcast
-// INPUT: util.status.check_ok
 // INPUT-NOT: arith.select
 // INPUT: util.return
 func.func @dot_result_broadcast(%x: tensor<?x64xf32>, %w: tensor<64x32xf32>, %bias: tensor<?xf32>) -> tensor<?x32xf32> {
@@ -386,7 +366,6 @@ func.func @dot_result_broadcast(%x: tensor<?x64xf32>, %w: tensor<64x32xf32>, %bi
 
 // A transpose moves the asserted dimension to the front.
 // INPUT-LABEL: util.func public @transpose_result_broadcast
-// INPUT: util.status.check_ok
 // INPUT-NOT: arith.select
 // INPUT: util.return
 func.func @transpose_result_broadcast(%x: tensor<?x?xf32>, %bias: tensor<?xf32>) -> tensor<?x?xf32> {
@@ -407,8 +386,6 @@ func.func @transpose_result_broadcast(%x: tensor<?x?xf32>, %bias: tensor<?xf32>)
 
 // An equality checked in one branch says nothing after the branch.
 // INPUT-LABEL: util.func public @branch_local_transpose_broadcast
-// INPUT: scf.if
-// INPUT: util.status.check_ok
 // INPUT: arith.cmpi eq, %{{.+}}, %c1 : index
 func.func @branch_local_transpose_broadcast(%condition: i1, %x: tensor<?x?xf32>, %bias: tensor<?xf32>) -> tensor<?x?xf32> {
   %x1 = stablehlo.get_dimension_size %x, dim = 1 : (tensor<?x?xf32>) -> tensor<i32>
@@ -431,7 +408,6 @@ func.func @branch_local_transpose_broadcast(%condition: i1, %x: tensor<?x?xf32>,
 // 2 * b - 1 wraps in i32 for b = 2^30 on the way to a valid size; the tie
 // computes in i32 without overflow flags and widens only the exact result.
 // INPUT-LABEL: util.func public @expression_twice_minus_one
-// INPUT: util.status.check_ok
 // INPUT: %[[TWICE:.+]] = arith.muli %{{.+}}, %c2_i32 : i32
 // INPUT: %[[DIM_I32:.+]] = arith.addi %[[TWICE]], %c-1_i32 : i32
 // INPUT: %[[DIM:.+]] = arith.index_cast %[[DIM_I32]] : i32 to index

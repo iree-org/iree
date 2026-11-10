@@ -81,39 +81,73 @@ struct StableHLOSession
     typeMnemonics.insert("vhlo");
   }
 
+  // Detects the input conversion a module needs:
+  //   input dialect operations, types or attributes with tuples
+  //       --> only "stablehlo_xla"
+  //   input dialect operations, types or attributes without tuples
+  //       --> only "stablehlo"
+  //   no input dialect use --> no types
   void populateDetectedCustomInputConversionTypes(
       ModuleOp &module, StringSet<> &typeMnemonics) override {
+    InputDialectScan scan(module.getContext());
+    scan.run(module);
+    if (scan.hasStableHLO && scan.hasTuples) {
+      typeMnemonics.insert("stablehlo_xla");
+    } else if (scan.hasStableHLO) {
+      typeMnemonics.insert("stablehlo");
+    }
+  }
 
-    auto *ctx = module.getContext();
-    const Dialect *chloDialect = ctx->getLoadedDialect("chlo");
-    const Dialect *stablehloDialect = ctx->getLoadedDialect("stablehlo");
-    const Dialect *vhloDialect = ctx->getLoadedDialect("vhlo");
+private:
+  // Finds uses of the CHLO, StableHLO and VHLO dialects and of tuples. Input
+  // dialect types and tensor encodings also require conversion when the
+  // module has no input dialect operations. Any tuples in such a module
+  // require the tuple-flattening pipeline.
+  class InputDialectScan {
+  public:
+    explicit InputDialectScan(MLIRContext *ctx)
+        : chloDialect(ctx->getLoadedDialect("chlo")),
+          stablehloDialect(ctx->getLoadedDialect("stablehlo")),
+          vhloDialect(ctx->getLoadedDialect("vhlo")) {
+      typeWalker.addWalk([this](Type type) {
+        hasStableHLO |= isInputDialect(&type.getDialect());
+        hasTuples |= isa<TupleType>(type);
+      });
+      typeWalker.addWalk([this](Attribute attr) {
+        hasStableHLO |= isInputDialect(&attr.getDialect());
+      });
+    }
 
-    auto isInputDialect = [chloDialect, stablehloDialect,
-                           vhloDialect](const Dialect *dialect) {
-      return dialect && (dialect == chloDialect ||
-                         dialect == stablehloDialect || dialect == vhloDialect);
-    };
-    // Input dialect types and tensor encodings also require conversion when
-    // the module has no input dialect operations. Any tuples in such a module
-    // require the tuple-flattening pipeline.
+    // The type walker refers to this scan.
+    InputDialectScan(const InputDialectScan &) = delete;
+    InputDialectScan &operator=(const InputDialectScan &) = delete;
+
+    // Scans until both the input dialect and tuple requirements are known,
+    // even if they occur in different operations.
+    void run(ModuleOp module) {
+      module.walk([this](Operation *op) {
+        scanOperation(op);
+        return hasStableHLO && hasTuples ? WalkResult::interrupt()
+                                         : WalkResult::advance();
+      });
+    }
+
     bool hasStableHLO = false;
     bool hasTuples = false;
-    AttrTypeWalker typeWalker;
-    typeWalker.addWalk([&hasStableHLO, &hasTuples, &isInputDialect](Type type) {
-      hasStableHLO |= isInputDialect(&type.getDialect());
-      hasTuples |= isa<TupleType>(type);
-    });
-    typeWalker.addWalk([&hasStableHLO, &isInputDialect](Attribute attr) {
-      hasStableHLO |= isInputDialect(&attr.getDialect());
-    });
-    auto walkTypes = [&typeWalker](TypeRange types) {
+
+  private:
+    bool isInputDialect(const Dialect *dialect) const {
+      return dialect && (dialect == chloDialect ||
+                         dialect == stablehloDialect || dialect == vhloDialect);
+    }
+
+    void walkTypes(TypeRange types) {
       for (Type type : types) {
         typeWalker.walk(type);
       }
-    };
-    module.walk([&hasStableHLO, &hasTuples, &isInputDialect,
-                 &walkTypes](Operation *op) {
+    }
+
+    void scanOperation(Operation *op) {
       hasStableHLO |= isInputDialect(op->getDialect());
       walkTypes(op->getOperandTypes());
       walkTypes(op->getResultTypes());
@@ -129,18 +163,13 @@ struct StableHLOSession
           walkTypes(block.getArgumentTypes());
         }
       }
-      // Keep scanning until both the input dialect and tuple requirements are
-      // known, even if they occur in different operations.
-      return hasStableHLO && hasTuples ? WalkResult::interrupt()
-                                       : WalkResult::advance();
-    });
-
-    if (hasStableHLO && hasTuples) {
-      typeMnemonics.insert("stablehlo_xla");
-    } else if (hasStableHLO) {
-      typeMnemonics.insert("stablehlo");
     }
-  }
+
+    const Dialect *chloDialect;
+    const Dialect *stablehloDialect;
+    const Dialect *vhloDialect;
+    AttrTypeWalker typeWalker;
+  };
 };
 
 } // namespace

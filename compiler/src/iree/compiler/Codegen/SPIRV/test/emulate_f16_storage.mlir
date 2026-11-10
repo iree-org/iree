@@ -1,6 +1,11 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-spirv-emulate-f16-storage,canonicalize,cse))' %s | FileCheck %s
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-spirv-emulate-f16-storage,iree-spirv-emulate-f16-storage,canonicalize,cse))' %s | FileCheck %s
 
+// The second RUN line runs the emulation twice: emulating already emulated
+// IR must change nothing.
+
+// Neither f16 arithmetic nor 16-bit storage: f16 is computed in f32 and
+// stored in 32-bit words.
 #target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.3,cap:Shader", wgp = <compute = fp32|int32, storage = b32, subgroup = none, subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384, max_workgroup_counts = [65535, 65535, 65535]>>}>
 #layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>
 func.func @half_storage_b32(%i: index, %j: index) attributes {hal.executable.target = #target} {
@@ -24,6 +29,8 @@ func.func @half_storage_b32(%i: index, %j: index) attributes {hal.executable.tar
 
 // -----
 
+// 16-bit storage without f16 arithmetic still needs f32 computation, and
+// f16 storage is emulated in words with it.
 #target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.3,cap:Shader", wgp = <compute = fp32|int32, storage = b32|b16, subgroup = none, subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384, max_workgroup_counts = [65535, 65535, 65535]>>}>
 #layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>
 func.func @half_storage_b16(%i: index, %j: index) attributes {hal.executable.target = #target} {
@@ -47,6 +54,7 @@ func.func @half_storage_b16(%i: index, %j: index) attributes {hal.executable.tar
 
 // -----
 
+// f16 arithmetic without 16-bit storage: f16 is stored in 32-bit words.
 #target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.3,cap:Shader", wgp = <compute = fp32|fp16|int32|int16, storage = b32, subgroup = none, subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384, max_workgroup_counts = [65535, 65535, 65535]>>}>
 #layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>
 func.func @half_storage_fp16_b32(%i: index, %j: index) attributes {hal.executable.target = #target} {
@@ -70,6 +78,7 @@ func.func @half_storage_fp16_b32(%i: index, %j: index) attributes {hal.executabl
 
 // -----
 
+// f16 arithmetic and 16-bit storage: nothing is emulated.
 #target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.3,cap:Shader", wgp = <compute = fp32|fp16|int32|int16, storage = b32|b16, subgroup = none, subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384, max_workgroup_counts = [65535, 65535, 65535]>>}>
 #layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>
 func.func @half_storage_native(%i: index, %j: index) attributes {hal.executable.target = #target} {
@@ -149,6 +158,8 @@ func.func @caller(%a: f16) -> f16 attributes {hal.executable.target = #target} {
 
 // -----
 
+// f16 arithmetic and 16-bit storage without 16-bit integers: f16 values
+// still need no emulation.
 #target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.3,cap:Shader", wgp = <compute = fp32|fp16|int32, storage = b32|b16, subgroup = none, subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384, max_workgroup_counts = [65535, 65535, 65535]>>}>
 #layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>, #hal.pipeline.binding<storage_buffer>]>
 func.func @half_storage_native_without_int16(%i: index, %j: index) attributes {hal.executable.target = #target} {

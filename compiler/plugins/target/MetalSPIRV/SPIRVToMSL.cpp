@@ -62,9 +62,13 @@ public:
             if (instruction.op != spv::OpFAdd) {
               continue;
             }
+            // OpFAdd operands: result type, result id, and the two addends.
             const uint32_t *operands = stream(instruction);
-            if (isPositiveZero(operands[2]) || isPositiveZero(operands[3])) {
-              set_decoration(operands[1], spv::DecorationNoContraction);
+            uint32_t resultId = operands[1];
+            uint32_t lhsId = operands[2];
+            uint32_t rhsId = operands[3];
+            if (isPositiveZero(lhsId) || isPositiveZero(rhsId)) {
+              set_decoration(resultId, spv::DecorationNoContraction);
             }
           }
         });
