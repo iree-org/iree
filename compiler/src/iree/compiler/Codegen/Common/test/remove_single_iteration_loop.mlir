@@ -312,3 +312,39 @@ func.func @dynamic_unittrip_with_destination(%arg_index : index, %arg_value : te
 //       CHECK:   scf.yield %[[EMPTY]] : tensor<4xf16>
 //       CHECK: }
 //       CHECK: return %[[RESULT]] : tensor<4xf16>
+
+// -----
+
+// Exercises the ValueBoundsOpInterface model of a rank-reducing
+// iree_tensor_ext.dispatch.tensor.load via this pass. The result dim 0 must be
+// bounded by %size (in [4, 8]), not by the dropped unit size in sizes[0].
+
+// CHECK-LABEL: func.func @rank_reducing_dispatch_tensor_load
+func.func @rank_reducing_dispatch_tensor_load(
+    %arg_tensor : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>,
+    %arg_d0 : index, %arg_d1 : index, %arg_size : index) {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c8 = arith.constant 8 : index
+  %size = util.assume.int %arg_size<umin = 4, umax = 8> : index
+  // Rank-reducing: the unit size in dim 0 is dropped from the result, so the
+  // result is tensor<?xf32> rather than tensor<1x?xf32>.
+  %load = iree_tensor_ext.dispatch.tensor.load %arg_tensor,
+      offsets = [0, 0], sizes = [1, %size], strides = [1, 1]
+      : !iree_tensor_ext.dispatch.tensor<readonly:tensor<?x?xf32>>{%arg_d0, %arg_d1}
+      -> tensor<?xf32>
+  %dim = tensor.dim %load, %c0 : tensor<?xf32>
+  // %dim is in [4, 8], so a step of 8 executes exactly once.
+  //  CHECK-NOT: scf.for
+  //      CHECK: gpu.barrier memfence [#gpu.address_space<workgroup>]
+  scf.for %arg3 = %c0 to %dim step %c8 {
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
+  }
+  // %dim is at least 4, so a step of 2 executes more than once.
+  //      CHECK: scf.for
+  //      CHECK:   gpu.barrier memfence [#gpu.address_space<workgroup>]
+  scf.for %arg3 = %c0 to %dim step %c2 {
+    gpu.barrier memfence [#gpu.address_space<workgroup>]
+  }
+  return
+}
