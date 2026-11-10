@@ -26,6 +26,7 @@
 # Experimental
 # It's experimental, but we still don't want any old directory added here.
 /experimental/ @benvanik @jschuhmacher @maxbartel @stellaraccident
+/experimental/runtime/src/iree/hal/drivers/hexagon/ @jschuhmacher @maxbartel @schuermans-roofline
 
 # Infra Top-Level Directories
 /.github/ @AGindinson @kuhar @schuermans-roofline

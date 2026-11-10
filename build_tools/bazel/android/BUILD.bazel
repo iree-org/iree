@@ -1,0 +1,69 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Android aarch64 cross-compilation using the Android NDK.
+#
+# Build with: bazel build --config=android_arm64 //tools:iree-run-module
+# The NDK is located via ANDROID_NDK (see android_ndk_repo.bzl).
+
+load("@rules_cc//cc/toolchains:cc_toolchain.bzl", "cc_toolchain")
+load(":aarch64_android_toolchain_config.bzl", "aarch64_android_toolchain_config")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+platform(
+    name = "android_arm64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:android",
+    ],
+)
+
+filegroup(
+    name = "empty",
+    srcs = [],
+)
+
+# Only analyzed for Android, so that host builds (e.g. `bazel build //...`)
+# do not require the NDK.
+_ANDROID_ARM64 = [
+    "@platforms//cpu:aarch64",
+    "@platforms//os:android",
+]
+
+aarch64_android_toolchain_config(
+    name = "aarch64_android_toolchain_config",
+    target_compatible_with = _ANDROID_ARM64,
+)
+
+cc_toolchain(
+    name = "aarch64_android_cc_toolchain",
+    all_files = ":empty",
+    compiler_files = ":empty",
+    dwp_files = ":empty",
+    linker_files = ":empty",
+    objcopy_files = ":empty",
+    strip_files = ":empty",
+    supports_param_files = 0,
+    target_compatible_with = _ANDROID_ARM64,
+    toolchain_config = ":aarch64_android_toolchain_config",
+)
+
+toolchain(
+    name = "aarch64_android_toolchain",
+    target_compatible_with = _ANDROID_ARM64,
+    toolchain = ":aarch64_android_cc_toolchain",
+    toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+
+# libc++_shared.so from the NDK, to be deployed next to Android binaries.
+alias(
+    name = "libcxx_shared",
+    actual = "@iree_android_ndk//:libcxx_shared",
+)

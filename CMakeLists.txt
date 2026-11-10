@@ -698,6 +698,8 @@ include(iree_tablegen_doc)
 include(iree_c_embed_data)
 include(iree_amdgpu_binary)
 include(iree_bitcode_library)
+include(iree_hexagon_dsp_library)
+include(iree_hexagon_interface)
 include(iree_bytecode_module)
 include(iree_vmasm_module)
 include(iree_hal_executable)
@@ -720,6 +722,25 @@ include(iree_wasm_library)
 # to derive it relative to this directory and prefixed with iree/.
 set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(IREE_PACKAGE_ROOT_PREFIX "iree")
+
+#-------------------------------------------------------------------------------
+# Experimental Qualcomm Hexagon DSP HAL driver (Android arm64 only).
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=hexagon -DHEXAGON_SDK_ROOT=<path>
+# See experimental/runtime/src/iree/hal/drivers/hexagon/README.md.
+#-------------------------------------------------------------------------------
+
+iree_register_external_hal_driver(
+  NAME
+    hexagon
+  SOURCE_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/runtime/src"
+  BINARY_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/experimental/runtime/src"
+  DRIVER_TARGET
+    iree::hal::drivers::hexagon::registration
+  REGISTER_FN
+    iree_hal_hexagon_driver_module_register
+)
 
 #-------------------------------------------------------------------------------
 # IREE compilation flags

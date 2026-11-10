@@ -110,6 +110,23 @@ Build the runtime using the Android NDK toolchain:
     The specific `ANDROID_ABI` and `ANDROID_PLATFORM` used should match your
     target device.
 
+### Building with Bazel
+
+The runtime can also be built for Android arm64 with Bazel. This requires
+Android NDK r28 (e.g. r28c) with the `ANDROID_NDK` (or `ANDROID_NDK_HOME`)
+environment variable set to its location. Binaries target Android API level
+28.
+
+``` shell
+bazel build --config=android_arm64 //tools:iree-run-module
+```
+
+Binaries built with Bazel link the shared C++ library of the NDK. Push
+`libc++_shared.so` from
+`${ANDROID_NDK}/toolchains/llvm/prebuilt/<host>/sysroot/usr/lib/aarch64-linux-android/`
+to the device into a `lib/` directory next to the `bin/` directory containing
+the binaries.
+
 ## :octicons-code-16: Running Android tests
 
 Make sure you

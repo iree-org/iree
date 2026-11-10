@@ -10,7 +10,9 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", "new_local_repository")
 load("//build_tools/bazel:amdgpu_device_libs_repository.bzl", "amdgpu_device_libs_repository")
 load("//build_tools/bazel:amdgpu_device_toolchain_repo.bzl", "amdgpu_device_toolchain_repo")
+load("//build_tools/bazel:hexagon_sdk_repo.bzl", "hexagon_sdk_repo")
 load("//build_tools/bazel:workspace.bzl", "cuda_auto_configure")
+load("//build_tools/bazel/android:android_ndk_repo.bzl", "android_ndk_repo")
 load("//build_tools/wasm:wasi_sdk_repo.bzl", "wasi_sdk_repo")
 
 def _iree_extension_impl(module_ctx):
@@ -166,6 +168,18 @@ def _iree_extension_impl(module_ctx):
     # evaluated by source-mode AMDGPU device binary builds.
     amdgpu_device_toolchain_repo(
         name = "iree_amdgpu_device_toolchain",
+    )
+
+    # Android NDK detection for Android cross-compilation. A stub when no NDK
+    # is configured; see build_tools/bazel/android/android_ndk_repo.bzl.
+    android_ndk_repo(
+        name = "iree_android_ndk",
+    )
+
+    # Hexagon SDK for the experimental Hexagon HAL driver. Only fetched when a
+    # Hexagon target is built.
+    hexagon_sdk_repo(
+        name = "hexagon_sdk",
     )
 
     # wasi-sdk: clang + lld + wasi-libc + libc++ + compiler-rt for wasm targets.

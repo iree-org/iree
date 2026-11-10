@@ -5,9 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Ignore 'experimental' folders. These builds are not regularly maintained.
-# If you wish to build/run a target under experimental/, you must remove this
-# line from this file.
-experimental
+# If you wish to build/run a target under experimental/, you must remove its
+# line from this file. experimental/runtime/ is built with Bazel, so it is not
+# listed here.
+experimental/hal_executable_library_call_hooks
 
 # Ignore third_party directories which contain BUILD files so that recursive
 # from root works.
