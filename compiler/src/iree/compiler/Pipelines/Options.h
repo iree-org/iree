@@ -22,14 +22,18 @@ struct GlobalPipelineOptions {
   bool constExprHoisting = true;
 
   // Enables data tiling.
-  // There are two data-tiling paths. One starts from GlobalOptimization phase
-  // and the other starts from DispatchCreation phase. They are mutually
-  // exclusive. Only one of them can be enabled at a time. The default is using
-  // the DispatchCreation data-tiling path, which enables more fusion
-  // opportunities.
-  // Note that any feature built on top of GlobalOptimization path will be
-  // deprecated eventually.
+  // There are three data-tiling paths, and only one of them is used at a time:
+  //  - DispatchCreation, which this option selects and which enables more
+  //    fusion opportunities.
+  //  - GlobalOptimization. Any feature built on top of this path will be
+  //    deprecated eventually.
+  //  - Early data tiling, see `earlyDataTiling`. It is experimental and takes
+  //    precedence over this option.
   bool dataTiling = false;
+
+  // Assign, propagate, and materialize encodings before dispatch creation for
+  // supported homogeneous targets. Other targets retain late data tiling.
+  bool earlyDataTiling = false;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalPipelineOptions>;

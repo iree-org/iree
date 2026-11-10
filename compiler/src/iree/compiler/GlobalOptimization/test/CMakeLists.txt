@@ -26,6 +26,9 @@ iree_lit_test_suite(
     "demote_contraction_inputs.mlir"
     "demote_generic_contraction_inputs.mlir"
     "detach_elementwise_from_named_ops.mlir"
+    "early_data_tiling.mlir"
+    "early_data_tiling_fallback.mlir"
+    "early_data_tiling_invalid.mlir"
     "expand_tensor_shapes.mlir"
     "fold_broadcast_into_batch_matmul.mlir"
     "fold_broadcast_into_batch_matmul_pipeline.mlir"
@@ -37,6 +40,8 @@ iree_lit_test_suite(
     "linalg_quantized_conv_to_conv.mlir"
     "linalg_quantized_matmul_to_matmul.mlir"
     "optimize_numerics.mlir"
+    "pack_sub_byte_quantized_constants.mlir"
+    "pack_sub_byte_quantized_constants_pipeline.mlir"
     "propagate_affine_quantization.mlir"
     "propagate_linalg_transpose.mlir"
     "raise_special_ops.mlir"
@@ -48,6 +53,7 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-opt
+    not
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

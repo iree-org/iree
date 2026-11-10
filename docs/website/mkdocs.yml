@@ -277,9 +277,9 @@ nav:
           - "developers/lowering-config.md"
   - "Community":
       - "community/index.md"
-      - "Blog":
-          - "community/blog/index.md"
       - "community/tags.md"
+  - "Blog":
+      - "blog/index.md"
 
 # https://www.mkdocs.org/user-guide/configuration/#hooks
 hooks:
@@ -288,8 +288,9 @@ hooks:
 plugins:
   # https://squidfunk.github.io/mkdocs-material/setup/setting-up-a-blog/
   - blog:
-      blog_dir: "community/blog"
+      blog_dir: "blog"
       blog_toc: true
+      archive: false
       post_url_date_format: yyyy-MM-dd
       post_url_format: "{date}-{slug}"
 
@@ -326,14 +327,26 @@ plugins:
         "bindings/c-api.md": "reference/bindings/c-api.md"
         "bindings/python.md": "reference/bindings/python.md"
 
-        # "blog/" moved under "community/"
-        "blog/index.md": "community/blog/index.md"
-        "blog/2021-07-19-tflite-tosa.md": "community/blog/posts/tflite-tosa.md"
-        "blog/2021-10-13-mmt4d.md": "community/blog/posts/mmt4d.md"
-        "blog/2021-10-15-cuda-backend.md": "community/blog/posts/cuda-backend.md"
+        # Old "blog/" paths from before the blog plugin was set up
+        "blog/2021-07-19-tflite-tosa.md": "blog/posts/tflite-tosa.md"
+        "blog/2021-10-13-mmt4d.md": "blog/posts/mmt4d.md"
         # Some blog post names/paths changed when setting up the blog plugin
-        "community/blog/2021-07-19-tflite-tosa.md": "community/blog/posts/tflite-tosa.md"
-        "community/blog/2021-10-13-mmt4d.md": "community/blog/posts/mmt4d.md"
+        "community/blog/2021-07-19-tflite-tosa.md": "blog/posts/tflite-tosa.md"
+        "community/blog/2021-10-13-mmt4d.md": "blog/posts/mmt4d.md"
+        # "blog/" moved from "community/blog/" to a top-level section
+        "community/blog/index.md": "blog/index.md"
+        "community/blog/2021-07-19-tflite-support-via-tosa.md": "blog/posts/tflite-tosa.md"
+        "community/blog/2021-10-13-matrix-multiplication-with-mmt4d.md": "blog/posts/mmt4d.md"
+        "community/blog/2021-10-15-cuda-backend.md": "blog/posts/cuda-backend.md"
+        "community/blog/2024-01-22-exploring-cpu-microkernels-on-a-matmul-example.md": "blog/posts/microkernels.md"
+        "community/blog/2024-01-29-iree-mlir-linalg-tutorial.md": "blog/posts/linalg-tutorial.md"
+        "community/blog/2025-08-25-data-tiling-walkthrough.md": "blog/posts/data-tiling-walkthrough.md"
+        "community/blog/2026-05-28-virtual-dense-mfmas-for-skinny-gemm.md": "blog/posts/vdmfma_canvas.md"
+        "community/blog/2026-07-23-running-models-on-risc-v-with-iree.md": "blog/posts/rvv-pipeline-usage.md"
+        "community/blog/archive/2021.md": "blog/index.md"
+        "community/blog/archive/2024.md": "blog/index.md"
+        "community/blog/archive/2025.md": "blog/index.md"
+        "community/blog/archive/2026.md": "blog/index.md"
 
         # "Developers" section was added
         "guides/developer-tips.md": "developers/general/developer-tips.md"

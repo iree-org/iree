@@ -31,6 +31,14 @@ static llvm::cl::opt<bool> clConvertQDQToIntegerMath(
                    "changes floating-point rounding and exceptional-value "
                    "behavior)."),
     llvm::cl::init(true));
+static llvm::cl::opt<bool> clEnableSubByteQuantizedStorage(
+    "iree-global-opt-enable-sub-byte-quantized-storage",
+    llvm::cl::desc("Packs constant quantized values whose quantization range "
+                   "fits 2 or 4 bits into i2 or i4 storage. Requires "
+                   "const-expr hoisting and const-eval. With data tiling, "
+                   "contractions on packed values currently lose the "
+                   "data-tiling speedup."),
+    llvm::cl::init(false));
 static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",
     llvm::cl::desc(
@@ -204,7 +212,15 @@ void buildGlobalOptimizationPassPipeline(
       // direct dequantize producers after the preceding reshape/transpose
       // transformations, before im2col or input demotion can hide them.
       .addPredicatedPass(clConvertQDQToIntegerMath,
-                         createPropagateAffineQuantizationPass)
+                         createPropagateAffineQuantizationPass);
+  // Pack sub-byte constants between propagation, which moves reshapes onto the
+  // i8 values, and the QDQ rewrite, so the integer contraction reads the packed
+  // storage. Without hoisting and const-eval, the packing would run at runtime.
+  if (clEnableSubByteQuantizedStorage && transformOptions.constExprHoisting &&
+      transformOptions.constEval) {
+    mainPassManager.addPass(createPackSubByteQuantizedConstantsPass());
+  }
+  FunctionLikeNest(mainPassManager)
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createConvertQDQToIntegerMathPass)
       .addPredicatedPass(transformOptions.useIm2colForConvs,
@@ -219,7 +235,12 @@ void buildGlobalOptimizationPassPipeline(
       GlobalOptimization::createConvertStridedContractionToContractionPass());
 
   // Enable data tiling after they are in a canonical form.
-  if (transformOptions.dataTiling) {
+  if (transformOptions.earlyDataTiling) {
+    const DispatchCreation::DataTilingEncodingOptions &encodingOptions =
+        transformOptions.earlyDataTilingEncodingOptions;
+    mainPassManager.addPass(createEarlyDataTilingPass(
+        {encodingOptions.opTypes, encodingOptions.encodingOption}));
+  } else if (transformOptions.dataTiling) {
     FunctionLikeNest(mainPassManager)
         // Data tiling wants a single M, N and K dim. Collapse contractions
         // whose loops merge, such as a batch_matmul with a batch-broadcast

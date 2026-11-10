@@ -76,8 +76,8 @@ hal.executable private @push_constant_annotated {
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
-  #hal.pipeline.binding<storage_buffer>,
-  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
   #hal.pipeline.binding<storage_buffer>
 ]>
 hal.executable private @resource_bindings_in_same_func {
@@ -87,9 +87,9 @@ hal.executable private @resource_bindings_in_same_func {
     >
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       // CHECK-LABEL: spirv.module
-      // CHECK: spirv.GlobalVariable @[[ARG0:.+]] bind(0, 0) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-      // CHECK: spirv.GlobalVariable @[[ARG1_0:.+]] bind(0, 1) {aliased} : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
-      // CHECK: spirv.GlobalVariable @[[ARG1_1:.+]] bind(0, 1) {aliased} : !spirv.ptr<!spirv.struct<(!spirv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
+      // CHECK: spirv.GlobalVariable @[[ARG0:.+]] bind(0, 0) {non_writable} : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+      // CHECK: spirv.GlobalVariable @[[ARG1_0:.+]] bind(0, 1) {aliased, non_writable} : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+      // CHECK: spirv.GlobalVariable @[[ARG1_1:.+]] bind(0, 1) {aliased, non_writable} : !spirv.ptr<!spirv.struct<(!spirv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
       // CHECK: spirv.GlobalVariable @[[RET0:.+]] bind(0, 2) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
       // CHECK: spirv.func @resource_bindings_in_same_entry_func()
       func.func @resource_bindings_in_same_entry_func() -> f32 {
@@ -133,6 +133,10 @@ hal.executable private @resource_bindings_in_same_func {
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<constants = 5, bindings = [
+  #hal.pipeline.binding<storage_buffer, ReadOnly>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#writable_layout = #hal.pipeline.layout<constants = 5, bindings = [
   #hal.pipeline.binding<storage_buffer>,
   #hal.pipeline.binding<storage_buffer>
 ]>
@@ -141,12 +145,12 @@ hal.executable private @resource_bindings_in_multi_entry_func {
     hal.executable.export public @resource_bindings_in_entry_func1 layout(#pipeline_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
     >
-    hal.executable.export public @resource_bindings_in_entry_func2 layout(#pipeline_layout) <
+    hal.executable.export public @resource_bindings_in_entry_func2 layout(#writable_layout) <
       workgroup_size = [32: index, 1: index, 1: index]
     >
     builtin.module attributes {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Int64, Shader], []>, #spirv.resource_limits<>>} {
       // CHECK-LABEL: spirv.module
-      // CHECK: spirv.GlobalVariable @[[FUNC1_ARG:.+]] bind(0, 0) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
+      // CHECK: spirv.GlobalVariable @[[FUNC1_ARG:.+]] bind(0, 0) {non_writable} : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
       // CHECK: spirv.GlobalVariable @[[FUNC1_RET:.+]] bind(0, 1) : !spirv.ptr<!spirv.struct<(!spirv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
       // CHECK: spirv.GlobalVariable @[[FUNC2_ARG:.+]] bind(0, 0) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
       // CHECK: spirv.GlobalVariable @[[FUNC2_RET:.+]] bind(0, 1) : !spirv.ptr<!spirv.struct<(!spirv.array<16 x f32, stride=4> [0])>, StorageBuffer>
@@ -173,8 +177,8 @@ hal.executable private @resource_bindings_in_multi_entry_func {
         // CHECK: spirv.mlir.addressof @[[FUNC2_ARG]]
         // CHECK: spirv.mlir.addressof @[[FUNC2_RET]]
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>> // Same type as previous function
-        %1 = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>> // Different type as previous function
+        %0 = hal.interface.binding.subspan layout(#writable_layout) binding(0) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>> // Same type as previous function
+        %1 = hal.interface.binding.subspan layout(#writable_layout) binding(1) : memref<4x4xf32, #spirv.storage_class<StorageBuffer>> // Different type as previous function
 
         %2 = memref.load %0[%c0, %c0] : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>
         %3 = memref.load %1[%c0, %c0] : memref<4x4xf32, #spirv.storage_class<StorageBuffer>>

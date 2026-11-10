@@ -82,9 +82,7 @@ public:
   LogicalResult encodeType(Type type) override {
     // HACK: it'd be nice to remove the implicit ref wrapper hiding.
     if (auto refType = dyn_cast<IREE::VM::RefType>(type)) {
-      if (isa<IREE::VM::ListType>(refType.getObjectType())) {
-        type = refType.getObjectType();
-      }
+      type = refType.getObjectType();
     }
     auto it = typeTable_->find(type);
     if (it == typeTable_->end()) {

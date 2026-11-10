@@ -98,6 +98,46 @@ def DetachElementwiseFromNamedOpsPass :
   let summary = "Detaches elementwise ops from named Linalg ops.";
 }
 
+def EarlyDataTilingPass : Pass<"iree-global-opt-early-data-tiling", "mlir::ModuleOp"> {
+  let summary = "Materializes data-tiling layouts before dispatch creation for a supported target.";
+  let description = [{
+    For a module with a single executable target that supports host encoding
+    materialization, normalizes contraction dimensions, assigns data-tiling
+    encodings, propagates them through elementwise producers and consumers,
+    and materializes them into packed layouts such as linalg.pack,
+    linalg.mmt4d and linalg.unpack. Records the target in the
+    `iree.encoding.materialized_layout_target` module attribute, which keeps
+    dispatch creation from assigning encodings again and from compiling the
+    module for another target. Other modules are left unchanged, so they use
+    dispatch-time data tiling. The options select the operation families and
+    encoding strategy, as for iree-dispatch-creation-assign-data-tiling-encodings.
+    Only the default encoding strategy materializes into packed layouts, so
+    modules are left unchanged for other strategies.
+  }];
+  let options = [
+    ListOption<
+        "opTypes", "data-tiling-op-types",
+        "mlir::iree_compiler::IREE::Encoding::EncodingOpType",
+        "Op families eligible for data tiling. "
+        "Defaults to {matmul, scaled_matmul}.",
+        [{::llvm::cl::list_init(
+            mlir::iree_compiler::DispatchCreation::getDefaultDataTilingOpTypes())}]>,
+    Option<
+        "encodingOption", "encoding-option",
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions",
+        /*default=*/
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic",
+        "Select the type of encoding options to add.",
+        [{::llvm::cl::values(
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Padding,
+                "padding", "Encode tensors that need to be padded."),
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic,
+                "default", "Uses EncodingAttr which encodes as much information as possible."))}]>,
+  ];
+}
+
 def EraseUnusedLinalgOperandsPass :
     Pass<"iree-global-opt-erase-unused-linalg-operands", "mlir::ModuleOp"> {
   let summary = "Erases unused linalg operand and remove dead code.";
@@ -144,8 +184,51 @@ def PropagateAffineQuantizationPass :
     collapsed `[M, G, L]` and `[N, G, L]` operands thus iterates over
     `(m, n, g, l)`. When a contraction consumes the result, the dequantize
     becomes its direct producer so the integer contraction rewrite can match
-    it.
+    it. A pad is not moved onto storage that is not byte-aligned, such as `i4`,
+    where it could shift values off byte boundaries.
   }];
+}
+
+def PackSubByteQuantizedConstantsPass :
+    Pass<"iree-global-opt-pack-sub-byte-quantized-constants", "mlir::ModuleOp"> {
+  let summary = "Packs constant quantized values with sub-byte ranges into i2 or i4 storage.";
+  let description = [{
+    Packs the constant `i8` input of an `iree_linalg_ext.dequantize_affine`
+    into `i2` or `i4` storage, which the dequantize then reads through an
+    `iree_tensor_ext.bitcast`. With `w`-bit storage, element `k * i + j` of the
+    innermost dimension goes to bits `[j * w, (j + 1) * w)` of byte `i`, where
+    `k = 8 / w`.
+
+    A dequantize can use `w`-bit storage if its `quant_min`/`quant_max` range
+    and its zero point fit `w` bits. The zero point must be a constant, and the
+    input must have a static, non-empty shape whose innermost dimension is a
+    multiple of `k`. Each dequantize needs the narrowest such type. An input
+    value that several dequantizes read is packed once, into the widest type
+    they need. Every load of a global is packed into the same type, and the
+    identical packings are merged later.
+
+    An input is packed only when constant evaluation folds the packing and no
+    `i8` reader remains. The input must be computed from inline constants or
+    immutable globals with an inline initial value, at the top level of a
+    function, where hoisting reaches. Every read of the input value must be the
+    input of a packed dequantize, in the same shape. This includes reads
+    through reshapes and through other loads of the same global, which must be
+    private, since code outside the module can read a public one.
+    Each packing must also store no more bytes than leaving its input
+    unpacked. Unpacked, hoisting stores a computed input no larger than the
+    constants and globals it reads in a global of its own, which packing
+    shrinks. Reshapes and slices are read in place instead, so their packing,
+    like that of any larger input, must take no more bytes than the constants
+    and globals it frees, which only the computation of packed inputs reads.
+    Either way, hoisting accepts the packing at any size threshold. Other
+    inputs, such as runtime values and parameters, stay `i8`.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
+  ];
 }
 
 def ConvertQDQToIntegerMathPass :

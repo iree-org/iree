@@ -44,6 +44,7 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingTypes.h"
 #include "iree/compiler/Dialect/Encoding/Utils/ElementPackingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -96,10 +97,9 @@ static std::optional<Type> getLegalizedType(Type t) {
 
 static Type dropEncodingWithoutMaterialization(Type t) {
   if (auto shapedType = dyn_cast<RankedTensorType>(t)) {
-    // TODO(#21185): Remove special casing and replace with more generic logic.
-    if (auto packedStorage =
-            dyn_cast_if_present<IREE::Encoding::PackedStorageAttr>(
-                shapedType.getEncoding())) {
+    auto encoding = dyn_cast_if_present<IREE::Encoding::SerializableAttr>(
+        shapedType.getEncoding());
+    if (encoding && encoding.canDropWithoutTensorMaterialization()) {
       return shapedType.dropEncoding();
     }
   }

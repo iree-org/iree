@@ -120,63 +120,40 @@ void collectTiledAndFusedOps(Operation *rootOp,
   }
 }
 
-namespace {
-// Entry for the pseudo-priority queue of consumer fusion candidates. Contains
-// the consumer (fusableUser) that can be fused and the set of slice operations
-// in the loop to fuse into that feed the consumer.
-struct ConsumerFusionQueueEntry {
-  ConsumerFusionQueueEntry(SmallVector<Operation *> &&slices,
-                           Operation *fusableUser)
-      : slices(std::move(slices)), fusableUser(fusableUser) {}
-
-  SmallVector<Operation *> slices;
-  Operation *fusableUser;
-};
-} // namespace
-
-FailureOr<std::queue<Operation *>> fuseConsumersIntoForall(
-    RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
-    MutableArrayRef<LoopLikeOpInterface> loops,
-    std::function<bool(Operation *)> filterFn,
-    const scf::InnerTileAlignmentFnTy &innerTileAlignmentFn) {
-  // Collect the candidate slices which can be potential consumers that can be
-  // fused. Keep them in a vector reverse-sorted by dominance: the candidate
-  // dominating others comes last (so it can be cheaply popped from the vector).
-  // The most-dominating candidate is to be fused first since not fusing it may
-  // prevent dominated candidates to be fused:
-  //
-  //     A
-  //     |
-  //     B
-  //   / |
-  //  |  D
-  //  | /
-  //  C
-  //
-  // here, B must be fused before both C and D, and D must be fused before C.
-  // Candidates are kept in a vector rather than a priority queue since we may
-  // update them as fusion happens, in particular, more slices may need to be
-  // handled. For example, fusing B with A will create a slice of B that will
-  // need to be handled correctly.
-  SmallVector<ConsumerFusionQueueEntry> candidates;
-  llvm::SmallDenseSet<OpResult> visitedLoopResults;
-  auto addCandidateSlices = [&candidates, &visitedLoopResults,
-                             &filterFn](Operation *fusedOp,
-                                        DominanceInfo &dominanceInfo) {
-    for (auto *userOp : fusedOp->getResults().getUsers()) {
+/// Adds the fusable users of the loop results that `fusedOps` write to (through
+/// `tensor.parallel_insert_slice`) to `candidates`, keeping it free of
+/// duplicates and reverse-sorted by dominance. The most-dominating candidate is
+/// to be fused first since not fusing it may prevent dominated candidates to be
+/// fused:
+///
+///     A
+///     |
+///     B
+///   / |
+///  |  D
+///  | /
+///  C
+///
+/// here, B must be fused before both C and D, and D must be fused before C.
+///
+/// Every fusion rebuilds the loop and erases the old one, so handles to the
+/// loop and its results are only valid within one call and none is kept across
+/// calls. Consumer ops survive fusions with their loop-result operands
+/// redirected to the rebuilt loop, so only consumers are kept in `candidates`.
+static void
+collectConsumerFusionCandidates(ArrayRef<Operation *> fusedOps,
+                                llvm::function_ref<bool(Operation *)> filterFn,
+                                SmallVectorImpl<Operation *> &candidates) {
+  DominanceInfo dominanceInfo;
+  for (Operation *fusedOp : fusedOps) {
+    for (Operation *userOp : fusedOp->getUsers()) {
       auto sliceOp = dyn_cast<tensor::ParallelInsertSliceOp>(userOp);
       if (!sliceOp) {
         continue;
       }
-
-      auto currLoop =
-          cast<scf::ForallOp>(sliceOp->getParentOp()->getParentOp());
-      OpResult loopResult = currLoop.getTiedOpResult(
-          currLoop.getTiedOpOperand(cast<BlockArgument>(sliceOp.getDest())));
-      if (visitedLoopResults.contains(loopResult)) {
-        continue;
-      }
-      visitedLoopResults.insert(loopResult);
+      auto loop = cast<scf::ForallOp>(sliceOp->getParentOp()->getParentOp());
+      OpResult loopResult = loop.getTiedOpResult(
+          loop.getTiedOpOperand(cast<BlockArgument>(sliceOp.getDest())));
       SmallVector<Operation *> users = llvm::to_vector(
           llvm::make_filter_range(loopResult.getUsers(), filterFn));
       if (users.empty()) {
@@ -184,78 +161,57 @@ FailureOr<std::queue<Operation *>> fuseConsumersIntoForall(
       }
       mlir::computeTopologicalSorting(users);
       for (Operation *fusableUser : users) {
-        // Check all operands from the `scf.forall`
-        SmallVector<OpResult> loopResults;
-        for (OpOperand &opOperand : fusableUser->getOpOperands()) {
-          if (opOperand.get().getDefiningOp() == currLoop.getOperation()) {
-            loopResults.push_back(cast<OpResult>(opOperand.get()));
-          }
+        // Several slices may write the same loop result and a user may read
+        // several loop results, so deduplicate by identity (dominance is only
+        // a partial order, so equality cannot be probed through the ordering).
+        // `tileAndFuseConsumer` checks that each loop result the user reads is
+        // written by exactly one slice.
+        if (llvm::is_contained(candidates, fusableUser)) {
+          continue;
         }
-
-        SmallVector<Operation *> fusedSlices;
-        for (OpResult result : loopResults) {
-          BlockArgument tiedBlockArg =
-              currLoop.getTiedBlockArgument(currLoop.getTiedOpOperand(result));
-          SmallVector<tensor::ParallelInsertSliceOp> slices =
-              llvm::map_to_vector(
-                  currLoop.getCombiningOps(tiedBlockArg), [](Operation *op) {
-                    return cast<tensor::ParallelInsertSliceOp>(op);
-                  });
-          llvm::append_range(fusedSlices, slices);
-        }
-        if (!fusedSlices.empty()) {
-          ConsumerFusionQueueEntry entry(std::move(fusedSlices), fusableUser);
-
-          // Comparator that puts the dominating user last.
-          auto comp = [&](const ConsumerFusionQueueEntry &lhs,
-                          const ConsumerFusionQueueEntry &rhs) {
-            return dominanceInfo.properlyDominates(rhs.fusableUser,
-                                                   lhs.fusableUser);
-          };
-
-          // If the fusable user is already a candidate, update it with the new
-          // list of slices to handle. Otherwise, insert it into the right
-          // position based on dominance.
-          auto *it = llvm::lower_bound(candidates, entry, comp);
-          if (it != candidates.end() && it->fusableUser == fusableUser) {
-            *it = std::move(entry);
-          } else {
-            candidates.insert(it, std::move(entry));
-          }
-        }
+        // Comparator that puts the dominating user last.
+        auto comp = [&](Operation *lhs, Operation *rhs) {
+          return dominanceInfo.properlyDominates(rhs, lhs);
+        };
+        candidates.insert(llvm::lower_bound(candidates, fusableUser, comp),
+                          fusableUser);
       }
     }
-  };
-
-  // Add slices from all tiled ops, not only the "main" one.
-  DominanceInfo dominanceInfo;
-  for (Operation *tiledOp : tiledOps) {
-    addCandidateSlices(tiledOp, dominanceInfo);
   }
+}
+
+FailureOr<std::queue<Operation *>> fuseConsumersIntoForall(
+    RewriterBase &rewriter, ArrayRef<Operation *> tiledOps,
+    MutableArrayRef<LoopLikeOpInterface> loops,
+    std::function<bool(Operation *)> filterFn,
+    const scf::InnerTileAlignmentFnTy &innerTileAlignmentFn) {
+  SmallVector<Operation *> candidates;
+  // Add candidates from all tiled ops, not only the "main" one.
+  collectConsumerFusionCandidates(tiledOps, filterFn, candidates);
 
   std::queue<Operation *> newFusionOpportunities;
   while (!candidates.empty()) {
     // Get the next candidate.
-    ConsumerFusionQueueEntry entry = candidates.pop_back_val();
+    Operation *consumer = candidates.pop_back_val();
 
     FailureOr<scf::SCFFuseConsumerOfSliceResult> fusedResult =
-        mlir::scf::tileAndFuseConsumer(rewriter, entry.fusableUser, loops,
+        mlir::scf::tileAndFuseConsumer(rewriter, consumer, loops,
                                        innerTileAlignmentFn);
     if (failed(fusedResult)) {
       return failure();
     }
+    assert(!fusedResult->origConsumerOperands.empty() &&
+           "candidate must use a result of loops.front()");
 
     // Replace the original consumer operation with the tiled implementation.
     rewriter.replaceOp(fusedResult->origConsumerOperands.front()->getOwner(),
                        fusedResult->tiledOps.front());
 
-    // The result of the fused consumers might themselves be slices of
-    // values produced by operations that implement the `TilingInterface`.
-    // Add these operations to the worklist.
-    DominanceInfo dominanceInfo;
-    addCandidateSlices(
+    // The fused consumer is written into a new result of the rebuilt loop, so
+    // its users are the next fusion candidates.
+    collectConsumerFusionCandidates(
         fusedResult->tiledAndFusedConsumerOperands.front()->getOwner(),
-        dominanceInfo);
+        filterFn, candidates);
 
     // Add the list of new producer fusion opportunities.
     for (auto tiledOp : fusedResult.value().tiledOps) {

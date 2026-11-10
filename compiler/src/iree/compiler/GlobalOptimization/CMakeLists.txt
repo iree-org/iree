@@ -30,6 +30,7 @@ iree_cc_library(
     MLIRPass
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::DispatchCreation::PassHeaders
   PUBLIC
 )
 
@@ -79,6 +80,7 @@ iree_cc_library(
     "DecomposeConcat.cpp"
     "DemoteContractionInputs.cpp"
     "DetachElementwiseFromNamedOps.cpp"
+    "EarlyDataTiling.cpp"
     "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"
     "FoldBroadcastIntoBatchMatmul.cpp"
@@ -88,6 +90,7 @@ iree_cc_library(
     "InferNumericNarrowing.cpp"
     "MaterializeHomogeneousEncodings.cpp"
     "OptimizeNumerics.cpp"
+    "PackSubByteQuantizedConstants.cpp"
     "Passes.cpp"
     "PropagateAffineQuantization.cpp"
     "PropagateLinalgTranspose.cpp"
@@ -106,9 +109,11 @@ iree_cc_library(
     ::QuantizedContraction
     LLVMSupport
     MLIRAffineDialect
+    MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
@@ -141,6 +146,7 @@ iree_cc_library(
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
+    iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms

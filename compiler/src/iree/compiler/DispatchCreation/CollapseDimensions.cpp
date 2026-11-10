@@ -301,15 +301,15 @@ static bool isEligibleForCollapse(Operation *op) {
     }
   }
 
-  auto hasEncoding = [](Type type) -> bool {
+  auto hasNonCollapsibleEncoding = [](Type type) -> bool {
     auto rankedTensorType = dyn_cast<RankedTensorType>(type);
     if (!rankedTensorType || !rankedTensorType.getEncoding()) {
       return false;
     }
-    // TODO(#21185): Remove special casing and replace with more generic logic.
-    return !IREE::Encoding::hasPackedStorageAttr(rankedTensorType);
+    auto encoding = IREE::Encoding::getSerializableAttr(rankedTensorType);
+    return !encoding || !encoding.isInvariantUnderDimCollapse();
   };
-  if (llvm::any_of(op->getOperandTypes(), hasEncoding)) {
+  if (llvm::any_of(op->getOperandTypes(), hasNonCollapsibleEncoding)) {
     return false;
   }
 

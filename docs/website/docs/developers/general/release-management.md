@@ -331,6 +331,16 @@ module version, and whether they changed since the previous release:
           "${WHEEL_DIR}"/*.whl "${WHEEL_DIR}"/iree-dist-*.tar.xz
         ```
 
+    * Upload the candidate's attestation bundles for the `iree-dist-*.tar.xz`
+        files
+
+        ```bash
+        gh release download iree-3.1.0rc20241119 --repo iree-org/iree \
+          --pattern '*-main-dist-linux.sigstore.json' --dir "${WHEEL_DIR}"
+        gh release upload v3.1.0 --repo iree-org/iree \
+          "${WHEEL_DIR}"/*-main-dist-linux.sigstore.json
+        ```
+
     * Publish the release. Uncheck the option for "pre-release", and check the
         option for "latest" and hit publish.
 

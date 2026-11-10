@@ -93,6 +93,9 @@ def PackedStorageAttr :
           "calculateStorageSizeInBytes",
           "isCompatibleWith",
           "getCollapsedEncoding",
+          "canDropWithoutTensorMaterialization",
+          "canSkipBufferViewAssertions",
+          "isInvariantUnderDimCollapse",
       ]>,
       DeclareAttrInterfaceMethods<VerifiableTensorEncoding>
     ]> {

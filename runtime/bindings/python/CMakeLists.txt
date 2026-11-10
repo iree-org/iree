@@ -343,6 +343,13 @@ iree_py_test(
 
 iree_py_test(
   NAME
+    hal_enums_test
+  SRCS
+    "tests/hal_enums_test.py"
+)
+
+iree_py_test(
+  NAME
     io_test
   SRCS
     "tests/io_test.py"
