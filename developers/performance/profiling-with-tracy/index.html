@@ -6599,15 +6599,15 @@ UI and CLI capture tool, is a PDF manual:</p>
 <h2 id="capturing-a-trace"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M14.184 1.143zl1.422 2.464a1.75 1.75 0 0 1-.757 2.451L3.104 11.713a1.75 1.75 0 0 1-2.275-.702l-.447-.775a1.75 1.75 0 0 1 .53-2.32L11.682.573a1.75 1.75 0 0 1 2.502.57m-4.709 9.32zl2.644 3.863a.75.75 0 1 1-1.238.848l-1.881-2.75v2.826a.75.75 0 0 1-1.5 0v-2.826l-1.881 2.75a.75.75 0 1 1-1.238-.848l2.049-2.992a.75.75 0 0 1 .293-.253l1.809-.87a.75.75 0 0 1 .944.252M9.436 3.92zl-4.97 3.39.942 1.63 5.42-2.61Zm3.091-2.108h.001l-1.85 1.26 1.505 2.605 2.016-.97a.25.25 0 0 0 .13-.151.25.25 0 0 0-.022-.199l-1.422-2.464a.25.25 0 0 0-.161-.119.25.25 0 0 0-.197.038M1.756 9.157a.25.25 0 0 0-.075.33l.447.775a.25.25 0 0 0 .325.1l1.598-.769-.83-1.436z"/></svg></span> Capturing a trace<a class="headerlink" href="#capturing-a-trace" title="Permanent link">link</a></h2>
 <p>You will need three things to capture a trace:</p>
 <ol>
-<li>The Tracy profiler UI or CLI capture tool</li>
+<li>The Tracy profiler UI or CLI capture tool  <a href="https://github.com/wolfpld/tracy/releases/tag/v0.15.0">v0.15.0</a></li>
 <li>A binary tool to trace, such as <code>iree-run-module</code>, built with tracing
     support enabled</li>
 <li>A program to profile, e.g. a <code>.vmfb</code> file with parameters and input values</li>
 </ol>
 <p>The Tracy tools can either be downloaded from
-<a href="https://github.com/wolfpld/tracy/releases">the official releases</a> or they can
-be built from source by using either the upstream CMake build or IREE's
-<a href="#building-tracy-from-source">downstream CMake build</a>.</p>
+<a href="https://github.com/wolfpld/tracy/releases/tag/v0.15.0">the official releases</a>
+or they can be built from source by using either the upstream CMake build or
+IREE's <a href="#building-tracy-from-source">downstream CMake build</a>.</p>
 <h3 id="quickstart"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M14.064 0h.186C15.216 0 16 .784 16 1.75v.186a8.75 8.75 0 0 1-2.564 6.186l-.458.459q-.472.471-.979.904v3.207c0 .608-.315 1.172-.833 1.49l-2.774 1.707a.75.75 0 0 1-1.11-.418l-.954-3.102a1 1 0 0 1-.145-.125L3.754 9.816a1 1 0 0 1-.124-.145L.528 8.717a.75.75 0 0 1-.418-1.11l1.71-2.774A1.75 1.75 0 0 1 3.31 4h3.204q.433-.508.904-.979l.459-.458A8.75 8.75 0 0 1 14.064 0M8.938 3.623h-.002l-.458.458c-.76.76-1.437 1.598-2.02 2.5l-1.5 2.317 2.143 2.143 2.317-1.5c.902-.583 1.74-1.26 2.499-2.02l.459-.458a7.25 7.25 0 0 0 2.123-5.127V1.75a.25.25 0 0 0-.25-.25h-.186a7.25 7.25 0 0 0-5.125 2.123M3.56 14.56c-.732.732-2.334 1.045-3.005 1.148a.23.23 0 0 1-.201-.064.23.23 0 0 1-.064-.201c.103-.671.416-2.273 1.15-3.003a1.502 1.502 0 1 1 2.12 2.12m6.94-3.935q-.132.09-.266.175l-2.35 1.521.548 1.783 1.949-1.2a.25.25 0 0 0 .119-.213ZM3.678 8.116 5.2 5.766q.087-.135.176-.266H3.309a.25.25 0 0 0-.213.119l-1.2 1.95ZM12 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/></svg></span> Quickstart<a class="headerlink" href="#quickstart" title="Permanent link">link</a></h3>
 <ol>
 <li>
