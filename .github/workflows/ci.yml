@@ -175,6 +175,8 @@ jobs:
           node-version: "22"
       - name: Test WebGPU import pointers
         run: node --test runtime/src/iree/hal/drivers/webgpu/webgpu_imports_test.mjs
+      - name: Test JS inline completion progress
+        run: node --test runtime/src/iree/async/platform/js/proactor_imports_test.mjs
       - name: Install requirements
         run: sudo apt update && sudo apt install -y ninja-build
       - name: Checkout runtime submodules
