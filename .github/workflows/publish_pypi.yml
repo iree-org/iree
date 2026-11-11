@@ -16,6 +16,9 @@
 #     publisher.
 #   * The `pypi` environment requires approval by a release maintainer and only
 #     allows deployments from `main`.
+#   * A tag ruleset blocks updates and deletions of release tags (`iree-*` and
+#     `v*`), so that the tag that a release and its attestations name cannot be
+#     moved to another commit.
 
 name: Publish to PyPI
 
