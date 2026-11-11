@@ -74,6 +74,27 @@ IREEVMPipelineHooks::operator IREE::HAL::PipelineHooks() const {
   return halHooks;
 }
 
+/// Returns whether dispatch creation data-tiles: when it is asked to or the
+/// pipeline data-tiles, but not together with global optimization data tiling.
+/// The pipeline option has higher priority.
+static bool
+isDispatchCreationDataTiling(const GlobalPipelineOptions &pipelineOptions,
+                             const GlobalOptimizationOptions &globalOptions,
+                             const DispatchCreationOptions &dispatchOptions) {
+  bool dataTiling = dispatchOptions.dataTiling || pipelineOptions.dataTiling ||
+                    pipelineOptions.earlyDataTiling;
+  if (dataTiling && globalOptions.dataTiling &&
+      !pipelineOptions.earlyDataTiling) {
+#ifndef NDEBUG
+    llvm::reportFatalUsageError(
+        "Invalid configuration: data-tiling cannot be enabled in both "
+        "global optimization phase and dispatch creation phase.");
+#endif
+    return false;
+  }
+  return dataTiling;
+}
+
 void buildIREEPrecompileTransformPassPipeline(
     const IREE::HAL::TargetRegistry &targetRegistry,
     GlobalPipelineOptions pipelineOptions, BindingOptions bindingOptions,
@@ -210,6 +231,9 @@ void buildIREEPrecompileTransformPassPipeline(
   // data tiling, so both use the dispatch creation configuration.
   globalTransformOptions.earlyDataTilingEncodingOptions =
       DispatchCreation::getDataTilingEncodingOptionsFromFlags();
+  globalTransformOptions.dispatchCreationDataTiling =
+      isDispatchCreationDataTiling(pipelineOptions, globalOptimizationOptions,
+                                   dispatchCreationOptions);
   globalTransformOptions.constEval = globalOptimizationOptions.constEval;
   globalTransformOptions.numericPrecisionReduction =
       globalOptimizationOptions.numericPrecisionReduction;
@@ -348,21 +372,8 @@ void buildIREEVMTransformPassPipeline(
         dispatchCreationOptions.enableAggressiveFusion;
     dispatchTransformOptions.enableFuseMultiUse =
         dispatchCreationOptions.enableFuseMultiUse;
-    // The pipeline option has higher priority.
-    dispatchTransformOptions.dataTiling = dispatchCreationOptions.dataTiling;
-    if (pipelineOptions.dataTiling || pipelineOptions.earlyDataTiling) {
-      dispatchTransformOptions.dataTiling = true;
-    }
-    if (dispatchTransformOptions.dataTiling &&
-        globalOptimizationOptions.dataTiling &&
-        !pipelineOptions.earlyDataTiling) {
-#ifndef NDEBUG
-      llvm::reportFatalUsageError(
-          "Invalid configuration: data-tiling cannot be enabled in both "
-          "global optimization phase and dispatch creation phase.");
-#endif
-      dispatchTransformOptions.dataTiling = false;
-    }
+    dispatchTransformOptions.dataTiling = isDispatchCreationDataTiling(
+        pipelineOptions, globalOptimizationOptions, dispatchCreationOptions);
     dispatchTransformOptions.enableSplitReduction =
         dispatchCreationOptions.enableSplitReduction;
     dispatchTransformOptions.splitReductionLowParallelism =

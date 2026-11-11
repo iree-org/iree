@@ -70,4 +70,18 @@ iree_check_single_backend_test_suite(
     "--iree-global-opt-enable-sub-byte-quantized-storage=false"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_signedness_rebase_llvm-cpu_local-task
+  SRCS
+    "signedness_rebase.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
+    "--iree-opt-data-tiling"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

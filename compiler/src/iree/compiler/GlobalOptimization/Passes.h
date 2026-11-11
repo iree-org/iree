@@ -105,6 +105,12 @@ struct TransformOptions : PassPipelineOptions<TransformOptions> {
   };
   /// Operation families and encoding strategy of early data tiling.
   DispatchCreation::DataTilingEncodingOptions earlyDataTilingEncodingOptions;
+  Option<bool> dispatchCreationDataTiling{
+      *this,
+      "dispatch-creation-data-tiling",
+      llvm::cl::desc("Whether dispatch creation data-tiles contractions."),
+      llvm::cl::init(false),
+  };
   Option<bool> constEval{
       *this,
       "const-eval",

@@ -6,9 +6,15 @@
 
 #include "iree/compiler/GlobalOptimization/Utils.h"
 
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/ADT/SmallVectorExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/SymbolTable.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
@@ -166,6 +172,154 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
                linalg::YieldOp::create(b, loc, sum);
              })
       .getResult(0);
+}
+
+IREE::Util::GlobalOpInterface
+getLoadedGlobal(Value value, SymbolTableCollection &symbolTables) {
+  auto loadOp = value.getDefiningOp<IREE::Util::GlobalLoadOpInterface>();
+  if (!loadOp) {
+    return {};
+  }
+  return IREE::Util::lookupGlobalOp(loadOp, loadOp.getGlobalAttr(),
+                                    symbolTables);
+}
+
+Value getReshapeSource(Value value) {
+  while (isa_and_present<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
+      value.getDefiningOp())) {
+    value = value.getDefiningOp()->getOperand(0);
+  }
+  return value;
+}
+
+std::optional<SmallVector<OpOperand *>>
+getUsesOfSameData(Value value, const SymbolUserMap &symbolUsers,
+                  SymbolTableCollection &symbolTables) {
+  Value source = getReshapeSource(value);
+  SmallVector<Value> worklist;
+  if (IREE::Util::GlobalOpInterface globalOp =
+          getLoadedGlobal(source, symbolTables)) {
+    if (!globalOp.isGlobalPrivate()) {
+      return std::nullopt;
+    }
+    for (Operation *user : symbolUsers.getUsers(globalOp)) {
+      auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(user);
+      if (!loadOp) {
+        return std::nullopt;
+      }
+      worklist.push_back(loadOp.getLoadedGlobalValue());
+    }
+  } else {
+    worklist.push_back(source);
+  }
+  SmallVector<OpOperand *> uses;
+  while (!worklist.empty()) {
+    Value data = worklist.pop_back_val();
+    for (OpOperand &use : data.getUses()) {
+      if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(use.getOwner())) {
+        worklist.push_back(use.getOwner()->getResult(0));
+      } else {
+        uses.push_back(&use);
+      }
+    }
+  }
+  return uses;
+}
+
+/// Returns the attribute holding `value` when it is a constant or a load of an
+/// immutable global that only loads use, or null otherwise. For a global this
+/// is its initial value, which may be a parameter reference rather than data.
+static Attribute getConstantAttr(Value value, const SymbolUserMap &symbolUsers,
+                                 SymbolTableCollection &symbolTables) {
+  Attribute attr;
+  if (matchPattern(value, m_Constant(&attr))) {
+    return attr;
+  }
+  IREE::Util::GlobalOpInterface globalOp = getLoadedGlobal(value, symbolTables);
+  if (!globalOp || globalOp.isGlobalMutable() ||
+      !llvm::all_of(symbolUsers.getUsers(globalOp),
+                    llvm::IsaPred<IREE::Util::GlobalLoadOpInterface>)) {
+    return {};
+  }
+  return globalOp.getGlobalInitialValue();
+}
+
+/// Calls `fn` on each integer in `attr`, read as unsigned if `isUnsigned`, and
+/// returns false when `attr` holds no readable integers. A splat gives a single
+/// value.
+static bool forEachIntegerValue(Attribute attr, bool isUnsigned,
+                                function_ref<void(const APSInt &)> fn) {
+  auto visit = [&](const APInt &value) { fn(APSInt(value, isUnsigned)); };
+  return llvm::TypeSwitch<Attribute, bool>(attr)
+      .Case([&](IntegerAttr intAttr) {
+        visit(intAttr.getValue());
+        return true;
+      })
+      .Case([&](DenseIntElementsAttr denseAttr) {
+        if (denseAttr.isSplat()) {
+          visit(denseAttr.getSplatValue<APInt>());
+        } else {
+          llvm::for_each(denseAttr.getValues<APInt>(), visit);
+        }
+        return true;
+      })
+      .Case<DenseI8ResourceElementsAttr, DenseI16ResourceElementsAttr,
+            DenseI32ResourceElementsAttr, DenseI64ResourceElementsAttr>(
+          [&](auto resourceAttr) {
+            unsigned bitWidth = resourceAttr.getType().getElementTypeBitWidth();
+            auto values = resourceAttr.tryGetAsArrayRef();
+            if (!values) {
+              return false;
+            }
+            for (auto value : *values) {
+              visit(APInt(bitWidth, value, /*isSigned=*/true));
+            }
+            return true;
+          })
+      .Default(false);
+}
+
+std::optional<SmallVector<APSInt>>
+getConstantIntegerValues(Value value, bool isUnsigned,
+                         const SymbolUserMap &symbolUsers,
+                         SymbolTableCollection &symbolTables) {
+  Attribute attr =
+      getConstantAttr(getReshapeSource(value), symbolUsers, symbolTables);
+  SmallVector<APSInt> values;
+  if (!attr || !forEachIntegerValue(attr, isUnsigned, [&](const APSInt &v) {
+        values.push_back(v);
+      })) {
+    return std::nullopt;
+  }
+  return values;
+}
+
+std::optional<QuantMinMax>
+getConstantIntegerRange(Value value, bool isUnsigned,
+                        const SymbolUserMap &symbolUsers,
+                        SymbolTableCollection &symbolTables) {
+  Attribute attr =
+      getConstantAttr(getReshapeSource(value), symbolUsers, symbolTables);
+  std::optional<QuantMinMax> range;
+  if (!attr || !forEachIntegerValue(attr, isUnsigned, [&](const APSInt &v) {
+        QuantMinMax point{v.getExtValue(), v.getExtValue()};
+        range = range ? unionRanges(*range, point) : point;
+      })) {
+    return std::nullopt;
+  }
+  return range;
+}
+
+bool isComputedFromInlineData(
+    const IREE::Util::ConstExprAnalysis::ConstValueInfo &info,
+    const SymbolUserMap &symbolUsers, SymbolTableCollection &symbolTables) {
+  if (!info.isConstExpr()) {
+    return false;
+  }
+  return llvm::all_of(info.roots, [&](Value root) {
+    return isa_and_present<ElementsAttr, IntegerAttr, FloatAttr>(
+        getConstantAttr(root, symbolUsers, symbolTables));
+  });
 }
 
 } // namespace mlir::iree_compiler::GlobalOptimization

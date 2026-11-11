@@ -8,6 +8,7 @@
 
 #include <algorithm>
 
+#include "llvm/ADT/APInt.h"
 #include "llvm/Support/MathExtras.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
@@ -27,6 +28,31 @@ std::optional<QuantMinMax> getStorageRange(unsigned bitWidth, bool isUnsigned) {
   }
   return isUnsigned ? QuantMinMax{0, magnitude}
                     : QuantMinMax{-magnitude, magnitude - 1};
+}
+
+QuantMinMax unionRanges(QuantMinMax lhs, QuantMinMax rhs) {
+  return {std::min(lhs.min, rhs.min), std::max(lhs.max, rhs.max)};
+}
+
+std::optional<unsigned> getGridBitWidth(QuantMinMax range, bool isUnsigned,
+                                        unsigned maxBitWidth) {
+  if (isUnsigned && range.min < 0) {
+    return std::nullopt;
+  }
+  llvm::APInt min(64, range.min, /*isSigned=*/true);
+  llvm::APInt max(64, range.max, /*isSigned=*/true);
+  unsigned bitWidth =
+      isUnsigned ? std::max(max.getActiveBits(), 1u)
+                 : std::max(min.getSignificantBits(), max.getSignificantBits());
+  if (bitWidth > maxBitWidth || !getStorageRange(bitWidth, isUnsigned)) {
+    return std::nullopt;
+  }
+  return bitWidth;
+}
+
+int64_t getSignednessFlipOffset(unsigned bitWidth, bool isUnsigned) {
+  int64_t half = getStorageMagnitude(bitWidth, /*isUnsigned=*/false);
+  return isUnsigned ? -half : half;
 }
 
 std::optional<QuantizedOperandRanges>

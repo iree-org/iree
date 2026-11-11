@@ -8,10 +8,12 @@
 #define IREE_COMPILER_GLOBALOPTIMIZATION_QUANTIZEDCONTRACTION_H_
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/GlobalOptimization/QuantizationUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/AffineMap.h"
 
-// Internal analysis support for ConvertQDQToIntegerMath.
+// Internal analysis support for ConvertQDQToIntegerMath and the passes that
+// prepare its input.
 namespace mlir::iree_compiler::GlobalOptimization::detail {
 
 using IREE::LinalgExt::DequantizeAffineOp;
@@ -55,10 +57,31 @@ struct QuantizedContraction {
   }
 };
 
+/// Returns the ranges of the values `dequantize` reads and of its zero point,
+/// which bound the integer intermediates of the contraction it feeds.
+std::optional<QuantizedOperandRanges>
+getOperandRanges(DequantizeAffineOp dequantize);
+
 /// Analyzes a verified contraction without modifying its IR. Fails when the
 /// contraction cannot be rewritten using a statically bounded integer
 /// reduction.
 FailureOr<QuantizedContraction> getQuantizedContraction(linalg::LinalgOp op);
+
+/// Indexing maps and iterator types of an integer contraction.
+struct IntegerContractionMaps {
+  /// Maps of the lhs, rhs and result, in that order.
+  SmallVector<AffineMap> indexingMaps;
+  /// Iterator types of the integer contraction's loops.
+  SmallVector<utils::IteratorType> iteratorTypes;
+};
+
+/// Returns the indexing maps and iterator types of the integer contraction that
+/// replaces `op`. Its operands read the quantized inputs. Each floating
+/// reduction dim becomes parallel and is appended to the result, which keeps
+/// one partial result per block for the epilogue to scale and reduce.
+IntegerContractionMaps
+getIntegerContractionMaps(linalg::LinalgOp op,
+                          const QuantizedContraction &detail);
 
 /// Returns a map selecting domain dimensions that do not appear as bare results
 /// in any of `maps`, a nonempty list with a shared domain. These dimensions

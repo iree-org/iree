@@ -321,6 +321,44 @@ util.func public @decline_computed_zero_point(%scale: tensor<4xf32>) -> tensor<4
 //  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]], %[[ZERO_POINT]] : tensor<4x8xi8>, tensor<4xf32>, tensor<4xi8>)
 //       CHECK:   util.return %[[DEQ]]
 
+// -----
+
+#id2 = affine_map<(d0, d1) -> (d0, d1)>
+#row2 = affine_map<(d0, d1) -> (d0)>
+
+// The initial value of the zero point fits i4, but a function the initializer
+// calls stores 20, which does not.
+util.global private @weight = dense<1> : tensor<4x8xi8>
+util.global private @zero_point = dense<[1, 2, 3, 4]> : tensor<4xi8>
+util.func private @store_zero_point() {
+  %zero_point = arith.constant dense<[1, 2, 3, 20]> : tensor<4xi8>
+  util.global.store %zero_point, @zero_point : tensor<4xi8>
+  util.return
+}
+util.initializer {
+  util.call @store_zero_point() : () -> ()
+  util.return
+}
+util.func public @decline_zero_point_stored_by_initializer(%scale: tensor<4xf32>) -> tensor<4x8xf32> {
+  %weight = util.global.load @weight : tensor<4x8xi8>
+  %zero_point = util.global.load @zero_point : tensor<4xi8>
+  %init = tensor.empty() : tensor<4x8xf32>
+  %dequantized = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [#id2, #row2, #row2, #id2], quant_min = 0, quant_max = 15,
+       input_unsigned>
+      ins(%weight, %scale, %zero_point : tensor<4x8xi8>, tensor<4xf32>, tensor<4xi8>)
+      outs(%init : tensor<4x8xf32>) -> tensor<4x8xf32>
+  util.return %dequantized : tensor<4x8xf32>
+}
+// CHECK-LABEL: util.func public @decline_zero_point_stored_by_initializer(
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
+//       CHECK:   %[[WEIGHT:.+]] = util.global.load @weight : tensor<4x8xi8>
+//   CHECK-NOT:   iree_tensor_ext.bitcast
+//       CHECK:   %[[ZERO_POINT:.+]] = util.global.load @zero_point : tensor<4xi8>
+//       CHECK:   %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     ins(%[[WEIGHT]], %[[SCALE]], %[[ZERO_POINT]] : tensor<4x8xi8>, tensor<4xf32>, tensor<4xi8>)
+//       CHECK:   util.return %[[DEQ]]
+
 //===----------------------------------------------------------------------===//
 // Shapes
 //
