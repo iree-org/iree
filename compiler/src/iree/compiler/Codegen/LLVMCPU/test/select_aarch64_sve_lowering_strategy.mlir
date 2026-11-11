@@ -592,3 +592,41 @@ func.func @pooling_nchw_max(%2: tensor<1x64x114x114xf32>) -> tensor<1x64x56x56xf
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK:      linalg.pooling_nchw_max
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+// `inner_tiled` rooted dispatch with a *scalable* MMA kind. The inner tile of
+// an SVE `1x4VLx1` kind keeps its VL-dependent extents dynamic in tensor form
+// (`vector<[4]x1xf32>` materializes as `1x?`), so its element footprint is not
+// statically known, while `getIntrinsicMNKShape` reports the base-VL shape
+// {1, 4, 1} whatever the VL is. `selectInnerTiledDistribution` budgets workgroup
+// tile bytes from those extents, which understates the real footprint by up to
+// vscale, so it has to fall back to one inner tile per workgroup. Without that
+// guard this shape picks [18, 17, 0]: 5 workgroups, each taking all 17 N tiles,
+// so every workgroup re-traverses the whole RHS. The RVV spelling of scalable is
+// already caught earlier (a
+// concrete `vlen` is required to resolve an RVV intrinsic at all, see
+// select_riscv_inner_tiled_lowering_strategy.mlir); SVE intrinsic extents are
+// base-VL regardless of `vlen`, so they need the layout check.
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu_features = "+sve", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-elf", vscale_range = [1, 16]}>
+func.func @inner_tiled_sve_fmla_f32(%lhs: tensor<90x332x1x1xf32>, %rhs: tensor<17x332x1x?xf32>, %acc: tensor<90x17x1x?xf32>) -> tensor<90x17x1x?xf32> attributes {hal.executable.target = #executable_target_embedded_elf_arm_64_} {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ],
+    iterator_types = [#linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_ARM_SVE_FMLA_1x4VLx1_F32_F32>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : tensor<90x332x1x1xf32>, tensor<17x332x1x?xf32> into tensor<90x17x1x?xf32>
+  return %0 : tensor<90x17x1x?xf32>
+}
+// CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+// CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<Mmt4dTilingExpert>>
+// CHECK:      func.func @inner_tiled_sve_fmla_f32
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+// CHECK:      iree_codegen.inner_tiled
+// CHECK-SAME:     lowering_config = #[[CONFIG]]

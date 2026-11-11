@@ -3106,8 +3106,12 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 /// Returns nullopt when the shape does not resolve to positive static element
 /// counts. Scalable vectorization is one such case: `getVlenBitsForConfig`
 /// returns vlen = 0 there, which resolves an RVV intrinsic to a zero-sized
-/// tile. A scalable `inner_tiled` does not exist today, so nothing here should
-/// try to guess its extents.
+/// tile. Note that this only catches the RVV spelling of scalable: an SVE
+/// intrinsic resolves to its *base-VL* shape at any vlen (see
+/// `getIntrinsicMNKShape`), which is positive and therefore not rejected
+/// here — `selectInnerTiledDistribution` screens those kinds out by checking
+/// the operand layout, because bytes computed from base-VL extents would
+/// understate the real tile.
 static std::optional<std::tuple<int64_t, int64_t, int64_t>>
 getInnerTiledTileSizes(IREE::Codegen::InnerTiledOp op) {
   auto mma = dyn_cast_or_null<IREE::CPU::DataTiledMMAAttr>(op.getKind());
@@ -3158,7 +3162,9 @@ struct InnerTiledDistribution {
 /// Returns nullopt to mean "keep exactly one inner tile per workgroup", which
 /// is the behavior this heuristic replaces. That fallback is taken whenever
 /// something the model needs is not statically known: no data-tiled MMA
-/// `kind`, a multi-input/output op, or dynamic M/N/K iteration bounds.
+/// `kind`, a multi-input/output op, a scalable inner tile, or dynamic M/N/K
+/// iteration bounds. It is also taken for an empty M or N extent, which has no
+/// work to distribute and would divide by zero in the baseline cost.
 /// Dynamic bounds must not be tiled here: `UnrollInnerTiledPattern` bails when
 /// it cannot divide a shape statically, pattern failures are swallowed by the
 /// greedy driver in `LLVMCPUVirtualVectorLowering`, and an unlowered
@@ -3237,10 +3243,35 @@ selectInnerTiledDistribution(IREE::Codegen::InnerTiledOp op,
     return std::nullopt;
   }
 
+  // A scalable inner tile has no statically resolvable element extents: the
+  // tensor form of a scalable MMA tile keeps its VL-dependent extents dynamic
+  // (`vector<[4]x1xf32>` materializes as `1x?` — see the SVE cases in
+  // `Codegen/Dialect/CPU/IR/test/iree_cpu_inner_tiled_ops.mlir`), while
+  // `getInnerTiledTileSizes` can only report the intrinsic's base-VL shape for
+  // it. Budgeting bytes from base-VL extents understates the footprint by up to
+  // vscale and lets the model hand a whole matrix to one workgroup, so fall
+  // back rather than guess at the scalable extent.
+  auto hasDynamicInnerTile = [](Value operand, AffineMap map) {
+    ArrayRef<int64_t> shape = cast<ShapedType>(operand.getType()).getShape();
+    return llvm::any_of(shape.drop_front(map.getNumResults()),
+                        ShapedType::isDynamic);
+  };
+  if (hasDynamicInnerTile(op.getInputs()[0], maps[0]) ||
+      hasDynamicInnerTile(op.getInputs()[1], maps[1]) ||
+      hasDynamicInnerTile(op.getOutputs()[0], maps[numInputs])) {
+    return std::nullopt;
+  }
+
   // Element extents. K is never distributed, so a workgroup sees the whole
   // reduction extent of both operands.
   const int64_t numTilesM = bounds[mDim];
   const int64_t numTilesN = bounds[nDim];
+  // An empty M or N extent has no work to distribute, and the baseline cost
+  // below divides the thread count by the workgroup count it derives from
+  // these. Keep the tile-of-1 fallback rather than dividing by zero.
+  if (numTilesM == 0 || numTilesN == 0) {
+    return std::nullopt;
+  }
   const int64_t M = numTilesM * m0;
   const int64_t N = numTilesN * n0;
   const int64_t K = bounds[kDim] * k0;

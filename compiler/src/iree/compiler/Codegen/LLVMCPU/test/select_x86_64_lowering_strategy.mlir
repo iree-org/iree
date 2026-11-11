@@ -1,4 +1,10 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' --split-input-file %s | FileCheck %s
+// Same shapes at a quarter of the default --iree-llvmcpu-matmul-tile-bytes
+// budget (64 KiB instead of 256 KiB): the SMALLTILE checks below pin how the
+// `inner_tiled` cost model's divisor search shrinks when the footprint filter
+// bites. The 64^3 pick is budget-insensitive (it fits either way), 256^3 drops
+// from [32, 4] to [8, 1] and 540x516x332 from [54, 1] to [6, 1].
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' --iree-llvmcpu-matmul-tile-bytes=65536 --split-input-file %s | FileCheck %s --check-prefix=SMALLTILE
 // Test the same lowering strategy selection on generic convolution ops by first
 // generalizing the named ops. This ensures convolution pipeline selection works
 // on both named and generic convs.
@@ -1918,6 +1924,10 @@ func.func @inner_tiled_avx512_1x16x1_f32_64x64x64(%lhs: tensor<32x64x2x1xf32>, %
 //       CHECK: func.func @inner_tiled_avx512_1x16x1_f32_64x64x64(
 //       CHECK:   iree_codegen.inner_tiled
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
+// SMALLTILE-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [8, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//     SMALLTILE: func.func @inner_tiled_avx512_1x16x1_f32_64x64x64(
+//     SMALLTILE:   iree_codegen.inner_tiled
+// SMALLTILE-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -1942,6 +1952,12 @@ func.func @inner_tiled_avx512_1x16x1_f32_256x256x256(%lhs: tensor<128x256x2x1xf3
 //       CHECK: func.func @inner_tiled_avx512_1x16x1_f32_256x256x256(
 //       CHECK:   iree_codegen.inner_tiled
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
+// At 64 KiB no candidate can afford two N tiles (the RHS alone is 64 KiB), so
+// the search takes the largest M tile that fits with tilesN = 1: [8, 1].
+// SMALLTILE-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [8, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//     SMALLTILE: func.func @inner_tiled_avx512_1x16x1_f32_256x256x256(
+//     SMALLTILE:   iree_codegen.inner_tiled
+// SMALLTILE-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -1996,3 +2012,9 @@ func.func @inner_tiled_avx512_1x16x1_f32_540x516x332(%lhs: tensor<270x332x2x1xf3
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK:   iree_codegen.inner_tiled
 //  CHECK-SAME:       lowering_config = #[[CONFIG]]
+// A quarter of the budget leaves 6 M tiles (15,936 LHS + 42,496 RHS + 1,536
+// acc bytes; 9 tiles would need 68,704): 45 x 17 = 765 workgroups.
+// SMALLTILE-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [6, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//     SMALLTILE: func.func @inner_tiled_avx512_1x16x1_f32_540x516x332(
+//     SMALLTILE:   iree_codegen.inner_tiled
+// SMALLTILE-SAME:       lowering_config = #[[CONFIG]]
