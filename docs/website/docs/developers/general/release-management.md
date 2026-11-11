@@ -313,6 +313,11 @@ module version, and whether they changed since the previous release:
         tag when the release is published, so nothing needs to be pushed
         beforehand.
 
+        Release tags (`iree-*` and `v*`) cannot be moved or deleted after they
+        are created, because a
+        [tag ruleset](https://github.com/iree-org/iree/rules) blocks both.
+        Check the target commit before you publish the release or push the tag.
+
         ![rename_tag](./release-tag.png)
 
         The target picker only lists recent commits. If the candidate's commit
