@@ -60,6 +60,7 @@ python -m pip install -r ./pypi_deploy_requirements.txt
 the packages, edit
 [`pypi_deploy_requirements.in`](./pypi_deploy_requirements.in) and run the
 command at the top of `pypi_deploy_requirements.txt` in this directory.
+Dependabot also proposes updates to the pins every week.
 
 ### Release index publication
 
