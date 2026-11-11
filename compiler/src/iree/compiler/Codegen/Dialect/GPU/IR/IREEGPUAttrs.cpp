@@ -1243,15 +1243,15 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
           amdgpu::WMMAOp::create(builder, loc, hwVecTy, layout.mSize,
                                  layout.nSize, layout.kSize, lhs, rhs, hwAcc)
               .getResult();
-      Value result =
-          IREE::Util::HoistableConversionOp::create(
-              builder, loc, /*tag=*/kRdna3DeinterleaveAcc,
-              /*inverseTag=*/kRdna3InterleaveAcc, hwResult,
-              [](OpBuilder &b, Location loc, ValueRange args) {
-                return SmallVector<Value>{
-                    vector::DeinterleaveOp::create(b, loc, args[0]).getRes1()};
-              })
-              .getResult(0);
+      Value result = IREE::Util::HoistableConversionOp::create(
+                         builder, loc, /*tag=*/kRdna3DeinterleaveAcc,
+                         /*inverseTag=*/kRdna3InterleaveAcc, hwResult,
+                         [](OpBuilder &b, Location loc, ValueRange args) {
+                           return SmallVector<Value>{
+                               vector::DeinterleaveOp::create(b, loc, args[0])
+                                   .getResultEven()};
+                         })
+                         .getResult(0);
       return result;
     }
     return amdgpu::WMMAOp::create(builder, loc, resultType, layout.mSize,
@@ -2087,8 +2087,8 @@ static LogicalResult buildVDMFMAOps(OpBuilder &builder, Location loc,
           [elementType](OpBuilder &builder, Location loc, ValueRange args) {
             auto deinterleave =
                 vector::DeinterleaveOp::create(builder, loc, args[0]);
-            Value evens = deinterleave.getRes1();
-            Value odds = deinterleave.getRes2();
+            Value evens = deinterleave.getResultEven();
+            Value odds = deinterleave.getResultOdd();
             if (isa<FloatType>(elementType)) {
               return SmallVector<Value>{
                   arith::AddFOp::create(builder, loc, evens, odds)};

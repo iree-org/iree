@@ -643,7 +643,7 @@ struct ConvertVectorFromElements final
   LogicalResult
   matchAndRewrite(vector::FromElementsOp op, OneToNOpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    VectorType resultType = op.getDest().getType();
+    VectorType resultType = op.getResult().getType();
     if (resultType.getRank() <= 1) {
       return failure();
     }
@@ -839,8 +839,8 @@ struct ConvertVectorDeinterleave final
     SmallVector<Value> res2Values;
     for (Value src : srcValues) {
       auto deinterleave = vector::DeinterleaveOp::create(rewriter, loc, src);
-      res1Values.push_back(deinterleave.getRes1());
-      res2Values.push_back(deinterleave.getRes2());
+      res1Values.push_back(deinterleave.getResultEven());
+      res2Values.push_back(deinterleave.getResultOdd());
     }
     rewriter.replaceOpWithMultiple(op, {res1Values, res2Values});
     return success();

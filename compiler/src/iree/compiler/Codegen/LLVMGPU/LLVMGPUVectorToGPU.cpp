@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Conversion/VectorToNVGPU/VectorToNVGPU.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -62,7 +63,11 @@ struct LLVMGPUVectorToGPUPass final
 
     RewritePatternSet patterns(funcOp.getContext());
     mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-    populatePrepareVectorToMMAPatterns(patterns, targetMmaSync);
+    if (targetMmaSync) {
+      populatePrepareVectorToNVMMAPatterns(patterns);
+    } else {
+      populatePrepareVectorToMMAPatterns(patterns);
+    }
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }

@@ -230,7 +230,7 @@ void LayoutAnalysis::propagateOneForward(Value val,
     if (auto scanOp = dyn_cast<vector::ScanOp>(user)) {
       if (scanOp.getSource() == val) {
         // source to dest: same layout (shape preserved).
-        addCandidate(scanOp.getDest(), layout);
+        addCandidate(scanOp.getResult(), layout);
         // source to accumulated_value: project out scan dim.
         int64_t rank = cast<VectorType>(val.getType()).getRank();
         SmallVector<bool> projMask(rank, false);
@@ -411,7 +411,7 @@ void LayoutAnalysis::fixupOp(Operation *op) {
 
   // scan: dest layout -> source gets same layout, init gets projected layout.
   if (auto scanOp = dyn_cast<vector::ScanOp>(op)) {
-    VectorLayoutInterface layout = getResolvedLayout(scanOp.getDest());
+    VectorLayoutInterface layout = getResolvedLayout(scanOp.getResult());
     if (layout) {
       setLayoutOrClone(&scanOp.getSourceMutable(), layout);
       int64_t rank = scanOp.getSourceType().getRank();

@@ -1236,8 +1236,6 @@ bool isaHorizontallyFusedContraction(Operation *op) {
     return false;
   }
 
-  llvm::SetVector<BlockArgument> rhsArgs;
-  llvm::SetVector<BlockArgument> outArgs;
   for (auto [index, yieldedVal] :
        llvm::enumerate(linalgOp.getBlock()->getTerminator()->getOperands())) {
     std::optional<ContractionOpSequenceArgs> args =

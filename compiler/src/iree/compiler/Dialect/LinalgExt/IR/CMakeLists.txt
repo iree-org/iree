@@ -54,6 +54,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRIndexingMapOpInterface
     MLIRInferTypeOpInterface
     MLIRLinalgDialect
     MLIRLinalgStructuredOpsIncGenLib

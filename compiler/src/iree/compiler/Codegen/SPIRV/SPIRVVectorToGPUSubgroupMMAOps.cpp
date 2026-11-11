@@ -38,7 +38,7 @@ struct SPIRVVectorToGPUSubgroupMMAPass final
 
     RewritePatternSet patterns(funcOp.getContext());
     mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-    populatePrepareVectorToMMAPatterns(patterns, /*useNvGpu=*/false);
+    populatePrepareVectorToMMAPatterns(patterns);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }

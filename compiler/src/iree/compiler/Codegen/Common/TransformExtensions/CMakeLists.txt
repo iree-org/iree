@@ -62,6 +62,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToGPU
+    MLIRVectorToNVGPU
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses

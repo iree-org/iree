@@ -38,8 +38,7 @@ LogicalResult runLLVMIRPasses(const LLVMTarget &target,
       /*DebugLogging=*/false);
   standardInstrumentations.registerCallbacks(passInstrumentationCallbacks);
 
-  llvm::PipelineTuningOptions tuningOptions(
-      &module->getContext().getLibraryOptions());
+  llvm::PipelineTuningOptions tuningOptions;
   tuningOptions.LoopInterleaving =
       target.pipelineTuningOptions.LoopInterleaving;
   tuningOptions.LoopVectorization =

@@ -61,7 +61,8 @@ func.func @matmul_391x384x384_f32() {
 // CHECK:                   scf.if
 // CHECK:                     scf.yield %{{.*}}
 // CHECK:                   } else {
-// CHECK:                     linalg.fill
+// CHECK:                     %[[CAST:.+]] = vector.type_cast
+// CHECK:                     memref.store %{{.*}}, %[[CAST]][]
 // CHECK:                     memref.copy
 // CHECK:                     scf.yield %{{.*}}
 // CHECK:                   }
