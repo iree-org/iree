@@ -59,8 +59,13 @@ jobs:
         with:
           python-version: "3.12"
 
+      # These tools rewrite the wheels before they are attested. Their versions
+      # and those of their dependencies are pinned by hash, and no source
+      # distribution is built, so that only the pinned files run here.
       - name: Install requirements
-        run: pip install -r build_tools/python_deploy/pypi_deploy_requirements.txt
+        run: |
+          pip install --require-hashes --only-binary=:all: \
+            -r build_tools/python_deploy/pypi_deploy_requirements.txt
 
       - name: Download wheels
         env:

@@ -107,7 +107,9 @@ EXPECTED_PACKAGES=(
 )
 
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
-REQUIREMENTS_FILE="${SCRIPT_DIR}/pypi_deploy_requirements.txt"
+# The tools that this script needs. pypi_deploy_requirements.txt pins them and
+# their dependencies by hash.
+REQUIREMENTS_FILE="${SCRIPT_DIR}/pypi_deploy_requirements.in"
 if [[ -n "${WHEEL_DIR}" ]]; then
   TMPDIR="$(readlink -f -- "${WHEEL_DIR}")"
 else
