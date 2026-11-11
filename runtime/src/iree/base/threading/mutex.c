@@ -99,8 +99,8 @@ bool iree_mutex_try_lock(iree_mutex_t* mutex) {
 }
 
 void iree_mutex_unlock(iree_mutex_t* mutex) {
+  iree_tracing_mutex_before_unlock(mutex->lock_id);
   iree_mutex_impl_unlock(mutex);
-  iree_tracing_mutex_after_unlock(mutex->lock_id);
 }
 
 #else

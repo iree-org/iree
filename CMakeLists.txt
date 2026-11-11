@@ -1015,6 +1015,9 @@ if((IREE_ENABLE_RUNTIME_TRACING OR IREE_ENABLE_COMPILER_TRACING) AND
     IREE_TRACING_PROVIDER STREQUAL "tracy")
   message(STATUS "Configuring third_party/tracy")
   list(APPEND CMAKE_MESSAGE_INDENT "  ")
+  # Tracy >= 0.14 defaults TRACY_ENABLE to OFF. Keep it on so the exported
+  # TracyClient target is functional and propagates TRACY_ENABLE to consumers.
+  set(TRACY_ENABLE ON)
   add_subdirectory(third_party/tracy EXCLUDE_FROM_ALL)
   list(POP_BACK CMAKE_MESSAGE_INDENT)
   iree_install_targets(
