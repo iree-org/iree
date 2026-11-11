@@ -12,13 +12,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <numeric>
+
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Util/Analysis/IntegerDivisibilityAnalysis.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
+#include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
+#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -101,8 +106,8 @@ static std::optional<unsigned> getBitWidth(Type type) {
 }
 
 // Calculates the vector bit count we want to use based on the memref uses.
-static unsigned
-calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
+static unsigned calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses,
+                                             const DataFlowSolver &solver) {
   unsigned minBits = kMaxVectorNumBits;
   for (Operation *op : uses) {
     if (isa<gpu::SubgroupMmaLoadMatrixOp, gpu::SubgroupMmaStoreMatrixOp>(op)) {
@@ -123,6 +128,17 @@ calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
       return 0;
     }
     minBits = std::min(minBits, *transferSize);
+    // Packed vector accesses must start at a multiple of their lane count.
+    auto *divisibility =
+        solver.lookupState<IREE::Util::IntegerDivisibilityLattice>(
+            transferOp.getIndices().back());
+    uint64_t divisor = 1;
+    if (divisibility && !divisibility->getValue().isUninitialized()) {
+      divisor = divisibility->getValue().getValue().udiv();
+    }
+    unsigned elementBits = cast<MemRefType>(transferOp.getBase().getType())
+                               .getElementTypeBitWidth();
+    minBits = std::gcd<uint64_t>(minBits / elementBits, divisor) * elementBits;
   }
 
   for (Operation *op : uses) {
@@ -163,7 +179,8 @@ calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
 /// otherwise return 0. If it returns a value greater than 0 it also returns the
 /// memref uses.
 static unsigned isMemRefVectorizable(Value value,
-                                     SmallVectorImpl<Operation *> &uses) {
+                                     SmallVectorImpl<Operation *> &uses,
+                                     const DataFlowSolver &solver) {
   auto memrefType = dyn_cast<MemRefType>(value.getType());
 
   // Require scalar element type
@@ -202,7 +219,7 @@ static unsigned isMemRefVectorizable(Value value,
   }
 
   if (getUsesIfAllTransferOp(value, uses)) {
-    unsigned vectorBits = calculateMemRefVectorNumBits(uses);
+    unsigned vectorBits = calculateMemRefVectorNumBits(uses, solver);
     LLVM_DEBUG(llvm::dbgs() << "vectorBits=" << vectorBits << "\n");
     if (!vectorBits) {
       return 0;
@@ -262,6 +279,7 @@ public:
 
 private:
   void analyzeMemRefValue(Value value);
+  DataFlowSolver solver;
 
   // The mapping from a MemRef value to the number of bits of the vector this
   // MemRef value should be vectorized into.
@@ -271,6 +289,13 @@ private:
 };
 
 MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
+  solver.load<dataflow::SparseConstantPropagation>();
+  solver.load<dataflow::DeadCodeAnalysis>();
+  solver.load<IREE::Util::IntegerDivisibilityAnalysis>();
+  if (failed(solver.initializeAndRun(op))) {
+    return;
+  }
+
   op->walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
         .Case([this](mlir::FunctionOpInterface funcOp) {
@@ -287,7 +312,7 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
 void MemRefUsageAnalysis::analyzeMemRefValue(Value value) {
   SmallVector<Operation *> vectorUses;
   LLVM_DEBUG(llvm::dbgs() << "analyzing value: " << value << "\n");
-  if (unsigned vectorSize = isMemRefVectorizable(value, vectorUses)) {
+  if (unsigned vectorSize = isMemRefVectorizable(value, vectorUses, solver)) {
     valueToVectorBitsMap.insert(std::make_pair(value, vectorSize));
     transferOps.insert(vectorUses.begin(), vectorUses.end());
   }
