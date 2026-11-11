@@ -15,12 +15,13 @@ iree_lit_test_suite(
     lit
   SRCS
     "early_data_tiling.mlir"
-    "early_data_tiling_convolution.mlir"
-    "early_data_tiling_dynamic.mlir"
+    "early_data_tiling_convolution_x86_64.mlir"
+    "early_data_tiling_dynamic_x86_64.mlir"
+    "early_data_tiling_x86_64.mlir"
     "executable_object_data.mlir"
     "hal_target_device_attributes.mlir"
     "materialize_homogeneous_encodings.mlir"
-    "roundeven_native.mlir"
+    "roundeven_native_x86_64.mlir"
     "smoketest_embedded.mlir"
     "smoketest_system.mlir"
     "vscale_range_validation.mlir"
@@ -31,5 +32,40 @@ iree_lit_test_suite(
     iree-opt
     not
 )
+
+iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_ARM_64 "arm_64")
+if(_IREE_COMPILER_TARGETING_ARM_64)
+
+iree_lit_test_suite(
+  NAME
+    lit_aarch64
+  SRCS
+    "early_data_tiling_aarch64.mlir"
+    "early_data_tiling_convolution_aarch64.mlir"
+    "early_data_tiling_dynamic_aarch64.mlir"
+    "roundeven_native_aarch64.mlir"
+  TOOLS
+    ${IREE_LLD_TARGET}
+    FileCheck
+    iree-compile
+)
+
+endif()
+
+iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_RISCV_64 "riscv_64")
+if(_IREE_COMPILER_TARGETING_RISCV_64)
+
+iree_lit_test_suite(
+  NAME
+    lit_riscv64
+  SRCS
+    "roundeven_native_riscv64.mlir"
+  TOOLS
+    ${IREE_LLD_TARGET}
+    FileCheck
+    iree-compile
+)
+
+endif()
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

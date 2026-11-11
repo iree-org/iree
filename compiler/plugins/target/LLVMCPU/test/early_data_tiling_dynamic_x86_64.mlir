@@ -1,5 +1,3 @@
-// RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu --iree-llvmcpu-target-cpu=generic --iree-llvmcpu-target-triple=aarch64-unknown-unknown-eabi-elf --iree-opt-experimental-early-data-tiling --compile-to=dispatch-creation | FileCheck %s
-// RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu --iree-llvmcpu-target-cpu=generic --iree-llvmcpu-target-triple=aarch64-unknown-unknown-eabi-elf --iree-opt-experimental-early-data-tiling --compile-to=executable-targets | FileCheck %s --check-prefix=UKERNEL
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu --iree-llvmcpu-target-cpu=generic --iree-llvmcpu-target-triple=x86_64-unknown-unknown-eabi-elf --iree-opt-experimental-early-data-tiling --compile-to=executable-targets | FileCheck %s --check-prefix=UKERNEL
 
 // Fusing the epilogue and the unpack keeps the contraction on the mmt4d ukernel.
@@ -14,17 +12,6 @@
 // UKERNEL-LABEL: llvm.func @multi_m_relu_dispatch_{{[0-9]+}}_mmt4d_
 // UKERNEL:         llvm.call @iree_uk_mmt4d
 
-// CHECK-LABEL: util.func public @dynamic_m_bias
-// CHECK: %[[MM:.*]] = linalg.mmt4d
-// CHECK-SAME: -> tensor<8x?x8x8xf32>
-// CHECK-NOT: flow.return
-// CHECK: %[[EPILOGUE:.*]] = linalg.generic
-// CHECK-SAME: ins(%[[MM]]
-// CHECK: arith.addf
-// CHECK-NOT: flow.return
-// CHECK: %[[UNPACK:.*]] = linalg.unpack %[[EPILOGUE]]
-// CHECK-SAME: tensor<8x?x8x8xf32> -> tensor<?x64xf32>
-// CHECK-NEXT: iree_tensor_ext.dispatch.tensor.store %[[UNPACK]]
 func.func @dynamic_m_bias(%lhs: tensor<?x128xf32>, %rhs: tensor<128x64xf32>, %bias: tensor<64xf32>) -> tensor<?x64xf32> {
   %zero = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
@@ -43,17 +30,6 @@ func.func @dynamic_m_bias(%lhs: tensor<?x128xf32>, %rhs: tensor<128x64xf32>, %bi
   return %result : tensor<?x64xf32>
 }
 
-// CHECK-LABEL: util.func public @odd_relu
-// CHECK: %[[MM:.*]] = linalg.mmt4d
-// CHECK-SAME: -> tensor<9x9x8x8xf32>
-// CHECK-NOT: flow.return
-// CHECK: %[[EPILOGUE:.*]] = linalg.generic
-// CHECK-SAME: ins(%[[MM]]
-// CHECK: arith.maximumf
-// CHECK-NOT: flow.return
-// CHECK: %[[UNPACK:.*]] = linalg.unpack %[[EPILOGUE]]
-// CHECK-SAME: tensor<9x9x8x8xf32> -> tensor<65x67xf32>
-// CHECK-NEXT: iree_tensor_ext.dispatch.tensor.store %[[UNPACK]]
 func.func @odd_relu(%lhs: tensor<65x129xf32>, %rhs: tensor<129x67xf32>) -> tensor<65x67xf32> {
   %zero = arith.constant 0.0 : f32
   %empty = tensor.empty() : tensor<65x67xf32>
@@ -70,17 +46,6 @@ func.func @odd_relu(%lhs: tensor<65x129xf32>, %rhs: tensor<129x67xf32>) -> tenso
   return %result : tensor<65x67xf32>
 }
 
-// CHECK-LABEL: util.func public @batched_relu
-// CHECK: %[[MM:.*]] = linalg.batch_mmt4d
-// CHECK-SAME: -> tensor<2x8x8x8x8xf32>
-// CHECK-NOT: flow.return
-// CHECK: %[[EPILOGUE:.*]] = linalg.generic
-// CHECK-SAME: ins(%[[MM]]
-// CHECK: arith.maximumf
-// CHECK-NOT: flow.return
-// CHECK: %[[UNPACK:.*]] = linalg.unpack %[[EPILOGUE]]
-// CHECK-SAME: tensor<2x8x8x8x8xf32> -> tensor<2x64x64xf32>
-// CHECK-NEXT: iree_tensor_ext.dispatch.tensor.store %[[UNPACK]]
 func.func @batched_relu(%lhs: tensor<2x64x128xf32>, %rhs: tensor<2x128x64xf32>) -> tensor<2x64x64xf32> {
   %zero = arith.constant 0.0 : f32
   %empty = tensor.empty() : tensor<2x64x64xf32>
@@ -97,23 +62,6 @@ func.func @batched_relu(%lhs: tensor<2x64x128xf32>, %rhs: tensor<2x128x64xf32>) 
   return %result : tensor<2x64x64xf32>
 }
 
-// The widening producer receives the packed input layout. The normal dispatch
-// fusion policy keeps this producer separate; the contraction still owns its
-// epilogue and unpack.
-// CHECK-LABEL: util.func public @extend_producer
-// CHECK: %[[WIDE:.*]] = linalg.generic
-// CHECK-SAME: ins(%{{.*}} : tensor<8192xf16>)
-// CHECK: arith.extf
-// CHECK: arith.mulf
-// CHECK: iree_tensor_ext.dispatch.tensor.store %[[WIDE]]
-// CHECK: flow.return
-// CHECK: %[[MM:.*]] = linalg.mmt4d
-// CHECK-NOT: flow.return
-// CHECK: linalg.generic
-// CHECK-SAME: ins(%[[MM]]
-// CHECK: arith.maximumf
-// CHECK-NOT: flow.return
-// CHECK: linalg.unpack
 func.func @extend_producer(%lhs: tensor<64x128xf16>, %rhs: tensor<128x64xf32>) -> tensor<64x64xf32> {
   %zero = arith.constant 0.0 : f32
   %scale = arith.constant 1.5 : f32
@@ -141,21 +89,6 @@ func.func @extend_producer(%lhs: tensor<64x128xf16>, %rhs: tensor<128x64xf32>) -
   return %result : tensor<64x64xf32>
 }
 
-// Normalization adds an expand after the collapsed contraction. Sink it through
-// the epilogue before encoding propagation, then restore the public ABI shape.
-// CHECK-LABEL: util.func public @multi_m_relu
-// CHECK: %[[MM:.*]] = linalg.mmt4d
-// CHECK-SAME: -> tensor<1x1x4x8xf32>
-// CHECK-NOT: flow.return
-// CHECK: %[[RELU:.*]] = linalg.generic
-// CHECK-SAME: ins(%[[MM]] : tensor<1x1x4x8xf32>)
-// CHECK: arith.maximumf
-// CHECK-NOT: flow.return
-// CHECK: %[[UNPACK:.*]] = linalg.unpack %[[RELU]]
-// CHECK-SAME: tensor<1x1x4x8xf32> -> tensor<6x4xf32>
-// CHECK-NEXT: iree_tensor_ext.dispatch.tensor.store %[[UNPACK]]
-// CHECK: flow.tensor.reshape
-// CHECK-SAME: tensor<6x4xf32> -> tensor<2x3x4xf32>
 func.func @multi_m_relu(%a: tensor<2x3x8xf32>, %b: tensor<8x4xf32>) -> tensor<2x3x4xf32> {
   %zero = arith.constant 0.0 : f32
   %empty = tensor.empty() : tensor<2x3x4xf32>
