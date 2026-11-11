@@ -15,9 +15,15 @@
 // which zeroes these tiles downstream of this pass. Operand shapes are the
 // packed forms emitted by data tiling (M/N padded up to inner-tile
 // multiples: 64 -> 11x6, 81 -> 14x6, 41 -> 2x32, 516 -> 17x32).
+// The last two cases are not benchmark shapes: they pin the two fallbacks of
+// the model (a batch dim, which keeps one tile per workgroup because the
+// iteration bound is not what the model tiles, and an empty M extent, which
+// must not divide the thread count by zero workgroups).
 // Note: the scalable-vectorization RVV strategy tests live in
-// select_riscv_v_lowering_strategy.mlir; inner_tiled kinds bake a concrete
-// `vlen` and do not use the scalable path.
+// select_riscv_v_lowering_strategy.mlir. RVV `inner_tiled` kinds bake a
+// concrete `vlen` and so resolve to a fixed tile here; a kind whose inner tile
+// is scalable (SVE) cannot and falls back — see
+// select_aarch64_sve_lowering_strategy.mlir.
 
 #executable_target_riscv64 = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+c,+v,+zvl256b", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 32 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
 
@@ -92,8 +98,10 @@ func.func @inner_tiled_rvv_f32_256x256x256(%lhs: tensor<43x256x6x1x1xf32>, %rhs:
 // -----
 
 // 81x41x19 (rect): 14 x 2 inner-tile iterations over K = 19. Small enough
-// that the underutilization term dominates the whole sweep: 28 workgroups at
-// 8 threads, 14 at 4, 1 at 1.
+// that the underutilization term dominates the whole sweep: [2, 2] covers 4
+// of the 28 inner tiles per workgroup (7 workgroups) at 8 threads, [7, 1]
+// covers 7 (4 workgroups) at 4, and [14, 2] takes the whole matmul (1
+// workgroup) at 1. One tile per workgroup would be 28 workgroups.
 #executable_target_riscv64 = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+c,+v,+zvl256b", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 32 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
 func.func @inner_tiled_rvv_f32_81x41x19(%lhs: tensor<14x19x6x1x1xf32>, %rhs: tensor<2x19x32x1xf32>, %acc: tensor<14x2x6x1x32xf32>) -> tensor<14x2x6x1x32xf32> attributes {hal.executable.target = #executable_target_riscv64} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
@@ -191,5 +199,79 @@ func.func @inner_tiled_rvv_f32_dynamic(%lhs: tensor<?x?x6x1x1xf32>, %rhs: tensor
 //   T4-SAME:       lowering_config = #[[CONFIG]]
 //    T1-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
 //        T1: func.func @inner_tiled_rvv_f32_dynamic(
+//        T1:   iree_codegen.inner_tiled
+//   T1-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+// Batched 8 x (64x64x64): the batch iter dim is neither M nor N, so it keeps
+// the default one tile per workgroup and only (M, N) are consolidated — the
+// two are exactly the picks of the unbatched 64x64x64 case above. Note that
+// the model's underutilization term counts M/N workgroups only and never the
+// batch factor (same as `getMmt4dLoweringConfig` for `linalg.batch_mmt4d`):
+// at 8 threads it sees 11 workgroups here, not 88, so it consolidates less
+// aggressively than the real parallelism would allow.
+#executable_target_riscv64 = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+c,+v,+zvl256b", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 32 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
+func.func @inner_tiled_rvv_f32_batched_8x64x64x64(%lhs: tensor<8x11x64x6x1x1xf32>, %rhs: tensor<8x2x64x32x1xf32>, %acc: tensor<8x11x2x6x1x32xf32>) -> tensor<8x11x2x6x1x32xf32> attributes {hal.executable.target = #executable_target_riscv64} {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = [
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+      affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+    ],
+    iterator_types = [#linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32, intrinsics_m = 6, vlen = 256>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : tensor<8x11x64x6x1x1xf32>, tensor<8x2x64x32x1xf32> into tensor<8x11x2x6x1x32xf32>
+  return %0 : tensor<8x11x2x6x1x32xf32>
+}
+//    T8-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 2, 0], vector_common_parallel = [1, 1, 1, 0], vector_reduction = [0, 0, 0, 1]>
+//        T8: func.func @inner_tiled_rvv_f32_batched_8x64x64x64(
+//        T8:   iree_codegen.inner_tiled
+//   T8-SAME:       lowering_config = #[[CONFIG]]
+//    T4-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 11, 1, 0], vector_common_parallel = [1, 1, 1, 0], vector_reduction = [0, 0, 0, 1]>
+//        T4: func.func @inner_tiled_rvv_f32_batched_8x64x64x64(
+//        T4:   iree_codegen.inner_tiled
+//   T4-SAME:       lowering_config = #[[CONFIG]]
+//    T1-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 11, 2, 0], vector_common_parallel = [1, 1, 1, 0], vector_reduction = [0, 0, 0, 1]>
+//        T1: func.func @inner_tiled_rvv_f32_batched_8x64x64x64(
+//        T1:   iree_codegen.inner_tiled
+//   T1-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+// Empty M extent: there is no work to distribute, and the model's baseline
+// cost divides the thread count by the workgroup count derived from the M and
+// N iteration bounds. It must bail out for a zero bound instead of dividing by
+// zero (a crash in the compiler, not just a bad tile).
+#executable_target_riscv64 = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+c,+v,+zvl256b", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 32 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
+func.func @inner_tiled_rvv_f32_empty_m(%lhs: tensor<0x64x6x1x1xf32>, %rhs: tensor<2x64x32x1xf32>, %acc: tensor<0x2x6x1x32xf32>) -> tensor<0x2x6x1x32xf32> attributes {hal.executable.target = #executable_target_riscv64} {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ],
+    iterator_types = [#linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32, intrinsics_m = 6, vlen = 256>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : tensor<0x64x6x1x1xf32>, tensor<2x64x32x1xf32> into tensor<0x2x6x1x32xf32>
+  return %0 : tensor<0x2x6x1x32xf32>
+}
+//    T8-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//        T8: func.func @inner_tiled_rvv_f32_empty_m(
+//        T8:   iree_codegen.inner_tiled
+//   T8-SAME:       lowering_config = #[[CONFIG]]
+//    T4-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//        T4: func.func @inner_tiled_rvv_f32_empty_m(
+//        T4:   iree_codegen.inner_tiled
+//   T4-SAME:       lowering_config = #[[CONFIG]]
+//    T1-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//        T1: func.func @inner_tiled_rvv_f32_empty_m(
 //        T1:   iree_codegen.inner_tiled
 //   T1-SAME:       lowering_config = #[[CONFIG]]
