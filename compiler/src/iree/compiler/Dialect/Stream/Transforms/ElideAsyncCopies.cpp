@@ -723,6 +723,24 @@ public:
     return containsBorrowedStorage(value, visited);
   }
 
+  // A transfer may retain a distinct SSA result while reusing its source
+  // storage. Follow forwarding values so a clone cannot lose that isolation.
+  bool mayAliasThroughTransfer(Value value) {
+    bool foundTransfer = false;
+    auto traversalResult =
+        explorer.walkDefiningOps(value, [&](OpResult result) {
+          if (isa<IREE::Stream::TensorImportOp>(result.getOwner())) {
+            return WalkResult::skip();
+          }
+          if (isa<IREE::Stream::AsyncTransferOp>(result.getOwner())) {
+            foundTransfer = true;
+            return WalkResult::interrupt();
+          }
+          return WalkResult::advance();
+        });
+    return foundTransfer || traversalResult == TraversalResult::INCOMPLETE;
+  }
+
   // Attempts to infer the affinity of |value| by walking up its defining ops
   // and checking for explicit affinity annotations or default affinities.
   // Returns nullptr if no affinity can be determined.
@@ -881,6 +899,13 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
     return false;
   }
 
+  if (analysis.mayAliasThroughTransfer(cloneOp.getSource())) {
+    LLVM_DEBUG(
+        llvm::dbgs()
+        << "  - clone source may alias through a transfer; cannot elide\n");
+    return false;
+  }
+
   // Constant-to-constant clones can be elided only if both source and result
   // are never mutated anywhere in the program (interprocedural analysis).
   // Constants are immutable after initialization, but during initialization
@@ -1008,8 +1033,8 @@ static TransferElisionAction getTransferElisionAction(
   auto sourceType = cast<IREE::Stream::ResourceType>(source.getType());
   auto resultType = cast<IREE::Stream::ResourceType>(result.getType());
 
-  // An explicit storage policy must remain attached to its transfer.
-  if (transferOp.getStorageAttr()) {
+  // Reusable storage must keep the transfer that carries its affinity.
+  if (transferOp.getEffectiveStorage() == TransferStorage::Reuse) {
     return TransferElisionAction::Preserve;
   }
 
@@ -1031,8 +1056,8 @@ static TransferElisionAction getTransferElisionAction(
   }
   auto resultAffinityAttr = transferOp.getResultAffinityAttr();
 
-  // Track whether topology analysis allows the source storage to be reused.
-  bool topologyAllowsReuse = false;
+  // Track whether topology analysis allows the transfer to be elided.
+  bool topologyAllowsElision = false;
 
   // Check if topology allows reuse across distinct devices.
   if (sourceAffinityAttr && resultAffinityAttr &&
@@ -1043,9 +1068,9 @@ static TransferElisionAction getTransferElisionAction(
     if (topologyAttr.hasUnifiedMemory(sourceAffinityAttr, resultAffinityAttr) ||
         topologyAttr.hasTransparentAccess(sourceAffinityAttr,
                                           resultAffinityAttr)) {
-      LLVM_DEBUG(llvm::dbgs() << "  + topology allows reuse (unified memory "
+      LLVM_DEBUG(llvm::dbgs() << "  + topology allows elision (unified memory "
                                  "or transparent access)\n");
-      topologyAllowsReuse = true;
+      topologyAllowsElision = true;
     } else {
       // Topology requires an actual transfer - cannot elide.
       LLVM_DEBUG(llvm::dbgs()
@@ -1056,17 +1081,27 @@ static TransferElisionAction getTransferElisionAction(
 
   // Different affinity without topology info = real transfer operation.
   // These must be preserved as they represent data movement and we don't have
-  // topology information to determine if they're needed.
-  if (!topologyAllowsReuse && transferOp.getSourceAffinityAttr() !=
-                                  transferOp.getResultAffinityAttr()) {
+  // topology information to determine if they're needed. An omitted target
+  // affinity still follows the prior default-copy behavior when the source
+  // affinity was only inferred.
+  if (!topologyAllowsElision &&
+      (transferOp.getSourceAffinityAttr() || resultAffinityAttr) &&
+      sourceAffinityAttr != resultAffinityAttr) {
     LLVM_DEBUG(llvm::dbgs()
                << "  - transfer changes affinity and no topology info; cannot "
                   "elide\n");
     return TransferElisionAction::Preserve;
   }
 
-  // Same affinity can be a no-op; for shared cross-device storage, keep the
-  // transfer after the same safety checks.
+  // Topology can select reuse for an unannotated transfer. An explicit copy
+  // still follows the pre-PR elision path.
+  const auto elisionAction =
+      topologyAllowsElision && !transferOp.getStorage()
+          ? TransferElisionAction::Reuse
+          : TransferElisionAction::Elide;
+
+  // Same affinity can be a no-op; shared cross-device storage follows the
+  // same elision safety checks.
   const bool isSameType =
       (sourceType.getLifetime() == resultType.getLifetime());
 
@@ -1116,8 +1151,7 @@ static TransferElisionAction getTransferElisionAction(
     }
     LLVM_DEBUG(llvm::dbgs()
                << "  + transfer source SSA value has one use; can simplify\n");
-    return topologyAllowsReuse ? TransferElisionAction::Reuse
-                               : TransferElisionAction::Elide;
+    return elisionAction;
   }
 
   // If this is the last user of the source SSA value then we can share its
@@ -1127,16 +1161,14 @@ static TransferElisionAction getTransferElisionAction(
     LLVM_DEBUG(
         llvm::dbgs()
         << "  + transfer source use is the last and same type; can simplify\n");
-    return topologyAllowsReuse ? TransferElisionAction::Reuse
-                               : TransferElisionAction::Elide;
+    return elisionAction;
   }
 
   // Special case: same-type transfers can share storage regardless of multiple
-  // users. Preserve cross-device transfers so their affinity remains explicit.
+  // users.
   if (isSameType) {
     LLVM_DEBUG(llvm::dbgs() << "  + same-type transfer can share storage\n");
-    return topologyAllowsReuse ? TransferElisionAction::Reuse
-                               : TransferElisionAction::Elide;
+    return elisionAction;
   }
 
   // Now we have multiple users, are not the last user, or have a type-changing
@@ -1676,8 +1708,8 @@ static ElisionResults tryElideAsyncCopiesInRegion(
 // a resource) and the last users of all cloned values. Once analyzed all copies
 // in the program are checked to see if they can be safely removed and if so are
 // rerouted to the cloned source value. This process repeats until no more
-// copies are elided or transfers are marked for reuse. We reach a fixed point
-// because each transfer is marked at most once and no new ops are introduced.
+// copies are elided or transfers are marked for reuse. Each transfer is marked
+// at most once and no new ops are introduced, so this reaches a fixed point.
 struct ElideAsyncCopiesPass
     : IREE::Stream::impl::ElideAsyncCopiesPassBase<ElideAsyncCopiesPass> {
   void runOnOperation() override {
