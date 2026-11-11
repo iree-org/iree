@@ -19,12 +19,13 @@ iree_lit_test_suite(
         # keep sorted
         [
             "early_data_tiling.mlir",
-            "early_data_tiling_convolution.mlir",
-            "early_data_tiling_dynamic.mlir",
+            "early_data_tiling_convolution_x86_64.mlir",
+            "early_data_tiling_dynamic_x86_64.mlir",
+            "early_data_tiling_x86_64.mlir",
             "executable_object_data.mlir",
             "hal_target_device_attributes.mlir",
             "materialize_homogeneous_encodings.mlir",
-            "roundeven_native.mlir",
+            "roundeven_native_x86_64.mlir",
             "smoketest_embedded.mlir",
             "smoketest_system.mlir",
             "vscale_range_validation.mlir",

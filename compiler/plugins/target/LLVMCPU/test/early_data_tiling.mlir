@@ -1,13 +1,4 @@
 // RUN: iree-compile %s --iree-hal-target-backends=vmvx --iree-opt-experimental-early-data-tiling --compile-to=dispatch-creation | FileCheck %s --check-prefix=LATE --implicit-check-not=materialized_layout_target
-// RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu --iree-llvmcpu-target-cpu=generic --iree-llvmcpu-target-triple=x86_64-unknown-unknown-eabi-elf --iree-opt-experimental-early-data-tiling --compile-to=global-optimization | FileCheck %s --check-prefix=GLOBAL --implicit-check-not=flow.dispatch --implicit-check-not=iree_encoding.set_encoding
-
-// GLOBAL: iree.encoding.materialized_layout_target =
-// GLOBAL-LABEL: util.func public @matmul_relu
-// GLOBAL: %[[MM:.*]] = linalg.mmt4d
-// GLOBAL: linalg.generic
-// GLOBAL-SAME: ins(%[[MM]] : tensor<{{[0-9]+x[0-9]+x[0-9]+x[0-9]+}}xf32>)
-// GLOBAL: arith.maximumf
-// GLOBAL: linalg.unpack
 
 // LATE-LABEL: util.func public @matmul_relu
 // LATE: flow.tensor.encode
