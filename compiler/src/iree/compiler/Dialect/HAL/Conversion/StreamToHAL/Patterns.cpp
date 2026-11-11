@@ -1225,30 +1225,16 @@ static void insertSerializationBarriers(Location loc, Block &block,
 }
 
 // Checks if |executeOp| contains only a single transfer operation and returns
-// it. Non-transfer/dispatch operations like cache control will be ignored.
-//
-// Intended to match things like:
-//   stream.cmd.execute ... {
-//     stream.cmd.invalidate
-//     stream.cmd.fill        <----- returned
-//     stream.cmd.flush
-//   }
-// And not:
-//   stream.cmd.execute ... {
-//     stream.cmd.invalidate
-//     stream.cmd.fill
-//     stream.cmd.flush
-//     stream.cmd.dispatch
-//   }
+// it. Cache control and other commands that must be preserved fail the match.
 static Operation *matchSingleTransferOp(IREE::Stream::CmdExecuteOp executeOp) {
   Operation *foundOp = nullptr;
   for (auto &block : executeOp.getBodyRegion()) {
     for (auto &op : block) {
       if (!TypeSwitch<Operation *, bool>(&op)
-               // Ignore non-transfer/dispatch ops.
-               .Case<IREE::Stream::CmdInvalidateOp, IREE::Stream::CmdFlushOp,
-                     IREE::Stream::CmdDiscardOp, IREE::Stream::YieldOp>(
-                   [&](auto metaOp) { return true; })
+               .Case<IREE::Stream::CmdInvalidateOp, IREE::Stream::CmdFlushOp>(
+                   [](auto) { return false; })
+               .Case<IREE::Stream::CmdDiscardOp, IREE::Stream::YieldOp>(
+                   [](auto) { return true; })
                .Case<IREE::Stream::CmdFillOp, IREE::Stream::CmdCopyOp>(
                    [&](auto transferOp) {
                      if (!foundOp) {

@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-hal-conversion --cse --iree-hal-indirect-command-buffers=true --verify-diagnostics %s | FileCheck %s
 
-// Flush and invalidate lower to HAL command buffer operations with sequential
-// execution barriers; discard is ignored.
+// Invalidate and flush lower to HAL command buffer operations with a sequential
+// execution barrier.
 
 util.global private @device : !hal.device
 
@@ -12,16 +12,14 @@ util.func public @cmdMemoryControl(%arg0: !stream.resource<transient>, %arg1: in
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
   %0 = stream.cmd.execute on(#hal.device.affinity<@device>) with(%arg0 as %arg2: !stream.resource<transient>{%arg1}) {
-    // CHECK-NEXT: hal.command_buffer.flush_buffer<%[[CMD]] : !hal.command_buffer>
-    // CHECK-SAME: target(%[[TARGET]] : !hal.buffer)[%c0, %c128]
-    stream.cmd.flush %arg2[%c0 for %c128] : !stream.resource<transient>{%arg1}
-    // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
     // CHECK-NEXT: hal.command_buffer.invalidate_buffer<%[[CMD]] : !hal.command_buffer>
     // CHECK-SAME: target(%[[TARGET]] : !hal.buffer)[%c0, %c128]
     stream.cmd.invalidate %arg2[%c0 for %c128] : !stream.resource<transient>{%arg1}
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
+    // CHECK-NEXT: hal.command_buffer.flush_buffer<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: target(%[[TARGET]] : !hal.buffer)[%c0, %c128]
+    stream.cmd.flush %arg2[%c0 for %c128] : !stream.resource<transient>{%arg1}
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
-    stream.cmd.discard %arg2[%c0 for %c128] : !stream.resource<transient>{%arg1}
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
   util.return %0 : !stream.timepoint
@@ -58,8 +56,7 @@ util.func public @cmdFill(%target: !stream.resource<transient>, %target_size: in
 // -----
 
 // Tests that an execution region with a single fill is converted to a queue
-// operation instead of a command buffer. The extra flush is ignored as queue
-// operations have implicit flushes (today).
+// operation instead of a command buffer.
 
 util.global private @device : !hal.device
 
@@ -77,9 +74,43 @@ util.func public @cmdFillOnQueue(%target: !stream.resource<transient>, %target_s
     // CHECK-SAME: target(%[[TARGET]] : !hal.buffer)[%c0] length(%c128)
     // CHECK-SAME: pattern(%c255_i32 : i32)
     stream.cmd.fill %c255_i32, %target_capture[%c0 for %c128] : i32 -> !stream.resource<transient>{%target_size}
-    stream.cmd.flush %target_capture[%c0 for %c128] : !stream.resource<transient>{%target_size}
+    stream.cmd.discard %target_capture[%c0 for %c128] : !stream.resource<transient>{%target_size}
   } => !stream.timepoint
+  // CHECK-NOT: stream.cmd.discard
   // CHECK: util.return %[[SIGNAL]]
+  util.return %signal : !stream.timepoint
+}
+
+// -----
+
+// Cache maintenance on a different resource must keep the fill in a command buffer.
+
+util.global private @device : !hal.device
+
+// CHECK-LABEL: @cmdFillWithCacheControl
+// CHECK-SAME: (%[[CACHE:.+]]: !hal.buffer, %{{.+}}: index, %[[TARGET:.+]]: !hal.buffer, %{{.+}}: index)
+util.func public @cmdFillWithCacheControl(%cache: !stream.resource<transient>, %cache_size: index, %target: !stream.resource<transient>, %target_size: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %c255_i32 = arith.constant 255 : i32
+  // CHECK-NOT: hal.device.queue.fill
+  // CHECK: %[[CMD:.+]] = hal.command_buffer.create
+  %signal = stream.cmd.execute once on(#hal.device.affinity<@device>) with(%cache as %cache_capture: !stream.resource<transient>{%cache_size}, %target as %target_capture: !stream.resource<transient>{%target_size}) {
+    // CHECK-NEXT: hal.command_buffer.invalidate_buffer<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: target(%[[CACHE]] : !hal.buffer)[%c0, %c128]
+    stream.cmd.invalidate %cache_capture[%c0 for %c128] : !stream.resource<transient>{%cache_size}
+    // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
+    // CHECK-NEXT: hal.command_buffer.fill_buffer<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: target(%[[TARGET]] : !hal.buffer)[%c0, %c128]
+    // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
+    stream.cmd.fill %c255_i32, %target_capture[%c0 for %c128] : i32 -> !stream.resource<transient>{%target_size}
+    // CHECK-NEXT: hal.command_buffer.flush_buffer<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: target(%[[CACHE]] : !hal.buffer)[%c0, %c128]
+    stream.cmd.flush %cache_capture[%c0 for %c128] : !stream.resource<transient>{%cache_size}
+  } => !stream.timepoint
+  // CHECK: hal.command_buffer.finalize<%[[CMD]]
+  // CHECK-NOT: hal.device.queue.fill
+  // CHECK: util.return
   util.return %signal : !stream.timepoint
 }
 
@@ -114,8 +145,7 @@ util.func public @cmdCopy(%source: !stream.resource<transient>, %source_size: in
 // -----
 
 // Tests that an execution region with a single copy is converted to a queue
-// operation instead of a command buffer. The extra flush is ignored as queue
-// operations have implicit flushes (today).
+// operation instead of a command buffer.
 
 util.global private @device : !hal.device
 
@@ -133,9 +163,41 @@ util.func public @cmdCopyOnQueue(%source: !stream.resource<transient>, %source_s
     // CHECK-SAME: target(%[[TARGET]] : !hal.buffer)[%c0]
     // CHECK-SAME: length(%c128)
     stream.cmd.copy %source_capture[%c0], %target_capture[%c0], %c128 : !stream.resource<transient>{%source_size} -> !stream.resource<staging>{%target_size}
-    stream.cmd.flush %target_capture[%c0 for %c128] : !stream.resource<staging>{%target_size}
   } => !stream.timepoint
   // CHECK: util.return %[[SIGNAL]]
+  util.return %signal : !stream.timepoint
+}
+
+// -----
+
+// Cache maintenance on a third resource must keep the copy in a command buffer.
+
+util.global private @device : !hal.device
+
+// CHECK-LABEL: @cmdCopyWithCacheControl
+// CHECK-SAME: (%[[CACHE:.+]]: !hal.buffer, %{{.+}}: index, %[[SOURCE:.+]]: !hal.buffer, %{{.+}}: index, %[[TARGET:.+]]: !hal.buffer, %{{.+}}: index)
+util.func public @cmdCopyWithCacheControl(%cache: !stream.resource<transient>, %cache_size: index, %source: !stream.resource<transient>, %source_size: index, %target: !stream.resource<staging>, %target_size: index) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  // CHECK-NOT: hal.device.queue.copy
+  // CHECK: %[[CMD:.+]] = hal.command_buffer.create
+  %signal = stream.cmd.execute once on(#hal.device.affinity<@device>) with(%cache as %cache_capture: !stream.resource<transient>{%cache_size}, %source as %source_capture: !stream.resource<transient>{%source_size}, %target as %target_capture: !stream.resource<staging>{%target_size}) {
+    // CHECK-NEXT: hal.command_buffer.invalidate_buffer<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: target(%[[CACHE]] : !hal.buffer)[%c0, %c128]
+    stream.cmd.invalidate %cache_capture[%c0 for %c128] : !stream.resource<transient>{%cache_size}
+    // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
+    // CHECK-NEXT: hal.command_buffer.copy_buffer<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: source(%[[SOURCE]] : !hal.buffer)[%c0]
+    // CHECK-SAME: target(%[[TARGET]] : !hal.buffer)[%c0]
+    // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
+    stream.cmd.copy %source_capture[%c0], %target_capture[%c0], %c128 : !stream.resource<transient>{%source_size} -> !stream.resource<staging>{%target_size}
+    // CHECK-NEXT: hal.command_buffer.flush_buffer<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: target(%[[CACHE]] : !hal.buffer)[%c0, %c128]
+    stream.cmd.flush %cache_capture[%c0 for %c128] : !stream.resource<transient>{%cache_size}
+  } => !stream.timepoint
+  // CHECK: hal.command_buffer.finalize<%[[CMD]]
+  // CHECK-NOT: hal.device.queue.copy
+  // CHECK: util.return
   util.return %signal : !stream.timepoint
 }
 
