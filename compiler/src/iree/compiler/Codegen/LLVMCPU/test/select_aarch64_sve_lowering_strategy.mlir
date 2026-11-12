@@ -566,10 +566,13 @@ func.func @depthwise_conv(%3: tensor<1x57x57x72xf32>, %4: tensor<3x3x72xf32>) ->
   %7 = linalg.depthwise_conv_2d_nhwc_hwc {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%3, %4 : tensor<1x57x57x72xf32>, tensor<3x3x72xf32>) outs(%6 : tensor<1x28x28x72xf32>) -> tensor<1x28x28x72xf32>
   return %7 : tensor<1x28x28x72xf32>
 }
+// CHECK-DAG: #[[FILL_CONFIG:.+]] = #iree_cpu.lowering_config<vector_common_parallel = [1, 1, 4, [4]]>
 // CHECK-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 2, 28, 72, 0, 0], vector_common_parallel = [1, 1, 4, [4], 0, 0], vector_reduction = [0, 0, 0, 0, 1, 3]>
 // CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
 // CHECK:      func.func @depthwise_conv
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
+// CHECK:      linalg.fill
+// CHECK-SAME:     lowering_config = #[[FILL_CONFIG]]
 // CHECK:      linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
