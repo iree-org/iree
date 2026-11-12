@@ -74,24 +74,15 @@ jobs:
           pip install --require-hashes --only-binary=:all: \
             -r build_tools/python_deploy/pypi_deploy_requirements.txt
 
-      - name: Download wheels
+      # A dry run of pypi_deploy.sh downloads the release's wheels into wheels/,
+      # promotes them and checks them with `twine check --strict`. It fails if a
+      # check fails or if a package is missing, since it cannot ask whether to
+      # continue without it.
+      - name: Download, promote and check wheels
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download "${RELEASE}" --repo iree-org/iree \
-            --pattern "*.whl" --dir wheels
-          ls wheels
-
-      - name: Promote wheels
-        run: |
-          for wheel in wheels/*.whl; do
-            python build_tools/python_deploy/promote_whl_from_rc_to_final.py \
-              "${wheel}" --delete-old-wheel
-          done
-          ls wheels
-
-      - name: Check wheels
-        run: twine check --strict wheels/*.whl
+          ./build_tools/python_deploy/pypi_deploy.sh --wheel-dir wheels "${RELEASE}"
 
       # Lets users verify promoted wheels with `gh attestation verify`, including
       # the copies uploaded to the stable GitHub release.
