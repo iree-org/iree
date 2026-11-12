@@ -1,0 +1,135 @@
+{
+  "description": "Targets and compiler configurations for the compiler microbenchmarks. A case is any .mlir file under cases/; its id is the path relative to cases/ without the extension. Every case runs in every config unless the config's include/exclude globs or a case_overrides entry say otherwise.",
+  "default_target": "host_cpu",
+  "targets": {
+    "host_cpu": {
+      "description": "llvm-cpu for the host CPU, run on the local-task driver.",
+      "compile_flags": [
+        "--iree-hal-target-device=local",
+        "--iree-hal-local-target-device-backends=llvm-cpu",
+        "--iree-llvmcpu-target-cpu=host"
+      ],
+      "run_flags": [
+        "--device=local-task",
+        "--task_topology_performance_level=performance"
+      ]
+    },
+    "host_cpu_sync": {
+      "description": "llvm-cpu for the host CPU, run single-threaded on the local-sync driver.",
+      "compile_flags": [
+        "--iree-hal-target-device=local",
+        "--iree-hal-local-target-device-backends=llvm-cpu",
+        "--iree-llvmcpu-target-cpu=host"
+      ],
+      "run_flags": [
+        "--device=local-sync"
+      ]
+    }
+  },
+  "configs": {
+    "default": {
+      "description": "Target flags only.",
+      "compile_flags": []
+    },
+    "default_im2col": {
+      "description": "im2col rewrite for convolutions.",
+      "compile_flags": [
+        "--iree-global-opt-use-im2col-for-convs"
+      ],
+      "include": [
+        "conv/*",
+        "quantized/conv*",
+        "quantized/depthwise*",
+        "quantized/shortcut*"
+      ]
+    },
+    "dt": {
+      "description": "Data tiling.",
+      "compile_flags": [
+        "--iree-opt-data-tiling"
+      ]
+    },
+    "dt_im2col": {
+      "description": "Data tiling and im2col.",
+      "compile_flags": [
+        "--iree-opt-data-tiling",
+        "--iree-global-opt-use-im2col-for-convs"
+      ],
+      "include": [
+        "conv/*",
+        "quantized/conv*",
+        "quantized/depthwise*",
+        "quantized/shortcut*"
+      ]
+    },
+    "dt_uk": {
+      "description": "Data tiling and all CPU ukernels.",
+      "compile_flags": [
+        "--iree-opt-data-tiling",
+        "--iree-llvmcpu-enable-ukernels=all"
+      ]
+    },
+    "dt_uk_im2col": {
+      "description": "Data tiling, all CPU ukernels and im2col.",
+      "compile_flags": [
+        "--iree-opt-data-tiling",
+        "--iree-llvmcpu-enable-ukernels=all",
+        "--iree-global-opt-use-im2col-for-convs"
+      ],
+      "include": [
+        "conv/*",
+        "quantized/conv*",
+        "quantized/depthwise*",
+        "quantized/shortcut*"
+      ]
+    },
+    "default_noqdq": {
+      "description": "Target flags only, QDQ-to-integer rewrite off (float path).",
+      "compile_flags": [
+        "--iree-global-opt-enable-qdq-to-integer-math=false"
+      ],
+      "include": [
+        "quantized/bmm_shared_weight*"
+      ]
+    },
+    "dt_noqdq": {
+      "description": "Data tiling, QDQ-to-integer rewrite off (float path).",
+      "compile_flags": [
+        "--iree-opt-data-tiling",
+        "--iree-global-opt-enable-qdq-to-integer-math=false"
+      ],
+      "include": [
+        "quantized/bmm_shared_weight*"
+      ]
+    },
+    "dt_uk_noqdq": {
+      "description": "Data tiling and all CPU ukernels, QDQ-to-integer rewrite off (float path).",
+      "compile_flags": [
+        "--iree-opt-data-tiling",
+        "--iree-llvmcpu-enable-ukernels=all",
+        "--iree-global-opt-enable-qdq-to-integer-math=false"
+      ],
+      "include": [
+        "quantized/bmm_shared_weight*"
+      ]
+    }
+  },
+  "case_overrides": {
+    "attention/mha_block_384x768": {
+      "exclude_configs": [
+        "dt",
+        "dt_uk"
+      ],
+      "reason": "llvm-cpu codegen fails with data tiling: 'One or more operations with large vector sizes (8192 bytes) were found' (attention op consuming an encoded tensor)."
+    },
+    "conv/conv1d_ncw_k1_s2": {
+      "exclude_configs": [
+        "dt",
+        "dt_uk",
+        "dt_im2col",
+        "dt_uk_im2col"
+      ],
+      "reason": "llvm-cpu codegen fails with data tiling: 'exceeded stack allocation limit of 32768 bytes for function. Got 65792 bytes'."
+    }
+  }
+}
