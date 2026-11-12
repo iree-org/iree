@@ -129,13 +129,6 @@ void LLVMCPUTileToVectorSizePass::runOnOperation() {
   FunctionOpInterface funcOp = getOperation();
   SmallVector<linalg::LinalgOp> candidates;
   funcOp.walk([&](linalg::LinalgOp op) {
-    // XXX(hanchung): linalg.fill usually follow the reduction consumer ops, so
-    // the additional tiling is not needed. Otherwise, it results in an
-    // additional loops before converting it to a vector. We may need to fix the
-    // lowering config issue, but it is a fair stopgap in practice.
-    if (isa<linalg::FillOp>(op)) {
-      return;
-    }
     IREE::Codegen::LoweringConfigAttrInterface loweringConfig =
         getLoweringConfig(op);
     if (!loweringConfig) {
