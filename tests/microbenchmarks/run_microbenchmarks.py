@@ -266,6 +266,85 @@ def structure_signature(structure):
 
 
 ###############################################################################
+# Codegen configuration extraction
+###############################################################################
+
+_CONFIG_FUNC_RE = re.compile(r"^\s*func\.func\s+(?:private\s+|public\s+)?@([\w$.-]+)\(")
+_CONFIG_OP_RE = re.compile(r"(?:=\s*)?\b([a-z_][a-z_0-9]*(?:\.[a-z_0-9]+)+)\b")
+
+
+def _balanced_attr(text, start):
+    """Returns the `#dialect.attr<...>` text starting at `start`."""
+    open_at = text.find("<", start)
+    if open_at < 0:
+        return text[start:].split()[0]
+    depth = 0
+    for i in range(open_at, len(text)):
+        ch = text[i]
+        if ch == "<":
+            depth += 1
+        elif ch == ">" and text[i - 1] != "-":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return text[start:]
+
+
+def _attr_value(line, name):
+    marker = f"{name} = "
+    at = line.find(marker)
+    return _balanced_attr(line, at + len(marker)) if at >= 0 else None
+
+
+def extract_codegen_configs(config_ir):
+    """Summarizes a module compiled with --compile-to=executable-configurations.
+
+    For every dispatch function this records the `translation_info` (the
+    codegen pipeline and its options) and, in order, each op that carries a
+    `lowering_config` (tile sizes and similar per-op decisions). This is what
+    strategy selection decided for the dispatch, before any lowering runs. It
+    is target-specific, unlike the flow-phase structure.
+    """
+    functions = []
+    current = None
+    for line in config_ir.splitlines():
+        m = _CONFIG_FUNC_RE.match(line)
+        if m:
+            current = {
+                "function": m.group(1),
+                "name": _DISPATCH_PREFIX_RE.sub("", m.group(1)),
+                "translation_info": _attr_value(line, "translation_info"),
+                "ops": [],
+            }
+            functions.append(current)
+            continue
+        if current is None or "lowering_config = " not in line:
+            continue
+        stripped = line.strip()
+        # `%r = op.name ...` or `op.name ...` for ops without results.
+        rhs = stripped.split(" = ", 1)[1] if stripped.startswith("%") else stripped
+        op = _CONFIG_OP_RE.match(rhs)
+        current["ops"].append(
+            {
+                "op": op.group(1) if op else "?",
+                "lowering_config": _attr_value(line, "lowering_config"),
+            }
+        )
+    return functions
+
+
+def codegen_signature(codegen):
+    """The part of the codegen configs that A/B comparisons check."""
+    if codegen is None:
+        return None
+    lines = []
+    for f in codegen:
+        lines.append(f"{f['name']}: {f['translation_info'] or '(no translation_info)'}")
+        lines += [f"  {o['op']}: {o['lowering_config']}" for o in f["ops"]]
+    return lines
+
+
+###############################################################################
 # Tool invocation
 ###############################################################################
 
@@ -314,6 +393,23 @@ def compile_case(job):
     if not job["keep_flow"]:
         flow_path.unlink()
 
+    if job["codegen_configs"]:
+        config_path = Path(f"{stem}.configs.mlir")
+        cmd = [job["compile"], str(job["case_path"]), *flags]
+        cmd += ["--compile-to=executable-configurations", "-o", str(config_path)]
+        rc, out, err, secs = _run(cmd, job["timeout"])
+        result["configs_compile_cmd"] = shlex.join(cmd)
+        if rc != 0:
+            Path(f"{stem}.configs.log").write_text(out + err)
+            error = _first_error(out + err).replace(
+                str(job["case_path"]), job["case_id"]
+            )
+            result.update(status="compile_error", error=error)
+            return result
+        result["codegen"] = extract_codegen_configs(config_path.read_text())
+        if not job["keep_flow"]:
+            config_path.unlink()
+
     if job["structure_only"]:
         return result
 
@@ -328,7 +424,21 @@ def compile_case(job):
         result.update(status="compile_error", error=error)
         return result
     result["vmfb"] = str(vmfb_path)
+    result["vmfb_sha256"] = hashlib.sha256(vmfb_path.read_bytes()).hexdigest()
     return result
+
+
+def _remote_cmd(remote, shell_command):
+    """Command line that runs `shell_command` on the remote benchmark host."""
+    return [*remote["ssh"], remote["host"], shell_command]
+
+
+def _remote_copy(remote, local_path, remote_path):
+    """Copies a file to the remote host through the ssh command itself."""
+    cmd = _remote_cmd(remote, f"cat > {remote_path}")
+    with open(local_path, "rb") as f:
+        proc = subprocess.run(cmd, stdin=f, capture_output=True, check=False)
+    return proc.returncode == 0, proc.stderr.decode(errors="replace")
 
 
 def _to_ms(value, unit):
@@ -341,27 +451,44 @@ def benchmark_function(args, side, vmfb, run_flags, func, arg_types, log_stem):
     except ValueError as e:
         return {"status": "input_error", "error": str(e)}
     out_json = Path(f"{log_stem}.{func}.bench.json")
+    remote = args.remote
+    if remote:
+        # The module is copied by benchmark_entries(); the benchmark JSON is
+        # written on the remote host and fetched afterwards.
+        module = f"{remote['dir']}/{side}.vmfb"
+        bench_out = f"{remote['dir']}/{side}.bench.json"
+    else:
+        module, bench_out = vmfb, out_json
     cmd = [
-        args.benchmark_tools[side],
-        f"--module={vmfb}",
+        remote["iree_benchmark_module"] if remote else args.benchmark_tools[side],
+        f"--module={module}",
         f"--function={func}",
         *run_flags,
         *inputs,
         f"--benchmark_repetitions={args.repetitions}",
         f"--benchmark_min_time={args.min_time}",
-        f"--benchmark_out={out_json}",
+        f"--benchmark_out={bench_out}",
         "--benchmark_out_format=json",
     ]
     if args.threads:
         cmd.append(f"--task_topology_group_count={args.threads}")
     if args.dispatch_stats:
         cmd.append("--dispatch_statistics")
+    if remote:
+        out_json.unlink(missing_ok=True)
+        cmd = _remote_cmd(remote, f"rm -f {bench_out}; {shlex.join(cmd)}")
     result = {"cmd": shlex.join(cmd)}
     rc, out, err, _ = _run(cmd, args.bench_timeout)
     if rc == -1:
         # Rare benchmark hangs have been seen that did not reproduce; retry once.
         result["timeouts"] = 1
         rc, out, err, _ = _run(cmd, args.bench_timeout)
+    if remote and rc == 0:
+        frc, fout, ferr, _ = _run(_remote_cmd(remote, f"cat {bench_out}"), 60)
+        if frc == 0:
+            out_json.write_text(fout)
+        else:
+            err += ferr
     if rc != 0 or not out_json.exists():
         Path(f"{log_stem}.{func}.bench.log").write_text(out + err)
         result.update(status="run_error", error=_first_error(out + err))
@@ -518,6 +645,7 @@ def compare(base, head, threshold):
             "base_status": _status(b),
             "head_status": _status(h),
             "structural_change": False,
+            "codegen_change": False,
             "time_change": None,
             "functions": {},
         }
@@ -528,6 +656,14 @@ def compare(base, head, threshold):
             row["removed"] = [s for s in (bs or []) if s not in (hs or [])]
             row["added"] = [s for s in (hs or []) if s not in (bs or [])]
             row["base_dispatches"], row["head_dispatches"] = bs, hs
+        bh, hh = (b or {}).get("vmfb_sha256"), (h or {}).get("vmfb_sha256")
+        row["identical_modules"] = bh is not None and bh == hh
+        bc = codegen_signature(b.get("codegen")) if b else None
+        hc = codegen_signature(h.get("codegen")) if h else None
+        if bc is not None and hc is not None and bc != hc:
+            row["codegen_change"] = True
+            row["base_codegen"] = [s for s in bc if s not in hc]
+            row["head_codegen"] = [s for s in hc if s not in bc]
         bt, ht = (_func_times(b) if b else {}), (_func_times(h) if h else {})
         for func in sorted(set(bt) & set(ht)):
             ratio = ht[func] / bt[func] if bt[func] > 0 else None
@@ -541,6 +677,10 @@ def compare(base, head, threshold):
                 "ranges_overlap": overlap,
             }
             if ratio is None or abs(ratio - 1.0) <= threshold:
+                continue
+            if row["identical_modules"]:
+                # Only reachable with --bench-identical: same code, so noise.
+                row["time_change"] = row["time_change"] or "noise"
                 continue
             if overlap:
                 row["time_change"] = row["time_change"] or "noise"
@@ -649,6 +789,15 @@ def render_compare(base, head, rows, threshold):
     ]
     structural = [r for r in rows if r["structural_change"]]
     timed = [r for r in rows if r["time_change"] in ("slower", "faster")]
+    if any(r["identical_modules"] for r in rows):
+        identical = sum(r["identical_modules"] for r in rows)
+        out += [
+            f"{identical} of {sum('vmfb_sha256' in e for e in head['entries'].values())}"
+            " compiled modules are byte-identical between base and head; those"
+            " entries are not timed (use `--bench-identical` to time them"
+            " anyway).",
+            "",
+        ]
     out += [f"## Structural changes ({len(structural)})", ""]
     if structural:
         srows = []
@@ -672,6 +821,24 @@ def render_compare(base, head, rows, threshold):
         out.append(_md_table(header, srows))
     else:
         out.append("None.")
+    if any(e.get("codegen") is not None for e in head["entries"].values()):
+        codegen = [r for r in rows if r["codegen_change"]]
+        out += ["", f"## Codegen configuration changes ({len(codegen)})", ""]
+        if codegen:
+            crows = []
+            for r in codegen:
+                case_id, config = r["key"].split("@")
+                crows.append(
+                    [
+                        case_id,
+                        config,
+                        "<br>".join(f"`{s.strip()}`" for s in r["base_codegen"]) or "-",
+                        "<br>".join(f"`{s.strip()}`" for s in r["head_codegen"]) or "-",
+                    ]
+                )
+            out.append(_md_table(["case", "config", "base only", "head only"], crows))
+        else:
+            out.append("None.")
     out += [
         "",
         f"## Time changes over {100 * threshold:.0f}% outside noise ({len(timed)})",
@@ -713,12 +880,24 @@ def render_compare(base, head, rows, threshold):
                 )
                 or "-",
                 ("CHANGED" if r["structural_change"] else "same"),
+                ("CHANGED" if r["codegen_change"] else "same"),
+                ("identical" if r["identical_modules"] else "differ"),
                 r["time_change"] or "-",
             ]
         )
     out.append(
         _md_table(
-            ["case", "config", "base ms", "head ms", "ratio", "structure", "time"],
+            [
+                "case",
+                "config",
+                "base ms",
+                "head ms",
+                "ratio",
+                "structure",
+                "codegen",
+                "module",
+                "time",
+            ],
             arows,
         )
     )
@@ -737,6 +916,11 @@ def structure_only_view(results):
                 "error": e.get("error"),
                 "dispatches": structure_signature(e.get("structure")),
                 "data_tiled": (e.get("structure") or {}).get("data_tiled"),
+                **(
+                    {"codegen": codegen_signature(e["codegen"])}
+                    if e.get("codegen") is not None
+                    else {}
+                ),
             }
             for key, e in sorted(results["entries"].items())
         },
@@ -798,6 +982,20 @@ def parse_args(argv):
         action="store_true",
         help="Only compile to flow and record dispatch structure; no timing.",
     )
+    p.add_argument(
+        "--compile-only",
+        action="store_true",
+        help="Compile the modules and compare them between base and head, but"
+        " run no benchmarks. Works for cross-compiled targets and shows"
+        " whether a change affects the generated code at all.",
+    )
+    p.add_argument(
+        "--codegen-configs",
+        action="store_true",
+        help="Also record what strategy selection chose per dispatch: the"
+        " codegen pipeline and each op's lowering_config"
+        " (--compile-to=executable-configurations).",
+    )
     p.add_argument("--repetitions", type=int, default=5)
     p.add_argument(
         "--min-time",
@@ -821,6 +1019,31 @@ def parse_args(argv):
         default=0.05,
         help="Relative time change flagged in A/B mode (default 0.05 = 5%%).",
     )
+    p.add_argument(
+        "--bench-identical",
+        action="store_true",
+        help="In A/B mode, also time entries whose base and head modules are"
+        " byte-identical (skipped by default).",
+    )
+    p.add_argument(
+        "--remote-host",
+        help="Run the benchmarks on this host over ssh (e.g. user@host),"
+        " for targets that are cross-compiled. Overrides the target's"
+        " 'remote.host' in the manifest.",
+    )
+    p.add_argument(
+        "--remote-dir",
+        help="Scratch directory on the remote host (default: the target's"
+        " 'remote.dir' or /tmp/iree-microbench).",
+    )
+    p.add_argument(
+        "--remote-iree-benchmark-module",
+        help="Path of iree-benchmark-module on the remote host.",
+    )
+    p.add_argument(
+        "--ssh-command",
+        help="ssh command line used to reach the remote host (default: 'ssh').",
+    )
     p.add_argument("-j", "--jobs", type=int, default=max(1, (os.cpu_count() or 2) // 2))
     p.add_argument("--timeout", type=int, default=600, help="Per compile, seconds.")
     p.add_argument(
@@ -831,7 +1054,9 @@ def parse_args(argv):
     )
     p.add_argument("-o", "--output-dir", help="Default: ./microbench-<timestamp>.")
     p.add_argument(
-        "--keep-flow", action="store_true", help="Keep the flow-phase .mlir files."
+        "--keep-flow",
+        action="store_true",
+        help="Keep the flow-phase (and codegen configuration) .mlir files.",
     )
     p.add_argument("--list", action="store_true", help="List case x config and exit.")
     p.add_argument(
@@ -890,6 +1115,7 @@ def run_side(args, manifest, side, compile_tool, extra_flags, work, out_root):
                 "out_dir": out_root / side / config,
                 "structure_only": args.structure_only,
                 "keep_flow": args.keep_flow,
+                "codegen_configs": args.codegen_configs,
                 "timeout": args.timeout,
             }
         )
@@ -915,12 +1141,32 @@ def benchmark_entries(args, manifest, sides, results, work):
         if not benchmark_allowed(manifest, case_id):
             continue
         funcs = parse_entry_functions(Path(path).read_text())
+        hashes = {results[s]["entries"][key].get("vmfb_sha256") for s in sides}
+        if len(sides) > 1 and len(hashes) == 1 and None not in hashes:
+            # Both compilers produced the same module: any time difference
+            # would be noise, so there is nothing to measure.
+            for side in sides:
+                results[side]["entries"][key]["benchmarks"] = {}
+            if not args.bench_identical:
+                print(f"[{n}/{total}] skip {key}: identical modules", flush=True)
+                continue
         for side in sides:
             entry = results[side]["entries"][key]
             entry["benchmarks"] = {}
             if entry["status"] != "ok":
                 continue
             stem = Path(entry["vmfb"]).with_suffix("")
+            if args.remote:
+                ok, err = _remote_copy(
+                    args.remote, entry["vmfb"], f"{args.remote['dir']}/{side}.vmfb"
+                )
+                if not ok:
+                    for func, _ in funcs:
+                        entry["benchmarks"][func] = {
+                            "status": "run_error",
+                            "error": f"copy to remote failed: {err.strip()[:200]}",
+                        }
+                    continue
             for func, arg_types in funcs:
                 r = benchmark_function(
                     args, side, entry["vmfb"], run_flags, func, arg_types, stem
@@ -942,7 +1188,7 @@ def main(argv):
         head = json.loads(Path(args.compare_results[1]).read_text())
         rows = compare(base, head, args.threshold)
         print(render_compare(base, head, rows, args.threshold))
-        changed = any(r["structural_change"] for r in rows)
+        changed = any(r["structural_change"] or r["codegen_change"] for r in rows)
         return 1 if changed and args.fail_on_structural_change else 0
 
     manifest = load_manifest(args.manifest)
@@ -971,6 +1217,39 @@ def main(argv):
         "base": args.base_iree_benchmark_module or bench_tool,
     }
 
+    remote_cfg = dict(manifest["targets"][args.target].get("remote", {}))
+    if args.remote_host:
+        remote_cfg["host"] = args.remote_host
+    if args.remote_dir:
+        remote_cfg["dir"] = args.remote_dir
+    if args.remote_iree_benchmark_module:
+        remote_cfg["iree_benchmark_module"] = args.remote_iree_benchmark_module
+    args.remote = None
+    no_runs = args.structure_only or args.compile_only
+    if remote_cfg.get("host") and not no_runs:
+        remote_cfg["ssh"] = shlex.split(
+            args.ssh_command or remote_cfg.get("ssh", "ssh")
+        )
+        remote_cfg.setdefault("dir", "/tmp/iree-microbench")
+        if not remote_cfg.get("iree_benchmark_module"):
+            raise SystemExit(
+                "remote runs need --remote-iree-benchmark-module (or"
+                " 'remote.iree_benchmark_module' in the manifest target)"
+            )
+        rc, out, err, _ = _run(
+            _remote_cmd(remote_cfg, f"mkdir -p {remote_cfg['dir']} && uname -srm"), 60
+        )
+        if rc != 0:
+            raise SystemExit(f"cannot reach remote host: {err.strip()[:300]}")
+        remote_cfg["uname"] = out.strip()
+        args.remote = remote_cfg
+    elif manifest["targets"][args.target].get("cross_compiled") and not no_runs:
+        raise SystemExit(
+            f"target '{args.target}' is cross-compiled: use --structure-only,"
+            " --compile-only, or give --remote-host to run the benchmarks on a"
+            " matching machine"
+        )
+
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     out_root = Path(args.output_dir or f"microbench-{stamp}").resolve()
     out_root.mkdir(parents=True, exist_ok=True)
@@ -986,8 +1265,13 @@ def main(argv):
                 "iree_compile": tool_metadata(tool),
                 "iree_benchmark_module": (
                     None
-                    if args.structure_only
+                    if args.structure_only or args.compile_only or args.remote
                     else tool_metadata(args.benchmark_tools[side])
+                ),
+                "remote": (
+                    {k: v for k, v in args.remote.items() if k != "ssh"}
+                    if args.remote
+                    else None
                 ),
                 "extra_compile_flags": extra,
                 "target": args.target,
@@ -995,7 +1279,11 @@ def main(argv):
                 "configs": {
                     c: manifest["configs"][c] for c in sorted({w[2] for w in work})
                 },
-                "mode": "structure-only" if args.structure_only else "timing",
+                "mode": (
+                    "structure-only"
+                    if args.structure_only
+                    else "compile-only" if args.compile_only else "timing"
+                ),
                 "repetitions": args.repetitions,
                 "min_time": args.min_time,
                 "threads": args.threads,
@@ -1004,7 +1292,7 @@ def main(argv):
             "entries": run_side(args, manifest, side, tool, extra, work, out_root),
         }
 
-    if not args.structure_only:
+    if not args.structure_only and not args.compile_only:
         benchmark_entries(args, manifest, list(sides), results, work)
 
     for side, res in results.items():
@@ -1034,7 +1322,9 @@ def main(argv):
     )
     if failed and args.fail_on_error:
         return 1
-    if args.fail_on_structural_change and any(r["structural_change"] for r in rows):
+    if args.fail_on_structural_change and any(
+        r["structural_change"] or r["codegen_change"] for r in rows
+    ):
         return 1
     return 0
 

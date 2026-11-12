@@ -24,6 +24,60 @@
       "run_flags": [
         "--device=local-sync"
       ]
+    },
+    "riscv64_rvv": {
+      "description": "llvm-cpu cross-compiled for 64-bit RISC-V with the vector extension (SpacemiT X60, VLEN 256). Structure-only locally; timing needs --remote-host.",
+      "cross_compiled": true,
+      "compile_flags": [
+        "--iree-hal-target-device=local",
+        "--iree-hal-local-target-device-backends=llvm-cpu",
+        "--iree-llvmcpu-target-triple=riscv64-unknown-linux-gnu",
+        "--iree-llvmcpu-target-abi=lp64d",
+        "--iree-llvmcpu-target-cpu=spacemit-x60"
+      ],
+      "run_flags": [
+        "--device=local-task"
+      ]
+    },
+    "x86_64_avx2": {
+      "description": "llvm-cpu cross-compiled for x86-64 with AVX2 (Haswell). Structure-only locally; timing needs --remote-host.",
+      "cross_compiled": true,
+      "compile_flags": [
+        "--iree-hal-target-device=local",
+        "--iree-hal-local-target-device-backends=llvm-cpu",
+        "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu",
+        "--iree-llvmcpu-target-cpu=haswell"
+      ],
+      "run_flags": [
+        "--device=local-task"
+      ]
+    },
+    "x86_64_avx512": {
+      "description": "llvm-cpu cross-compiled for x86-64 with AVX-512 (Skylake-X). Structure-only locally; timing needs --remote-host.",
+      "cross_compiled": true,
+      "compile_flags": [
+        "--iree-hal-target-device=local",
+        "--iree-hal-local-target-device-backends=llvm-cpu",
+        "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu",
+        "--iree-llvmcpu-target-cpu=skylake-avx512"
+      ],
+      "run_flags": [
+        "--device=local-task"
+      ]
+    },
+    "aarch64_sve": {
+      "description": "llvm-cpu cross-compiled for AArch64 with SVE and scalable vectorization (Neoverse V1). Structure-only locally; timing needs --remote-host.",
+      "cross_compiled": true,
+      "compile_flags": [
+        "--iree-hal-target-device=local",
+        "--iree-hal-local-target-device-backends=llvm-cpu",
+        "--iree-llvmcpu-target-triple=aarch64-unknown-linux-gnu",
+        "--iree-llvmcpu-target-cpu=neoverse-v1",
+        "--iree-llvmcpu-enable-scalable-vectorization"
+      ],
+      "run_flags": [
+        "--device=local-task"
+      ]
     }
   },
   "configs": {

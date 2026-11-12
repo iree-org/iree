@@ -5,6 +5,9 @@ ways:
 
 * **Structure**: which dispatches the compiler forms for each case and whether
   they are data-tiled. This is deterministic and needs no benchmarking host.
+* **Codegen configuration** (optional, `--codegen-configs`): which codegen
+  pipeline strategy selection picked for each dispatch and the tile sizes it
+  attached to each op. Also deterministic, but target-specific.
 * **Time**: the median run time of each case, measured with
   `iree-benchmark-module`. This is for local A/B checks on a quiet machine.
 
@@ -111,6 +114,13 @@ python3 tests/microbenchmarks/run_microbenchmarks.py \
 
 * `--structure-only`: compile to the flow phase only. Takes seconds for the
   whole suite.
+* `--codegen-configs`: also compile to the executable-configurations phase
+  and record the `translation_info` of each dispatch and the `lowering_config`
+  of each op. Use it for changes to backend strategy selection, which leave
+  the flow-phase structure untouched.
+* `--compile-only`: compile the modules but run nothing. In A/B mode this
+  shows which modules differ between the two compilers; it also works for
+  cross-compiled targets.
 * `--case 'conv/*' --case '*qdq*'`, `--exclude-case`, `--config dt_uk`: select
   work. `--list` prints the selected `case@config` pairs.
 * `--repetitions 5 --min-time 0.2s`: Google Benchmark repetitions and minimum
@@ -137,6 +147,11 @@ are interleaved to reduce drift. A/B over flags with one binary works with
 `--base-flags` / `--head-flags`, e.g.
 `--base-flags='' --head-flags='--iree-opt-experimental-early-data-tiling'`.
 
+In A/B mode the compiled modules are compared first. Entries whose base and
+head modules are byte-identical are not timed, because any difference would be
+noise; the report says how many there were. `--bench-identical` times them
+anyway, which is a way to measure the noise floor of the machine.
+
 Two earlier runs can be compared without recompiling:
 
 ```shell
@@ -146,6 +161,40 @@ python3 tests/microbenchmarks/run_microbenchmarks.py \
 
 For CI-style checks, `--fail-on-structural-change` and `--fail-on-error` set a
 non-zero exit code.
+
+### Other targets and remote machines
+
+The manifest has cross-compiled targets next to the host ones:
+`riscv64_rvv`, `x86_64_avx2`, `x86_64_avx512` and `aarch64_sve`. On their own
+they support `--structure-only` and `--compile-only`, which is enough to see
+what a change does to the selected configurations and the generated modules
+on a target you cannot run:
+
+```shell
+python3 tests/microbenchmarks/run_microbenchmarks.py \
+  --base=<base-build>/tools/iree-compile --head=<build>/tools/iree-compile \
+  --target x86_64_avx512 --compile-only --codegen-configs -o /tmp/mb-x86
+```
+
+To time a cross-compiled target, run the benchmarks on a matching machine over
+ssh. The machine needs an `iree-benchmark-module` built from the same source
+(a runtime-only build, `-DIREE_BUILD_COMPILER=OFF`, is enough):
+
+```shell
+python3 tests/microbenchmarks/run_microbenchmarks.py \
+  --base=<base-build>/tools/iree-compile --head=<build>/tools/iree-compile \
+  --target riscv64_rvv --remote-host user@board \
+  --remote-iree-benchmark-module /home/user/iree-rt-build/tools/iree-benchmark-module \
+  -o /tmp/mb-rv
+```
+
+Modules are compiled locally, copied through the ssh connection and run on the
+remote host. `--remote-dir` sets the scratch directory there and
+`--ssh-command` replaces `ssh` (options, a jump host, a wrapper). The same
+settings can live in the target as a `remote` object with `host`, `dir`,
+`iree_benchmark_module` and `ssh`. Base and head still alternate per entry;
+on a small board, check for a run-order bias by swapping `--base` and `--head`
+once.
 
 ### Base build in a worktree
 
@@ -211,15 +260,33 @@ instead of looking for `mmt4d` in later phases because the flow phase is
 target-independent, cheap to reach and already shows whether the contraction
 was selected for data tiling.
 
+### Reading the codegen configuration
+
+With `--codegen-configs`, each entry also has a `codegen` list with one item
+per dispatch function: its `translation_info` (pipeline and pipeline options,
+e.g. `ConvTileAndDecomposeExpert` with `enable_loop_peeling`) and, in order,
+every op that carries a `lowering_config` with that config. This is the output
+of strategy selection, before any lowering runs. Dispatches added by the
+backend, such as the pack dispatches of data-tiled operands, show up here but
+not in the flow-phase structure.
+
+Unlike the structure, this depends on the target and its CPU features. An A/B
+report gets a **Codegen configuration changes** section with the lines only in
+base and only in head, and `structure.<side>.json` includes the configs.
+
 ### Reading an A/B report
 
 * **Structural changes** lists every entry whose dispatch list (names and tags,
   in order) or status differs, with the dispatches only in base and only in
   head. Any change is listed, whatever the time does.
+* **Codegen configuration changes** (with `--codegen-configs`) lists every
+  entry whose pipelines or lowering configs differ. `--fail-on-structural-change`
+  covers these too.
 * **Time changes** lists entries whose head/base median ratio is outside
   `1 +/- --threshold` (default 5%) and whose base and head samples do not
   overlap (min..max). Ratio > 1 means head is slower.
-* **All results** has every entry with both medians and the ratio. Entries
+* **All results** has every entry with both medians and the ratio, and whether
+  the two modules are identical. Entries
   over the threshold whose samples overlap are marked `noise` there and not
   listed as time changes.
 
