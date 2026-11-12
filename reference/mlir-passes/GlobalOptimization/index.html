@@ -6758,11 +6758,17 @@
 <p>Rewrites every linalg op that implements a convolution, named or generic,
 as an all-parallel <code>linalg.generic</code> that gathers the convolved input
 windows, followed by a contraction over the gathered tensor with the
-original payload. Contraction loops are collapsed wherever the operand
+original payload. The match is on the input access, a sum of scaled loops
+that is not a projected permutation, so it also covers what unit dimension
+folding leaves of a convolution whose filter window has extent one along a
+strided axis, which is no longer a convolution. Contraction loops are collapsed wherever the operand
 layouts allow, so standard layouts become plain or batched matmuls.
 Convolutions without an output channel dimension, i.e. depthwise
 convolutions with a unit multiplier and pooling ops, are left unchanged:
-nothing reuses the gathered input, so the rewrite never pays off.</p>
+nothing reuses the gathered input, so the rewrite never pays off. The
+exception is a convolution whose gather is identical to that of another
+rewritten convolution, such as the input window sum of a quantized
+convolution with a weight zero point; it reads the shared gather.</p>
 <p>The pass expects quantization to be lowered already: quantized
 convolutions such as <code>linalg.conv_2d_nhwc_hwcf_q</code> are not matched, and
 dequantize producers are not looked through.</p>
