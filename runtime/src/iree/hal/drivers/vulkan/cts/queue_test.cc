@@ -6,6 +6,9 @@
 
 // Vulkan-specific queue API tests
 
+#include <cstdint>
+#include <vector>
+
 #include "iree/hal/cts/util/test_base.h"
 #include "iree/hal/local/transient_buffer.h"
 
@@ -159,5 +162,199 @@ TEST_P(VulkanQueueDeallocaTest, FailedSubmissionAllowsRetry) {
 }
 
 CTS_REGISTER_TEST_SUITE(VulkanQueueDeallocaTest);
+
+class VulkanQueueCacheMaintenanceTest : public CtsTestBase<> {
+ protected:
+  iree_status_t AllocateCoherentStagingBuffer(
+      iree_device_size_t size, iree_hal_buffer_t** out_buffer) {
+    iree_hal_buffer_params_t params = {0};
+    params.type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                  IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+    params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+    params.usage =
+        IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
+    return iree_hal_allocator_allocate_buffer(device_allocator_, params, size,
+                                               out_buffer);
+  }
+
+  int64_t QueryNativeReplayCache(iree_string_view_t key) {
+    int64_t value = 0;
+    IREE_EXPECT_OK(iree_hal_device_query_i64(
+        device_, IREE_SV("vulkan.queue.native_replay_cache"), key, &value));
+    return value;
+  }
+};
+
+TEST_P(VulkanQueueCacheMaintenanceTest, ProducerWaitOrdersCoherentTransfer) {
+  constexpr iree_device_size_t kSize = 16;
+  const uint32_t source_data[4] = {11, 22, 33, 44};
+  Ref<iree_hal_buffer_t> source;
+  Ref<iree_hal_buffer_t> target;
+  IREE_ASSERT_OK(AllocateCoherentStagingBuffer(kSize, source.out()));
+  IREE_ASSERT_OK(AllocateCoherentStagingBuffer(kSize, target.out()));
+  IREE_ASSERT_OK(
+      iree_hal_buffer_map_write(source, 0, source_data, sizeof(source_data)));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  iree_hal_buffer_ref_t source_ref =
+      iree_hal_make_buffer_ref(source, 0, kSize);
+  iree_hal_buffer_ref_t target_ref =
+      iree_hal_make_buffer_ref(target, 0, kSize);
+  IREE_ASSERT_OK(
+      iree_hal_command_buffer_invalidate_buffer(command_buffer, source_ref));
+  IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
+      command_buffer, source_ref, target_ref, IREE_HAL_COPY_FLAG_NONE));
+  IREE_ASSERT_OK(
+      iree_hal_command_buffer_flush_buffer(command_buffer, target_ref));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  SemaphoreList producer(device_, {0}, {1});
+  SemaphoreList completion(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, producer, completion,
+      command_buffer, iree_hal_buffer_binding_table_empty(),
+      IREE_HAL_EXECUTE_FLAG_NONE));
+  EXPECT_FALSE(iree_hal_semaphore_list_poll(completion));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_signal(producer, /*frontier=*/NULL));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      completion, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+  EXPECT_EQ(ReadBufferData<uint32_t>(target),
+            (std::vector<uint32_t>{11, 22, 33, 44}));
+}
+
+TEST_P(VulkanQueueCacheMaintenanceTest, ReplaysIndirectMaintenanceWithNewBinding) {
+  if (QueryNativeReplayCache(IREE_SV("max_instance_count")) == 0) {
+    GTEST_SKIP() << "Vulkan native replay cache is disabled";
+  }
+  IREE_ASSERT_OK(iree_hal_device_trim(device_));
+  if (QueryNativeReplayCache(IREE_SV("instance_count")) >=
+      QueryNativeReplayCache(IREE_SV("max_instance_count"))) {
+    GTEST_SKIP() << "Vulkan native replay cache is full";
+  }
+  const int64_t initial_hit_count =
+      QueryNativeReplayCache(IREE_SV("hit_count"));
+  const int64_t initial_create_count =
+      QueryNativeReplayCache(IREE_SV("create_count"));
+
+  constexpr iree_device_size_t kSize = 16;
+  constexpr uint32_t kPattern = 0x12345678;
+  const uint32_t zeros[4] = {0, 0, 0, 0};
+  Ref<iree_hal_buffer_t> buffer_a;
+  Ref<iree_hal_buffer_t> buffer_b;
+  IREE_ASSERT_OK(AllocateCoherentStagingBuffer(kSize, buffer_a.out()));
+  IREE_ASSERT_OK(AllocateCoherentStagingBuffer(kSize, buffer_b.out()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(buffer_a, 0, zeros, sizeof(zeros)));
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(buffer_b, 0, zeros, sizeof(zeros)));
+
+  constexpr iree_hal_queue_affinity_t kQueueAffinity = 1ull;
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, kQueueAffinity,
+      /*binding_capacity=*/1, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  iree_hal_buffer_ref_t target_ref =
+      iree_hal_make_indirect_buffer_ref(/*buffer_slot=*/0, /*offset=*/4,
+                                        /*length=*/8);
+  IREE_ASSERT_OK(
+      iree_hal_command_buffer_invalidate_buffer(command_buffer, target_ref));
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      command_buffer, target_ref, &kPattern, sizeof(kPattern),
+      IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(
+      iree_hal_command_buffer_flush_buffer(command_buffer, target_ref));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  for (int i = 0; i < 2; ++i) {
+    iree_hal_buffer_t* buffer = i == 0 ? buffer_a.get() : buffer_b.get();
+    iree_hal_buffer_binding_t binding = {buffer, 0, kSize};
+    iree_hal_buffer_binding_table_t binding_table = {1, &binding};
+    SemaphoreList completion(device_, {0}, {1});
+    IREE_ASSERT_OK(iree_hal_device_queue_execute(
+        device_, kQueueAffinity, iree_hal_semaphore_list_empty(), completion,
+        command_buffer, binding_table, IREE_HAL_EXECUTE_FLAG_NONE));
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        completion, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
+    EXPECT_EQ(ReadBufferData<uint32_t>(buffer),
+              (std::vector<uint32_t>{0, kPattern, kPattern, 0}));
+  }
+  EXPECT_EQ(initial_hit_count, QueryNativeReplayCache(IREE_SV("hit_count")));
+  EXPECT_EQ(initial_create_count,
+            QueryNativeReplayCache(IREE_SV("create_count")));
+}
+
+TEST_P(VulkanQueueCacheMaintenanceTest, ReplayFailureFailsCompletionSemaphore) {
+  constexpr iree_device_size_t kSize = 16;
+  Ref<iree_hal_buffer_t> coherent_buffer;
+  IREE_ASSERT_OK(
+      AllocateCoherentStagingBuffer(kSize, coherent_buffer.out()));
+
+  iree_hal_buffer_params_t candidate_params = {0};
+  candidate_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                          IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  candidate_params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  candidate_params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
+  Ref<iree_hal_buffer_t> candidate;
+  iree_status_t allocation_status = iree_hal_allocator_allocate_buffer(
+      device_allocator_, candidate_params, kSize, candidate.out());
+  if (!iree_status_is_ok(allocation_status)) {
+    iree_status_ignore(allocation_status);
+  }
+  const bool has_noncoherent_buffer =
+      candidate.get() != nullptr &&
+      !iree_all_bits_set(iree_hal_buffer_memory_type(candidate),
+                         IREE_HAL_MEMORY_TYPE_HOST_COHERENT);
+
+  // HAL validates short bindings before queue submission. For the range
+  // fallback, let native replay report the error so semaphore propagation is
+  // exercised on devices with only coherent memory.
+  const iree_hal_command_buffer_mode_t mode =
+      has_noncoherent_buffer
+          ? IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT
+          : IREE_HAL_COMMAND_BUFFER_MODE_DEFAULT |
+                IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED;
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, mode,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/1, command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_invalidate_buffer(
+      command_buffer,
+      iree_hal_make_indirect_buffer_ref(/*buffer_slot=*/0, /*offset=*/4,
+                                        /*length=*/8)));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  iree_hal_buffer_binding_t binding = {
+      has_noncoherent_buffer ? candidate.get() : coherent_buffer.get(), 0,
+      has_noncoherent_buffer ? kSize : 8};
+  iree_hal_buffer_binding_table_t binding_table = {1, &binding};
+  const iree_status_code_t expected_status =
+      has_noncoherent_buffer ? IREE_STATUS_UNIMPLEMENTED
+                             : IREE_STATUS_OUT_OF_RANGE;
+  SemaphoreList gate(device_, {0}, {1});
+  SemaphoreList completion(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, gate, completion, command_buffer,
+      binding_table, IREE_HAL_EXECUTE_FLAG_NONE));
+  EXPECT_FALSE(iree_hal_semaphore_list_poll(completion));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_signal(gate, /*frontier=*/NULL));
+  IREE_EXPECT_STATUS_IS(
+      expected_status,
+      iree_hal_semaphore_list_wait(completion, iree_infinite_timeout(),
+                                   IREE_ASYNC_WAIT_FLAG_NONE));
+  uint64_t value = 0;
+  IREE_EXPECT_STATUS_IS(expected_status,
+                        iree_hal_semaphore_query(completion.semaphores[0],
+                                                 &value));
+  EXPECT_GE(value, IREE_HAL_SEMAPHORE_FAILURE_VALUE);
+}
+
+CTS_REGISTER_TEST_SUITE(VulkanQueueCacheMaintenanceTest);
 
 }  // namespace iree::hal::cts
