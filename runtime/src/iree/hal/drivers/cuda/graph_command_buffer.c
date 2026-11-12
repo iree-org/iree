@@ -416,8 +416,9 @@ iree_hal_cuda_graph_command_buffer_execution_barrier_internal(
   IREE_RETURN_IF_ERROR(
       iree_hal_cuda_graph_command_buffer_flush_collectives(command_buffer));
 
-  IREE_ASSERT_GT(command_buffer->graph_node_count, 0,
-                 "expected at least one node before a barrier");
+  // Cache maintenance can be a no-op and leave no nodes to join. Retain the
+  // previous barrier node so subsequent commands still depend on it.
+  if (command_buffer->graph_node_count == 0) return iree_ok_status();
 
   // Use the last node as a barrier to avoid creating redundant empty nodes.
   if (IREE_LIKELY(command_buffer->graph_node_count == 1)) {
@@ -490,6 +491,39 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_advise_buffer(
   // We could mark the memory as invalidated so that if this is a managed buffer
   // CUDA does not try to copy it back to the host.
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_cuda_graph_command_buffer_cache_maintenance(
+    iree_hal_buffer_ref_t target_ref, const char* operation) {
+  if (!target_ref.buffer) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "CUDA graph %s buffer reference is NULL", operation);
+  }
+  // Direct graph bindings are concrete at recording time. Coherent memory
+  // needs no cache operation; graph and submission dependencies order accesses.
+  if (iree_all_bits_set(iree_hal_buffer_memory_type(target_ref.buffer),
+                        IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+    return iree_ok_status();
+  }
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "CUDA graph %s requires unsupported execution-time cache maintenance "
+      "for non-coherent memory",
+      operation);
+}
+
+static iree_status_t iree_hal_cuda_graph_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  return iree_hal_cuda_graph_command_buffer_cache_maintenance(target_ref,
+                                                              "flush_buffer");
+}
+
+static iree_status_t iree_hal_cuda_graph_command_buffer_invalidate_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  return iree_hal_cuda_graph_command_buffer_cache_maintenance(
+      target_ref, "invalidate_buffer");
 }
 
 // Splats a pattern value of 1/2/4 bytes out to a 4 byte value.
@@ -863,6 +897,9 @@ static const iree_hal_command_buffer_vtable_t
         .reset_event = iree_hal_cuda_graph_command_buffer_reset_event,
         .wait_events = iree_hal_cuda_graph_command_buffer_wait_events,
         .advise_buffer = iree_hal_cuda_graph_command_buffer_advise_buffer,
+        .flush_buffer = iree_hal_cuda_graph_command_buffer_flush_buffer,
+        .invalidate_buffer =
+            iree_hal_cuda_graph_command_buffer_invalidate_buffer,
         .fill_buffer = iree_hal_cuda_graph_command_buffer_fill_buffer,
         .update_buffer = iree_hal_cuda_graph_command_buffer_update_buffer,
         .copy_buffer = iree_hal_cuda_graph_command_buffer_copy_buffer,
