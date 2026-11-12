@@ -153,5 +153,121 @@ TEST_F(HipGraphCommandBufferTest,
   IREE_EXPECT_OK(status);
 }
 
+TEST_F(HipGraphCommandBufferTest, CoherentCacheMaintenanceAndEmptyBarriers) {
+  iree_hal_buffer_params_t buffer_params = {0};
+  buffer_params.type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                       IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  buffer_params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  buffer_params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
+
+  iree_hal_buffer_t* buffer = NULL;
+  iree_status_t status = iree_hal_allocator_allocate_buffer(
+      iree_hal_device_allocator(device_), buffer_params, sizeof(uint32_t),
+      &buffer);
+  if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
+    GTEST_SKIP() << "Allocator does not support coherent staging buffers";
+  }
+
+  iree_hal_buffer_params_t fill_buffer_params = buffer_params;
+  fill_buffer_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  iree_hal_buffer_t* fill_buffer = NULL;
+  status = iree_hal_allocator_allocate_buffer(
+      iree_hal_device_allocator(device_), fill_buffer_params, sizeof(uint32_t),
+      &fill_buffer);
+  if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
+    iree_hal_buffer_release(buffer);
+    GTEST_SKIP() << "Allocator does not support device-local buffers";
+  }
+
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  status = iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, &command_buffer);
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_begin(command_buffer);
+  }
+
+  iree_hal_buffer_ref_t target_ref =
+      iree_hal_make_buffer_ref(buffer, 0, sizeof(uint32_t));
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_invalidate_buffer(command_buffer,
+                                                       target_ref);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_execution_barrier(
+        command_buffer, IREE_HAL_EXECUTION_STAGE_TRANSFER,
+        IREE_HAL_EXECUTION_STAGE_TRANSFER,
+        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, nullptr, 0, nullptr);
+  }
+  const uint32_t pattern = 0x12345678;
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_fill_buffer(
+        command_buffer,
+        iree_hal_make_buffer_ref(fill_buffer, 0, sizeof(uint32_t)), &pattern,
+        sizeof(pattern), IREE_HAL_FILL_FLAG_NONE);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_execution_barrier(
+        command_buffer, IREE_HAL_EXECUTION_STAGE_TRANSFER,
+        IREE_HAL_EXECUTION_STAGE_TRANSFER,
+        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, nullptr, 0, nullptr);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_flush_buffer(command_buffer, target_ref);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_execution_barrier(
+        command_buffer, IREE_HAL_EXECUTION_STAGE_TRANSFER,
+        IREE_HAL_EXECUTION_STAGE_TRANSFER,
+        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, 0, nullptr, 0, nullptr);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_command_buffer_end(command_buffer);
+  }
+
+  iree_hal_command_buffer_release(command_buffer);
+  iree_hal_buffer_release(fill_buffer);
+  iree_hal_buffer_release(buffer);
+  IREE_EXPECT_OK(status);
+}
+
+TEST_F(HipGraphCommandBufferTest, UnsupportedCacheMaintenanceFails) {
+  iree_hal_buffer_params_t buffer_params = {0};
+  buffer_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  buffer_params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  buffer_params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
+
+  iree_hal_buffer_t* buffer = NULL;
+  iree_status_t status = iree_hal_allocator_allocate_buffer(
+      iree_hal_device_allocator(device_), buffer_params, sizeof(uint32_t),
+      &buffer);
+  if (!iree_status_is_ok(status)) {
+    iree_status_ignore(status);
+    GTEST_SKIP() << "Allocator does not support device-local buffers";
+  }
+
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*binding_capacity=*/0, &command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+
+  iree_hal_buffer_ref_t target_ref =
+      iree_hal_make_buffer_ref(buffer, 0, sizeof(uint32_t));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNIMPLEMENTED,
+                        iree_hal_command_buffer_flush_buffer(command_buffer,
+                                                             target_ref));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNIMPLEMENTED,
+                        iree_hal_command_buffer_invalidate_buffer(
+                            command_buffer, target_ref));
+
+  iree_hal_command_buffer_release(command_buffer);
+  iree_hal_buffer_release(buffer);
+}
+
 }  // namespace
 }  // namespace iree::hal::hip
