@@ -265,6 +265,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:VectorDialect",
         "@llvm-project//mlir:VectorToGPU",
         "@llvm-project//mlir:VectorToLLVM",
+        "@llvm-project//mlir:VectorToNVGPU",
         "@llvm-project//mlir:VectorToSCF",
         "@llvm-project//mlir:VectorTransforms",
         "@llvm-project//mlir:VectorUtils",

@@ -19,6 +19,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Conversion/VectorToNVGPU/VectorToNVGPU.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
@@ -688,7 +689,11 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
   // ops. Convert slice of contract operations to mma_sync/wmma ops.
   RewritePatternSet patterns(ctx);
   mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-  populatePrepareVectorToMMAPatterns(patterns, getUseMmaSync());
+  if (getUseMmaSync()) {
+    populatePrepareVectorToNVMMAPatterns(patterns);
+  } else {
+    populatePrepareVectorToMMAPatterns(patterns);
+  }
   if (failed(applyPatternsGreedily(target, std::move(patterns), config))) {
     target->emitOpError("vector to mma preparation patterns failed to apply");
     return emitDefaultDefiniteFailure(target);

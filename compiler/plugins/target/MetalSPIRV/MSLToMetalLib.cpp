@@ -65,7 +65,7 @@ static LogicalResult runSystemCommand(llvm::StringRef command) {
 std::unique_ptr<llvm::MemoryBuffer>
 compileMSLToMetalLib(MetalTargetPlatform targetPlatform,
                      llvm::StringRef mslCode, llvm::StringRef entryPoint) {
-  llvm::SmallString<32> mslFile, airFile, libFile;
+  llvm::SmallString<32> mslFile, libFile;
   int mslFd = 0;
   llvm::sys::fs::createTemporaryFile(entryPoint, "metal", mslFd, mslFile);
   llvm::sys::fs::createTemporaryFile(entryPoint, "metallib", libFile);

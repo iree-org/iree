@@ -434,8 +434,7 @@ public:
       RewritePatternSet patterns(context);
       vector::ContractionOp::getCanonicalizationPatterns(patterns, context);
       populateCombineVectorTransferReadBroadcastPatterns(patterns);
-      populatePrepareVectorToMMAPatterns(patterns,
-                                         /*useNvGPU=*/false);
+      populatePrepareVectorToMMAPatterns(patterns);
       if (failed(applyPatternsGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }

@@ -620,7 +620,7 @@ public:
 
     fam.registerPass([&] { return targetMachine.getTargetIRAnalysis(); });
 
-    llvm::PipelineTuningOptions pto(&module.getContext().getLibraryOptions());
+    llvm::PipelineTuningOptions pto;
     pto.SLPVectorization = slpVectorization;
 
     llvm::PassInstrumentationCallbacks pic;

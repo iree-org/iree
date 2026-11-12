@@ -43,6 +43,7 @@ iree_cc_library(
     LLVMSupport
     MLIRArithDialect
     MLIRControlFlowDialect
+    MLIRControlFlowInterfaces
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR

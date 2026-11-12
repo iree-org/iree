@@ -43,7 +43,8 @@ public:
   void visitNonControlFlowArguments(
       Operation *op, const RegionSuccessor &successor,
       ValueRange successorInputs,
-      ArrayRef<IntegerDivisibilityLattice *> argLattices) override;
+      ArrayRef<IntegerDivisibilityLattice *> argLattices,
+      GetLatticeFn getLattice) override;
 };
 
 } // namespace mlir::iree_compiler::IREE::Util
