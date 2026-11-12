@@ -633,9 +633,8 @@ static inline uint8_t iree_math_f32_to_f8e8m0fnu(float value) {
   // Normalized is in the interval [0.5, 1.0).
   float normalized = frexpf(value, &exp);
   // If the normalized value is closer to 0.5 than to 1.0, decrement the
-  // exponent. At a midpoint, choose the even exponent encoding.
-  int rounded =
-      exp - (normalized < 0.75f || (normalized == 0.75f && ((exp + 127) & 1)));
+  // exponent.
+  int rounded = exp - (normalized < 0.75f);
   int biased = rounded + 127;
   // The clamping below is to 0xFF, mapping to NaN any value that is larger than
   // the max finite value.

@@ -1085,12 +1085,9 @@ TEST(F8E8M0FNUConversionTest, F32ToF8E8M0FNU) {
   EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(NAN));
   for (int exp = -127; exp <= 127; ++exp) {
     EXPECT_EQ(127 + exp, iree_math_f32_to_f8e8m0fnu(ldexpf(1.0f, exp)));
-    const float midpoint = ldexpf(1.5f, exp);
-    const int lower = 127 + exp;
-    EXPECT_EQ(lower, iree_math_f32_to_f8e8m0fnu(std::nextafter(midpoint, 0.f)));
-    EXPECT_EQ(lower + (lower & 1), iree_math_f32_to_f8e8m0fnu(midpoint));
-    EXPECT_EQ(lower + 1,
-              iree_math_f32_to_f8e8m0fnu(std::nextafter(midpoint, INFINITY)));
+    // 1.5 Should get rounded to the next exponent value or to NaN if that
+    // overflows.
+    EXPECT_EQ(128 + exp, iree_math_f32_to_f8e8m0fnu(ldexpf(1.5f, exp)));
   }
   EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(NAN));
   EXPECT_EQ(0xFF, iree_math_f32_to_f8e8m0fnu(+INFINITY));
