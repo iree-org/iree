@@ -17,9 +17,15 @@ on:
         type: string
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   test_onnx_ops:
     name: "test_onnx_ops :: ${{ matrix.name }}"
+    permissions:
+      contents: read
+      actions: read  # setup_venv.py --fetch-gh-workflow (dispatch with artifact_run_id).
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
@@ -136,6 +142,9 @@ jobs:
 
   test_onnx_models:
     name: "test_onnx_models :: ${{ matrix.name }}"
+    permissions:
+      contents: read
+      actions: read  # setup_venv.py --fetch-gh-workflow (dispatch with artifact_run_id).
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false

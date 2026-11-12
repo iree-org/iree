@@ -17,8 +17,14 @@ on:
         type: string
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   test_r9700:
+    permissions:
+      contents: read
+      actions: read  # setup_venv.py --fetch-gh-workflow (dispatch with artifact_run_id).
     runs-on: [Linux, X64, iree-r9700]
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages

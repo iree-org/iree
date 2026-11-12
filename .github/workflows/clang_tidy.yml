@@ -20,8 +20,7 @@ on:
       - '.github/workflows/clang_tidy.yml'
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -33,6 +32,10 @@ jobs:
     if: >-
       github.event.pull_request.stack == null ||
       github.event.pull_request.stack.base.ref == github.event.pull_request.base.ref
+    permissions:
+      contents: read
+      actions: read  # Download iree-clang-tidy from a build_clang_tidy.yml run.
+      pull-requests: read  # Fetch the PR diff (here and in cpp-linter).
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
@@ -98,9 +101,13 @@ jobs:
             "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
           if [[ "${status_code}" == "200" ]]; then
             echo "use_cpp_linter=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "GitHub PR diff request returned ${status_code}; running clang-tidy locally on changed files."
+          elif [[ "${status_code}" == "406" ]] && grep -qE '"code": ?"too_large"' /tmp/pr.diff; then
+            echo "GitHub refused the PR diff as too large; skipping clang-tidy."
             echo "use_cpp_linter=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "::error title=PR diff request failed::GitHub returned HTTP ${status_code} for the PR diff."
+            cat /tmp/pr.diff
+            exit 1
           fi
 
       - name: Run clang-tidy
@@ -138,4 +145,4 @@ jobs:
             exit 0
           fi
 
-          echo "::warning title=clang-tidy skipped::GitHub refused the PR diff because it exceeds the 20,000-line API limit, so cpp-linter cannot compute changed-line diagnostics for $(wc -l < "${changed_files}") changed C/C++ files."
+          echo "::warning title=clang-tidy skipped::GitHub refused the PR diff as too large (the API caps diffs at 300 files and 20,000 lines), so cpp-linter cannot compute changed-line diagnostics for $(wc -l < "${changed_files}") changed C/C++ files."

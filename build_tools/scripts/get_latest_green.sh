@@ -41,7 +41,10 @@ function get_latest_green() {
 
     local all_passing="true"
     for workflow in "${REQUIRED_WORKFLOWS[@]}"; do
-      local successful_run_count="$(\
+      # Declared separately: `local x="$(cmd)"` discards cmd's exit status, so a
+      # failed API call (e.g. 403) would count as zero runs instead of aborting.
+      local successful_run_count
+      successful_run_count="$(\
         gh api --jq '.total_count' \
         "/repos/iree-org/iree/actions/workflows/${workflow}/runs?${query_string}" \
       )"
