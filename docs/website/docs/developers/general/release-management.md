@@ -274,7 +274,7 @@ module version, and whether they changed since the previous release:
 
 1. Push to PyPI by running the
     [Publish to PyPI](https://github.com/iree-org/iree/actions/workflows/publish_pypi.yml)
-    workflow with the candidate's tag:
+    workflow with the candidate's tag. Only release maintainers can run it:
 
     ```bash
     gh workflow run publish_pypi.yml --repo iree-org/iree \
