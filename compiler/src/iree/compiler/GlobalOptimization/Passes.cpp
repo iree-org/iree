@@ -223,6 +223,10 @@ void buildGlobalOptimizationPassPipeline(
   FunctionLikeNest(mainPassManager)
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createConvertQDQToIntegerMathPass)
+      // The QDQ rewrite replaces named contractions, which unit dim folding
+      // skips, with generics. Fold the unit dims those generics still carry.
+      .addPredicatedPass(clConvertQDQToIntegerMath,
+                         DispatchCreation::createFoldUnitExtentDimsForFuncPass)
       .addPredicatedPass(transformOptions.useIm2colForConvs,
                          createConvertConvToIm2ColPass)
       .addPass([&]() {

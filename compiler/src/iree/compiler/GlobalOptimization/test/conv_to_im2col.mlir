@@ -656,3 +656,169 @@ func.func @conv_compilation_info(%input: tensor<1x16x16x4xf32>, %filter: tensor<
 //       CHECK:   linalg.conv_2d_nhwc_hwcf
 //  CHECK-SAME:       compilation_info =
 //   CHECK-NOT:   linalg.generic
+
+// -----
+
+// Unit dimension folding turns a strided 1x1 convolution into a contraction
+// that reads its input with strides. It is no longer a convolution, but its
+// input is gathered in the same way.
+#input_map = affine_map<(d0, d1, d2, d3) -> (d3, d1 * 2, d2 * 2)>
+#filter_map = affine_map<(d0, d1, d2, d3) -> (d0, d3)>
+#output_map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+func.func @strided_contraction(%input: tensor<32x8x8xf32>, %filter: tensor<16x32xf32>,
+                               %init: tensor<16x4x4xf32>) -> tensor<16x4x4xf32> {
+  %0 = linalg.generic {indexing_maps = [#input_map, #filter_map, #output_map],
+                       iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+      ins(%input, %filter : tensor<32x8x8xf32>, tensor<16x32xf32>) outs(%init : tensor<16x4x4xf32>) {
+  ^bb0(%in: f32, %weight: f32, %acc: f32):
+    %mul = arith.mulf %in, %weight : f32
+    %add = arith.addf %acc, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<16x4x4xf32>
+  return %0 : tensor<16x4x4xf32>
+}
+// CHECK-DAG:  #[[$GATHER_READ:.+]] = affine_map<(d0, d1, d2) -> (d2, d0 * 2, d1 * 2)>
+// CHECK-DAG:  #[[$LHS:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG:  #[[$RHS:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG:  #[[$OUT:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-LABEL: func.func @strided_contraction(
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<32x8x8xf32>
+//  CHECK-SAME:     %[[FILTER:[a-zA-Z0-9_]+]]: tensor<16x32xf32>
+//       CHECK:   %[[GATHER:.+]] = linalg.generic
+//  CHECK-SAME:       indexing_maps = [#[[$GATHER_READ]],
+//  CHECK-SAME:       ins(%[[INPUT]] : tensor<32x8x8xf32>)
+//  CHECK-SAME:       outs(%{{.+}} : tensor<4x4x32xf32>)
+//       CHECK:   %[[LHS:.+]] = tensor.collapse_shape %[[GATHER]] {{\[}}[0, 1], [2]] : tensor<4x4x32xf32> into tensor<16x32xf32>
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       indexing_maps = [#[[$LHS]], #[[$RHS]], #[[$OUT]]]
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction"]
+//  CHECK-SAME:       ins(%[[LHS]], %[[FILTER]] : tensor<16x32xf32>, tensor<16x32xf32>)
+//  CHECK-SAME:       outs(%{{.+}} : tensor<16x16xf32>)
+
+// -----
+
+// A filter window of extent one along one strided axis only: folding leaves a
+// bare strided loop next to a regular window access. The integer payload with
+// operand extensions is kept.
+#input_map = affine_map<(d0, d1, d2, d3, d4) -> (d3, d1 * 2, d2 * 2 + d4)>
+#filter_map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+#output_map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+func.func @strided_contraction_with_window(%input: tensor<32x8x9xi8>, %filter: tensor<16x32x3xi8>,
+                                           %init: tensor<16x4x4xi32>) -> tensor<16x4x4xi32> {
+  %0 = linalg.generic {indexing_maps = [#input_map, #filter_map, #output_map],
+                       iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]}
+      ins(%input, %filter : tensor<32x8x9xi8>, tensor<16x32x3xi8>) outs(%init : tensor<16x4x4xi32>) {
+  ^bb0(%in: i8, %weight: i8, %acc: i32):
+    %in_i32 = arith.extsi %in : i8 to i32
+    %weight_i32 = arith.extsi %weight : i8 to i32
+    %mul = arith.muli %in_i32, %weight_i32 : i32
+    %add = arith.addi %acc, %mul : i32
+    linalg.yield %add : i32
+  } -> tensor<16x4x4xi32>
+  return %0 : tensor<16x4x4xi32>
+}
+// CHECK-DAG:  #[[$GATHER_READ:.+]] = affine_map<(d0, d1, d2, d3) -> (d2, d0 * 2, d1 * 2 + d3)>
+// CHECK-DAG:  #[[$LHS:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+// CHECK-DAG:  #[[$RHS:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK-DAG:  #[[$OUT:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-LABEL: func.func @strided_contraction_with_window(
+//       CHECK:   %[[GATHER:.+]] = linalg.generic
+//  CHECK-SAME:       indexing_maps = [#[[$GATHER_READ]],
+//  CHECK-SAME:       outs(%{{.+}} : tensor<4x4x32x3xi8>)
+//       CHECK:   %[[LHS:.+]] = tensor.collapse_shape %[[GATHER]] {{\[}}[0, 1], [2, 3]] : tensor<4x4x32x3xi8> into tensor<16x96xi8>
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       indexing_maps = [#[[$LHS]], #[[$RHS]], #[[$OUT]]]
+//  CHECK-SAME:       ins(%[[LHS]], %{{.+}} : tensor<16x96xi8>, tensor<16x96xi8>)
+//  CHECK-SAME:       outs(%{{.+}} : tensor<16x16xi32>)
+//       CHECK:     arith.extsi
+//       CHECK:     arith.extsi
+//       CHECK:     arith.muli
+//       CHECK:     arith.addi
+
+// -----
+
+// A contraction that reads its input through a projected permutation has
+// nothing to gather and is left to the passes that handle contractions.
+#input_map = affine_map<(d0, d1, d2, d3) -> (d3, d1, d2)>
+#filter_map = affine_map<(d0, d1, d2, d3) -> (d0, d3)>
+#output_map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+func.func @contraction(%input: tensor<32x4x4xf32>, %filter: tensor<16x32xf32>,
+                       %init: tensor<16x4x4xf32>) -> tensor<16x4x4xf32> {
+  %0 = linalg.generic {indexing_maps = [#input_map, #filter_map, #output_map],
+                       iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+      ins(%input, %filter : tensor<32x4x4xf32>, tensor<16x32xf32>) outs(%init : tensor<16x4x4xf32>) {
+  ^bb0(%in: f32, %weight: f32, %acc: f32):
+    %mul = arith.mulf %in, %weight : f32
+    %add = arith.addf %acc, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<16x4x4xf32>
+  return %0 : tensor<16x4x4xf32>
+}
+// CHECK-LABEL: func.func @contraction(
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<32x4x4xf32>
+//   CHECK-NOT:   tensor.collapse_shape
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%[[INPUT]], %{{.+}} : tensor<32x4x4xf32>, tensor<16x32xf32>)
+//   CHECK-NOT:   linalg.generic
+
+// -----
+
+// Named contractions are left alone as well.
+func.func @named_matmul(%lhs: tensor<8x16xf32>, %rhs: tensor<16x32xf32>,
+                        %init: tensor<8x32xf32>) -> tensor<8x32xf32> {
+  %0 = linalg.matmul ins(%lhs, %rhs : tensor<8x16xf32>, tensor<16x32xf32>)
+      outs(%init : tensor<8x32xf32>) -> tensor<8x32xf32>
+  return %0 : tensor<8x32xf32>
+}
+// CHECK-LABEL: func.func @named_matmul(
+//       CHECK:   linalg.matmul
+//   CHECK-NOT:   linalg.generic
+
+// -----
+
+// A strided input without a loop that the input and the other operand reduce
+// over together is not a contraction of the two, so it is not gathered.
+#input_map = affine_map<(d0, d1) -> (d0 * 2)>
+#filter_map = affine_map<(d0, d1) -> (d0, d1)>
+#output_map = affine_map<(d0, d1) -> (d0, d1)>
+func.func @strided_elementwise(%input: tensor<8xf32>, %scale: tensor<4x16xf32>,
+                               %init: tensor<4x16xf32>) -> tensor<4x16xf32> {
+  %0 = linalg.generic {indexing_maps = [#input_map, #filter_map, #output_map],
+                       iterator_types = ["parallel", "parallel"]}
+      ins(%input, %scale : tensor<8xf32>, tensor<4x16xf32>) outs(%init : tensor<4x16xf32>) {
+  ^bb0(%in: f32, %s: f32, %out: f32):
+    %mul = arith.mulf %in, %s : f32
+    linalg.yield %mul : f32
+  } -> tensor<4x16xf32>
+  return %0 : tensor<4x16xf32>
+}
+// CHECK-LABEL: func.func @strided_elementwise(
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<8xf32>
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%[[INPUT]], %{{.+}} : tensor<8xf32>, tensor<4x16xf32>)
+//   CHECK-NOT:   linalg.generic
+
+// -----
+
+// The gather is laid out by the output and filter maps, so an input loop that
+// neither of them uses is rejected.
+#input_map = affine_map<(d0, d1, d2) -> (d1 * 2, d2)>
+#filter_map = affine_map<(d0, d1, d2) -> (d0, d1)>
+#output_map = affine_map<(d0, d1, d2) -> (d0)>
+func.func @input_only_loop(%input: tensor<8x5xf32>, %filter: tensor<16x4xf32>,
+                           %init: tensor<16xf32>) -> tensor<16xf32> {
+  %0 = linalg.generic {indexing_maps = [#input_map, #filter_map, #output_map],
+                       iterator_types = ["parallel", "reduction", "reduction"]}
+      ins(%input, %filter : tensor<8x5xf32>, tensor<16x4xf32>) outs(%init : tensor<16xf32>) {
+  ^bb0(%in: f32, %weight: f32, %acc: f32):
+    %mul = arith.mulf %in, %weight : f32
+    %add = arith.addf %acc, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<16xf32>
+  return %0 : tensor<16xf32>
+}
+// CHECK-LABEL: func.func @input_only_loop(
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<8x5xf32>
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%[[INPUT]], %{{.+}} : tensor<8x5xf32>, tensor<16x4xf32>)
+//   CHECK-NOT:   linalg.generic
