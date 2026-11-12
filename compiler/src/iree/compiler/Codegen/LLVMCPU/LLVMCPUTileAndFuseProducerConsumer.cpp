@@ -22,6 +22,7 @@
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -141,6 +142,42 @@ static Operation *getLastAnchorOpBeforeRootOp(ArrayRef<Operation *> computeOps,
   return nullptr;
 }
 
+/// Returns whether a slice uses the same producer value across every iteration
+/// of the surrounding reduction loops.
+/// Uses a conservative dependency analysis that may reject slices that are
+/// actually invariant, e.g. slices that depend on operations containing
+/// regions.
+static bool isInvariantReductionSlice(tensor::ExtractSliceOp slice,
+                                      Operation *rootOp) {
+  scf::ForOp outermostLoop;
+  for (Operation *parent = slice->getParentOp();
+       parent && parent != rootOp->getParentOp();
+       parent = parent->getParentOp()) {
+    if (auto loop = dyn_cast<scf::ForOp>(parent)) {
+      outermostLoop = loop;
+    }
+  }
+  if (!outermostLoop) {
+    return false;
+  }
+
+  SmallVector<Value> worklist(slice->getOperands());
+  llvm::SmallDenseSet<Value> visited;
+  while (!worklist.empty()) {
+    Value value = worklist.pop_back_val();
+    if (!visited.insert(value).second ||
+        outermostLoop.isDefinedOutsideOfLoop(value)) {
+      continue;
+    }
+    Operation *def = value.getDefiningOp();
+    if (!def || def->getNumRegions() != 0 || !isPure(def)) {
+      return false;
+    }
+    llvm::append_range(worklist, def->getOperands());
+  }
+  return true;
+}
+
 /// Implementation of tile root and fuse producers and consumers greedily. Tile
 /// the root operation and fuse the producers of the root operation then
 /// consumers (finds any missing fusion opportunities, then apply producer
@@ -225,6 +262,17 @@ static FailureOr<Operation *> tileRootAndFuseProducerConsumer(
           bool isDestinationOperand)
       -> std::optional<scf::SCFTileAndFuseOptions::ControlFnResult> {
     Operation *owner = originalProducer.getOwner();
+    // During reduction tiling, avoid fusing a Linalg reduction when every
+    // iteration requests the same producer slice. Keep it outside the loop
+    // to avoid repeating the same computation.
+    if (onlyFuseProducerInputOperands && !isDestinationOperand) {
+      if (auto producer = dyn_cast<linalg::LinalgOp>(owner);
+          producer && producer.hasPureTensorSemantics() &&
+          producer.getNumReductionLoops() != 0 &&
+          isInvariantReductionSlice(candidateSliceOp, rootOp)) {
+        return std::nullopt;
+      }
+    }
     bool yieldProducerReplacement = yieldReplacementsFor.contains(owner);
     // Do not fuse destination operands if onlyFuseProducerInputOperands is
     // true.
