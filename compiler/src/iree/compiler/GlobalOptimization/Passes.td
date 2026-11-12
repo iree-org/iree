@@ -153,7 +153,8 @@ def ExpandTensorShapesPass :
 
 def FoldBroadcastIntoBatchMatmulPass :
     InterfacePass<"iree-global-opt-fold-broadcast-into-batch-matmul", "mlir::FunctionOpInterface"> {
-  let summary = "Folds broadcasts of batch_matmul inputs into its indexing maps.";
+  let summary =
+      "Folds broadcasts of contraction inputs into its indexing maps.";
   let description = [{
     Rewrites `batch_matmul(A, broadcast(B))`, where the weight is shared across
     the batch, into a `batch_matmul` over `A` and `B` whose RHS indexing map
@@ -172,6 +173,10 @@ def FoldBroadcastIntoBatchMatmulPass :
     broadcast's source and the broadcast is folded into the contraction map in
     the same step, so the weights are dequantized once rather than once per
     batch element.
+
+    A contraction that is already a `linalg.generic`, such as a `batch_matmul`
+    generalized earlier in the pipeline, is recognized through the contraction
+    interface and folded the same way; it stays a generic.
   }];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",

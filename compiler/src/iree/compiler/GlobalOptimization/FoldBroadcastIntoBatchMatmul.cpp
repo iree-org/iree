@@ -18,6 +18,10 @@
 // at the rank of `W_q` and the broadcast is folded into the contraction map in
 // the same step, so no broadcast ever sits between the dequantize and the
 // contraction and the weights are dequantized once instead of once per batch.
+//
+// Contractions that are already `linalg.generic` ops, for example because named
+// contractions were generalized earlier in the pipeline, are folded the same
+// way: they are recognized through the contraction interface and stay generic.
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
@@ -192,6 +196,19 @@ static Value materializeFoldedInput(RewriterBase &rewriter,
   return folded->getResult(0);
 }
 
+/// Replaces every entry of `inputs` that has a matched producer with the value
+/// the contraction reads after the fold.
+static void
+materializeFoldedInputs(RewriterBase &rewriter,
+                        ArrayRef<std::optional<FoldableProducer>> producers,
+                        MutableArrayRef<Value> inputs) {
+  for (auto [input, producer] : llvm::zip_equal(inputs, producers)) {
+    if (producer) {
+      input = materializeFoldedInput(rewriter, *producer);
+    }
+  }
+}
+
 /// Returns the default map of the given batch_matmul input.
 static AffineMap getDefaultInputMap(linalg::BatchMatmulOp op, bool isLhs) {
   SmallVector<AffineMap> defaultMaps =
@@ -274,11 +291,7 @@ struct FoldBroadcastIntoBatchMatmul
     // first.
     SmallVector<Value> inputs(op.getDpsInputs());
     auto materializeInputs = [&]() {
-      for (auto [input, producer] : llvm::zip_equal(inputs, producers)) {
-        if (producer) {
-          input = materializeFoldedInput(rewriter, *producer);
-        }
-      }
+      materializeFoldedInputs(rewriter, producers, inputs);
     };
     if (!needsGeneric) {
       materializeInputs();
@@ -303,13 +316,88 @@ struct FoldBroadcastIntoBatchMatmul
   }
 };
 
+/// Returns true if a generic contraction whose loops are classified by `dims`
+/// is still a contraction with the same loops once its maps are `maps`, where
+/// `foldedMap` is the new map of one input: the input still reads a reduction
+/// loop, the maps still describe a contraction, and every loop is still bound
+/// by some operand.
+static bool
+isFoldedGenericContraction(const linalg::ContractionDimensions &dims,
+                           ArrayRef<AffineMap> maps, AffineMap foldedMap) {
+  if (!foldedMap.isProjectedPermutation() ||
+      llvm::none_of(dims.k, [&](unsigned dim) {
+        return foldedMap.isFunctionOfDim(dim);
+      })) {
+    return false;
+  }
+  if (failed(linalg::inferContractionDims(maps))) {
+    return false;
+  }
+  return static_cast<bool>(
+      inversePermutation(concatAffineMaps(maps, foldedMap.getContext())));
+}
+
+/// Folds broadcast producers of the inputs of a contraction that is already a
+/// `linalg.generic`, direct or under a dequantize, into its indexing maps. This
+/// is the generic counterpart of `FoldBroadcastIntoBatchMatmul`: the same
+/// producers fold, and the op stays a generic with the same body.
+struct FoldBroadcastIntoGenericContraction
+    : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.hasPureTensorSemantics() ||
+        !linalg::isaContractionOpInterface(op)) {
+      return failure();
+    }
+    FailureOr<linalg::ContractionDimensions> dims =
+        linalg::inferContractionDims(op);
+    if (failed(dims)) {
+      return failure();
+    }
+    SmallVector<AffineMap> maps = op.getIndexingMapsArray();
+    SmallVector<std::optional<FoldableProducer>> producers(
+        op.getNumDpsInputs());
+    bool changed = false;
+    for (auto [idx, input] : llvm::enumerate(op.getDpsInputs())) {
+      FailureOr<FoldableProducer> producer = matchFoldableProducer(input);
+      if (failed(producer)) {
+        continue;
+      }
+      // Take contraction loops to operand indices, then to source indices.
+      AffineMap foldedMap = producer->map.compose(maps[idx]);
+      SmallVector<AffineMap> foldedMaps = maps;
+      foldedMaps[idx] = foldedMap;
+      if (!isFoldedGenericContraction(*dims, foldedMaps, foldedMap)) {
+        continue;
+      }
+      maps = std::move(foldedMaps);
+      producers[idx] = std::move(*producer);
+      changed = true;
+    }
+    if (!changed) {
+      return failure();
+    }
+    SmallVector<Value> inputs(op.getDpsInputs());
+    materializeFoldedInputs(rewriter, producers, inputs);
+    rewriter.modifyOpInPlace(op, [&] {
+      op.getInputsMutable().assign(inputs);
+      op.setIndexingMapsAttr(rewriter.getAffineMapArrayAttr(maps));
+    });
+    return success();
+  }
+};
+
 struct FoldBroadcastIntoBatchMatmulPass final
     : impl::FoldBroadcastIntoBatchMatmulPassBase<
           FoldBroadcastIntoBatchMatmulPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<FoldBroadcastIntoBatchMatmul>(context);
+    patterns
+        .add<FoldBroadcastIntoBatchMatmul, FoldBroadcastIntoGenericContraction>(
+            context);
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       return signalPassFailure();
     }

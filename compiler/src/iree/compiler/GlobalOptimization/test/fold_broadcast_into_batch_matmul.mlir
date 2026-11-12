@@ -644,3 +644,139 @@ util.func public @dequantize_broadcast_batch_varying_zero_point(%act: tensor<4x8
 //       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     ins(%[[BROADCAST]], %{{.+}}, %{{.+}} : tensor<4x16x12xi8>, f32, tensor<4xi8>)
 //       CHECK:   linalg.batch_matmul ins(%{{.+}}, %[[DQ]] : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+
+// -----
+
+// A contraction that is already a generic folds the same way and stays a
+// generic.
+util.func public @generic_contraction_broadcast_rhs(%act: tensor<4x8x16xf32>, %weight: tensor<16x12xf32>) -> tensor<4x8x12xf32> {
+  %init_broadcast = tensor.empty() : tensor<4x16x12xf32>
+  %broadcast = linalg.broadcast ins(%weight : tensor<16x12xf32>)
+                                outs(%init_broadcast : tensor<4x16x12xf32>) dimensions = [0]
+  %init_out = tensor.empty() : tensor<4x8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+      ins(%act, %broadcast : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+      outs(%fill : tensor<4x8x12xf32>) {
+  ^bb0(%a: f32, %b: f32, %out: f32):
+    %mul = arith.mulf %a, %b : f32
+    %add = arith.addf %out, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<4x8x12xf32>
+  util.return %result : tensor<4x8x12xf32>
+}
+// CHECK-LABEL: @generic_contraction_broadcast_rhs(
+//  CHECK-SAME:   %[[ACT:[a-zA-Z0-9]+]]: tensor<4x8x16xf32>
+//  CHECK-SAME:   %[[WEIGHT:[a-zA-Z0-9]+]]: tensor<16x12xf32>
+//   CHECK-NOT:   linalg.broadcast
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
+//  CHECK-SAME:     ins(%[[ACT]], %[[WEIGHT]] : tensor<4x8x16xf32>, tensor<16x12xf32>)
+
+// -----
+
+// A generic contraction over a dequantize of a broadcast: the dequantize is
+// rebuilt at the weight's rank and the broadcast folds into the RHS map.
+util.func public @generic_contraction_dequantize_broadcast_rhs(%act: tensor<4x8x16xf32>, %weight: tensor<16x12xi8>, %scale: tensor<12xf32>) -> tensor<4x8x12xf32> {
+  %init_broadcast = tensor.empty() : tensor<4x16x12xi8>
+  %broadcast = linalg.broadcast ins(%weight : tensor<16x12xi8>)
+                                outs(%init_broadcast : tensor<4x16x12xi8>) dimensions = [0]
+  %init_dq = tensor.empty() : tensor<4x16x12xf32>
+  %dq = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                        affine_map<(d0, d1, d2) -> (d2)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>]>
+      ins(%broadcast, %scale : tensor<4x16x12xi8>, tensor<12xf32>)
+      outs(%init_dq : tensor<4x16x12xf32>) -> tensor<4x16x12xf32>
+  %init_out = tensor.empty() : tensor<4x8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+      ins(%act, %dq : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+      outs(%fill : tensor<4x8x12xf32>) {
+  ^bb0(%a: f32, %b: f32, %out: f32):
+    %mul = arith.mulf %a, %b : f32
+    %add = arith.addf %out, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<4x8x12xf32>
+  util.return %result : tensor<4x8x12xf32>
+}
+// CHECK-LABEL: @generic_contraction_dequantize_broadcast_rhs(
+//  CHECK-SAME:   %[[ACT:[a-zA-Z0-9]+]]: tensor<4x8x16xf32>
+//  CHECK-SAME:   %[[WEIGHT:[a-zA-Z0-9]+]]: tensor<16x12xi8>
+//   CHECK-NOT:   linalg.broadcast
+//       CHECK:   %[[DQ:.+]] = iree_linalg_ext.dequantize_affine
+//  CHECK-SAME:     <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>]>
+//  CHECK-SAME:     ins(%[[WEIGHT]], %{{.+}} : tensor<16x12xi8>, tensor<12xf32>)
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>]
+//  CHECK-SAME:     ins(%[[ACT]], %[[DQ]] : tensor<4x8x16xf32>, tensor<16x12xf32>)
+
+// -----
+
+// A generic with the maps of a contraction but another body is not a
+// contraction, so its broadcast input is left alone.
+util.func public @generic_contraction_maps_other_body(%act: tensor<4x8x16xf32>, %weight: tensor<16x12xf32>) -> tensor<4x8x12xf32> {
+  %init_broadcast = tensor.empty() : tensor<4x16x12xf32>
+  %broadcast = linalg.broadcast ins(%weight : tensor<16x12xf32>)
+                                outs(%init_broadcast : tensor<4x16x12xf32>) dimensions = [0]
+  %init_out = tensor.empty() : tensor<4x8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<4x8x12xf32>) -> tensor<4x8x12xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+      ins(%act, %broadcast : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+      outs(%fill : tensor<4x8x12xf32>) {
+  ^bb0(%a: f32, %b: f32, %out: f32):
+    %mul = arith.mulf %a, %b : f32
+    %max = arith.maximumf %out, %mul : f32
+    linalg.yield %max : f32
+  } -> tensor<4x8x12xf32>
+  util.return %result : tensor<4x8x12xf32>
+}
+// CHECK-LABEL: @generic_contraction_maps_other_body(
+//       CHECK:   %[[BROADCAST:.+]] = linalg.broadcast
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%{{.+}}, %[[BROADCAST]] : tensor<4x8x16xf32>, tensor<4x16x12xf32>)
+
+// -----
+
+// A broadcast along the reduction dim does not fold: the operand would no
+// longer read the reduction loop.
+util.func public @generic_contraction_broadcast_along_reduction(%act: tensor<8x16xf32>, %weight: tensor<12xf32>) -> tensor<8x12xf32> {
+  %init_broadcast = tensor.empty() : tensor<16x12xf32>
+  %broadcast = linalg.broadcast ins(%weight : tensor<12xf32>)
+                                outs(%init_broadcast : tensor<16x12xf32>) dimensions = [0]
+  %init_out = tensor.empty() : tensor<8x12xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%init_out : tensor<8x12xf32>) -> tensor<8x12xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>,
+                       affine_map<(d0, d1, d2) -> (d2, d1)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel", "reduction"]}
+      ins(%act, %broadcast : tensor<8x16xf32>, tensor<16x12xf32>)
+      outs(%fill : tensor<8x12xf32>) {
+  ^bb0(%a: f32, %b: f32, %out: f32):
+    %mul = arith.mulf %a, %b : f32
+    %add = arith.addf %out, %mul : f32
+    linalg.yield %add : f32
+  } -> tensor<8x12xf32>
+  util.return %result : tensor<8x12xf32>
+}
+// CHECK-LABEL: @generic_contraction_broadcast_along_reduction(
+//       CHECK:   %[[BROADCAST:.+]] = linalg.broadcast
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%{{.+}}, %[[BROADCAST]] : tensor<8x16xf32>, tensor<16x12xf32>)

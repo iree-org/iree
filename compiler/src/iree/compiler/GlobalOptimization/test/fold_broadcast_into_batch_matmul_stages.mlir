@@ -1,5 +1,6 @@
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --iree-global-optimization-transformation-pipeline --iree-global-opt-enable-qdq-to-integer-math=false %s | FileCheck %s --check-prefix=STAGE3 --implicit-check-not=linalg.broadcast
 // RUN: iree-opt --split-input-file --mlir-print-local-scope --iree-global-optimization-transformation-pipeline --iree-global-opt-enable-qdq-to-integer-math=true %s | FileCheck %s --check-prefix=STAGE4 --implicit-check-not=linalg.broadcast --implicit-check-not=iree_linalg_ext.dequantize_affine
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --iree-global-optimization-transformation-pipeline="generalize-matmul=true" --iree-global-opt-enable-qdq-to-integer-math=true %s | FileCheck %s --check-prefix=STAGE4 --implicit-check-not=linalg.broadcast --implicit-check-not=iree_linalg_ext.dequantize_affine
 
 // Stage-boundary tests for contractions over shared quantized weights, run
 // through the whole global optimization pipeline.
@@ -15,6 +16,10 @@
 //
 // Weights broadcast after dequantization (form A) and before it (form B)
 // reach the same form.
+//
+// STAGE4 also runs with named contractions generalized before the fold, as
+// at -O2: the result must not depend on whether the contraction is still a
+// named op when the broadcast fold sees it.
 
 // STAGE3-LABEL: @form_a(
 //  STAGE3-SAME:   %[[W:[a-zA-Z0-9]+]]: tensor<16x12xi8>
