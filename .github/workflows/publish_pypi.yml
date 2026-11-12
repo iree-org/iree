@@ -16,6 +16,10 @@
 #     publisher.
 #   * The `pypi` environment requires approval by a release maintainer and only
 #     allows deployments from `main`.
+#   * An Actions policy (Settings > Actions > Policies) lets only release
+#     maintainers run this workflow. Without it, anyone with write access can
+#     run the `promote` job, which signs an attestation for the wheels of any
+#     candidate release.
 #   * A tag ruleset blocks updates and deletions of release tags (`iree-*` and
 #     `v*`), so that the tag that a release and its attestations name cannot be
 #     moved to another commit.
