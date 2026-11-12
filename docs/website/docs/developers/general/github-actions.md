@@ -353,30 +353,6 @@ run tests using a previous run of the build_packages job.
 
     ![ci-extra](./pkgci-workflow-dispatch.png)
 
-### Security checks for workflows
-
-The `zizmor` pre-commit hook runs [zizmor](https://docs.zizmor.sh/) on workflow
-files and `.github/dependabot.yml` as part of the Lint workflow. It reports
-common GitHub Actions security problems, for example:
-
-* `${{ ... }}` expressions expanded inside `run:` scripts. Pass the value
-  through `env:` and use the shell variable instead.
-* Token permissions broader than a job needs. Keep the top-level `permissions:`
-  read-only and grant write scopes only to the jobs that need them.
-* `actions/checkout` steps that leave the token on disk. Set
-  `persist-credentials: false` unless a later step needs the stored token.
-
-The hook fails on findings of low severity or higher. To check the workflows you
-changed locally:
-
-```shell
-pre-commit run zizmor --files .github/workflows/my_workflow.yml
-```
-
-If a finding is a false positive or an accepted risk, add an ignore comment
-with a short reason to the flagged step, for example
-`# zizmor: ignore[template-injection] <reason>`.
-
 ## :material-book-open-outline: Maintenance tips
 
 * Certain workflow failures are posted in the `#github-ci` channel in IREE's
