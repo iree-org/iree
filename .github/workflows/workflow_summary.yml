@@ -19,7 +19,7 @@
 #        needs:
 #          - job_1
 #          - job_2
-#        uses: ./.github/workflows/workflow_summary.yml
+#        uses: $/.github/workflows/workflow_summary.yml
 #        secrets:
 #          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 #        with:
