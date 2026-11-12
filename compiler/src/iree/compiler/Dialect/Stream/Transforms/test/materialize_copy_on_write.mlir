@@ -189,3 +189,37 @@ util.func public @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>,
 ^bb2(%bb2_0: !stream.resource<*>, %bb2_1: !stream.resource<*>):
   util.return %bb2_0, %bb2_1 : !stream.resource<*>, !stream.resource<*>
 }
+
+// -----
+
+// Tests that a resource stored into more than one mutable global is copied for
+// each store: mutable globals are updated in place, so each must own its
+// storage. Stores of a single-use value and stores into immutable globals are
+// left alone.
+
+util.global private mutable @mutableA : !stream.resource<variable>
+util.global private mutable @mutableB : !stream.resource<variable>
+util.global private mutable @mutableC : !stream.resource<variable>
+util.global private @immutable : !stream.resource<variable>
+
+// CHECK-LABEL: @storeSharedValueToGlobals
+util.func public @storeSharedValueToGlobals(%size: index) {
+  %c0_i32 = arith.constant 0 : i32
+  // CHECK: %[[SHARED:.+]] = stream.async.splat %c0_i32
+  %shared = stream.async.splat %c0_i32 : i32 -> !stream.resource<variable>{%size}
+  // CHECK: %[[CLONE_A:.+]] = stream.async.clone %[[SHARED]]
+  // CHECK: util.global.store %[[CLONE_A]], @mutableA
+  util.global.store %shared, @mutableA : !stream.resource<variable>
+  // CHECK: %[[CLONE_B:.+]] = stream.async.clone %[[SHARED]]
+  // CHECK: util.global.store %[[CLONE_B]], @mutableB
+  util.global.store %shared, @mutableB : !stream.resource<variable>
+  // CHECK-NOT: stream.async.clone
+  // CHECK: util.global.store %[[SHARED]], @immutable
+  util.global.store %shared, @immutable : !stream.resource<variable>
+  // CHECK: %[[UNIQUE:.+]] = stream.async.splat %c0_i32
+  %unique = stream.async.splat %c0_i32 : i32 -> !stream.resource<variable>{%size}
+  // CHECK-NOT: stream.async.clone
+  // CHECK: util.global.store %[[UNIQUE]], @mutableC
+  util.global.store %unique, @mutableC : !stream.resource<variable>
+  util.return
+}
