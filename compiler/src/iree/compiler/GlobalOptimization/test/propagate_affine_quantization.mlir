@@ -1,5 +1,70 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-global-opt-propagate-affine-quantization))" %s | FileCheck %s
 
+// A rank-zero expansion has empty reassociation and must still move to the
+// quantized side. Scalar parameters broadcast over the new unit dimensions.
+func.func @absorb_scalar_expand(%aq: tensor<i8>, %scale: f32) -> tensor<1x1xf32> {
+  %init = tensor.empty() : tensor<f32>
+  %a = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>, affine_map<() -> ()>]>
+      ins(%aq, %scale : tensor<i8>, f32) outs(%init : tensor<f32>) -> tensor<f32>
+  %expanded = tensor.expand_shape %a [] output_shape [1, 1]
+      : tensor<f32> into tensor<1x1xf32>
+  return %expanded : tensor<1x1xf32>
+}
+// CHECK-LABEL: func.func @absorb_scalar_expand(
+// CHECK-SAME: %[[AQ:[a-zA-Z0-9_]+]]: tensor<i8>
+// CHECK: %[[EXPANDED:.+]] = tensor.expand_shape %[[AQ]] [] output_shape [1, 1]
+// CHECK-SAME: tensor<i8> into tensor<1x1xi8>
+// CHECK: %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+// CHECK-SAME: ins(%[[EXPANDED]], %{{.+}} : tensor<1x1xi8>, f32)
+// CHECK-SAME: outs(%{{.+}} : tensor<1x1xf32>) -> tensor<1x1xf32>
+// CHECK: return %[[DEQ]]
+
+// -----
+
+// Rank-zero tensor parameters stay rank zero. Preserve unsigned storage and
+// zero-point attributes as well as the declared quantization range.
+func.func @absorb_scalar_expand_with_zero_point(%aq: tensor<i8>, %scale: tensor<f32>, %zp: tensor<i8>) -> tensor<1x1x1xf32> {
+  %init = tensor.empty() : tensor<f32>
+  %a = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>, affine_map<() -> ()>, affine_map<() -> ()>],
+       input_unsigned, zp_unsigned, quant_min = 0, quant_max = 255>
+      ins(%aq, %scale, %zp : tensor<i8>, tensor<f32>, tensor<i8>)
+      outs(%init : tensor<f32>) -> tensor<f32>
+  %expanded = tensor.expand_shape %a [] output_shape [1, 1, 1]
+      : tensor<f32> into tensor<1x1x1xf32>
+  return %expanded : tensor<1x1x1xf32>
+}
+// CHECK-LABEL: func.func @absorb_scalar_expand_with_zero_point(
+// CHECK-SAME: %[[AQ:[a-zA-Z0-9_]+]]: tensor<i8>, %[[SCALE:[a-zA-Z0-9_]+]]: tensor<f32>, %[[ZP:[a-zA-Z0-9_]+]]: tensor<i8>
+// CHECK: %[[EXPANDED:.+]] = tensor.expand_shape %[[AQ]] [] output_shape [1, 1, 1]
+// CHECK: %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+// CHECK-SAME: quant_min = 0
+// CHECK-SAME: quant_max = 255
+// CHECK-SAME: input_unsigned
+// CHECK-SAME: zp_unsigned
+// CHECK-SAME: ins(%[[EXPANDED]], %[[SCALE]], %[[ZP]] : tensor<1x1x1xi8>, tensor<f32>, tensor<i8>)
+// CHECK: return %[[DEQ]]
+
+// -----
+
+func.func @decline_scalar_expand_with_multiple_consumers(%aq: tensor<i8>, %scale: f32) -> (tensor<1xf32>, tensor<f32>) {
+  %init = tensor.empty() : tensor<f32>
+  %a = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>, affine_map<() -> ()>]>
+      ins(%aq, %scale : tensor<i8>, f32) outs(%init : tensor<f32>) -> tensor<f32>
+  %expanded = tensor.expand_shape %a [] output_shape [1]
+      : tensor<f32> into tensor<1xf32>
+  return %expanded, %a : tensor<1xf32>, tensor<f32>
+}
+// CHECK-LABEL: func.func @decline_scalar_expand_with_multiple_consumers(
+// CHECK: %[[DEQ:.+]] = iree_linalg_ext.dequantize_affine
+// CHECK-SAME: outs(%{{.+}} : tensor<f32>) -> tensor<f32>
+// CHECK: %[[EXPANDED:.+]] = tensor.expand_shape %[[DEQ]]
+// CHECK: return %[[EXPANDED]], %[[DEQ]]
+
+// -----
+
 #id2 = affine_map<(d0, d1) -> (d0, d1)>
 #scalar2 = affine_map<(d0, d1) -> ()>
 

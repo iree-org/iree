@@ -927,3 +927,29 @@ util.func public @dequantize_scalar_qparam_expand_result(%q: tensor<32x64xi8>, %
 //  CHECK-SAME:       ins(%[[INPUT]], %[[ARG1]] : tensor<4x8x64xi8>, f32)
 //   CHECK-NOT:   tensor.expand_shape
 //       CHECK:   util.return %[[DQ]]
+
+// -----
+
+// Reshaping a rank-0 value adds unit dimensions without splitting any. A
+// zero-loop op gains them as new loops, which its quantized value and init
+// span, while the rank-0 scale broadcasts over them.
+util.func public @quantize_scalar_collapse_input(%x: tensor<1x1xf32>, %s: tensor<f32>) -> tensor<i8> {
+  %collapsed = tensor.collapse_shape %x [] : tensor<1x1xf32> into tensor<f32>
+  %init = tensor.empty() : tensor<i8>
+  %q = iree_linalg_ext.quantize_affine
+      <indexing_maps = [affine_map<() -> ()>, affine_map<() -> ()>, affine_map<() -> ()>],
+       quant_min = -128, quant_max = 127>
+      ins(%collapsed, %s : tensor<f32>, tensor<f32>)
+      outs(%init : tensor<i8>) -> tensor<i8>
+  util.return %q : tensor<i8>
+}
+// CHECK-LABEL: util.func public @quantize_scalar_collapse_input
+//  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]:
+//  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]:
+//       CHECK:   %[[Q:.+]] = iree_linalg_ext.quantize_affine
+//  CHECK-SAME:       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>
+//  CHECK-SAME:                        affine_map<(d0, d1) -> ()>
+//  CHECK-SAME:                        affine_map<(d0, d1) -> (d0, d1)>]
+//  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] : tensor<1x1xf32>, tensor<f32>)
+//  CHECK-SAME:       -> tensor<1x1xi8>
+//       CHECK:   tensor.collapse_shape %[[Q]] [] : tensor<1x1xi8> into tensor<i8>
