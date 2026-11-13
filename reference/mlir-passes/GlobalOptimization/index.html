@@ -6830,7 +6830,7 @@ modules are left unchanged for other strategies.</p>
 <h3 id="-iree-global-opt-expand-tensor-shapes"><code>-iree-global-opt-expand-tensor-shapes</code><a class="headerlink" href="#-iree-global-opt-expand-tensor-shapes" title="Permanent link">link</a></h3>
 <p><em>Expands tensor shape dimensions into SSA values across the program.</em></p>
 <h3 id="-iree-global-opt-fold-broadcast-into-batch-matmul"><code>-iree-global-opt-fold-broadcast-into-batch-matmul</code><a class="headerlink" href="#-iree-global-opt-fold-broadcast-into-batch-matmul" title="Permanent link">link</a></h3>
-<p><em>Folds broadcasts of batch_matmul inputs into its indexing maps.</em></p>
+<p><em>Folds broadcasts of contraction inputs into its indexing maps.</em></p>
 <p>Rewrites <code>batch_matmul(A, broadcast(B))</code>, where the weight is shared across
 the batch, into a <code>batch_matmul</code> over <code>A</code> and <code>B</code> whose RHS indexing map
 drops the batch dim. Broadcasts on either input, as <code>linalg.broadcast</code> or
@@ -6841,6 +6841,15 @@ must be [K, N]), the contraction is carried by a <code>linalg.generic</code> wit
 same body instead of moving data. The contraction then consumes its
 producers directly, so rewrites that match on them (such as the
 dequantization folding) still apply, and no broadcast is materialized.</p>
+<p>A broadcast under an <code>iree_linalg_ext.dequantize_affine</code> that only feeds
+the contraction folds too, when the scale and zero point do not vary along
+the broadcast dims: the dequantize is rebuilt at the rank of the
+broadcast's source and the broadcast is folded into the contraction map in
+the same step, so the weights are dequantized once rather than once per
+batch element.</p>
+<p>A contraction that is already a <code>linalg.generic</code>, such as a <code>batch_matmul</code>
+generalized earlier in the pipeline, is recognized through the contraction
+interface and folded the same way; it stays a generic.</p>
 <h3 id="-iree-global-opt-fuse-dequantization-matmul"><code>-iree-global-opt-fuse-dequantization-matmul</code><a class="headerlink" href="#-iree-global-opt-fuse-dequantization-matmul" title="Permanent link">link</a></h3>
 <p><em>Fuses dequantization and matmul linalg.generic ops.</em></p>
 <h3 id="-iree-global-opt-generalize-linalg-named-ops"><code>-iree-global-opt-generalize-linalg-named-ops</code><a class="headerlink" href="#-iree-global-opt-generalize-linalg-named-ops" title="Permanent link">link</a></h3>
