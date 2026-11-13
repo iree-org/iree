@@ -529,7 +529,7 @@ util.func public @multi_device_fork_unified(%input: !util.buffer) -> (!util.buff
 // -----
 
 // Tests transfer chain collapsing: A->B->C where B has unified memory with both.
-// The chain should collapse to direct communication between A and C.
+// The chain may collapse, but the transfer handoff must remain explicit.
 
 module @transfer_chain attributes {
   stream.topology = #hal.device.topology<links = [
@@ -552,16 +552,18 @@ util.func public @transfer_chain_collapse(%input: !util.buffer) -> !util.buffer 
   %size = stream.tensor.sizeof tensor<1024xf32> : index
   %imported = stream.tensor.import on(#hal.device.promise<@dev_a>) %input : !util.buffer -> tensor<1024xf32> in !stream.resource<external>{%size}
 
-  // Transfer A->B (unified memory, should be elided).
-  // Transfer B->C (unified memory, should be elided).
-  // Result: no intermediate transfers, direct use of imported resource.
+  // Transfers A->B and B->C use shared storage.
   %transfer_to_b = stream.async.transfer %imported : !stream.resource<external>{%size}
       from(#hal.device.promise<@dev_a>) -> to(#hal.device.promise<@dev_b>) !stream.resource<external>{%size}
   %transfer_to_c = stream.async.transfer %transfer_to_b : !stream.resource<external>{%size}
       from(#hal.device.promise<@dev_b>) -> to(#hal.device.promise<@dev_c>) !stream.resource<external>{%size}
 
+  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[IMPORTED]]
+  // CHECK-SAME: from(#hal.device.promise<@dev_a>) -> to(#hal.device.promise<@dev_c>)
+  // CHECK-SAME: storage = reuse
+
   // Export on device C.
-  // CHECK: %[[EXPORTED:.+]] = stream.tensor.export %[[IMPORTED]] : tensor<1024xf32> in !stream.resource<external>{%[[SIZE]]} -> !util.buffer
+  // CHECK: %[[EXPORTED:.+]] = stream.tensor.export %[[TRANSFER]] : tensor<1024xf32> in !stream.resource<external>{%[[SIZE]]} -> !util.buffer
   %exported = stream.tensor.export %transfer_to_c : tensor<1024xf32> in !stream.resource<external>{%size} -> !util.buffer
 
   // CHECK: util.return %[[EXPORTED]]
