@@ -20,8 +20,13 @@ without a HAL device, threads, or a filesystem.
 Requires a `riscv-none-elf` GCC toolchain that provides `semihost.specs` and
 uses a newlib built with `-mcmodel=medany`, such as
 [xPack riscv-none-elf-gcc](https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack),
-along with prebuilt IREE host tools and `qemu-system-riscv64`. From the repository
-root:
+along with prebuilt IREE host tools and `qemu-system-riscv64`.
+
+`RISCV_TOOLCHAIN_ROOT` is the toolchain directory containing
+`bin/riscv-none-elf-gcc`. `qemu-system-riscv64` is QEMU's system emulator
+(`qemu-system-misc` on Debian/Ubuntu), not the user-mode `qemu-riscv64` that
+`build_tools/riscv/riscv_bootstrap.sh` installs; set `QEMU_BIN` if it is not
+on `PATH`. From the repository root:
 
 ```sh
 RISCV_TOOLCHAIN_ROOT=/path/to/xpack-gcc \
