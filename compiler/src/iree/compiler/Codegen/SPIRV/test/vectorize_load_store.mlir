@@ -2,12 +2,13 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-vectorize-load-store, cse))" --mlir-print-local-scope %s | FileCheck %s --check-prefix=BASE
 
 func.func @alloc_transfer_read_write_vector4_vector8(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
+  %aligned_y = util.assume.int %y[<udiv = 4>] : index
   %cst = arith.constant 0.000000e+00 : f32
   %0 = memref.alloc() : memref<128x32xf32, 3>
-  %v = vector.transfer_read %arg0[%x, %y], %cst : memref<4096x4096xf32>, vector<4xf32>
-  vector.transfer_write %v, %0[%x, %y] : vector<4xf32>, memref<128x32xf32, 3>
-  %mat = vector.transfer_read %arg0[%x, %y], %cst : memref<4096x4096xf32>, vector<8xf32>
-  vector.transfer_write %mat, %0[%x, %y] : vector<8xf32>, memref<128x32xf32, 3>
+  %v = vector.transfer_read %arg0[%x, %aligned_y], %cst : memref<4096x4096xf32>, vector<4xf32>
+  vector.transfer_write %v, %0[%x, %aligned_y] : vector<4xf32>, memref<128x32xf32, 3>
+  %mat = vector.transfer_read %arg0[%x, %aligned_y], %cst : memref<4096x4096xf32>, vector<8xf32>
+  vector.transfer_write %mat, %0[%x, %aligned_y] : vector<8xf32>, memref<128x32xf32, 3>
   memref.dealloc %0 : memref<128x32xf32, 3>
   return
 }
@@ -15,26 +16,27 @@ func.func @alloc_transfer_read_write_vector4_vector8(%arg0: memref<4096x4096xf32
 // BASE-LABEL: func @alloc_transfer_read_write_vector4_vector8
 //  BASE-SAME: (%[[ARG:.+]]: memref<4096x1024xvector<4xf32>>, %[[IDX0:.+]]: index, %[[IDX1:.+]]: index)
 
+//   BASE-DAG:   %[[ALIGNED_Y:.+]] = util.assume.int %[[IDX1]]
 //   BASE-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   BASE-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   BASE-DAG:   %[[C4:.+]] = arith.constant 4 : index
 
 //       BASE:   %[[ALLOC:.+]] = memref.alloc() : memref<128x8xvector<4xf32>, 3>
 
-//       BASE:   %[[OFFSET0:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 floordiv s1)>()[%[[IDX1]], %[[C4]]]
+//       BASE:   %[[OFFSET0:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 floordiv s1)>()[%[[ALIGNED_Y]], %[[C4]]]
 //       BASE:   %[[LOAD:.+]] = memref.load %[[ARG]][%[[IDX0]], %[[OFFSET0]]]
 //       BASE:   memref.store %[[LOAD]], %[[ALLOC]][%[[IDX0]], %[[OFFSET0]]]
 
-//       BASE:   %[[OFFSET1:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 + s1)>()[%0, %[[C0]]]
+//       BASE:   %[[OFFSET1:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 + s1)>()[%[[OFFSET0]], %[[C0]]]
 //       BASE:   %[[LOAD1:.+]] = memref.load %[[ARG]][%[[IDX0]], %[[OFFSET1]]]
-//       BASE:   %[[OFFSET2:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 + s1)>()[%0, %[[C1]]]
+//       BASE:   %[[OFFSET2:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 + s1)>()[%[[OFFSET0]], %[[C1]]]
 //       BASE:   %[[LOAD2:.+]] = memref.load %[[ARG]][%[[IDX0]], %[[OFFSET2]]]
 //       BASE:   %[[VEC:.+]] = vector.shuffle %[[LOAD1]], %[[LOAD2]] [0, 1, 2, 3, 4, 5, 6, 7] : vector<4xf32>, vector<4xf32>
 
 //       BASE:   %[[VEC0:.+]] = vector.extract_strided_slice %[[VEC]] offsets = [0], sizes = [4], strides = [1] : vector<8xf32> to vector<4xf32>
 //       BASE:   memref.store %[[VEC0]], %[[ALLOC]][%[[IDX0]], %[[OFFSET1]]]
 //       BASE:   %[[VEC1:.+]] = vector.extract_strided_slice %[[VEC]] offsets = [4], sizes = [4], strides = [1] : vector<8xf32> to vector<4xf32>
-//       BASE:   memref.store %[[VEC1]], %[[ALLOC]][%[[IDX0]], %4]
+//       BASE:   memref.store %[[VEC1]], %[[ALLOC]][%[[IDX0]], %[[OFFSET2]]]
 
 // -----
 
@@ -504,16 +506,18 @@ func.func @vectorize_mma_load_store_non_identity_memref(%i0: index, %i1: index) 
 ]>
 
 func.func @transfer_read_i4_memref_vector8(%x: index) -> vector<8xi4> {
+  %aligned_x = util.assume.int %x[<udiv = 8>] : index
   %c0_i4 = arith.constant 0 : i4
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<2048xi4>
-  %1 = vector.transfer_read %0[%x], %c0_i4 {in_bounds = [true]} : memref<2048xi4>, vector<8xi4>
+  %1 = vector.transfer_read %0[%aligned_x], %c0_i4 {in_bounds = [true]} : memref<2048xi4>, vector<8xi4>
   return %1: vector<8xi4>
 }
 
 // CHECK-LABEL: func.func @transfer_read_i4_memref_vector8
 //  CHECK-SAME: (%[[ARG:.+]]: index)
+//       CHECK:   %[[ALIGNED:.+]] = util.assume.int %[[ARG]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<256xvector<1xi32>>
-//       CHECK:   %[[INDEX:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()[%[[ARG]]]
+//       CHECK:   %[[INDEX:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 8)>()[%[[ALIGNED]]]
 //       CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[INDEX]]] : memref<256xvector<1xi32>>
 //       CHECK:   %[[CAST:.+]] = vector.bitcast %[[LOAD]] : vector<1xi32> to vector<8xi4>
 //       CHECK:   return %[[CAST]] : vector<8xi4>
@@ -580,24 +584,26 @@ func.func @transfer_read_i3_memref_vector8(%x: index) -> vector<8xi3> {
 ]>
 
 func.func @transfer_read_vector2_vector8(%x: index) -> (vector<2xi32>, vector<8xi32>) {
+  %aligned_x = util.assume.int %x[<udiv = 2>] : index
   %c0 = arith.constant 0 : i32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<2048xi32>
-  %1 = vector.transfer_read %0[%x], %c0 {in_bounds = [true]} : memref<2048xi32>, vector<2xi32>
-  %2 = vector.transfer_read %0[%x], %c0 {in_bounds = [true]} : memref<2048xi32>, vector<8xi32>
+  %1 = vector.transfer_read %0[%aligned_x], %c0 {in_bounds = [true]} : memref<2048xi32>, vector<2xi32>
+  %2 = vector.transfer_read %0[%aligned_x], %c0 {in_bounds = [true]} : memref<2048xi32>, vector<8xi32>
   return %1, %2: vector<2xi32>, vector<8xi32>
 }
 
 // CHECK-LABEL: func @transfer_read_vector2_vector8
 //  CHECK-SAME: (%[[INDEX:.+]]: index) -> (vector<2xi32>, vector<8xi32>)
 //       CHECK:   %[[INIT:.+]] = arith.constant dense<0> : vector<8xi32>
+//       CHECK:   %[[ALIGNED:.+]] = util.assume.int %[[INDEX]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan {{.+}} : memref<1024xvector<2xi32>>
-//       CHECK:   %[[OFFSET0:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2)>()[%[[INDEX]]]
+//       CHECK:   %[[OFFSET0:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2)>()[%[[ALIGNED]]]
 //       CHECK:   %[[LOAD0:.+]] = memref.load %[[SUBSPAN]][%[[OFFSET0]]]
-//       CHECK:   %[[OFFSE1:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 1)>()[%[[INDEX]]]
+//       CHECK:   %[[OFFSE1:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 1)>()[%[[ALIGNED]]]
 //       CHECK:   %[[LOAD1:.+]] = memref.load %[[SUBSPAN]][%[[OFFSE1]]]
-//       CHECK:   %[[OFFSET2:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 2)>()[%[[INDEX]]]
+//       CHECK:   %[[OFFSET2:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 2)>()[%[[ALIGNED]]]
 //       CHECK:   %[[LOAD2:.+]] = memref.load %[[SUBSPAN]][%[[OFFSET2]]]
-//       CHECK:   %[[OFFSET3:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 3)>()[%[[INDEX]]]
+//       CHECK:   %[[OFFSET3:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 3)>()[%[[ALIGNED]]]
 //       CHECK:   %[[LOAD3:.+]] = memref.load %[[SUBSPAN]][%[[OFFSET3]]]
 //       CHECK:   %[[INSERT0:.+]] = vector.insert_strided_slice %[[LOAD0]], %[[INIT]] offsets = [0], strides = [1] : vector<2xi32> into vector<8xi32>
 //       CHECK:   %[[INSERT1:.+]] = vector.insert_strided_slice %[[LOAD1]], %[[INSERT0]] offsets = [2], strides = [1] : vector<2xi32> into vector<8xi32>
@@ -612,30 +618,32 @@ func.func @transfer_read_vector2_vector8(%x: index) -> (vector<2xi32>, vector<8x
 ]>
 
 func.func @transfer_write_vector2_vector8(%x: index, %val0: vector<2xi32>, %val1: vector<8xi32>) {
+  %aligned_x = util.assume.int %x[<udiv = 2>] : index
   %c0 = arith.constant 0 : i32
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<2048xi32>
-  vector.transfer_write %val0, %0[%x] : vector<2xi32>, memref<2048xi32>
-  vector.transfer_write %val1, %0[%x] : vector<8xi32>, memref<2048xi32>
+  vector.transfer_write %val0, %0[%aligned_x] : vector<2xi32>, memref<2048xi32>
+  vector.transfer_write %val1, %0[%aligned_x] : vector<8xi32>, memref<2048xi32>
   return
 }
 
 // CHECK-LABEL: func @transfer_write_vector2_vector8
 //  CHECK-SAME: (%[[INDEX:.+]]: index, %[[VAL0:.+]]: vector<2xi32>, %[[VAL1:.+]]: vector<8xi32>)
+//       CHECK:   %[[ALIGNED:.+]] = util.assume.int %[[INDEX]]
 //       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) : memref<1024xvector<2xi32>>
 
-//       CHECK:   %[[OFFSET0:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2)>()[%[[INDEX]]]
+//       CHECK:   %[[OFFSET0:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2)>()[%[[ALIGNED]]]
 //       CHECK:   memref.store %[[VAL0]], %[[SUBSPAN]][%[[OFFSET0]]]
 
 //       CHECK:   %[[SLICE0:.+]] = vector.extract_strided_slice %[[VAL1]] offsets = [0], sizes = [2], strides = [1] : vector<8xi32> to vector<2xi32>
 //       CHECK:   memref.store %[[SLICE0]], %[[SUBSPAN]][%[[OFFSET0]]]
 //       CHECK:   %[[SLICE1:.+]] = vector.extract_strided_slice %[[VAL1]] offsets = [2], sizes = [2], strides = [1] : vector<8xi32> to vector<2xi32>
-//       CHECK:   %[[OFFSET1:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 1)>()[%[[INDEX]]]
+//       CHECK:   %[[OFFSET1:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 1)>()[%[[ALIGNED]]]
 //       CHECK:   memref.store %[[SLICE1]], %[[SUBSPAN]][%[[OFFSET1]]]
 //       CHECK:   %[[SLICE2:.+]] = vector.extract_strided_slice %[[VAL1]] offsets = [4], sizes = [2], strides = [1] : vector<8xi32> to vector<2xi32>
-//       CHECK:   %[[OFFSET2:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 2)>()[%[[INDEX]]]
+//       CHECK:   %[[OFFSET2:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 2)>()[%[[ALIGNED]]]
 //       CHECK:   memref.store %[[SLICE2]], %[[SUBSPAN]][%[[OFFSET2]]]
 //       CHECK:   %[[SLICE3:.+]] = vector.extract_strided_slice %[[VAL1]] offsets = [6], sizes = [2], strides = [1] : vector<8xi32> to vector<2xi32>
-//       CHECK:   %[[OFFSET3:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 3)>()[%[[INDEX]]]
+//       CHECK:   %[[OFFSET3:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 3)>()[%[[ALIGNED]]]
 //       CHECK:   memref.store %[[SLICE3]], %[[SUBSPAN]][%[[OFFSET3]]]
 
 // -----
@@ -732,3 +740,50 @@ func.func @extract_vector_transfer_read_mask_bits(%arg: vector<3xf32>, %index: i
 //     CHECK: scf.if %[[MB2]] -> (f32) {
 //     CHECK:   memref.load %{{.*}}[%[[C5]]] : memref<20xf32>
 //     CHECK: vector.from_elements {{.+}} : vector<3xf32>
+
+// -----
+
+// CHECK-LABEL: func.func @unaligned_vector_store(
+// CHECK-SAME: %[[BUFFER:.+]]: memref<8xf32>, %[[VALUE:.+]]: vector<2xf32>
+// CHECK-DAG: %[[ONE:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[TWO:.+]] = arith.constant 2 : index
+// CHECK: %[[FIRST:.+]] = vector.extract %[[VALUE]][0]
+// CHECK: memref.store %[[FIRST]], %[[BUFFER]][%[[ONE]]] : memref<8xf32>
+// CHECK: %[[SECOND:.+]] = vector.extract %[[VALUE]][1]
+// CHECK: memref.store %[[SECOND]], %[[BUFFER]][%[[TWO]]] : memref<8xf32>
+func.func @unaligned_vector_store(%buffer: memref<8xf32>, %value: vector<2xf32>) {
+  %c1 = arith.constant 1 : index
+  vector.transfer_write %value, %buffer[%c1] {in_bounds = [true]} : vector<2xf32>, memref<8xf32>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @aligned_vector_store(
+// CHECK-SAME: %[[BUFFER:.+]]: memref<4xvector<2xf32>>, %[[VALUE:.+]]: vector<2xf32>
+// CHECK: %[[ONE:.+]] = arith.constant 1 : index
+// CHECK: memref.store %[[VALUE]], %[[BUFFER]][%[[ONE]]] : memref<4xvector<2xf32>>
+func.func @aligned_vector_store(%buffer: memref<8xf32>, %value: vector<2xf32>) {
+  %c2 = arith.constant 2 : index
+  vector.transfer_write %value, %buffer[%c2] {in_bounds = [true]} : vector<2xf32>, memref<8xf32>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: func.func @odd_loop_vector_store(
+// CHECK-SAME: %[[BUFFER:.+]]: memref<16xf32>
+// CHECK: scf.for %[[IV:.+]] =
+// CHECK: %[[ODD:.+]] = affine.apply {{.*}}(%[[IV]])
+// CHECK: %[[FIRST:.+]] = vector.extract {{.*}}[0]
+// CHECK: memref.store %[[FIRST]], %[[BUFFER]][%[[ODD]]] : memref<16xf32>
+func.func @odd_loop_vector_store(%buffer: memref<16xf32>, %value: vector<2xf32>) {
+  %c0 = arith.constant 0 : index
+  %c4 = arith.constant 4 : index
+  %c12 = arith.constant 12 : index
+  scf.for %iv = %c0 to %c12 step %c4 {
+    %index = affine.apply affine_map<(d0) -> (d0 + 1)>(%iv)
+    vector.transfer_write %value, %buffer[%index] {in_bounds = [true]} : vector<2xf32>, memref<16xf32>
+  }
+  return
+}
