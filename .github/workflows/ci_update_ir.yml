@@ -1,0 +1,100 @@
+# Copyright 2025 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: CI - Update IR For Tests
+
+on:
+  schedule:
+    - cron: "10 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  upload_ir:
+    if: ${{ github.repository_owner == 'iree-org' || github.event_name != 'schedule' }}
+    timeout-minutes: 240
+    name: "Upload IR To Sharkpublic and Update JSON"
+    strategy:
+      matrix:
+        model: [
+          {
+            model_name: "llama-8b-fp8",
+            json_path: "tests/external/iree-test-suites/torch_models/llama_8b_fp8/modules/llama_gfx942.json"
+          },
+          {
+            model_name: "llama-8b-fp16",
+            json_path: "tests/external/iree-test-suites/torch_models/llama_8b_fp16/modules/llama_gfx942.json"
+          }
+        ]
+      fail-fast: false
+
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      VENV_DIR: ${{ github.workspace }}/.venv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check If New Ir Exists On Sharkpublic
+        id: check_mlir
+        run: |
+          set -e
+          mkdir -p output_artifacts/output_${{ matrix.model.model_name }}
+          DATE=$(date -u '+%Y-%m-%d')
+          LOCAL_PATH="output_artifacts/output_${{ matrix.model.model_name }}/fetched.mlir"
+          MLIR_URL="https://sharkpublic.blob.core.windows.net/sharkpublic/yrathore/mlir/${{ matrix.model.model_name }}_${DATE}.mlir"
+
+          echo "Checking for MLIR file at $MLIR_URL"
+          if curl -sfL -o "$LOCAL_PATH" "$MLIR_URL"; then
+            echo "MLIR_FOUND=true" >> $GITHUB_ENV
+            echo "NEW_MLIR_URL=$MLIR_URL" >> $GITHUB_ENV
+            echo "MLIR file found and downloaded successfully."
+            rm output_artifacts/output_${{ matrix.model.model_name }}/fetched.mlir
+          else
+            echo "No MLIR found for today: $MLIR_URL"
+            echo "MLIR_FOUND=false" >> $GITHUB_ENV
+            exit 0
+          fi
+
+      - name: Update Json file
+        if: env.MLIR_FOUND == 'true'
+        run: |
+          set -euo pipefail
+          JSON_FILE="${{ matrix.model.json_path }}"
+          NEW_MLIR_URL="${{ env.NEW_MLIR_URL }}"
+          echo "Updating MLIR URL in $JSON_FILE to $NEW_MLIR_URL"
+          jq --arg url "$NEW_MLIR_URL" '.mlir = $url' "$JSON_FILE" > tmp && mv tmp "$JSON_FILE"
+          echo "Updated JSON file successfully:"
+          cat "$JSON_FILE"
+
+      - name: Create Pull Request
+        if: env.MLIR_FOUND == 'true'
+        id: cpr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update MLIR URL for ${{ matrix.model.model_name }}"
+          title: "Update MLIR URL for ${{ matrix.model.model_name }}"
+          body: |
+            This PR updates the MLIR URL in the JSON file for model **${{ matrix.model.model_name }}**.
+            - New MLIR URL: `${{ env.NEW_MLIR_URL }}`
+            - Updated file: `${{ matrix.model.json_path }}`
+          branch: "update-mlir-${{ matrix.model.model_name }}-${{ github.run_id }}"
+          delete-branch: true
+          signoff: true
+          add-paths: |
+            ${{ matrix.model.json_path }}
+          base: main
