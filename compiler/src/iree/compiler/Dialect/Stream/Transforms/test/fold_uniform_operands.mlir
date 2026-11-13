@@ -134,7 +134,7 @@ util.func public @inlineConstantOperands(%a: i32) {
 stream.executable private @deduplicateWorkloadsEx {
   // CHECK: stream.executable.export public @dispatch workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index)
   stream.executable.export public @dispatch workgroups(%arg0: index, %arg1: index, %arg2 : index, %arg3 : index, %arg4 : index) -> (index, index, index) {
-    // CHECK: iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[ARG0]], %[[ARG0]], %[[ARG1]], %[[ARG0]], %[[ARG2]])
+    // CHECK: iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[ARG0]], %[[ARG1]], %[[ARG2]])
     %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg0, %arg1, %arg2, %arg3, %arg4)
     stream.return %x, %y, %z : index, index, index
   }
@@ -192,6 +192,51 @@ util.func public @deduplicateWorkloads(%arg0: !hal.buffer_view, %arg1: index, %a
     // CHECK-SAME: [%[[ARG1]], %[[ARG2]], %[[ARG3]]]
     // CHECK-SAME: (%[[ARG1]], %[[ARG2]], %[[ARG3]] : index, index, index)
     stream.cmd.dispatch @deduplicateWorkloadsEx::@dispatch[%arg1, %arg1, %arg2, %arg1, %arg3](%arg1, %arg2, %arg3 : index, index, index) {
+      rw %capture[%c0 for %c20] : !stream.resource<transient>{%c20}
+    }
+  } => !stream.timepoint
+  util.return
+}
+
+// -----
+
+// Tests deduplicating a workload that is not the leading one.
+
+// CHECK-LABEL: @deduplicateWorkloadsNonLeadingEx
+stream.executable private @deduplicateWorkloadsNonLeadingEx {
+  // CHECK: stream.executable.export public @dispatch workgroups(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index)
+  stream.executable.export public @dispatch workgroups(%arg0: index, %arg1: index, %arg2: index, %arg3: index) -> (index, index, index) {
+    // CHECK: iree_tensor_ext.dispatch.workgroup_count_from_slice(%[[ARG0]], %[[ARG1]], %[[ARG2]])
+    %x, %y, %z = iree_tensor_ext.dispatch.workgroup_count_from_slice(%arg0, %arg1, %arg2, %arg3)
+    stream.return %x, %y, %z : index, index, index
+  }
+  builtin.module  {
+    util.func public @dispatch(%arg0: !stream.binding, %arg1: index, %arg2: index, %arg3: index) {
+      // CHECK: iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 0 : index
+      %0 = iree_tensor_ext.dispatch.workload.ordinal %arg1, 0 : index
+      util.optimization_barrier %0 : index
+      // CHECK: iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1 : index
+      %1 = iree_tensor_ext.dispatch.workload.ordinal %arg2, 1 : index
+      util.optimization_barrier %1 : index
+      // CHECK: iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 1 : index
+      %2 = iree_tensor_ext.dispatch.workload.ordinal %arg2, 2 : index
+      util.optimization_barrier %2 : index
+      // CHECK: iree_tensor_ext.dispatch.workload.ordinal %{{.+}}, 2 : index
+      %3 = iree_tensor_ext.dispatch.workload.ordinal %arg3, 3 : index
+      util.optimization_barrier %3 : index
+      util.return
+    }
+  }
+}
+// CHECK: util.func public @deduplicateWorkloadsNonLeading(%[[ARG1:.+]]: index, %[[ARG2:.+]]: index, %[[ARG3:.+]]: index)
+util.func public @deduplicateWorkloadsNonLeading(%arg1: index, %arg2: index, %arg3: index) {
+  %c0 = arith.constant 0 : index
+  %c20 = arith.constant 20 : index
+  %alloc = stream.resource.alloc uninitialized : !stream.resource<transient>{%c20}
+  %result_timepoint = stream.cmd.execute with(%alloc as %capture: !stream.resource<transient>{%c20}) {
+    // CHECK: stream.cmd.dispatch @deduplicateWorkloadsNonLeadingEx::@dispatch
+    // CHECK-SAME: [%[[ARG1]], %[[ARG2]], %[[ARG3]]]
+    stream.cmd.dispatch @deduplicateWorkloadsNonLeadingEx::@dispatch[%arg1, %arg2, %arg2, %arg3](%arg1, %arg2, %arg3 : index, index, index) {
       rw %capture[%c0 for %c20] : !stream.resource<transient>{%c20}
     }
   } => !stream.timepoint
