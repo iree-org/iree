@@ -1039,7 +1039,8 @@ def MathTransformPass :
   let summary = "Apply math ops transformations: approximations, rewrites to other math ops, operand casts.";
   let dependentDialects = [
     "mlir::scf::SCFDialect",
-    "mlir::arith::ArithDialect"
+    "mlir::arith::ArithDialect",
+    "mlir::vector::VectorDialect"
   ];
 }
 
