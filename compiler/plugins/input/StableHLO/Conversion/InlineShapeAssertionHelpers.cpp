@@ -246,10 +246,11 @@ private:
   // when it is first charged and its count can be reused.
   uint64_t getCloneCost(func::FuncOp callee) {
     auto [it, inserted] = bodyOperationCounts.try_emplace(callee, 0);
+    uint64_t &count = it->second;
     if (inserted) {
-      callee.getBody().walk([&](Operation *) { ++it->second; });
+      callee.getBody().walk([&count](Operation *) { ++count; });
     }
-    return it->second;
+    return count;
   }
 
   const ShapeHelperAnalysis &analysis;
