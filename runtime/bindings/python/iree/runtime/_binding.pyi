@@ -301,7 +301,10 @@ class HalDriver:
     @staticmethod
     def query() -> List[str]: ...
     def create_default_device(
-        self, allocators: Optional[list[HalAllocator]] = None
+        self,
+        allocators: Optional[list[HalAllocator]] = None,
+        *,
+        max_concurrent_operations: int = 0,
     ) -> HalDevice: ...
     @overload
     def create_device(
@@ -309,6 +312,8 @@ class HalDriver:
         device_id: int,
         params: Optional[dict],
         allocators: Optional[list[HalAllocator]] = None,
+        *,
+        max_concurrent_operations: int = 0,
     ) -> HalDevice: ...
     @overload
     def create_device(
@@ -316,9 +321,15 @@ class HalDriver:
         device_info: dict,
         params: Optional[dict],
         allocators: Optional[list[HalAllocator]] = None,
+        *,
+        max_concurrent_operations: int = 0,
     ) -> HalDevice: ...
     def create_device_by_uri(
-        self, device_uri: str, allocators: Optional[list[HalAllocator]] = None
+        self,
+        device_uri: str,
+        allocators: Optional[list[HalAllocator]] = None,
+        *,
+        max_concurrent_operations: int = 0,
     ) -> HalDevice: ...
     def query_available_devices(self) -> list[dict]: ...
 

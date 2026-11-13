@@ -1094,12 +1094,22 @@ static HalDevice StealConfiguredDevice(iree_hal_device_t* device,
                                                   device_group);
 }
 
-HalDevice HalDriver::CreateDefaultDevice(std::optional<py::list> allocators) {
+static iree_status_t CreateProactorPool(
+    iree_host_size_t max_concurrent_operations,
+    iree_async_proactor_pool_t** out_pool) {
+  auto options = iree_async_proactor_pool_options_default();
+  options.proactor_options.max_concurrent_operations =
+      max_concurrent_operations;
+  return iree_async_proactor_pool_create(iree_numa_node_count(),
+                                         /*node_ids=*/nullptr, options,
+                                         iree_allocator_system(), out_pool);
+}
+
+HalDevice HalDriver::CreateDefaultDevice(
+    std::optional<py::list> allocators,
+    iree_host_size_t max_concurrent_operations) {
   iree_async_proactor_pool_t* proactor_pool = nullptr;
-  CheckApiStatus(iree_async_proactor_pool_create(
-                     iree_numa_node_count(), /*node_ids=*/nullptr,
-                     iree_async_proactor_pool_options_default(),
-                     iree_allocator_system(), &proactor_pool),
+  CheckApiStatus(CreateProactorPool(max_concurrent_operations, &proactor_pool),
                  "Creating proactor pool");
   iree_hal_device_t* device;
   iree_hal_device_create_params_t create_params =
@@ -1114,7 +1124,8 @@ HalDevice HalDriver::CreateDefaultDevice(std::optional<py::list> allocators) {
 
 HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
                                   std::optional<py::dict> params,
-                                  std::optional<py::list> allocators) {
+                                  std::optional<py::list> allocators,
+                                  iree_host_size_t max_concurrent_operations) {
   // Since the device ids are supposed to be opaque, we need to verify
   // them by querying available devices.
   py::list available_devices = QueryAvailableDevices();
@@ -1157,10 +1168,7 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
   }
 
   iree_async_proactor_pool_t* proactor_pool = nullptr;
-  CheckApiStatus(iree_async_proactor_pool_create(
-                     iree_numa_node_count(), /*node_ids=*/nullptr,
-                     iree_async_proactor_pool_options_default(),
-                     iree_allocator_system(), &proactor_pool),
+  CheckApiStatus(CreateProactorPool(max_concurrent_operations, &proactor_pool),
                  "Creating proactor pool");
   iree_hal_device_t* device;
   iree_hal_device_create_params_t create_params =
@@ -1175,13 +1183,11 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
   return StealConfiguredDevice(device, allocators);
 }
 
-HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
-                                       std::optional<py::list> allocators) {
+HalDevice HalDriver::CreateDeviceByURI(
+    std::string& device_uri, std::optional<py::list> allocators,
+    iree_host_size_t max_concurrent_operations) {
   iree_async_proactor_pool_t* proactor_pool = nullptr;
-  CheckApiStatus(iree_async_proactor_pool_create(
-                     iree_numa_node_count(), /*node_ids=*/nullptr,
-                     iree_async_proactor_pool_options_default(),
-                     iree_allocator_system(), &proactor_pool),
+  CheckApiStatus(CreateProactorPool(max_concurrent_operations, &proactor_pool),
                  "Creating proactor pool");
   iree_hal_device_t* device;
   iree_string_view_t device_uri_sv{
@@ -1571,26 +1577,31 @@ void SetupHalBindings(nanobind::module_ m) {
       // All 'create_device' functions take optional kwargs that should be kept
       // in sync.
       .def("create_default_device", &HalDriver::CreateDefaultDevice,
-           py::keep_alive<0, 1>(), py::arg("allocators") = py::none())
+           py::keep_alive<0, 1>(), py::arg("allocators") = py::none(),
+           py::kw_only(), py::arg("max_concurrent_operations") = 0)
       .def("create_device", &HalDriver::CreateDevice, py::keep_alive<0, 1>(),
            py::arg("device_id"), py::arg("params") = py::none(),
-           py::arg("allocators") = py::none())
+           py::arg("allocators") = py::none(), py::kw_only(),
+           py::arg("max_concurrent_operations") = 0)
       .def("create_device_by_uri", &HalDriver::CreateDeviceByURI,
            py::keep_alive<0, 1>(), py::arg("device_uri"),
-           py::arg("allocators") = py::none())
+           py::arg("allocators") = py::none(), py::kw_only(),
+           py::arg("max_concurrent_operations") = 0)
       .def(
           "create_device",
           [](HalDriver& self, py::dict device_info,
-             std::optional<py::dict> params,
-             std::optional<py::list> allocators) -> HalDevice {
+             std::optional<py::dict> params, std::optional<py::list> allocators,
+             iree_host_size_t max_concurrent_operations) -> HalDevice {
             // Alias of create_device that takes a dict as returned from
             // query_available_devices for convenience.
             auto device_id =
                 py::cast<iree_hal_device_id_t>(device_info["device_id"]);
-            return self.CreateDevice(device_id, params, allocators);
+            return self.CreateDevice(device_id, params, allocators,
+                                     max_concurrent_operations);
           },
           py::keep_alive<0, 1>(), py::arg("device_info"),
-          py::arg("params") = py::none(), py::arg("allocators") = py::none())
+          py::arg("params") = py::none(), py::arg("allocators") = py::none(),
+          py::kw_only(), py::arg("max_concurrent_operations") = 0)
       .def("query_available_devices", &HalDriver::QueryAvailableDevices)
       .def("dump_device_info",
            [](HalDriver& self, iree_hal_device_id_t device_id) {

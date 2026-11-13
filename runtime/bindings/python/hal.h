@@ -218,12 +218,17 @@ class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
                            py::dict& driver_cache);
 
   py::list QueryAvailableDevices();
-  HalDevice CreateDefaultDevice(std::optional<py::list> allocators);
+  // max_concurrent_operations is a proactor sizing hint; zero selects the
+  // platform default for all three device creation methods.
+  HalDevice CreateDefaultDevice(std::optional<py::list> allocators,
+                                iree_host_size_t max_concurrent_operations);
   HalDevice CreateDevice(iree_hal_device_id_t device_id,
                          std::optional<py::dict> params,
-                         std::optional<py::list> allocators);
+                         std::optional<py::list> allocators,
+                         iree_host_size_t max_concurrent_operations);
   HalDevice CreateDeviceByURI(std::string& device_uri,
-                              std::optional<py::list> allocators);
+                              std::optional<py::list> allocators,
+                              iree_host_size_t max_concurrent_operations);
 };
 
 class HalAllocator : public ApiRefCounted<HalAllocator, iree_hal_allocator_t> {
