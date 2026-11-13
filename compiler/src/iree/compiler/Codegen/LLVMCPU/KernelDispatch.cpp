@@ -247,11 +247,6 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
     return clPProcStrategy;
   }
 
-  // TODO: Implement heuristics for Convs
-  if (isa<linalg::ConvolutionOpInterface>(linalgOp.getOperation())) {
-    return VectorPreProcStrategy::None;
-  }
-
   // Select a strategy based on heuristics.
   if (linalgOp.hasPureBufferSemantics()) {
     return VectorPreProcStrategy::None;
@@ -272,13 +267,11 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   }
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(linalgOp);
-  bool isElementwiseOrReduction =
-      !linalg::isaContractionOpInterface(linalgOp) &&
-      isa<linalg::GenericOp>(linalgOp.getOperation());
+  bool isContraction = linalg::isaContractionOpInterface(linalgOp);
 
   // Default X86 specific strategy.
   if (targetAttr && isX86(targetAttr.getConfiguration())) {
-    if (isElementwiseOrReduction) {
+    if (!isContraction) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -294,7 +287,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default RISC-V specific strategies.
   if (targetAttr && isRISCV(targetAttr.getConfiguration())) {
-    if (isElementwiseOrReduction) {
+    if (!isContraction) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -3563,12 +3556,6 @@ MultiLoweringConfigGenerator::create(Operation *rootOperation,
   if (!llvm::is_contained(computeOps, rootOperation)) {
     // Root operation may not be included in the compute ops, after
     // `shouldSetLoweringConfig`.
-    return nullptr;
-  }
-
-  if (isa<linalg::ConvolutionOpInterface>(rootOperation)) {
-    // TODO(dcaballe): We don't know yet how to properly propagate the lowering
-    // config of a convolution.
     return nullptr;
   }
 

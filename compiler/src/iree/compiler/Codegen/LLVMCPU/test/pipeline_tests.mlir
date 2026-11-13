@@ -484,9 +484,11 @@ func.func @mmt4d_unpack_elementwise() attributes {hal.executable.target = #execu
 
 // -----
 
-// This tests that the pack op is not fusible in distribution, and it falls back
-// to the iree_linalg_ext.map_store solution. The check ensures that the
-// iree_linalg_ext.map_store op is fused within scf.forall op.
+// Regression test for a pooling op with a pack consumer whose inner tile does
+// not match the default distribution tile sizes of the pooling op. The
+// lowering config of the pooling op is adjusted for the pack consumer, so the
+// pack is fused into the distribution loop and written to the output directly,
+// without the iree_linalg_ext.map_store fallback.
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
 func.func @pooling_nchw_max_pack_without_padding_issue_20723() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
@@ -505,15 +507,16 @@ func.func @pooling_nchw_max_pack_without_padding_issue_20723() attributes {hal.e
   return
 }
 // CHECK-LABEL: func.func @pooling_nchw_max_pack_without_padding_issue_20723(
+// CHECK-NOT:     iree_linalg_ext.map_store
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             iree_linalg_ext.map_store
+// CHECK:           vector.store {{.+}} : memref<1x64x1x1x8xf32
+// CHECK-NOT:     iree_linalg_ext.map_store
 
 // -----
 
-// Similar to the above test, but the pack has padding semantics. After folding
-// the padding into iree_linalg_ext.map_store op, it creates an additional
-// scf.forall to fill the padding values.
+// Similar to the above test, but the pack has padding semantics. The padding
+// is written together with the packed tile.
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
 func.func @pooling_nchw_max_pack_with_padding_issue_20723() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
@@ -533,10 +536,11 @@ func.func @pooling_nchw_max_pack_with_padding_issue_20723() attributes {hal.exec
   return
 }
 // CHECK-LABEL: func.func @pooling_nchw_max_pack_with_padding_issue_20723(
+// CHECK-NOT:     iree_linalg_ext.map_store
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             iree_linalg_ext.map_store
-// CHECK:         scf.for
+// CHECK:           vector.store {{.+}} : memref<1x64x1x1x8xf32
+// CHECK-NOT:     iree_linalg_ext.map_store
 
 // -----
 
