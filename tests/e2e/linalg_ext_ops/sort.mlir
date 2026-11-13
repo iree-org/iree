@@ -70,3 +70,26 @@ func.func @sort1D_keys_and_indices() {
   check.expect_eq_const(%0#1, dense<[2, 5, 7, 3, 8, 6, 0, 1, 4]> : tensor<9xi32>) : tensor<9xi32>
   return
 }
+
+// Many equal keys with a comparator that orders them by their index, the form
+// frontends use to get the result of a stable sort.
+func.func @sort1D_ties_ordered_by_index() {
+  %keys = util.unfoldable_constant dense<[2, 1, 2, 2, 0, 1, 2, 0, 1, 1, 2, 0, 1]> : tensor<13xi32>
+  %indices = util.unfoldable_constant dense<[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]> : tensor<13xi32>
+  %empty_keys = tensor.empty() : tensor<13xi32>
+  %empty_indices = tensor.empty() : tensor<13xi32>
+  %0:2 = iree_linalg_ext.sort dimension(0)
+      ins(%keys, %indices : tensor<13xi32>, tensor<13xi32>)
+      outs(%empty_keys, %empty_indices : tensor<13xi32>, tensor<13xi32>) {
+    ^bb0(%arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32):
+      %before = arith.cmpi sge, %arg2, %arg3 : i32
+      %after = arith.cmpi sge, %arg3, %arg2 : i32
+      %ordered = arith.xori %before, %after : i1
+      %lower_index = arith.cmpi slt, %arg4, %arg5 : i32
+      %1 = arith.select %ordered, %before, %lower_index : i1
+      iree_linalg_ext.yield %1 : i1
+    } -> tensor<13xi32>, tensor<13xi32>
+  check.expect_eq_const(%0#0, dense<[2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 0, 0, 0]> : tensor<13xi32>) : tensor<13xi32>
+  check.expect_eq_const(%0#1, dense<[0, 2, 3, 6, 10, 1, 5, 8, 9, 12, 4, 7, 11]> : tensor<13xi32>) : tensor<13xi32>
+  return
+}
