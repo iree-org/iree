@@ -320,36 +320,6 @@ static iree_status_t iree_hal_metal_create_pipeline_state(
 }
 #endif  // 0
 
-// Collect the argument buffer's actual members, including sparse binding IDs.
-// Encoding an absent ID can overwrite an active argument in Metal's encoder.
-static iree_status_t iree_hal_metal_collect_used_bindings(MTLComputePipelineReflection* reflection,
-                                                          iree_host_size_t binding_count,
-                                                          uint64_t* out_binding_used_bits) {
-  *out_binding_used_bits = 0;
-  if (!reflection) {
-    // Without reflection every binding would be skipped at dispatch.
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "Metal returned no reflection for the compute pipeline");
-  }
-  for (id<MTLBinding> binding in reflection.bindings) {
-    // Only the argument buffer holds bindings; other buffers hold constants.
-    if (binding.type != MTLBindingTypeBuffer ||
-        binding.index != IREE_HAL_METAL_ARGUMENT_BUFFER_INDEX) {
-      continue;
-    }
-    id<MTLBufferBinding> buffer_binding = (id<MTLBufferBinding>)binding;
-    for (MTLStructMember* member in buffer_binding.bufferStructType.members) {
-      if (member.argumentIndex >= binding_count) {
-        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                "shader binding %lu exceeds dispatch binding count %" PRIhsz,
-                                (unsigned long)member.argumentIndex, binding_count);
-      }
-      *out_binding_used_bits |= 1ull << member.argumentIndex;
-    }
-  }
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_metal_create_pipeline(id<MTLDevice> device, id<MTLLibrary> library,
                                                     iree_hal_metal_PipelineDef_table_t pipeline_def,
                                                     iree_hal_metal_pipeline_t* out_pipeline) {
@@ -383,18 +353,15 @@ static iree_status_t iree_hal_metal_create_pipeline(id<MTLDevice> device, id<MTL
         [descriptor setThreadGroupSizeIsMultipleOfThreadExecutionWidth:
                         iree_hal_metal_PipelineDef_threadgroup_size_aligned_get(pipeline_def)];
       }
-      [[[descriptor buffers] objectAtIndexedSubscript:IREE_HAL_METAL_ARGUMENT_BUFFER_INDEX]
-          setMutability:MTLMutabilityImmutable];
+      [[[descriptor buffers] objectAtIndexedSubscript:0] setMutability:MTLMutabilityImmutable];
       [[[descriptor buffers] objectAtIndexedSubscript:IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX]
           setMutability:MTLMutabilityImmutable];
 
       NSError* error = nil;
-      MTLComputePipelineReflection* reflection = nil;
       out_pipeline->pipeline_state =
           [device newComputePipelineStateWithDescriptor:descriptor
-                                                options:MTLPipelineOptionBindingInfo |
-                                                        MTLPipelineOptionBufferTypeInfo
-                                             reflection:&reflection
+                                                options:MTLPipelineOptionNone
+                                             reflection:nil
                                                   error:&error];
       if (IREE_UNLIKELY(out_pipeline->pipeline_state == nil)) {
         const char* ns_c_error = [error.localizedDescription
@@ -402,12 +369,6 @@ static iree_status_t iree_hal_metal_create_pipeline(id<MTLDevice> device, id<MTL
         status = iree_make_status(
             IREE_STATUS_INVALID_ARGUMENT, "failed to create pipeline with function `%.*s`: %s",
             (int)flatbuffers_string_len(entry_point), entry_point, ns_c_error);
-      } else {
-        status = iree_hal_metal_collect_used_bindings(
-            reflection,
-            iree_hal_metal_BindingBits_vec_len(
-                iree_hal_metal_PipelineDef_binding_flags_get(pipeline_def)),
-            &out_pipeline->binding_used_bits);
       }
     }
   }
