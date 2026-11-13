@@ -110,6 +110,20 @@ jobs:
             exit 1
           fi
 
+      - name: Generate headers
+        if: steps.tidy-diff-mode.outputs.use_cpp_linter == 'true'
+        run: |
+          # The compilation database comes from a configure-only build, so the
+          # generated headers (TableGen .inc files, flatbuffer headers) do not
+          # exist yet. Without them clang-tidy cannot parse most compiler
+          # sources, and its checks only see a broken AST. Clang's headers are
+          # skipped, since IREE does not include them.
+          mapfile -t generated < <(ninja -C "${BUILD_DIR}" -t targets all \
+            | sed -nE 's/^([^:]+(\.inc|_builder\.h|_reader\.h|_verifier\.h|_json_parser\.h|_json_printer\.h)):.*/\1/p' \
+            | grep -v '/tools/clang/')
+          echo "Generating ${#generated[@]} headers."
+          ninja -C "${BUILD_DIR}" "${generated[@]}"
+
       - name: Run clang-tidy
         if: steps.tidy-diff-mode.outputs.use_cpp_linter == 'true'
         uses: cpp-linter/cpp-linter-action@774040af57f011a5fc47911f08ff0c3059d1835a # v1.11.4
@@ -126,6 +140,7 @@ jobs:
           ignore: 'third_party'
           thread-comments: false
           step-summary: true
+
 
       - name: Skip clang-tidy on large diff
         if: steps.tidy-diff-mode.outputs.use_cpp_linter == 'false'
