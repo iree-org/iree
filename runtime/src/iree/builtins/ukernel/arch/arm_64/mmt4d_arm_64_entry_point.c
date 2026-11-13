@@ -59,6 +59,13 @@ iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
 #define IREE_UK_MMT4D_TILE_arm_64_i8mm(lhs, rhs, out, m0, n0, k0)
 #endif
 
+#ifdef IREE_UK_BUILD_ARM_64_SVE_I8MM
+#define IREE_UK_MMT4D_TILE_arm_64_sve_i8mm(lhs, rhs, out, m0, n0, k0) \
+  IREE_UK_MMT4D_TILE_IMPL_arm_64(lhs, rhs, out, m0, n0, k0, _sve_i8mm)
+#else
+#define IREE_UK_MMT4D_TILE_arm_64_sve_i8mm(lhs, rhs, out, m0, n0, k0)
+#endif
+
 #define IREE_UK_MMT4D_TILE(arch, lhs, rhs, out, m0, n0, k0, suffix) \
   IREE_UK_MMT4D_TILE_arm_64##suffix(lhs, rhs, out, m0, n0, k0)
 
