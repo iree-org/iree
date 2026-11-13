@@ -50,9 +50,10 @@ struct DemoteContractionInputsPattern
     : OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
   explicit DemoteContractionInputsPattern(MLIRContext *ctx,
-                                          const DemoteOperation &operation)
+                                          const DemoteOperation &operation,
+                                          int64_t minReductionSize)
       : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx),
-        demoteOperation(operation) {}
+        demoteOperation(operation), minReductionSize(minReductionSize) {}
 
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
@@ -77,6 +78,32 @@ struct DemoteContractionInputsPattern
                             : isDemotableNamedConv(op);
     if (!(demoteMatmul && isMatmul) && !(demoteConv && isConv)) {
       return failure();
+    }
+
+    // Skip contractions with a tiny static reduction extent. Narrower inputs
+    // gain nothing, and often are index-derived data, e.g. the inv_freq x
+    // position_ids outer product (reduction dimension K = 1) that computes
+    // rotary-embedding angles. Rounding position ids above 256 to bf16 silently
+    // corrupts every token past that position.
+    if (minReductionSize > 1 &&
+        isa<linalg::ContractionOpInterface>(linalgOp.getOperation())) {
+      FailureOr<linalg::ContractionDimensions> dims =
+          linalg::inferContractionDims(linalgOp);
+      if (succeeded(dims)) {
+        SmallVector<int64_t> ranges = linalgOp.getStaticLoopRanges();
+        int64_t reductionSize = 1;
+        bool hasDynamicReduction = false;
+        for (unsigned dim : dims->k) {
+          if (ShapedType::isDynamic(ranges[dim])) {
+            hasDynamicReduction = true;
+            break;
+          }
+          reductionSize *= ranges[dim];
+        }
+        if (!hasDynamicReduction && reductionSize < minReductionSize) {
+          return failure();
+        }
+      }
     }
 
     Type srcType = SrcType::get(rewriter.getContext());
@@ -143,6 +170,7 @@ struct DemoteContractionInputsPattern
 
 private:
   DemoteOperation demoteOperation;
+  int64_t minReductionSize;
 };
 
 class DemoteContractionInputsPass
@@ -159,12 +187,12 @@ public:
     switch (demoteType.getValue()) {
     case DemoteType::F16:
       patterns.insert<DemoteContractionInputsPattern<Float32Type, Float16Type>>(
-          context, ops);
+          context, ops, minReductionSize);
       break;
     case DemoteType::BF16:
       patterns
           .insert<DemoteContractionInputsPattern<Float32Type, BFloat16Type>>(
-              context, ops);
+              context, ops, minReductionSize);
       break;
     default:
       llvm_unreachable("Unsupported demotion type");
