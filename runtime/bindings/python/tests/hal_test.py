@@ -8,7 +8,9 @@ from typing import List
 import iree.runtime
 import iree.compiler
 
+import ctypes
 import gc
+import weakref
 import sys
 import numpy as np
 import threading
@@ -596,6 +598,63 @@ class DeviceHalTest(unittest.TestCase):
         iree.runtime.HalFence.create_at(sem, 1).wait()
 
 
+class _DLDevice(ctypes.Structure):
+    _fields_ = [("device_type", ctypes.c_int), ("device_id", ctypes.c_int)]
+
+
+class _DLDataType(ctypes.Structure):
+    _fields_ = [
+        ("code", ctypes.c_uint8),
+        ("bits", ctypes.c_uint8),
+        ("lanes", ctypes.c_uint16),
+    ]
+
+
+class _DLTensor(ctypes.Structure):
+    _fields_ = [
+        ("data", ctypes.c_void_p),
+        ("device", _DLDevice),
+        ("ndim", ctypes.c_int),
+        ("dtype", _DLDataType),
+        ("shape", ctypes.POINTER(ctypes.c_int64)),
+        ("strides", ctypes.POINTER(ctypes.c_int64)),
+        ("byte_offset", ctypes.c_uint64),
+    ]
+
+
+class _DLManagedTensor(ctypes.Structure):
+    _fields_ = [
+        ("dl_tensor", _DLTensor),
+        ("manager_ctx", ctypes.c_void_p),
+        ("deleter", ctypes.c_void_p),
+    ]
+
+
+class _TrackedDLPack:
+    """Keep NumPy's ownership while exposing metadata and counting releases."""
+
+    def __init__(self, array):
+        self.capsule = array.__dlpack__()
+        get_pointer = ctypes.pythonapi.PyCapsule_GetPointer
+        get_pointer.argtypes = [ctypes.py_object, ctypes.c_char_p]
+        get_pointer.restype = ctypes.c_void_p
+        managed = ctypes.cast(
+            get_pointer(self.capsule, b"dltensor"), ctypes.POINTER(_DLManagedTensor)
+        ).contents
+        self.tensor = managed.dl_tensor
+        deleter_type = ctypes.CFUNCTYPE(None, ctypes.c_void_p)
+        original_deleter = deleter_type(managed.deleter)
+        self.releases = releases = []
+
+        def release(pointer):
+            releases.append(pointer)
+            original_deleter(pointer)
+
+        # The callback must outlive the imported HAL buffer.
+        self.deleter = deleter_type(release)
+        managed.deleter = ctypes.cast(self.deleter, ctypes.c_void_p).value
+
+
 class DeviceDLPackTest(unittest.TestCase):
     """Tests low level DLPack import/export against the CPU HAL backend.
 
@@ -613,6 +672,234 @@ class DeviceDLPackTest(unittest.TestCase):
         self.device = iree.runtime.get_device("local-task")
         self.allocator = self.device.allocator
         gc.collect()
+
+    def importTracked(self, tracked, access=None):
+        if access is None:
+            access = iree.runtime.MemoryAccess.READ | iree.runtime.MemoryAccess.WRITE
+        return self.device.from_dlpack_capsule(
+            tracked.capsule,
+            memory_type=iree.runtime.MemoryType.HOST_LOCAL
+            | iree.runtime.MemoryType.DEVICE_VISIBLE,
+            memory_access=iree.runtime.MemoryAccess.UNALIGNED | access,
+        )
+
+    def exportArray(self, buffer_view):
+        capsule = self.device.create_dlpack_capsule(buffer_view, 1, 0)
+
+        class Producer:
+            def __dlpack__(self, stream=None):
+                return capsule
+
+            def __dlpack_device__(self):
+                return (1, 0)
+
+        return np.from_dlpack(Producer())
+
+    def testUnalignedOffsetAliasesAndLifetime(self):
+        source = np.arange(7, dtype=np.int32)
+        source_ref = weakref.ref(source)
+        tracked = _TrackedDLPack(source)
+        tracked.tensor.byte_offset = source.itemsize
+        tracked.tensor.shape[0] = 6
+        imported = self.importTracked(tracked)
+        mapped = imported.map().asarray([6], np.dtype(np.int32))
+        np.testing.assert_array_equal(mapped, np.arange(1, 7))
+        self.assertTrue(np.shares_memory(mapped, source))
+        mapped[0] = 42
+        self.assertEqual(source[1], 42)
+        exported = self.exportArray(imported)
+        self.assertTrue(np.shares_memory(exported, source))
+        del mapped, imported, source
+        gc.collect()
+        self.assertIsNotNone(source_ref())
+        self.assertEqual(tracked.releases, [])
+        np.testing.assert_array_equal(exported, [42, 2, 3, 4, 5, 6])
+        del exported
+        gc.collect()
+        self.assertEqual(len(tracked.releases), 1)
+        self.assertIsNone(source_ref())
+
+    def testReadOnlyImportPreservesAccess(self):
+        source = np.arange(6, dtype=np.int32)
+        tracked = _TrackedDLPack(source)
+        imported = self.importTracked(tracked, iree.runtime.MemoryAccess.READ)
+        mapped_memory = imported.map()
+        mapped = mapped_memory.asarray(source.shape, source.dtype)
+        self.assertTrue(memoryview(mapped_memory).readonly)
+        self.assertFalse(mapped.flags.writeable)
+        with self.assertRaisesRegex(ValueError, "read-only"):
+            mapped[0] = 99
+        with self.assertRaises(ValueError):
+            mapped.setflags(write=True)
+        np.testing.assert_array_equal(mapped, source)
+        with self.assertRaisesRegex(ValueError, "read-only"):
+            self.device.create_dlpack_capsule(imported, 1, 0)
+        del mapped, mapped_memory, imported
+        gc.collect()
+        self.assertEqual(len(tracked.releases), 1)
+
+    def testReadOnlyMappingIgnoresAccessBypassFlag(self):
+        source = np.arange(6, dtype=np.int32)
+        tracked = _TrackedDLPack(source)
+        # The internal ANY flag must not grant permissions on an imported buffer.
+        imported = self.importTracked(
+            tracked, iree.runtime.MemoryAccess.READ | (1 << 5)
+        )
+        mapped_memory = imported.map()
+        mapped = mapped_memory.asarray(source.shape, source.dtype)
+        self.assertTrue(memoryview(mapped_memory).readonly)
+        self.assertFalse(mapped.flags.writeable)
+        np.testing.assert_array_equal(mapped, source)
+        self.assertTrue(np.shares_memory(mapped, source))
+        del mapped, mapped_memory, imported
+        gc.collect()
+        self.assertEqual(len(tracked.releases), 1)
+
+    def testDLPackExportRequiresReadWriteDespiteAccessBypassFlag(self):
+        any_access = 1 << 5  # Internal access-request flag, not a public enum.
+        for access in (
+            iree.runtime.MemoryAccess.READ | any_access,
+            iree.runtime.MemoryAccess.WRITE | any_access,
+        ):
+            with self.subTest(access=access):
+                tracked = _TrackedDLPack(np.arange(6, dtype=np.int32))
+                imported = self.importTracked(tracked, access)
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "Legacy dlpack cannot preserve read-only or write-only buffer access",
+                ):
+                    self.device.create_dlpack_capsule(imported, 1, 0)
+                del imported
+                gc.collect()
+                self.assertEqual(len(tracked.releases), 1)
+
+    def testDoubleConsumptionReleasesOnce(self):
+        tracked = _TrackedDLPack(np.arange(6, dtype=np.int32))
+        imported = self.importTracked(tracked)
+        with self.assertRaisesRegex(ValueError, "incorrect name"):
+            self.importTracked(tracked)
+        self.assertEqual(tracked.releases, [])
+        del imported
+        gc.collect()
+        self.assertEqual(len(tracked.releases), 1)
+
+    def testNoncontiguousFailureReleasesOnce(self):
+        source = np.arange(12, dtype=np.int32).reshape(3, 4)[:, ::2]
+        tracked = _TrackedDLPack(source)
+        with self.assertRaisesRegex(ValueError, "strided"):
+            self.importTracked(tracked)
+        self.assertEqual(len(tracked.releases), 1)
+        with self.assertRaisesRegex(ValueError, "incorrect name"):
+            self.importTracked(tracked)
+        np.testing.assert_array_equal(source, [[0, 2], [4, 6], [8, 10]])
+        del tracked.capsule
+        gc.collect()
+        self.assertEqual(len(tracked.releases), 1)
+
+    def testAllocatorFailureReleasesOnce(self):
+        tracked = _TrackedDLPack(np.arange(6, dtype=np.int32))
+        tracked.tensor.byte_offset = 1
+        tracked.tensor.shape[0] = 5
+        with self.assertRaisesRegex(IndexError, "align"):
+            self.device.from_dlpack_capsule(
+                tracked.capsule,
+                memory_type=iree.runtime.MemoryType.HOST_LOCAL
+                | iree.runtime.MemoryType.DEVICE_VISIBLE,
+            )
+        self.assertEqual(len(tracked.releases), 1)
+        del tracked.capsule
+        gc.collect()
+        self.assertEqual(len(tracked.releases), 1)
+
+    def testUnconsumedCapsulesReleaseOnce(self):
+        tracked = _TrackedDLPack(np.arange(6, dtype=np.int32))
+        del tracked.capsule
+        gc.collect()
+        self.assertEqual(len(tracked.releases), 1)
+
+        source = np.arange(6, dtype=np.int32)
+        source_ref = weakref.ref(source)
+        tracked = _TrackedDLPack(source)
+        imported = self.importTracked(tracked)
+        exported_capsule = self.device.create_dlpack_capsule(imported, 1, 0)
+        del imported, source
+        gc.collect()
+        self.assertEqual(tracked.releases, [])
+        self.assertIsNotNone(source_ref())
+        del exported_capsule
+        gc.collect()
+        self.assertEqual(len(tracked.releases), 1)
+        self.assertIsNone(source_ref())
+
+    def testEmptyTensorIgnoresStridesAndSizePrefixes(self):
+        for shape in ((2**59, 0), (0, 2**59), (2, 0, 3)):
+            with self.subTest(shape=shape):
+                tracked = _TrackedDLPack(np.empty(shape, dtype=np.int32))
+                strides = (ctypes.c_int64 * len(shape))(*([-42] * len(shape)))
+                tracked.tensor.strides = strides
+                imported = self.importTracked(tracked)
+                self.assertEqual(imported.byte_length, 0)
+                self.assertEqual(tuple(imported.shape), shape)
+                mapped = imported.map().asarray(shape, np.dtype(np.int32))
+                self.assertEqual(mapped.shape, shape)
+                self.assertEqual(mapped.size, 0)
+                del mapped, imported
+                gc.collect()
+                self.assertEqual(len(tracked.releases), 1)
+
+    def testInvalidMetadataReleasesOnce(self):
+        def negative_rank(tensor):
+            tensor.ndim = -1
+
+        def missing_shape(tensor):
+            tensor.shape = None
+
+        def negative_dimension(tensor):
+            tensor.shape[0] = -1
+
+        def overflowing_size(tensor):
+            tensor.shape[0] = 2**62
+
+        def overflowing_offset(tensor):
+            tensor.byte_offset = 2**64 - 1
+
+        def missing_data(tensor):
+            tensor.data = None
+
+        def empty_dtype(tensor):
+            tensor.dtype.bits = 0
+
+        cases = [
+            (negative_rank, "rank"),
+            (missing_shape, "shape"),
+            (negative_dimension, "dimension"),
+            (overflowing_size, "size"),
+            (overflowing_offset, "offset"),
+            (missing_data, "data"),
+            (empty_dtype, "bits"),
+        ]
+        for mutate, message in cases:
+            with self.subTest(case=mutate.__name__):
+                tracked = _TrackedDLPack(np.arange(6, dtype=np.int32))
+                mutate(tracked.tensor)
+                with self.assertRaisesRegex(ValueError, message):
+                    self.importTracked(tracked)
+                self.assertEqual(len(tracked.releases), 1)
+                del tracked.capsule
+                gc.collect()
+                self.assertEqual(len(tracked.releases), 1)
+
+    def testDiscardExportPreservesContents(self):
+        source = np.arange(6, dtype=np.int32)
+        tracked = _TrackedDLPack(source)
+        imported = self.importTracked(tracked, iree.runtime.MemoryAccess.ALL)
+        exported = self.exportArray(imported)
+        np.testing.assert_array_equal(exported, source)
+        np.testing.assert_array_equal(source, np.arange(6))
+        self.assertTrue(np.shares_memory(exported, source))
+        del imported, exported
+        gc.collect()
+        self.assertEqual(len(tracked.releases), 1)
 
     def roundtrip(self, input_array, element_type):
         # We have top copy the input array into our own buffer to ensure
