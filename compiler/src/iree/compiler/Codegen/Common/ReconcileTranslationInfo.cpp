@@ -345,9 +345,14 @@ resolveWorkgroupForAll(RewriterBase &rewriter, scf::ForallOp forallOp,
       if (std::optional<int64_t> numWorkgroupsStatic =
               getConstantIntValue(numWorkgroups)) {
         if (numWorkgroupsStatic.value() <= maxCount) {
+          // The target can launch one workgroup per iteration, so this
+          // dimension needs no kernel loop.
           generateLoopNest[index] = false;
+          continue;
         }
-        continue;
+        // Fall through to cap the launch count. Keep the loop for this
+        // dimension: its stride is the actual workgroup count times the
+        // original step, so the launched workgroups still cover all iterations.
       }
     }
 
