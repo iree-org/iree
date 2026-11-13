@@ -75,7 +75,8 @@ declare -a test_exclude_args=(
   # f16 (half-precision) arithmetic is broken on mips64el llvm-cpu codegen: a
   # bare `arith.addf` of f16 returns 0. MIPS has no native f16; the soft-float
   # conversion builtins (__extendhfsf2/__truncsfhf2) are present in the binary,
-  # so this is an ABI/lowering bug, not a missing symbol. Tracked in <ISSUE>.
+  # so this is an ABI/lowering bug in the LLVM MIPS backend, not a missing
+  # symbol.
   "exponential_fp16"
   "dynamic_attention"
   "dynamic_gather_attention"
@@ -89,7 +90,6 @@ declare -a test_exclude_args=(
 
   # Narrow-type (bf16/i8) data-tiled matmul fails under qemu-mips64el: SIGBUS
   # (unaligned access in the data-tiled inner kernel) or hangs (timeout).
-  # Tracked in <ISSUE>.
   "e2e_matmul_cpu_dt_inner_tiled_bf16"
   "e2e_matmul_cpu_dt_uk_bf16"
   "e2e_matmul_cpu_experimental_dt_bf16"

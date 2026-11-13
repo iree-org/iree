@@ -70,6 +70,15 @@ static bool predicateRewrite(StringRef name,
       hasNativeRoundEven(target)) {
     return false;
   }
+  // On MIPS, asinh/acosh expand to a log(x + sqrt(...)) form whose vectorized
+  // version the LLVM MIPS MSA backend miscompiles (same family as the erf and
+  // exp miscompiles). They have no LLVM intrinsic, so keep them un-expanded
+  // here and route them to scalar libm in ConvertToLLVM (see the erf handling).
+  if (isMIPS(target.getConfiguration()) &&
+      (name == math::AsinhOp::getOperationName() ||
+       name == math::AcoshOp::getOperationName())) {
+    return false;
+  }
   // Currently enable all non-approximative rewrites.
   return true;
 }
@@ -139,15 +148,19 @@ static bool predicateApprox(StringRef name,
 
   // The LLVM MIPS backend miscompiles the vectorized polynomial approximation
   // of certain transcendentals once MSA (128-bit SIMD) is enabled (e.g. exp(1)
-  // evaluates to 7.43 instead of 2.72); the same approximations are correct
-  // when scalar, so the fault is in MSA codegen of the vectorized approximation,
-  // not the approximation itself. Route only that confirmed-affected family to
-  // scalar libm on MIPS (correct; MSA still vectorizes the surrounding
-  // arith/matmul/conv). erf and cbrt are deliberately NOT included: they have
-  // no vector libm lowering and must stay approximated, else legalization
-  // fails. See <ISSUE>.
+  // evaluates to 7.43 instead of 2.72, and erf(1) to 0.655 instead of 0.843);
+  // the same approximations are correct when scalar, so the fault is in MSA
+  // codegen of the vectorized approximation, not the approximation itself. Keep
+  // these ops off the approximation on MIPS so they go to scalar libm instead
+  // (correct; MSA still vectorizes the surrounding arith/matmul/conv). exp,
+  // log, sin, cos, tanh, atan et al. have LLVM intrinsics and reach libm that
+  // way; erf has no intrinsic, so ConvertToLLVM converts it (and asinh/acosh,
+  // kept un-expanded in predicateRewrite) to a libm call on MIPS. cbrt and
+  // atan2 are intentionally NOT here: they were verified correct under MSA, so
+  // they stay vectorized.
   if (isMIPS(target.getConfiguration()) &&
-      llvm::is_contained({exp, expm1, log, log2, log1p, sin, cos, tanh}, name)) {
+      llvm::is_contained(
+          {exp, expm1, log, log2, log1p, sin, cos, tanh, erf, atan}, name)) {
     return false;
   }
 

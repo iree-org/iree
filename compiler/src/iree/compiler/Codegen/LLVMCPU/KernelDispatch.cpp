@@ -872,6 +872,9 @@ static int getRegisterSpaceBitsIfKnown(IREE::HAL::ExecutableTargetAttr target) {
     // 32 NEON/SVE registers (at least 128-bit each, returns the base size for
     // SVE).
     return 32 * 128;
+  } else if (isMIPS(targetConfig) && hasFeature(targetConfig, "+msa")) {
+    // 32 MSA vector registers (w0-w31), 128-bit each.
+    return 32 * 128;
   } else {
     // Don't know register space size as a compile-time constant on other
     // architectures.
@@ -1523,6 +1526,14 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
       getMatmulRISCVVectorSizes(entryPointFn, op, vectorSize, matmulTileSizes,
                                 matmulScalableFlags);
     }
+  }
+
+  if (targetAttr && isMIPS(targetAttr.getConfiguration()) &&
+      hasFeature(targetAttr.getConfiguration(), "+msa")) {
+    // MSA is fixed-width 128-bit; maximize vector register utilization the same
+    // way AArch64 NEON does (honors native_vector_size=16 set for +msa).
+    getMatmulVectorSizesUsingFillRegisterFileHeuristic(
+        entryPointFn, op, vectorSize, matmulTileSizes, matmulScalableFlags);
   }
 
   // If tile sizes were not computed by previous heuristics, use default
@@ -2941,6 +2952,19 @@ getNhwcConvVectorSizes(mlir::FunctionOpInterface entryPointFn,
       llvm_unreachable("unsupported conv");
     }
     if (isAArch64(targetConfig)) {
+      if (is2DConvOp(op)) {
+        return {1, 1, 32, 64, 1, 1, 16};
+      }
+      if (is2DDepthConvOp(op)) {
+        return {1, 1, 4, 4, 1, 4};
+      }
+      if (is2DPoolingOp(op)) {
+        return {1, 1, 32, 64, 1, 16};
+      }
+      llvm_unreachable("unsupported conv");
+    }
+    if (isMIPS(targetConfig) && hasFeature(targetConfig, "+msa")) {
+      // MSA is fixed-width 128-bit like NEON; reuse the AArch64 conv tiles.
       if (is2DConvOp(op)) {
         return {1, 1, 32, 64, 1, 1, 16};
       }

@@ -4,10 +4,18 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Two MIPS exclusion labels:
+#  - "nomips": a capability gap that MSA lifts (e.g. data-tiling/winograd that
+#    need SIMD). Excluded only on the scalar r2 build (IREE_MIPS_ENABLE_MSA off);
+#    on the r6/MSA build these compile and run, so they are NOT excluded.
+#  - "nomips_backend": a genuine LLVM MIPS backend gap that MSA does NOT fix
+#    (e.g. the f16 v8f16 inner-tiled instruction-selection crash). Excluded on
+#    every MIPS build until the backend is fixed.
 function(iree_is_bytecode_module_test_excluded_by_labels _DST_IS_EXCLUDED_VAR _SRC_LABELS)
   string(TOLOWER "${CMAKE_BUILD_TYPE}" _LOWERCASE_BUILD_TYPE)
   if(((IREE_ARCH MATCHES "^riscv_") AND ("noriscv" IN_LIST _SRC_LABELS)) OR
      ((IREE_ARCH MATCHES "^mips_") AND (NOT IREE_MIPS_ENABLE_MSA) AND ("nomips" IN_LIST _SRC_LABELS)) OR
+     ((IREE_ARCH MATCHES "^mips_") AND ("nomips_backend" IN_LIST _SRC_LABELS)) OR
      ((IREE_ARCH STREQUAL "arm_64") AND ("noaarch64" IN_LIST _SRC_LABELS)) OR
      (EMSCRIPTEN AND ("nowasm" IN_LIST _SRC_LABELS)) OR
      (IREE_ENABLE_ASAN AND ("noasan" IN_LIST _SRC_LABELS)) OR
@@ -107,6 +115,16 @@ function(iree_check_test)
     if(_NORMALIZED_TARGET_BACKEND STREQUAL "ROCM" AND NOT IREE_ROCM_TEST_TARGET_CHIP)
       set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
     endif()
+  endif()
+  # With a prebuilt host compiler (IREE_HOST_BIN_DIR) the runtime-side
+  # IREE_TARGET_BACKEND_* options do not describe that compiler, so the guard
+  # above cannot skip backends it lacks (this is the TODO above). If
+  # IREE_TEST_TARGET_BACKENDS is set, it is the explicit list of backends the
+  # host compiler supports; test modules for any other backend are not built.
+  # Empty (the default) keeps the original build-everything behavior.
+  if(IREE_HOST_BIN_DIR AND IREE_TEST_TARGET_BACKENDS AND
+     NOT ("${_RULE_TARGET_BACKEND}" IN_LIST IREE_TEST_TARGET_BACKENDS))
+    set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
   endif()
   # ---------------------------------------------------------------------------
 

@@ -35,11 +35,6 @@ iree_check_single_backend_test_suite(
     "nowasm"
 )
 
-# Data-tiling pack/unpack with wide (i32) inner tiles vectorize to vectors far
-# larger than a scalar target without SIMD can lower (generic MIPS has
-# native_vector_size=4), so iree-compile rejects them ("large vector sizes").
-# Split out and labelled nomips; efficient support is the motivation for MSA
-# vectorization (future work). pack_i8 stays above - its narrower tiles fit.
 iree_check_single_backend_test_suite(
   NAME
     check_llvm-cpu_datatiling_local-task
@@ -54,8 +49,8 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
   LABELS
-    "nowasm"
     "nomips"
+    "nowasm"
 )
 
 iree_check_single_backend_test_suite(

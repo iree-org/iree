@@ -8,10 +8,12 @@
 
 # Cross-compile the runtime + test deps for MIPS64 Release 6 with MSA (128-bit
 # SIMD), i.e. the native llvm-cpu codegen configuration (vs build_mips.sh, which
-# is the scalar r2 / VMVX runtime). Requires the Codescape IMG GNU toolchain
-# (prefix mips-img-linux-gnu-), whose root is passed via MIPS_TOOLCHAIN_ROOT;
-# that toolchain ships the mips64r6 / n64 / little-endian / NaN-2008 multilib
-# the distro mips64el-linux-gnuabi64 toolchain lacks.
+# is the scalar r2 / VMVX runtime). Uses the distro-packaged r6 toolchain
+# (prefix mipsisa64r6el-linux-gnuabi64-); install it with:
+#   sudo apt install gcc-mipsisa64r6el-linux-gnuabi64 \
+#     g++-mipsisa64r6el-linux-gnuabi64 libc6-dev-mips64r6el-cross qemu-user
+# That toolchain ships the mips64r6 / n64 / little-endian / NaN-2008 compiler +
+# sysroot the generic mips64el-linux-gnuabi64 (r2) toolchain lacks.
 #
 # The IREE_HOST_BIN_DIR environment variable indicates the location of the
 # precompiled IREE host binaries (the compiler that emits the MIPS .so). If not
@@ -28,40 +30,24 @@
 #   find "${BUILD_DIR}" -name '*.vmfb' -delete
 # before rebuilding.
 
-set -xeuo pipefail
+# No `set -x`: it echoes every command (each configure flag, every assignment)
+# and doubles the "Building ..." progress markers below. Those echoes mark
+# progress on their own, and ninja surfaces any real build error itself.
+set -euo pipefail
 
 BUILD_DIR="${1:-${IREE_TARGET_BUILD_DIR:-build-mips-r6}}"
 INSTALL_DIR="${IREE_INSTALL_DIR:-${BUILD_DIR}/install}"
 CMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-RelWithDebInfo}"
 CMAKE_TOOLCHAIN_FILE="${CMAKE_TOOLCHAIN_FILE:-$(realpath build_tools/cmake/linux_mips64r6_gcc.cmake)}"
-MIPS_TOOLCHAIN_PREFIX="${MIPS_TOOLCHAIN_PREFIX:-mips-img-linux-gnu-}"
-MIPS_TOOLCHAIN_ROOT="${MIPS_TOOLCHAIN_ROOT:-}"
-# Per-multilib sysroot that matches the r6 / n64 / little-endian flags.
-MIPS_R6_SYSROOT_VARIANT="${MIPS_R6_SYSROOT_VARIANT:-mipsel-r6-hard}"
 IREE_HOST_BIN_DIR="$(realpath "${IREE_HOST_BIN_DIR:-build/install/bin}")"
 IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 # Enable building the `iree-test-deps` target.
 IREE_BUILD_TEST_DEPS="${IREE_BUILD_TEST_DEPS:-1}"
 
-if [[ -z "${MIPS_TOOLCHAIN_ROOT}" ]]; then
-  echo "error: MIPS_TOOLCHAIN_ROOT must point to the extracted Codescape IMG" >&2
-  echo "       toolchain root (contains bin/mips-img-linux-gnu-gcc and sysroot/)," >&2
-  echo "       e.g. \$HOME/toolchains/mips-img-linux-gnu/2024.10-03" >&2
-  exit 1
-fi
-
-# The Codescape sysroot carries libc but not the C++/gcc runtime libs (those
-# live in the compiler tree). QEMU's loader resolves them from the sysroot, so
-# copy them in once (idempotent) for the C++ test binaries (iree-check-module,
-# the cc_tests). Harmless if already present.
-MIPS_SYSROOT="${MIPS_TOOLCHAIN_ROOT}/sysroot/${MIPS_R6_SYSROOT_VARIANT}"
-MIPS_RT_LIBDIR="${MIPS_TOOLCHAIN_ROOT}/${MIPS_TOOLCHAIN_PREFIX%-}/lib/${MIPS_R6_SYSROOT_VARIANT}/lib64"
-if [[ -d "${MIPS_SYSROOT}/lib64" && -d "${MIPS_RT_LIBDIR}" ]]; then
-  cp -a -n "${MIPS_RT_LIBDIR}"/libstdc++.so.6* \
-           "${MIPS_RT_LIBDIR}"/libgcc_s.so.1 \
-           "${MIPS_RT_LIBDIR}"/libatomic.so* \
-           "${MIPS_SYSROOT}/lib64/" 2>/dev/null || true
-fi
+# The apt r6 toolchain (mipsisa64r6el-linux-gnuabi64-*) is on PATH and its
+# sysroot (/usr/mipsisa64r6el-linux-gnuabi64, from libc6-dev-mips64r6el-cross)
+# already ships the C++/gcc runtime libs (libstdc++.so.6, libgcc_s, libatomic),
+# so no toolchain root or sysroot library-copy step is needed here.
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -87,8 +73,6 @@ args=(
   "-DIREE_BUILD_SAMPLES=OFF"
   "-DIREE_HOST_BIN_DIR=${IREE_HOST_BIN_DIR}"
   "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
-  "-DMIPS_TOOLCHAIN_PREFIX=${MIPS_TOOLCHAIN_PREFIX}"
-  "-DMIPS_TOOLCHAIN_ROOT=${MIPS_TOOLCHAIN_ROOT}"
 
   # Only build check-test modules that are actually tested here. With the GPU
   # backends' drivers disabled below, their fixtures would otherwise be built

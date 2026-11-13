@@ -426,10 +426,11 @@ void LLVMTarget::populateDefaultsFromTargetMachine() {
     auto targetMachine = getTargetMachine();
     auto targetFeatures = targetMachine->getTargetFeatureString();
 
-    // MipsTTIImpl has no getRegisterBitWidth override and always reports a fixed
-    // 32-bit (scalar) width regardless of +msa, so the TTI query below would
-    // yield native_vector_size=4. Force 128-bit (16-byte) MSA vectors when the
-    // MSA ASE is enabled, mirroring the RISCV +v / avx512 special-cases.
+    // MipsTTIImpl has no getRegisterBitWidth override and always reports a
+    // fixed 32-bit (scalar) width regardless of +msa, so the TTI query below
+    // would yield native_vector_size=4. Force 128-bit (16-byte) MSA vectors
+    // when the MSA ASE is enabled, mirroring the RISCV +v / avx512
+    // special-cases.
     if (llvm::Triple(getTriple()).isMIPS() && targetFeatures.contains("msa")) {
       vectorWidthInBytes = 16;
       return;

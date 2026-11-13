@@ -206,6 +206,15 @@ function(iree_single_backend_e2e_runner_test)
       set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
     endif()
   endif()
+  # With a prebuilt host compiler (IREE_HOST_BIN_DIR) the runtime-side
+  # IREE_TARGET_BACKEND_* options do not describe that compiler, so the guard
+  # above cannot skip backends it lacks. If IREE_TEST_TARGET_BACKENDS is set, it
+  # is the explicit list of backends the host compiler supports; test modules
+  # for any other backend are not built. Empty (default) = build everything.
+  if(IREE_HOST_BIN_DIR AND IREE_TEST_TARGET_BACKENDS AND
+     NOT ("${_RULE_TARGET_BACKEND}" IN_LIST IREE_TEST_TARGET_BACKENDS))
+    set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
+  endif()
   # ---------------------------------------------------------------------------
 
   # ---------------------------------------------------------------------------

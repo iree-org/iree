@@ -195,10 +195,8 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=none"
     "--iree-input-demote-f64-to-f32=false"
-  # Data-tiled f64 matmul vectorizes beyond the scalar MIPS target's vector
-  # width ("large vector sizes"); no SIMD on generic MIPS (see MSA future work).
   LABELS
-    "nomips"
+
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
 )
@@ -398,10 +396,8 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
     "--iree-input-demote-f64-to-f32=false"
-  # Data-tiled f64 ukernel matmul vectorizes beyond the scalar MIPS target's
-  # vector width ("large vector sizes"); no SIMD on generic MIPS (MSA future work).
   LABELS
-    "nomips"
+
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
 )
@@ -628,6 +624,7 @@ iree_generated_e2e_runner_test(
   LABELS
     "noriscv"
     "nowasm"
+    "nomips_backend"
   TARGET_CPU_FEATURES_VARIANTS
     "generic"
     "x86_64:avx2:+avx,+avx2,+fma,+f16c"

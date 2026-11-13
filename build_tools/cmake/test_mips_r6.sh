@@ -30,21 +30,12 @@ if [[ -z "${QEMU_BIN}" ]]; then
   echo "         binaries directly (only valid on a real MIPS r6 host)."
 fi
 
-# Sysroot for QEMU's dynamic loader. The r6 toolchain's per-multilib sysroot
-# (mipsel-r6-hard) carries libc and, after build_mips_r6.sh, the C++/gcc runtime
-# libs. The -L baked into each test command is not sufficient on its own, so
-# QEMU_LD_PREFIX must also be set. Default it from MIPS_TOOLCHAIN_ROOT; set it
-# yourself for a custom layout.
-if [[ -z "${QEMU_LD_PREFIX:-}" ]]; then
-  MIPS_R6_SYSROOT_VARIANT="${MIPS_R6_SYSROOT_VARIANT:-mipsel-r6-hard}"
-  if [[ -n "${MIPS_TOOLCHAIN_ROOT:-}" ]]; then
-    QEMU_LD_PREFIX="${MIPS_TOOLCHAIN_ROOT}/sysroot/${MIPS_R6_SYSROOT_VARIANT}"
-  else
-    echo "error: set QEMU_LD_PREFIX (or MIPS_TOOLCHAIN_ROOT) to the r6 sysroot," >&2
-    echo "       e.g. <toolchain>/sysroot/mipsel-r6-hard" >&2
-    exit 1
-  fi
-fi
+# Sysroot for QEMU's dynamic loader. The apt r6 toolchain's sysroot
+# (/usr/mipsisa64r6el-linux-gnuabi64, from libc6-dev-mips64r6el-cross) carries
+# libc and the C++/gcc runtime libs. The -L baked into each test command is not
+# sufficient on its own, so QEMU_LD_PREFIX must also be set. Default it to that
+# sysroot; override it for a custom toolchain layout.
+QEMU_LD_PREFIX="${QEMU_LD_PREFIX:-/usr/mipsisa64r6el-linux-gnuabi64}"
 export QEMU_LD_PREFIX
 
 # QEMU user-mode emulation is CPU-bound, so running one emulated test per host
@@ -84,18 +75,16 @@ declare -a test_exclude_args=(
   # f16 is broadly supported on r6/MSA: arith, conversions, and exp all pass
   # (e.g. exponential_fp16), and the f16 data-tiled matmuls are numerically
   # correct. bf16 and i8 data-tiled matmul, which SIGBUS'd on scalar r2, also
-  # now pass under MSA and are intentionally NOT skipped. The following are
-  # skipped for two distinct reasons (tracked in <ISSUE>):
+  # now pass under MSA and are intentionally NOT skipped.
   #
-  # LLVM MIPS backend gaps (genuine):
-  #  - inner-tiled data-tiling with an f16 accumulator crashes instruction
-  #    selection ("Do not know how to soft promote this operator's operand" on
-  #    a v8f16 scalar_to_vector); the f32-accumulator variant is fine.
-  #  - erf/cbrt are miscompiled under MSA (no vector libm, so they stay
-  #    polynomial-approximated and the MSA approximation is wrong) -> math_ops.
-  "e2e_matmul_cpu_dt_inner_tiled_f16_f16"
-  "math_ops_llvm-cpu"
+  # NOTE: the inner-tiled f16-accumulator matmul (dt_inner_tiled_f16_f16) that
+  # CRASHES the LLVM MIPS backend at instruction selection is a compile-time
+  # failure, so it is build-excluded via a `nomips` LABEL in
+  # tests/e2e/matmul/CMakeLists.txt (not a gate skip). math_ops_llvm-cpu was
+  # also previously skipped here (erf/asinh/acosh miscompiled under MSA); those
+  # now route to scalar libm, math_ops passes 56/56, and it is back in the gate.
   #
+  # The remaining skips are runtime-only (QEMU emulation speed, not codegen):
   # Emulation speed, NOT a codegen bug: the default-shape f16 data-tiled
   # matmuls are numerically correct (verified in isolation) but take ~46s each
   # under qemu soft-float emulation, so they exceed the baked 60s per-test

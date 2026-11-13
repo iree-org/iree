@@ -235,6 +235,17 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         # f16/bf16 also trigger LLVM assertion errors on riscv and wasm.
         "noriscv",
         "nowasm",
+        # f16-accumulator inner-tiled data tiling crashes the LLVM MIPS backend
+        # at instruction selection ("Do not know how to soft promote this
+        # operator's operand" on a v8f16 scalar_to_vector); the f32-accumulator
+        # variant is fine. MSA does not fix it (it is an f16 ABI/soft-promote
+        # gap, not a SIMD gap), so it is build-excluded on r2 AND r6 via
+        # "nomips_backend" (not "nomips"). Remove once the LLVM MIPS backend
+        # gains f16 soft-promote support for this instruction-selection path.
+        "nomips_backend",
+    ] if lhs_rhs_type == "f16" and acc_type == "f16" else [
+        "noriscv",
+        "nowasm",
     ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else [
         "noriscv",
     ] if lhs_rhs_type == "f32" and acc_type == "f32" else []),
