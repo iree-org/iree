@@ -182,6 +182,7 @@ func.func @fold_pad_op(%source : tensor<120x250xf32>, %result : memref<128x256xf
 }
 //       DISPATCH-SCOPE: #[[$MAP:.+]] = affine_map<(d0) -> (256, d0 + 64)>
 //       DISPATCH-SCOPE: #[[$MAP1:.+]] = affine_map<(d0) -> (128, d0 + 1)>
+//       DISPATCH-SCOPE: #[[$MAP2:.+]] = affine_map<(d0) -> (121, d0 + 1)>
 // DISPATCH-SCOPE-LABEL: @fold_pad_op
 //  DISPATCH-SCOPE-SAME:   %[[SOURCE:[a-zA-Z0-9_]+]]
 //  DISPATCH-SCOPE-SAME:   %[[RESULT:[a-zA-Z0-9_]+]]
@@ -221,10 +222,11 @@ func.func @fold_pad_op(%source : tensor<120x250xf32>, %result : memref<128x256xf
 //       DISPATCH-SCOPE:     }
 //       DISPATCH-SCOPE:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
-// Low padding for dimension 1
+// Low padding for dimension 1. It only spans the unpadded range [1, 121) of
+// dimension 0, so it does not overlap with the padding loops of dimension 0.
 
-//       DISPATCH-SCOPE:   scf.forall (%[[WG_LOOP2_IV0:.+]], %[[WG_LOOP2_IV1:.+]]) = (0, 0) to (128, 2) step (1, 64) {
-//   DISPATCH-SCOPE-DAG:     %[[WG_TILE2_UB0:.+]] = affine.min #[[$MAP1]](%[[WG_LOOP2_IV0]])
+//       DISPATCH-SCOPE:   scf.forall (%[[WG_LOOP2_IV0:.+]], %[[WG_LOOP2_IV1:.+]]) = (1, 0) to (121, 2) step (1, 64) {
+//   DISPATCH-SCOPE-DAG:     %[[WG_TILE2_UB0:.+]] = affine.min #[[$MAP2]](%[[WG_LOOP2_IV0]])
 //       DISPATCH-SCOPE:     scf.for %[[LOW1_IDX0:.+]] = %[[WG_LOOP2_IV0]] to %[[WG_TILE2_UB0]] step %[[C1]] {
 //       DISPATCH-SCOPE:       scf.for %[[LOW1_IDX1:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
 //  DISPATCH-SCOPE-NEXT:         memref.store %[[PAD_VAL]], %[[RESULT]][%[[LOW1_IDX0]], %[[LOW1_IDX1]]] : memref<128x256xf32>
@@ -232,10 +234,10 @@ func.func @fold_pad_op(%source : tensor<120x250xf32>, %result : memref<128x256xf
 //       DISPATCH-SCOPE:     }
 //       DISPATCH-SCOPE:   } {mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]}
 
-// High padding for dimension 1
+// High padding for dimension 1, also only over the unpadded range of dimension 0.
 
-//       DISPATCH-SCOPE:   scf.forall (%[[WG_LOOP3_IV0:.+]], %[[WG_LOOP3_IV1:.+]]) = (0, 252) to (128, 256) step (1, 64) {
-//   DISPATCH-SCOPE-DAG:     %[[WG_TILE3_UB0:.+]] = affine.min #[[$MAP1]](%[[WG_LOOP3_IV0]])
+//       DISPATCH-SCOPE:   scf.forall (%[[WG_LOOP3_IV0:.+]], %[[WG_LOOP3_IV1:.+]]) = (1, 252) to (121, 256) step (1, 64) {
+//   DISPATCH-SCOPE-DAG:     %[[WG_TILE3_UB0:.+]] = affine.min #[[$MAP2]](%[[WG_LOOP3_IV0]])
 //       DISPATCH-SCOPE:     scf.for %[[HIGH1_IDX0:.+]] = %[[WG_LOOP3_IV0]] to %[[WG_TILE3_UB0]] step %[[C1]] {
 //       DISPATCH-SCOPE:       scf.for %[[HIGH1_IDX1:.+]] = %[[C252]] to %[[C256]] step %[[C1]] {
 //  DISPATCH-SCOPE-NEXT:         memref.store %[[PAD_VAL]], %[[RESULT]][%[[HIGH1_IDX0]], %[[HIGH1_IDX1]]] : memref<128x256xf32>
