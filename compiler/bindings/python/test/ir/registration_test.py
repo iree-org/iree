@@ -20,3 +20,17 @@ with ir.Context() as ctx:
   """
     )
     print(input_module)
+
+
+# Torch input support is optional. When enabled, its Python dialect modules
+# should load normally for both namespace access and generic IR construction.
+with ir.Context() as ctx:
+    if ctx.is_registered_operation("torch.constant.int"):
+        from iree.compiler.dialects import torch, torch_c
+
+        assert isinstance(ctx.dialects["torch"], torch._Dialect)
+        assert isinstance(ctx.dialects["torch_c"], torch_c._Dialect)
+        tensor_type = ir.Type.parse("!torch.vtensor<[1],f32>")
+        for _ in range(3):
+            assert ir.Type.parse("!torch.vtensor<[1],f32>") == tensor_type
+        print("Torch Python dialect registration passed")
