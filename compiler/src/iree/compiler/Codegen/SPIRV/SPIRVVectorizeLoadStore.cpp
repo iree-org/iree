@@ -561,9 +561,10 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   Type scalarType = type.getElementType();
   unsigned scalarNumBits = type.getElementTypeBitWidth();
   unsigned vectorNumElements = vectorNumBits / scalarNumBits;
-  // If the vector we need to generate is bigger than the the max vector size
-  // allowed for loads use a larger element type.
-  if (vectorNumElements > kMaxVectorNumElements) {
+  // Pack narrow integers to preserve their storage stride.
+  if (vectorNumElements > kMaxVectorNumElements ||
+      (isa<IntegerType>(scalarType) && scalarNumBits < 32 &&
+       vectorNumBits >= 32)) {
     scalarType = isa<IntegerType>(scalarType)
                      ? cast<Type>(rewriter.getI32Type())
                      : cast<Type>(rewriter.getF32Type());
