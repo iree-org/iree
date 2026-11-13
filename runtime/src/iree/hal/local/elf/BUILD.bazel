@@ -72,6 +72,7 @@ iree_runtime_cc_library(
     srcs = [
         "arch/arm_32.c",
         "arch/arm_64.c",
+        "arch/mips_64.c",
         "arch/riscv.c",
         "arch/x86_32.c",
         "arch/x86_64.c",
