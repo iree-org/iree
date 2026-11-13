@@ -101,7 +101,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/io/formats:parser_registry",
         "//runtime/src/iree/io/formats/irpa",
         "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/modules/hal:debugging",
         "//runtime/src/iree/modules/io/parameters",
         "//runtime/src/iree/schemas:parameter_archive",
         "//runtime/src/iree/tokenizer",

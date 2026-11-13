@@ -1006,62 +1006,6 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
   return iree_ok_status();
 }
 
-// Encode only members present in the compiled argument buffer. Reflection is
-// cached in the pipeline; absent binding IDs must never reach the encoder.
-static iree_status_t iree_hal_metal_command_segment_record_arguments(
-    iree_hal_metal_command_buffer_t* command_buffer, iree_hal_metal_dispatch_segment_t* segment,
-    id<MTLComputeCommandEncoder> compute_encoder) {
-  if (!segment->pipeline->binding_used_bits) {
-    return iree_ok_status();
-  }
-  // Record argument buffers for all descriptors and record buffer usages.
-  iree_hal_metal_descriptor_t* descriptors = segment->descriptors;
-
-  // Build argument encoder and argument buffer for the current descriptor set.
-  // TODO(antiagainst): Use a cache layer to cache and reuse argument buffers with the same
-  // content, to avoid duplicating overhead.
-  id<MTLBuffer> argument_buffer = command_buffer->staging_buffer->metal_buffer;
-  id<MTLArgumentEncoder> argument_encoder = [segment->pipeline->function
-      newArgumentEncoderWithBufferIndex:IREE_HAL_METAL_ARGUMENT_BUFFER_INDEX];  // +1
-  IREE_ASSERT(argument_encoder != nil);
-
-  // Reserve space for the argument buffer from shared staging buffer.
-  iree_byte_span_t reservation = iree_byte_span_empty();
-  uint32_t argument_buffer_offset = 0;
-  iree_status_t status = iree_hal_metal_staging_buffer_reserve(
-      command_buffer->staging_buffer, argument_encoder.encodedLength, argument_encoder.alignment,
-      &reservation, &argument_buffer_offset);
-  if (!iree_status_is_ok(status)) {
-    [argument_encoder release];  // -1
-    return status;
-  }
-  [argument_encoder setArgumentBuffer:argument_buffer offset:argument_buffer_offset];
-
-  // Now record all bound buffers belonging to the current set into the argument buffer.
-  for (iree_host_size_t i = 0; i < segment->descriptor_count; ++i) {
-    uint32_t current_binding = descriptors[i].binding;
-    if (!iree_any_bit_set(segment->pipeline->binding_used_bits, 1ull << current_binding)) {
-      continue;
-    }
-    id<MTLBuffer> current_buffer =
-        iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(descriptors[i].buffer));
-    iree_host_size_t offset =
-        iree_hal_buffer_byte_offset(descriptors[i].buffer) + descriptors[i].offset;
-    [argument_encoder setBuffer:current_buffer offset:offset atIndex:current_binding];
-
-    // Also record buffer usages.
-    [compute_encoder useResource:current_buffer usage:descriptors[i].usage];
-  }
-  // Record the argument buffer.
-  [compute_encoder setBuffer:argument_buffer
-                      offset:argument_buffer_offset
-                     atIndex:IREE_HAL_METAL_ARGUMENT_BUFFER_INDEX];
-
-  [argument_encoder release];  // -1
-
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_metal_command_segment_record_dispatch(
     iree_hal_metal_command_buffer_t* command_buffer, iree_hal_metal_dispatch_segment_t* segment) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -1078,8 +1022,42 @@ static iree_status_t iree_hal_metal_command_segment_record_dispatch(
                       atIndex:IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX];
   }
 
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(z0, iree_hal_metal_command_segment_record_arguments(
-                                            command_buffer, segment, compute_encoder));
+  // Record argument buffers for all descriptors and record buffer usages.
+  iree_hal_metal_descriptor_t* descriptors = segment->descriptors;
+
+  // Build argument encoder and argument buffer for the current descriptor set.
+  // TODO(antiagainst): Use a cache layer to cache and reuse argument buffers with the same
+  // content, to avoid duplicating overhead.
+  id<MTLBuffer> argument_buffer = command_buffer->staging_buffer->metal_buffer;
+  id<MTLArgumentEncoder> argument_encoder =
+      [segment->pipeline->function newArgumentEncoderWithBufferIndex:0];  // +1
+  IREE_ASSERT(argument_encoder != nil);
+
+  // Reserve space for the argument buffer from shared staging buffer.
+  iree_byte_span_t reservation = iree_byte_span_empty();
+  uint32_t argument_buffer_offset = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_metal_staging_buffer_reserve(
+              command_buffer->staging_buffer, argument_encoder.encodedLength,
+              argument_encoder.alignment, &reservation, &argument_buffer_offset));
+  [argument_encoder setArgumentBuffer:argument_buffer offset:argument_buffer_offset];
+
+  // Now record all bound buffers belonging to the current set into the argument buffer.
+  for (iree_host_size_t i = 0; i < segment->descriptor_count; ++i) {
+    uint32_t current_binding = descriptors[i].binding;
+    id<MTLBuffer> current_buffer =
+        iree_hal_metal_buffer_handle(iree_hal_buffer_allocated_buffer(descriptors[i].buffer));
+    iree_host_size_t offset =
+        iree_hal_buffer_byte_offset(descriptors[i].buffer) + descriptors[i].offset;
+    [argument_encoder setBuffer:current_buffer offset:offset atIndex:current_binding];
+
+    // Also record buffer usages.
+    [compute_encoder useResource:current_buffer usage:descriptors[i].usage];
+  }
+  // Record the argument buffer.
+  [compute_encoder setBuffer:argument_buffer offset:argument_buffer_offset atIndex:0];
+
+  [argument_encoder release];  // -1
 
   // Record the dispatch, either direct or indirect.
   if (segment->workgroups_buffer == nil) {

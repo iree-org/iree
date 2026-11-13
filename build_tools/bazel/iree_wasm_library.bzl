@@ -378,7 +378,6 @@ def iree_wasm_cc_binary(name, main = None, srcs = None, deps = None, **kwargs):
     bundle_kwargs = {
         "binary": ":" + name + "_wasm",
         "cc_deps": deps or [],
-        "testonly": kwargs.get("testonly", False),
     }
     if main:
         bundle_kwargs["main"] = main
@@ -391,7 +390,6 @@ def iree_wasm_cc_binary(name, main = None, srcs = None, deps = None, **kwargs):
 
     native.sh_binary(
         name = name,
-        testonly = kwargs.get("testonly", False),
         srcs = [Label("//build_tools/wasm:wasm_node_test_runner.sh")],
         data = [":" + name + "_bundle"],
         args = ["$(rootpath :" + name + "_bundle)"],

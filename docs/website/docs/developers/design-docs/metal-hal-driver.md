@@ -244,22 +244,6 @@ For the Metal HAL driver, it means we need to embed the MSL kernels inside the
 module FlatBuffer. Right now we can either encode the MSL source strings and
 compile them at Metal run-time, or directly encoding the library instead.
 
-Device-buffer updates inside loops need an additional Metal compiler workaround.
-Some optimised shaders lose an earlier iteration's update when the loop reads
-and writes the same buffer. During serialization, the backend marks directly
-resolved scalar and vector buffer accesses as volatile before generating MSL.
-Read-only and write-only buffers retain ordinary access. Calls with unknown
-memory effects, unresolved device pointers, and composite read/write accesses
-instead disable MSL optimisation for the shader: SPIRV-Cross cannot propagate
-volatile qualifiers through every pointer expression or composite assignment.
-Helpers proven free of memory effects do not require this fallback. Both embedded
-MSL source and precompiled Metal libraries carry these requirements.
-Additions of a scalar or splat positive zero also use SPIRV-Cross's invariant
-addition helper. Metal's ordinary fast-math compilation can discard these
-additions, changing the required result for a negative-zero operand. The backend
-marks these add instructions in its private SPIRV-Cross IR so other arithmetic
-retains its existing lowering.
-
 ### Workgroup/threadgroup size
 
 When dispatching a compute kernel in Metal, we need to specify the number of
@@ -290,20 +274,12 @@ with the current active `MTLComputeCommandEncoder`:
 1. For each bound descriptor set at set #`S`:
    1. Create a [`MTLArgumentEncoder`][mtl-argument-encoder] for encoding an
       associated argument `MTLBuffer`.
-   1. For each bound resource buffer at binding #`B` that is present in the
-      compiled argument buffer,
+   1. For each bound resource buffer at binding #`B` in this descriptor set,
       encode it to the argument buffer index #`B` with
       `setBuffer::offset::atIndex:` and inform the `MTLComputeCommandEncoder`
       that the dispatch will use this resource with `useResource:usage:`.
    1. Set the argument `MTLBuffer` to buffer index #`S`.
 1. Dispatch with `dispatchThreadgroups:threadsPerThreadgroup:`.
-
-Pipeline creation reflects the compiled argument buffer and caches its used
-binding indices. Optimisation can remove a binding without renumbering later
-bindings. Dispatch recording must skip these absent indices: passing an absent
-index to Metal's argument encoder can overwrite an active argument. Reflection
-does not change the dispatch interface or the executable format and runs only
-when the pipeline is created.
 
 [metal-feature-set]: https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf
 [macos-version-share]: https://gs.statcounter.com/macos-version-market-share/desktop/worldwide
