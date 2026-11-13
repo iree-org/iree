@@ -221,7 +221,7 @@ void FusionGroup::insert(Operation *op) {
 }
 
 bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
-  llvm::SmallSetVector<Operation *, kIreeMaxOperandCount> dispatchOperands;
+  llvm::SmallSetVector<Value, kIreeMaxOperandCount> dispatchOperands;
   int64_t numResults = 0;
 
   auto visitOp = [&](Operation *op) {
@@ -233,8 +233,9 @@ bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
       if (llvm::isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(definingOp)) {
         return;
       }
-      if (definingOp && definingOp != newOp && !loopMaps.contains(definingOp)) {
-        dispatchOperands.insert(definingOp);
+      if (!definingOp ||
+          (definingOp != newOp && !loopMaps.contains(definingOp))) {
+        dispatchOperands.insert(operand->get());
       }
     };
     visitUsedValuesDefinedAbove(op->getRegions(), visitOperand);

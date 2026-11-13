@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true}))" --split-input-file %s | FileCheck %s --check-prefixes=CHECK,OPERANDS
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{aggressive-fusion=true fuse-multi-use-producers=false}))" --split-input-file %s | FileCheck %s --check-prefix=NO-MULTI-USE
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions))" --split-input-file %s | FileCheck %s --check-prefix=DEFAULT
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{fuse-mmt4d=true}))" --split-input-file %s | FileCheck %s --check-prefix=FUSE-MMT4D
@@ -3352,3 +3352,152 @@ util.func public @pack_per_operand_rejection(
 //            CHECK:     linalg.pack %[[RX]]#0
 //       CHECK-SAME:       into %[[RX]]#1
 //            CHECK:     flow.return
+
+// -----
+
+// Tensor arguments count toward the operand limit. Reusing an argument does
+// not consume another slot. The output also needs one slot.
+#id = affine_map<(d0) -> (d0)>
+// OPERANDS-LABEL: util.func public @external_tensor_operands
+util.func public @external_tensor_operands(%a0: tensor<32xf32>, %a1: tensor<32xf32>,
+    %a2: tensor<32xf32>, %a3: tensor<32xf32>, %a4: tensor<32xf32>, %a5: tensor<32xf32>,
+    %a6: tensor<32xf32>, %a7: tensor<32xf32>, %a8: tensor<32xf32>, %a9: tensor<32xf32>,
+    %a10: tensor<32xf32>, %a11: tensor<32xf32>, %a12: tensor<32xf32>, %a13: tensor<32xf32>,
+    %a14: tensor<32xf32>, %a15: tensor<32xf32>) -> tensor<32xf32> {
+  %empty = tensor.empty() : tensor<32xf32>
+  %sum = linalg.generic {indexing_maps = [#id, #id, #id, #id, #id, #id, #id, #id, #id, #id, #id,
+      #id, #id, #id, #id, #id], iterator_types = ["parallel"]}
+      ins(%a0, %a1, %a2, %a3, %a4, %a5, %a6, %a7, %a8, %a9, %a10, %a11, %a12, %a13,
+      %a14 : tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>,
+      tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>,
+      tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>,
+      tensor<32xf32>) outs(%empty : tensor<32xf32>) {
+  ^bb0(%x0: f32, %x1: f32, %x2: f32, %x3: f32, %x4: f32, %x5: f32, %x6: f32, %x7: f32, %x8: f32,
+      %x9: f32, %x10: f32, %x11: f32, %x12: f32, %x13: f32, %x14: f32, %x15: f32):
+    %v1 = arith.addf %x0, %x1 : f32
+    %v2 = arith.addf %v1, %x2 : f32
+    %v3 = arith.addf %v2, %x3 : f32
+    %v4 = arith.addf %v3, %x4 : f32
+    %v5 = arith.addf %v4, %x5 : f32
+    %v6 = arith.addf %v5, %x6 : f32
+    %v7 = arith.addf %v6, %x7 : f32
+    %v8 = arith.addf %v7, %x8 : f32
+    %v9 = arith.addf %v8, %x9 : f32
+    %v10 = arith.addf %v9, %x10 : f32
+    %v11 = arith.addf %v10, %x11 : f32
+    %v12 = arith.addf %v11, %x12 : f32
+    %v13 = arith.addf %v12, %x13 : f32
+    %v14 = arith.addf %v13, %x14 : f32
+    linalg.yield %v14 : f32
+  } -> tensor<32xf32>
+  %result = linalg.generic {indexing_maps = [#id, #id, #id], iterator_types = ["parallel"]}
+      ins(%sum, %a15 : tensor<32xf32>, tensor<32xf32>) outs(%empty : tensor<32xf32>) {
+  ^bb0(%x: f32, %y: f32, %unused: f32):
+    %v = arith.addf %x, %y : f32
+    linalg.yield %v : f32
+  } -> tensor<32xf32>
+  util.return %result : tensor<32xf32>
+}
+// OPERANDS-COUNT-2: flow.dispatch.region
+// OPERANDS-NOT: flow.dispatch.region
+
+// -----
+
+#id = affine_map<(d0) -> (d0)>
+// OPERANDS-LABEL: util.func public @repeated_external_tensor_operand
+util.func public @repeated_external_tensor_operand(%a0: tensor<32xf32>, %a1: tensor<32xf32>,
+    %a2: tensor<32xf32>, %a3: tensor<32xf32>, %a4: tensor<32xf32>, %a5: tensor<32xf32>,
+    %a6: tensor<32xf32>, %a7: tensor<32xf32>, %a8: tensor<32xf32>, %a9: tensor<32xf32>,
+    %a10: tensor<32xf32>, %a11: tensor<32xf32>, %a12: tensor<32xf32>, %a13: tensor<32xf32>,
+    %a14: tensor<32xf32>) -> tensor<32xf32> {
+  %empty = tensor.empty() : tensor<32xf32>
+  %sum = linalg.generic {indexing_maps = [#id, #id, #id, #id, #id, #id, #id, #id, #id, #id, #id,
+      #id, #id, #id, #id, #id], iterator_types = ["parallel"]}
+      ins(%a0, %a1, %a2, %a3, %a4, %a5, %a6, %a7, %a8, %a9, %a10, %a11, %a12, %a13,
+      %a14 : tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>,
+      tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>,
+      tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>,
+      tensor<32xf32>) outs(%empty : tensor<32xf32>) {
+  ^bb0(%x0: f32, %x1: f32, %x2: f32, %x3: f32, %x4: f32, %x5: f32, %x6: f32, %x7: f32, %x8: f32,
+      %x9: f32, %x10: f32, %x11: f32, %x12: f32, %x13: f32, %x14: f32, %x15: f32):
+    %v1 = arith.addf %x0, %x1 : f32
+    %v2 = arith.addf %v1, %x2 : f32
+    %v3 = arith.addf %v2, %x3 : f32
+    %v4 = arith.addf %v3, %x4 : f32
+    %v5 = arith.addf %v4, %x5 : f32
+    %v6 = arith.addf %v5, %x6 : f32
+    %v7 = arith.addf %v6, %x7 : f32
+    %v8 = arith.addf %v7, %x8 : f32
+    %v9 = arith.addf %v8, %x9 : f32
+    %v10 = arith.addf %v9, %x10 : f32
+    %v11 = arith.addf %v10, %x11 : f32
+    %v12 = arith.addf %v11, %x12 : f32
+    %v13 = arith.addf %v12, %x13 : f32
+    %v14 = arith.addf %v13, %x14 : f32
+    linalg.yield %v14 : f32
+  } -> tensor<32xf32>
+  %result = linalg.generic {indexing_maps = [#id, #id, #id], iterator_types = ["parallel"]}
+      ins(%sum, %a14 : tensor<32xf32>, tensor<32xf32>) outs(%empty : tensor<32xf32>) {
+  ^bb0(%x: f32, %y: f32, %unused: f32):
+    %v = arith.addf %x, %y : f32
+    linalg.yield %v : f32
+  } -> tensor<32xf32>
+  util.return %result : tensor<32xf32>
+}
+// OPERANDS-COUNT-1: flow.dispatch.region
+// OPERANDS-NOT: flow.dispatch.region
+
+// -----
+
+// Distinct results from a non-fusible producer consume separate slots.
+#id = affine_map<(d0) -> (d0)>
+// OPERANDS-LABEL: util.func public @distinct_results_from_one_producer
+util.func public @distinct_results_from_one_producer(%a0: tensor<32xf32>, %a1: tensor<32xf32>,
+    %a2: tensor<32xf32>, %a3: tensor<32xf32>, %a4: tensor<32xf32>, %a5: tensor<32xf32>,
+    %a6: tensor<32xf32>, %a7: tensor<32xf32>, %a8: tensor<32xf32>, %a9: tensor<32xf32>,
+    %a10: tensor<32xf32>, %a11: tensor<32xf32>, %a12: tensor<32xf32>, %a13: tensor<32xf32>,
+    %a14: tensor<32xf32>, %a15: tensor<32xf32>) -> tensor<32xf32> {
+  %inputs:16 = util.optimization_barrier
+      %a0, %a1, %a2, %a3, %a4, %a5, %a6, %a7,
+      %a8, %a9, %a10, %a11, %a12, %a13, %a14, %a15 :
+      tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>,
+      tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>,
+      tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>,
+      tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>
+  %empty = tensor.empty() : tensor<32xf32>
+  %sum = linalg.generic {indexing_maps = [#id, #id, #id, #id, #id, #id, #id, #id, #id, #id, #id,
+      #id, #id, #id, #id, #id], iterator_types = ["parallel"]}
+      ins(%inputs#0, %inputs#1, %inputs#2, %inputs#3, %inputs#4, %inputs#5,
+          %inputs#6, %inputs#7, %inputs#8, %inputs#9, %inputs#10, %inputs#11,
+          %inputs#12, %inputs#13, %inputs#14 : tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>,
+      tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>,
+      tensor<32xf32>, tensor<32xf32>, tensor<32xf32>, tensor<32xf32>,
+      tensor<32xf32>) outs(%empty : tensor<32xf32>) {
+  ^bb0(%x0: f32, %x1: f32, %x2: f32, %x3: f32, %x4: f32, %x5: f32, %x6: f32, %x7: f32, %x8: f32,
+      %x9: f32, %x10: f32, %x11: f32, %x12: f32, %x13: f32, %x14: f32, %x15: f32):
+    %v1 = arith.addf %x0, %x1 : f32
+    %v2 = arith.addf %v1, %x2 : f32
+    %v3 = arith.addf %v2, %x3 : f32
+    %v4 = arith.addf %v3, %x4 : f32
+    %v5 = arith.addf %v4, %x5 : f32
+    %v6 = arith.addf %v5, %x6 : f32
+    %v7 = arith.addf %v6, %x7 : f32
+    %v8 = arith.addf %v7, %x8 : f32
+    %v9 = arith.addf %v8, %x9 : f32
+    %v10 = arith.addf %v9, %x10 : f32
+    %v11 = arith.addf %v10, %x11 : f32
+    %v12 = arith.addf %v11, %x12 : f32
+    %v13 = arith.addf %v12, %x13 : f32
+    %v14 = arith.addf %v13, %x14 : f32
+    linalg.yield %v14 : f32
+  } -> tensor<32xf32>
+  %result = linalg.generic {indexing_maps = [#id, #id, #id], iterator_types = ["parallel"]}
+      ins(%sum, %inputs#15 : tensor<32xf32>, tensor<32xf32>) outs(%empty : tensor<32xf32>) {
+  ^bb0(%x: f32, %y: f32, %unused: f32):
+    %v = arith.addf %x, %y : f32
+    linalg.yield %v : f32
+  } -> tensor<32xf32>
+  util.return %result : tensor<32xf32>
+}
+// OPERANDS-COUNT-2: flow.dispatch.region
+// OPERANDS-NOT: flow.dispatch.region
