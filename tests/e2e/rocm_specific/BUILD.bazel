@@ -1,0 +1,80 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# End-to-end tests for specific AMD GPU architectures. CMake compiles check
+# tests for IREE_ROCM_TEST_TARGET_CHIP, so each suite below is only added when
+# that chip is one the suite is written for.
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
+
+package(
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+WMMA_SRCS = enforce_glob(
+    ["wmma_matmul_f16.mlir"],
+    include = ["*.mlir"],
+    exclude = ["im2col_dma_conv.mlir"],
+)
+
+IM2COL_DMA_SRCS = enforce_glob(
+    ["im2col_dma_conv.mlir"],
+    include = ["*.mlir"],
+    exclude = ["wmma_matmul_f16.mlir"],
+)
+
+# Regression test for the RDNA3 WMMA f16/bf16 accumulator layout bug.
+iree_cmake_extra_content(
+    content = """
+if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx1[12]")
+""",
+    inline = True,
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_rocm_hip_wmma_matmul_f16",
+    srcs = WMMA_SRCS,
+    driver = "hip",
+    tags = ["requires-gpu-rdna3"],
+    target_backend = "rocm",
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
+)
+
+# Conv2d through the im2col + DMA lowering on gfx950.
+iree_cmake_extra_content(
+    content = """
+if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx950")
+""",
+    inline = True,
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_rocm_hip_im2col_dma_conv",
+    srcs = IM2COL_DMA_SRCS,
+    compiler_flags = [
+        "--iree-codegen-llvmgpu-use-igemm=true",
+        "--iree-llvmgpu-use-direct-load=true",
+    ],
+    driver = "hip",
+    tags = ["requires-gpu-cdna4"],
+    target_backend = "rocm",
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
+)
