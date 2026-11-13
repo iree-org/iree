@@ -379,6 +379,9 @@ typedef struct iree_hal_vulkan_queue_t {
     // one-shot.
     uint64_t one_shot_bypass_count;
 
+    // Cached replay bypasses due to binding-table-dependent recorded commands.
+    uint64_t binding_table_bypass_count;
+
     // Cached replay acquisitions bypassed by configured capacity limits.
     uint64_t capacity_bypass_count;
 
