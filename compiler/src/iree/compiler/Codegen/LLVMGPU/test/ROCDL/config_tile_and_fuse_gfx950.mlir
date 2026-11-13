@@ -343,9 +343,9 @@ module {
 
 // CHECK-LABEL: func.func @data_tiled_scaled_mma_inner_tiled
 //  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<TileAndFuse> workgroup_size = [256, 1, 1] subgroup_size = 64
-//  CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}
+//  CHECK-SAME:   {gpu_pipeline_options = #iree_gpu.pipeline_options<prefetch_num_stages = 2, no_reduce_shared_memory_bank_conflicts = true, use_igemm_convolution = false>}
 //       CHECK:   iree_codegen.inner_tiled {{.*}}lowering_config = #iree_gpu.lowering_config
-//  CHECK-SAME:     promote_operands = [0, 1]
+//  CHECK-SAME:     promote_operands = [0, 1, 2, 3]
 //  CHECK-SAME:     reduction = [0, 0, 1, 1]
 //  CHECK-SAME:     workgroup = [1, 1, 0, 0]
 
