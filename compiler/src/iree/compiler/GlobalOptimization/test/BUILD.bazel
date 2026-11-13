@@ -36,6 +36,7 @@ iree_lit_test_suite(
             "expand_tensor_shapes.mlir",
             "fold_broadcast_into_batch_matmul.mlir",
             "fold_broadcast_into_batch_matmul_pipeline.mlir",
+            "fold_broadcast_into_batch_matmul_stages.mlir",
             "fuse_dequantization_matmul.mlir",
             "generalize_named_ops.mlir",
             "global_loop_invariant_code_motion.mlir",

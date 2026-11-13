@@ -153,7 +153,8 @@ def ExpandTensorShapesPass :
 
 def FoldBroadcastIntoBatchMatmulPass :
     InterfacePass<"iree-global-opt-fold-broadcast-into-batch-matmul", "mlir::FunctionOpInterface"> {
-  let summary = "Folds broadcasts of batch_matmul inputs into its indexing maps.";
+  let summary =
+      "Folds broadcasts of contraction inputs into its indexing maps.";
   let description = [{
     Rewrites `batch_matmul(A, broadcast(B))`, where the weight is shared across
     the batch, into a `batch_matmul` over `A` and `B` whose RHS indexing map
@@ -165,9 +166,21 @@ def FoldBroadcastIntoBatchMatmulPass :
     same body instead of moving data. The contraction then consumes its
     producers directly, so rewrites that match on them (such as the
     dequantization folding) still apply, and no broadcast is materialized.
+
+    A broadcast under an `iree_linalg_ext.dequantize_affine` that only feeds
+    the contraction folds too, when the scale and zero point do not vary along
+    the broadcast dims: the dequantize is rebuilt at the rank of the
+    broadcast's source and the broadcast is folded into the contraction map in
+    the same step, so the weights are dequantized once rather than once per
+    batch element.
+
+    A contraction that is already a `linalg.generic`, such as a `batch_matmul`
+    generalized earlier in the pipeline, is recognized through the contraction
+    interface and folded the same way; it stays a generic.
   }];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
   ];
 }
 
