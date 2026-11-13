@@ -16,7 +16,7 @@ on:
       - '**.h'
       - '**.c'
       - '**.cpp'
-      - '.clang-tidy'
+      - '**/.clang-tidy'
       - '.github/workflows/clang_tidy.yml'
 
 permissions:
@@ -70,6 +70,16 @@ jobs:
           echo "Using clang-tidy from llvm-project revision:"
           cat .iree-clang-tidy/llvm-project-revision.txt
           .iree-clang-tidy/clang-tidy --version
+
+      - name: Verify clang-tidy configs
+        run: |
+          # clang-tidy silently ignores unknown check names and options.
+          status=0
+          while IFS= read -r config; do
+            echo "Verifying ${config}"
+            .iree-clang-tidy/clang-tidy --verify-config --config-file="${config}" || status=1
+          done < <(git ls-files ':(glob)**/.clang-tidy')
+          exit "${status}"
 
       # Use uv instead of plain pip since cpp-linter uses it anyway.
       - name: Install uv
