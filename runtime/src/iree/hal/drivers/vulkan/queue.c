@@ -9090,7 +9090,11 @@ static iree_status_t iree_hal_vulkan_queue_record_execute_native(
       iree_hal_vulkan_command_buffer_has_descriptor_dispatches(
           submission->execute.command_buffer);
   bool acquired_native_replay = false;
-  if (iree_status_is_ok(status)) {
+  // A cached native recording would skip validation of a newly submitted
+  // indirect cache-maintenance buffer. Record it anew for each submission.
+  if (iree_status_is_ok(status) &&
+      !iree_hal_vulkan_command_buffer_has_indirect_cache_maintenance(
+          submission->execute.command_buffer)) {
     status = iree_hal_vulkan_queue_acquire_native_replay_under_lock(
         queue, submission, descriptor_requirements, has_descriptor_dispatches,
         bda_publication_length, &acquired_native_replay);

@@ -65,6 +65,14 @@ typedef struct iree_async_frontier_tracker_t iree_async_frontier_tracker_t;
 typedef struct iree_hal_resource_set_t iree_hal_resource_set_t;
 typedef struct iree_hal_task_queue_t iree_hal_task_queue_t;
 
+// Resolves one submitted binding to the queue-owned mapping used by the block
+// processor. Cache access is NONE for ordinary bindings.
+iree_status_t iree_hal_task_queue_resolve_binding_entry(
+    const iree_hal_buffer_binding_t* binding,
+    iree_hal_memory_access_t required_cache_access,
+    iree_hal_buffer_mapping_t* mapping,
+    iree_hal_cmd_binding_entry_t* out_entry);
+
 //===----------------------------------------------------------------------===//
 // Queue operation (ready list entry)
 //===----------------------------------------------------------------------===//

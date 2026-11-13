@@ -314,6 +314,39 @@ static iree_status_t iree_hal_hip_stream_command_buffer_advise_buffer(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_hip_stream_command_buffer_cache_maintenance(
+    iree_hal_buffer_ref_t target_ref, const char* operation) {
+  if (!target_ref.buffer) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "HIP %s buffer reference is NULL", operation);
+  }
+  // Host-coherent memory needs no cache maintenance. Stream and submission
+  // synchronization still order accesses to the buffer.
+  if (iree_all_bits_set(iree_hal_buffer_memory_type(target_ref.buffer),
+                        IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+    return iree_ok_status();
+  }
+  return iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "HIP %s requires unsupported execution-time cache maintenance for "
+      "non-coherent memory",
+      operation);
+}
+
+static iree_status_t iree_hal_hip_stream_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  return iree_hal_hip_stream_command_buffer_cache_maintenance(target_ref,
+                                                              "flush_buffer");
+}
+
+static iree_status_t iree_hal_hip_stream_command_buffer_invalidate_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  return iree_hal_hip_stream_command_buffer_cache_maintenance(
+      target_ref, "invalidate_buffer");
+}
+
 static iree_status_t iree_hal_hip_stream_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t target_ref, const void* pattern,
@@ -635,6 +668,9 @@ static const iree_hal_command_buffer_vtable_t
         .reset_event = iree_hal_hip_stream_command_buffer_reset_event,
         .wait_events = iree_hal_hip_stream_command_buffer_wait_events,
         .advise_buffer = iree_hal_hip_stream_command_buffer_advise_buffer,
+        .flush_buffer = iree_hal_hip_stream_command_buffer_flush_buffer,
+        .invalidate_buffer =
+            iree_hal_hip_stream_command_buffer_invalidate_buffer,
         .fill_buffer = iree_hal_hip_stream_command_buffer_fill_buffer,
         .update_buffer = iree_hal_hip_stream_command_buffer_update_buffer,
         .copy_buffer = iree_hal_hip_stream_command_buffer_copy_buffer,

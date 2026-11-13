@@ -73,6 +73,10 @@ iree_hal_vulkan_command_buffer_native_descriptor_pool_requirements(
 bool iree_hal_vulkan_command_buffer_has_descriptor_dispatches(
     iree_hal_command_buffer_t* command_buffer);
 
+// Indirect maintenance depends on the actual binding table at each submit.
+bool iree_hal_vulkan_command_buffer_has_indirect_cache_maintenance(
+    iree_hal_command_buffer_t* command_buffer);
+
 // Host-published BDA table storage used while replaying a command buffer once
 // into a native VkCommandBuffer.
 typedef struct iree_hal_vulkan_command_buffer_bda_publication_t {

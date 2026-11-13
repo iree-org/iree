@@ -250,6 +250,30 @@ static iree_status_t iree_hal_hip_multi_queue_command_buffer_advise_buffer(
   return status;
 }
 
+static iree_status_t iree_hal_hip_multi_queue_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  iree_hal_hip_multi_queue_command_buffer_t* command_buffer =
+      iree_hal_hip_multi_queue_command_buffer_cast(base_command_buffer);
+  iree_status_t status = iree_ok_status();
+  CALL_COMMAND(status, iree_hal_command_buffer_flush_buffer(
+                           command_buffer->child_buffers[command_buffer_index],
+                           target_ref));
+  return status;
+}
+
+static iree_status_t iree_hal_hip_multi_queue_command_buffer_invalidate_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  iree_hal_hip_multi_queue_command_buffer_t* command_buffer =
+      iree_hal_hip_multi_queue_command_buffer_cast(base_command_buffer);
+  iree_status_t status = iree_ok_status();
+  CALL_COMMAND(status, iree_hal_command_buffer_invalidate_buffer(
+                           command_buffer->child_buffers[command_buffer_index],
+                           target_ref));
+  return status;
+}
+
 static iree_status_t iree_hal_hip_multi_queue_command_buffer_fill_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t target_ref, const void* pattern,
@@ -330,6 +354,9 @@ static const iree_hal_command_buffer_vtable_t
         .reset_event = iree_hal_hip_multi_queue_command_buffer_reset_event,
         .wait_events = iree_hal_hip_multi_queue_command_buffer_wait_events,
         .advise_buffer = iree_hal_hip_multi_queue_command_buffer_advise_buffer,
+        .flush_buffer = iree_hal_hip_multi_queue_command_buffer_flush_buffer,
+        .invalidate_buffer =
+            iree_hal_hip_multi_queue_command_buffer_invalidate_buffer,
         .fill_buffer = iree_hal_hip_multi_queue_command_buffer_fill_buffer,
         .update_buffer = iree_hal_hip_multi_queue_command_buffer_update_buffer,
         .copy_buffer = iree_hal_hip_multi_queue_command_buffer_copy_buffer,
