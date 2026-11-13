@@ -8379,6 +8379,7 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_linalg_ext.sort` attr-dict
               `dimension` `(` $dimension `)`
+              (`is_stable` `(` $is_stable^ `)`)?
               (`ins` `(` $inputs^ `:` type($inputs) `)`)?
               `outs` `(` $outputs `:` type($outputs) `)`
               $region (`-&gt;` type($results)^)?
@@ -8386,12 +8387,38 @@ not guaranteed. If <code>unique_indices</code> is set to false, the first
 <p>Based on XLA operation semantics, sorts the given <code>operands</code> at the given
 <code>dimension</code> with the given <code>comparator</code>.</p>
 <p>See <a href="https://www.tensorflow.org/xla/operation_semantics#sort">https://www.tensorflow.org/xla/operation_semantics#sort</a>.</p>
+<p>The comparator gets two elements, as one pair of scalars per operand, and
+returns whether the first has to be placed before the second. It does not
+order two elements if it returns the same value for both argument orders,
+e.g. for equal keys both <code>false</code> with a strict comparison like <code>slt</code> and
+both <code>true</code> with a non-strict one like <code>sle</code>.</p>
+<p>By default the sort is not stable: elements that the comparator does not
+order are placed in unspecified order. With <code>is_stable</code> set they keep their
+input order: an element is only moved in front of another one if the
+comparator returns <code>true</code> for that order and <code>false</code> for the opposite one.
+A stable sort lowers to a slower algorithm, so only request it if the
+order of such elements matters.</p>
+<p>The comparator has to be consistent: if it does not order <code>a</code> and <code>b</code>, and
+does not order <code>b</code> and <code>c</code>, it must not order <code>a</code> and <code>c</code> either. An
+ordered floating point comparison is not consistent when the operand
+contains NaNs, which it does not order with any other value. The result
+for an inconsistent comparator is some permutation of the elements, in
+unspecified order.</p>
+<p>Example:
+<div class="highlight"><pre><span></span><code>%sorted = iree_linalg_ext.sort dimension(0) is_stable(true)
+    ins(%arr : tensor&lt;?xi64&gt;) outs(%init : tensor&lt;?xi64&gt;) {
+  ^bb0(%lhs: i64, %rhs: i64):
+    %before = arith.cmpi slt, %lhs, %rhs : i64
+    iree_linalg_ext.yield %before : i1
+} -&gt; tensor&lt;?xi64&gt;
+</code></pre></div></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>dimension</code></td><td>::mlir::IntegerAttr</td><td>64-bit signless integer attribute</td></tr>
+<tr><td><code>is_stable</code></td><td>::mlir::BoolAttr</td><td>bool attribute</td></tr>
 </table>
 
 <h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
