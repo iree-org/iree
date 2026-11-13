@@ -21,6 +21,10 @@ def ConvertToSPIRVPass : Pass<"iree-convert-to-spirv", "ModuleOp"> {
   ];
 }
 
+def SPIRVAnnotateEligibleForWinogradPass : InterfacePass<"iree-spirv-annotate-eligible-for-winograd", "mlir::FunctionOpInterface"> {
+  let summary = "Annotate Conv2D ops that are eligible for conversion to Winograd with the `__winograd_conv` annotation, if Winograd is heuristically convenient";
+}
+
 def SPIRVAnnotateWinogradLoopsPass : InterfacePass<"iree-spirv-annotate-winograd-loops", "mlir::FunctionOpInterface"> {
   let summary = "Annotate innermost Winograd loops with spirv distribute attribute";
 }
