@@ -64,6 +64,7 @@ jobs:
       - name: Checking out IREE repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: false
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -75,14 +76,17 @@ jobs:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
       - name: Setup venv
+        env:
+          ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
-            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+            --fetch-gh-workflow="${ARTIFACT_RUN_ID}"
 
       - name: Checkout test suites repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           repository: iree-org/iree-test-suites
           ref: 612f93663b32ea86ea442e87be549f1056a5de1c
           path: iree-test-suites

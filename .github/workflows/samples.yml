@@ -33,6 +33,8 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: "Setting up Python"
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -49,6 +51,8 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Installing build dependencies"
@@ -66,7 +70,8 @@ jobs:
     needs:
       - colab
       - samples
-    uses: ./.github/workflows/workflow_summary.yml
-    secrets: inherit
+    uses: $/.github/workflows/workflow_summary.yml
+    secrets:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
     with:
       jobs-json: ${{ toJson(needs) }}

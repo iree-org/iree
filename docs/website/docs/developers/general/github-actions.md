@@ -283,7 +283,7 @@ certain jobs as conditionally enabled:
     ```yaml
     jobs:
       setup:
-        uses: ./.github/workflows/setup.yml
+        uses: $/.github/workflows/setup.yml
 
       test:
         needs: [setup]

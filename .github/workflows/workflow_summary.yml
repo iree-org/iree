@@ -19,8 +19,9 @@
 #        needs:
 #          - job_1
 #          - job_2
-#        uses: ./.github/workflows/workflow_summary.yml
-#        secrets: inherit
+#        uses: $/.github/workflows/workflow_summary.yml
+#        secrets:
+#          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
 #        with:
 #          jobs-json: ${{ toJson(needs) }}
 #   ```
@@ -37,6 +38,9 @@ on:
         jobs-json:
           type: string
           description: The output of `toJson(needs)`
+    secrets:
+      DISCORD_WEBHOOK:
+        required: false
 
 permissions:
   contents: read
@@ -47,9 +51,11 @@ jobs:
     steps:
       - name: Getting failed jobs
         id: failed_jobs
+        env:
+          JOBS_JSON: ${{ inputs.jobs-json }}
         run: |
-          echo '${{ inputs.jobs-json }}'
-          FAILED_JOBS="$(echo '${{ inputs.jobs-json }}' \
+          echo "${JOBS_JSON}"
+          FAILED_JOBS="$(echo "${JOBS_JSON}" \
             | jq --raw-output \
             'map_values(select(.result!="success" and .result!="skipped")) | keys | join(",")' \
           )"

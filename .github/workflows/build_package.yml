@@ -52,6 +52,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           path: "c" # Windows can hit path length limits, so use a short path.
           submodules: false
           ref: ${{ github.event.inputs.commit }}
@@ -59,13 +60,19 @@ jobs:
       - name: Write version info (release)
         id: version_local
         shell: bash
+        env:
+          PACKAGE_SUFFIX: ${{ github.event.inputs.package_suffix }}
+          LEGACY_PACKAGE_VERSION: ${{ github.event.inputs.legacy_package_version }}
+          PACKAGE_VERSION: ${{ github.event.inputs.package_version }}
+          COMPILER_PACKAGE_VERSION: ${{ github.event.inputs.compiler_package_version }}
+          RUNTIME_PACKAGE_VERSION: ${{ github.event.inputs.runtime_package_version }}
         run: |
           # Note: `version_info.json` holds the CalVer version and is still used
           # for iree-tools-tf and iree-tools-tflite.
           cat << EOF > ./c/version_info.json
           {
-            "package-suffix": "${{ github.event.inputs.package_suffix }}",
-            "package-version": "${{ github.event.inputs.legacy_package_version }}",
+            "package-suffix": "${PACKAGE_SUFFIX}",
+            "package-version": "${LEGACY_PACKAGE_VERSION}",
             "iree-revision": "$(cd ./c && git rev-parse HEAD)"
           }
           EOF
@@ -74,8 +81,8 @@ jobs:
           echo "iree-dist"
           cat << EOF > ./c/version_local.json
           {
-            "package-suffix": "${{ github.event.inputs.package_suffix }}",
-            "package-version": "${{ github.event.inputs.package_version }}",
+            "package-suffix": "${PACKAGE_SUFFIX}",
+            "package-version": "${PACKAGE_VERSION}",
             "iree-revision": "$(cd ./c && git rev-parse HEAD)"
           }
           EOF
@@ -84,8 +91,8 @@ jobs:
           echo "iree-base-compiler"
           cat << EOF > ./c/compiler/version_local.json
           {
-            "package-suffix": "${{ github.event.inputs.package_suffix }}",
-            "package-version": "${{ github.event.inputs.compiler_package_version }}",
+            "package-suffix": "${PACKAGE_SUFFIX}",
+            "package-version": "${COMPILER_PACKAGE_VERSION}",
             "iree-revision": "$(cd ./c && git rev-parse HEAD)"
           }
           EOF
@@ -94,8 +101,8 @@ jobs:
           echo "iree-base-runtime"
           cat << EOF > ./c/runtime/version_local.json
           {
-            "package-suffix": "${{ github.event.inputs.package_suffix }}",
-            "package-version": "${{ github.event.inputs.runtime_package_version }}",
+            "package-suffix": "${PACKAGE_SUFFIX}",
+            "package-version": "${RUNTIME_PACKAGE_VERSION}",
             "iree-revision": "$(cd ./c && git rev-parse HEAD)"
           }
           EOF
@@ -191,6 +198,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           path: "c" # Windows can hit path length limits, so use a short path.
           submodules: true
           ref: ${{ github.event.inputs.commit }}

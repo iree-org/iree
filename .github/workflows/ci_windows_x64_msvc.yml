@@ -8,6 +8,9 @@ name: CI - Windows x64 MSVC
 
 on:
   workflow_call:
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING:
+        required: false
   workflow_dispatch:
 
 permissions:
@@ -26,6 +29,7 @@ jobs:
       - name: "Checking out repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: true
       # TODO(#18813): Remove this. Environment setup needs to happen on runners, not in workflows.
       - name: "Create build dir"
@@ -70,11 +74,11 @@ jobs:
       - name: "Building IREE"
         shell: bash
         run: |
-          echo "Building in ${{ env.BUILD_DIR_BASH }}"
+          echo "Building in ${BUILD_DIR_BASH}"
           source ./build_tools/cmake/setup_sccache.sh
-          bash ./build_tools/cmake/build_all.sh ${{ env.BUILD_DIR_BASH }}
+          bash ./build_tools/cmake/build_all.sh "${BUILD_DIR_BASH}"
       - name: "Testing IREE"
-        run: bash ./build_tools/cmake/ctest_all.sh ${{ env.BUILD_DIR_BASH }}
+        run: bash ./build_tools/cmake/ctest_all.sh "$env:BUILD_DIR_BASH"
       - name: "Clean up build dir"
         if: always()
         run: if (Test-Path -Path "$Env:BUILD_DIR_POWERSHELL") {Remove-Item -Path "$Env:BUILD_DIR_POWERSHELL" -Recurse -Force}

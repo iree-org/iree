@@ -35,11 +35,12 @@ jobs:
         id: last_green_commit
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ github.event.inputs.release-commit }}
         run: |
-          if [ -z "${{ github.event.inputs.release-commit }}" ]; then
+          if [ -z "${RELEASE_COMMIT}" ]; then
             release_commit="$(./build_tools/scripts/get_latest_green.sh)"
           else
-            release_commit="${{ github.event.inputs.release-commit }}"
+            release_commit="${RELEASE_COMMIT}"
           fi
           git checkout "${release_commit}"
           echo "release-commit=${release_commit}" >> "${GITHUB_OUTPUT}"
@@ -75,6 +76,7 @@ jobs:
 
       - name: Create Release
         id: create_release
+        # zizmor: ignore[superfluous-actions] `gh release create` does not output the release id used below
         uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
         with:
           tag: ${{ env.tag_name }}

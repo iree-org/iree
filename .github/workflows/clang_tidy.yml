@@ -48,6 +48,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: false
           fetch-depth: 0
 
@@ -112,7 +113,7 @@ jobs:
 
       - name: Run clang-tidy
         if: steps.tidy-diff-mode.outputs.use_cpp_linter == 'true'
-        uses: cpp-linter/cpp-linter-action@774040af57f011a5fc47911f08ff0c3059d1835a # v1.11.4
+        uses: cpp-linter/cpp-linter-action@774040af57f011a5fc47911f08ff0c3059d1835a # v2.24.0
         id: linter
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
