@@ -53,8 +53,9 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
 
 static llvm::cl::opt<bool> clBlockMatmulProducerFusion(
     "iree-dispatch-creation-block-matmul-producer-fusion",
-    llvm::cl::desc("Blocks matmul-producer fusion on CPU"), llvm::cl::Hidden,
-    llvm::cl::init(true));
+    llvm::cl::desc("Blocks fusion of gather producers into matmul "
+                   "dispatch regions on CPU"),
+    llvm::cl::Hidden, llvm::cl::init(true));
 
 namespace mlir::iree_compiler::IREE::Flow {
 
@@ -838,13 +839,15 @@ getSingleStaticExecutableTarget(ModuleOp moduleOp) {
   return executableTargets.front();
 }
 
-// On CPU, in cases when tiling and ukernels are enabled, fused matmul producers
-// are materialized on the stack in the same workgroup, which may lead to stack
-// overflow issues. At this level, it's unclear whether the target is a CPU and
-// whether ukernels are enabled, so it's a best effort implementation.
+// On CPU targets with the mmt4d ukernel, a gather fused with its matmul
+// consumer may not compile: with data tiling, the gathered tile may be
+// materialized on the stack beyond the stack allocation limit. At this level,
+// it's unclear whether data tiling and ukernels will be used, so it's a best
+// effort implementation. Bit-extend producers, such as dequantization, are not
+// blocked. Without fusion, each matmul dispatch reads a bit-extended copy of
+// the operand from memory, which makes quantized matmuls several times slower.
 static bool shouldBlockMatmulProducerFusion(Operation *op) {
-  if (!(isa<IREE::LinalgExt::GatherOp>(op) || LinalgExt::isBitExtendOp(op)) ||
-      !hasContractionConsumer(op)) {
+  if (!isa<IREE::LinalgExt::GatherOp>(op) || !hasContractionConsumer(op)) {
     return false;
   }
   auto moduleOp = op->getParentOfType<ModuleOp>();
