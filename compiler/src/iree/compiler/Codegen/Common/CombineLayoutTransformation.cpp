@@ -402,45 +402,55 @@ foldPadIntoMapStore(RewriterBase &rewriter, tensor::PadOp padOp,
     return succeeded(ubConstantBound) && *ubConstantBound <= 0;
   };
 
-  // Distribute the padding of each dimension separately. This causes some
-  // overlap of the iteration spaces across the loops, but simplifies the
-  // implementation. The trade-off is expected to be okay because we expect
-  // the padding to be small relative to the size of the output buffer, which
-  // makes the overlap small. The below example shows what the overlap looks
-  // like.
+  // Distribute the padding of each dimension separately, with one loop nest
+  // for the low padding and one for the high padding of each dimension.
   //
-  // 1st loop (low pad d0)        2nd loop (high pad d0)
-  //        |———|                       |———————|
-  //          |                             |
-  //          v                             v
-  //        +———+———————————————————————+———————+     ———
-  //        | . | . . . . . . . . . . . | . . . | <--  |  3rd loop (low pad d1)
-  //        +———+———————————————————————+———————+     ———
-  //        | . | . . . . . . . . . . . | . . . |
-  //        | . | . . . . . . . . . . . | . . . |
-  //        | . | . . . . . . . . . . . | . . . |
-  //        | . | . . . . . . . . . . . | . . . |
-  //        +———+———————————————————————+———————+     ———
-  //        | . | . . . . . . . . . . . | . . . | <--  |  4th loop (high pad d1)
-  //        +———+———————————————————————+———————+     ———
+  // The loop nests are distributed (to workgroups, and possibly threads)
+  // independently of each other, so their iteration spaces must not overlap:
+  // an element covered by two loop nests can be written by two different
+  // workgroups concurrently. That is a data race even though both write the
+  // same padding value, and ThreadSanitizer reports it for CPU dispatches.
   //
-  // Each distributed loop performs the padding for a hyperplane spanning the
-  // low or high pad of the corresponding dimension, and fully spanning all
-  // other dimensions of the tensor. This means that there is overlap on the
-  // intersection of high and low padding for each dimension.
+  // To keep them disjoint, the loop nests of dimension `idx` only span the
+  // unpadded range [low, low + srcSize) of the dimensions before `idx`, and the
+  // full range of the dimensions after `idx`. Each padding element is then
+  // written exactly once, by the loop nest of the first dimension in which it
+  // lies in the padding:
   //
-  // In most cases today, the low padding is generally either 0, or very small,
-  // and the high padding will be small relative to the size of the full tensor,
-  // since padding is usually done to the nearest multiple of some tile size, or
-  // for padding an image for a convolution. Because the padding is small, the
-  // overlap should also be small, and we can live with the small redundant
-  // computation in order to have a more simplified kernel.
+  //        +———+———————————————————————+———————+
+  //        | 1 | 1 1 1 1 1 1 1 1 1 1 1 | 1 1 1 |  1: low pad d0, all of d1
+  //        +———+———————————————————————+———————+
+  //        | 3 | . . . . . . . . . . . | 4 4 4 |  3: low pad d1, unpadded d0
+  //        | 3 | . . . . . . . . . . . | 4 4 4 |  4: high pad d1, unpadded d0
+  //        | 3 | . . . . . . . . . . . | 4 4 4 |
+  //        +———+———————————————————————+———————+
+  //        | 2 | 2 2 2 2 2 2 2 2 2 2 2 | 2 2 2 |  2: high pad d0, all of d1
+  //        +———+———————————————————————+———————+
+  SmallVector<OpFoldResult> lowPads = padOp.getMixedLowPad();
+  SmallVector<OpFoldResult> unpaddedUbs;
+  for (auto [low, srcSize] : llvm::zip_equal(lowPads, padSrcSizes)) {
+    unpaddedUbs.push_back(
+        IREE::LinalgExt::addOfrs(rewriter, loc, low, srcSize));
+  }
+  // Initializes `lbs`/`ubs` to the iteration space shared by the loop nests of
+  // dimension `idx`, before narrowing dimension `idx` to its low or high pad.
+  auto initPaddingLoopBounds = [&rewriter, &padResultSizes, &lowPads,
+                                &unpaddedUbs](int64_t idx,
+                                              SmallVector<OpFoldResult> &lbs,
+                                              SmallVector<OpFoldResult> &ubs) {
+    lbs.assign(padResultSizes.size(), rewriter.getIndexAttr(0));
+    ubs.assign(padResultSizes.begin(), padResultSizes.end());
+    for (int64_t prevIdx = 0; prevIdx < idx; ++prevIdx) {
+      lbs[prevIdx] = lowPads[prevIdx];
+      ubs[prevIdx] = unpaddedUbs[prevIdx];
+    }
+  };
   for (auto [idx, low, high] :
-       llvm::enumerate(padOp.getMixedLowPad(), padOp.getMixedHighPad())) {
+       llvm::enumerate(lowPads, padOp.getMixedHighPad())) {
     // Create a distributed loop for the low padding.
     if (!isConstantIntValue(low, 0)) {
-      SmallVector<OpFoldResult> ubs(padResultSizes);
-      SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
+      SmallVector<OpFoldResult> lbs, ubs;
+      initPaddingLoopBounds(idx, lbs, ubs);
       SmallVector<int64_t> shape(padOp.getSourceType().getShape());
       shape[idx] = padOp.getStaticLow()[idx];
       ubs[idx] = low;
@@ -453,11 +463,11 @@ foldPadIntoMapStore(RewriterBase &rewriter, tensor::PadOp padOp,
     if (isConstantIntValue(high, 0)) {
       continue;
     }
-    SmallVector<OpFoldResult> ubs(padResultSizes);
-    SmallVector<OpFoldResult> lbs(ubs.size(), rewriter.getIndexAttr(0));
+    SmallVector<OpFoldResult> lbs, ubs;
+    initPaddingLoopBounds(idx, lbs, ubs);
     SmallVector<int64_t> shape(padOp.getSourceType().getShape());
     shape[idx] = padOp.getStaticHigh()[idx];
-    lbs[idx] = IREE::LinalgExt::addOfrs(rewriter, loc, low, padSrcSizes[idx]);
+    lbs[idx] = unpaddedUbs[idx];
     // ubs[idx] is padResultSizes[idx] already (since ubs initialized from
     // padResultSizes)
 
