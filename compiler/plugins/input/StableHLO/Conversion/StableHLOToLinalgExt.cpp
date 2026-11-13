@@ -194,7 +194,7 @@ struct SortOpConversion final : OpConversionPattern<mlir::stablehlo::SortOp> {
     }
     auto sortOp = IREE::LinalgExt::SortOp::create(
         rewriter, loc, resultTypes, adaptor.getOperands(), outputs,
-        op.getDimensionAttr());
+        op.getDimension(), op.getIsStable());
     rewriter.inlineRegionBefore(op.getComparator(), sortOp.getRegion(),
                                 sortOp.getRegion().begin());
     Region &region = sortOp.getRegion();

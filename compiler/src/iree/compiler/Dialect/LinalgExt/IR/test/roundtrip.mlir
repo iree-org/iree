@@ -21,6 +21,24 @@ func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
 
 // -----
 
+func.func @sort_stable_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
+  %empty = tensor.empty() : tensor<128xi32>
+  %0 = iree_linalg_ext.sort
+    dimension(0) is_stable(true)
+    ins(%arg0 : tensor<128xi32>) outs(%empty : tensor<128xi32>) {
+  ^bb0(%arg1: i32, %arg2: i32):
+    %1 = arith.cmpi sgt, %arg1, %arg2 : i32
+    iree_linalg_ext.yield %1 : i1
+  } -> tensor<128xi32>
+  return %0 : tensor<128xi32>
+}
+// CHECK-LABEL: func.func @sort_stable_tensor(
+// CHECK:         iree_linalg_ext.sort
+// CHECK-SAME:      dimension(0) is_stable(true)
+// CHECK-SAME:      ins(%{{.+}} : tensor<128xi32>)
+
+// -----
+
 func.func @sort_memref(%arg0: memref<128xi32>) {
   iree_linalg_ext.sort dimension(0)
     ins(%arg0 : memref<128xi32>) outs(%arg0 : memref<128xi32>) {

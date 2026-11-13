@@ -156,6 +156,62 @@ func.func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>,
 
 // -----
 
+// A stable sort lowers to a binary insertion sort: find the position of each
+// element in the sorted prefix, move the elements behind it up by one, and
+// store it. An element only goes in front of another one if the comparator
+// holds for that order and not for the opposite one.
+func.func @sort_stable(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
+  iree_linalg_ext.sort dimension(0) is_stable(true)
+    ins(%arg0, %arg1 : memref<128xf32>, memref<128xi32>) outs(%arg0, %arg1 : memref<128xf32>, memref<128xi32>) {
+  ^bb0(%arg2: f32, %arg3: f32, %arg4: i32, %arg5: i32):
+    %0 = arith.cmpf ogt, %arg2, %arg3 : f32
+    iree_linalg_ext.yield %0 : i1
+  }
+  return
+}
+// CHECK-LABEL: func.func @sort_stable
+// CHECK-SAME:    %[[BUF1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[BUF2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C128:.+]] = arith.constant 128 : index
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[TRUE:.+]] = arith.constant true
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C128]] step %[[C1]]
+// CHECK:           %[[FIRST:.+]] = arith.cmpi eq, %[[I]], %[[C0]] : index
+// CHECK:           scf.if %[[FIRST]]
+// CHECK:             scf.for %[[J:.+]] = %[[C1]] to %[[C128]] step %[[C1]]
+// CHECK:               %[[X1:.+]] = memref.load %[[BUF1]][%[[J]]]
+// CHECK:               %[[X2:.+]] = memref.load %[[BUF2]][%[[J]]]
+// CHECK:               %[[SEARCH:.+]]:2 = scf.while (%[[LO:.+]] = %[[C0]], %[[HI:.+]] = %[[J]])
+// CHECK:                 %[[CONTINUE:.+]] = arith.cmpi slt, %[[LO]], %[[HI]] : index
+// CHECK:                 scf.condition(%[[CONTINUE]]) %[[LO]], %[[HI]]
+// CHECK:               } do {
+// CHECK:               ^bb0(%[[LO2:.+]]: index, %[[HI2:.+]]: index):
+// CHECK:                 %[[SUM:.+]] = arith.addi %[[LO2]], %[[HI2]] : index
+// CHECK:                 %[[MID:.+]] = arith.divsi %[[SUM]], %[[C2]] : index
+// CHECK:                 %[[M1:.+]] = memref.load %[[BUF1]][%[[MID]]]
+// CHECK:                 %[[BEFORE:.+]] = arith.cmpf ogt, %[[X1]], %[[M1]] : f32
+// CHECK:                 %[[AFTER:.+]] = arith.cmpf ogt, %[[M1]], %[[X1]] : f32
+// CHECK:                 %[[NOT_AFTER:.+]] = arith.xori %[[AFTER]], %[[TRUE]] : i1
+// CHECK:                 %[[STRICT:.+]] = arith.andi %[[BEFORE]], %[[NOT_AFTER]] : i1
+// CHECK:                 %[[MID1:.+]] = arith.addi %[[MID]], %[[C1]] : index
+// CHECK:                 %[[NEW_LO:.+]] = arith.select %[[STRICT]], %[[LO2]], %[[MID1]] : index
+// CHECK:                 %[[NEW_HI:.+]] = arith.select %[[STRICT]], %[[MID]], %[[HI2]] : index
+// CHECK:                 scf.yield %[[NEW_LO]], %[[NEW_HI]] : index, index
+// CHECK:               %[[COUNT:.+]] = arith.subi %[[J]], %[[SEARCH]]#0 : index
+// CHECK:               scf.for %[[K:.+]] = %[[C0]] to %[[COUNT]] step %[[C1]]
+// CHECK:                 %[[TO:.+]] = arith.subi %[[J]], %[[K]] : index
+// CHECK:                 %[[FROM:.+]] = arith.subi %[[TO]], %[[C1]] : index
+// CHECK:                 %[[V1:.+]] = memref.load %[[BUF1]][%[[FROM]]]
+// CHECK:                 %[[V2:.+]] = memref.load %[[BUF2]][%[[FROM]]]
+// CHECK:                 memref.store %[[V1]], %[[BUF1]][%[[TO]]]
+// CHECK:                 memref.store %[[V2]], %[[BUF2]][%[[TO]]]
+// CHECK:               memref.store %[[X1]], %[[BUF1]][%[[SEARCH]]#0]
+// CHECK:               memref.store %[[X2]], %[[BUF2]][%[[SEARCH]]#0]
+
+// -----
+
 func.func @scatter_update_scalar_1D(
     %original: memref<8xi32>, %indices: memref<3x1xi32>,
     %updates: memref<3xi32>) {

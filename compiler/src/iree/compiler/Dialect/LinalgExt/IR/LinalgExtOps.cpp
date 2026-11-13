@@ -1265,7 +1265,8 @@ struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
     // args.
     auto newSortOp = IREE::LinalgExt::SortOp::create(
         rewriter, loc, usedResultTypes,
-        /*inputs=*/usedInputs, usedOutputs, sortOp.getDimension());
+        /*inputs=*/usedInputs, usedOutputs, sortOp.getDimension(),
+        sortOp.getIsStable());
     newSortOp.getRegion().takeBody(sortOp.getRegion());
     newSortOp.getRegion().front().eraseArguments(eraseArg);
     rewriter.replaceAllUsesWith(usedResults, newSortOp.getResults());
@@ -1273,11 +1274,158 @@ struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
     return success();
   }
 };
+
+/// Returns true if `value` holds, at every position, the index of that
+/// position along `dimension`: a `linalg.generic` without inputs that yields
+/// `linalg.index dimension`, optionally cast to an integer type.
+static bool isIndexAlongDimension(Value value, int64_t dimension) {
+  auto genericOp = value.getDefiningOp<linalg::GenericOp>();
+  if (!genericOp || genericOp.getNumDpsInputs() != 0 ||
+      genericOp.getNumDpsInits() != 1 ||
+      !genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0))
+           .isIdentity()) {
+    return false;
+  }
+  Block *body = genericOp.getBlock();
+  Value yielded = body->getTerminator()->getOperand(0);
+  if (auto castOp = yielded.getDefiningOp<arith::IndexCastOp>()) {
+    yielded = castOp.getIn();
+  }
+  auto indexOp = yielded.getDefiningOp<linalg::IndexOp>();
+  return indexOp && indexOp->getBlock() == body &&
+         static_cast<int64_t>(indexOp.getDim()) == dimension;
+}
+
+/// Turns a stable sort into an unstable one if one of its operands holds the
+/// positions along the sort dimension. That operand tells the input order of
+/// two elements, so the comparator can order the elements that it does not
+/// order itself by position. It then is a strict total order: no two elements
+/// are left for which the order is unspecified, and every sorting algorithm
+/// returns the result of the stable sort. The unstable sort lowers to a
+/// faster algorithm.
+///
+/// For example:
+///
+/// %0:2 = iree_linalg_ext.sort dimension(0) is_stable(true)
+/// ins(%keys, %positions : tensor<?xf32>, tensor<?xi64>)
+/// outs(%empty0, %empty1 : tensor<?xf32>, tensor<?xi64>) {
+///   ^bb0(%lhs: f32, %rhs: f32, %lhs_pos: i64, %rhs_pos: i64):
+///    %before = arith.cmpf oge, %lhs, %rhs : f32
+///    iree_linalg_ext.yield %before : i1
+/// } -> tensor<?xf32>, tensor<?xi64>
+///
+/// ->
+///
+/// %0:2 = iree_linalg_ext.sort dimension(0)
+/// ins(%keys, %positions : tensor<?xf32>, tensor<?xi64>)
+/// outs(%empty0, %empty1 : tensor<?xf32>, tensor<?xi64>) {
+///   ^bb0(%lhs: f32, %rhs: f32, %lhs_pos: i64, %rhs_pos: i64):
+///    %before = arith.cmpf oge, %lhs, %rhs : f32
+///    %after = arith.cmpf oge, %rhs, %lhs : f32
+///    %ordered = arith.xori %before, %after : i1
+///    %lower_pos = arith.cmpi slt, %lhs_pos, %rhs_pos : i64
+///    %result = arith.select %ordered, %before, %lower_pos : i1
+///    iree_linalg_ext.yield %result : i1
+/// } -> tensor<?xf32>, tensor<?xi64>
+///
+/// The rewrite is limited to position operands whose result is used. An
+/// unused one is removed by `RemoveUnusedSortOpResults` instead, which avoids
+/// keeping its buffer only for the sake of the comparator.
+struct FoldSortStabilityIntoComparator
+    : OpRewritePattern<IREE::LinalgExt::SortOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::SortOp sortOp,
+                                PatternRewriter &rewriter) const override {
+    if (!sortOp.getIsStable()) {
+      return rewriter.notifyMatchFailure(sortOp, "sort is not stable");
+    }
+    if (sortOp.hasPureBufferSemantics()) {
+      return rewriter.notifyMatchFailure(sortOp, "expected tensor semantics");
+    }
+    int64_t dimension = sortOp.getDimension();
+    std::optional<unsigned> positionOperand;
+    for (auto [index, input] : llvm::enumerate(sortOp.getInputs())) {
+      if (isIndexAlongDimension(input, dimension) &&
+          !sortOp.getResult(index).use_empty()) {
+        positionOperand = index;
+        break;
+      }
+    }
+    if (!positionOperand) {
+      return rewriter.notifyMatchFailure(
+          sortOp, "no used operand holds the positions along the dimension");
+    }
+
+    Block &block = sortOp.getRegion().front();
+    Operation *terminator = block.getTerminator();
+    Location loc = sortOp.getLoc();
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(terminator);
+
+    // Evaluate the comparator a second time with the elements swapped.
+    IRMapping swapped;
+    for (unsigned i = 0, e = block.getNumArguments(); i < e; i += 2) {
+      swapped.map(block.getArgument(i), block.getArgument(i + 1));
+      swapped.map(block.getArgument(i + 1), block.getArgument(i));
+    }
+    SmallVector<Operation *> bodyOps(
+        llvm::make_pointer_range(block.without_terminator()));
+    for (Operation *op : bodyOps) {
+      rewriter.clone(*op, swapped);
+    }
+    Value before = terminator->getOperand(0);
+    Value after = swapped.lookupOrDefault(before);
+
+    // The comparator orders two elements if it holds in exactly one direction.
+    Value isOrdered = arith::XOrIOp::create(rewriter, loc, before, after);
+    Value lowerPosition =
+        arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::slt,
+                              block.getArgument(2 * *positionOperand),
+                              block.getArgument(2 * *positionOperand + 1));
+    Value result = arith::SelectOp::create(rewriter, loc, isOrdered, before,
+                                           lowerPosition);
+    rewriter.modifyOpInPlace(terminator,
+                             [&]() { terminator->setOperand(0, result); });
+    rewriter.modifyOpInPlace(sortOp, [&]() { sortOp.setIsStable(false); });
+    return success();
+  }
+};
+
+/// Turns a stable sort into an unstable one if the order of the elements that
+/// the comparator does not order cannot be observed: a single integer operand
+/// whose comparator is an integer comparison of its two arguments. Two
+/// elements that such a comparator does not order are the same value.
+struct DropUnobservableSortStability
+    : OpRewritePattern<IREE::LinalgExt::SortOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::SortOp sortOp,
+                                PatternRewriter &rewriter) const override {
+    if (!sortOp.getIsStable()) {
+      return rewriter.notifyMatchFailure(sortOp, "sort is not stable");
+    }
+    if (sortOp.getNumDpsInputs() != 1) {
+      return rewriter.notifyMatchFailure(sortOp, "expected a single operand");
+    }
+    Block &block = sortOp.getRegion().front();
+    Value lhs = block.getArgument(0);
+    Value rhs = block.getArgument(1);
+    auto cmpOp =
+        block.getTerminator()->getOperand(0).getDefiningOp<arith::CmpIOp>();
+    if (!cmpOp || !((cmpOp.getLhs() == lhs && cmpOp.getRhs() == rhs) ||
+                    (cmpOp.getLhs() == rhs && cmpOp.getRhs() == lhs))) {
+      return rewriter.notifyMatchFailure(
+          sortOp, "comparator is not an integer comparison of its arguments");
+    }
+    rewriter.modifyOpInPlace(sortOp, [&]() { sortOp.setIsStable(false); });
+    return success();
+  }
+};
 } // namespace
 
 void SortOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                          MLIRContext *ctx) {
-  results.add<RemoveUnusedSortOpResults>(ctx);
+  results.add<RemoveUnusedSortOpResults, FoldSortStabilityIntoComparator,
+              DropUnobservableSortStability>(ctx);
 }
 
 //===----------------------------------------------------------------------===//

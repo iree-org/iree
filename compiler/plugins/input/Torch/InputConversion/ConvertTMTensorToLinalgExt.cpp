@@ -14,7 +14,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -104,67 +103,6 @@ struct ScatterOpConversion
   }
 };
 
-/// Returns true if `value` holds, at every position, the index of that
-/// position along `dimension`: a `linalg.generic` without inputs that yields
-/// `linalg.index dimension`, optionally cast to an integer type. This is the
-/// index tensor that the conversion of `aten.sort` passes to the sort.
-static bool isIndexAlongDimension(Value value, int64_t dimension) {
-  auto genericOp = value.getDefiningOp<linalg::GenericOp>();
-  if (!genericOp || genericOp.getNumDpsInputs() != 0 ||
-      genericOp.getNumDpsInits() != 1 ||
-      !genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0))
-           .isIdentity()) {
-    return false;
-  }
-  Block *body = genericOp.getBlock();
-  Value yielded = body->getTerminator()->getOperand(0);
-  if (auto castOp = yielded.getDefiningOp<arith::IndexCastOp>()) {
-    yielded = castOp.getIn();
-  }
-  auto indexOp = yielded.getDefiningOp<linalg::IndexOp>();
-  return indexOp && indexOp->getBlock() == body &&
-         static_cast<int64_t>(indexOp.getDim()) == dimension;
-}
-
-/// Makes the comparator of `sortOp` order elements that it does not order
-/// itself by the operand `indexOperand`, which holds their input positions.
-/// The comparator becomes a strict total order, so the result is the one of a
-/// stable sort whichever algorithm the sort is lowered to.
-static void orderTiesByInputPosition(RewriterBase &rewriter,
-                                     IREE::LinalgExt::SortOp sortOp,
-                                     unsigned indexOperand) {
-  Block &block = sortOp.getRegion().front();
-  Operation *terminator = block.getTerminator();
-  Location loc = sortOp.getLoc();
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPoint(terminator);
-
-  // Evaluate the comparator a second time with the elements swapped.
-  IRMapping swapped;
-  for (unsigned i = 0, e = block.getNumArguments(); i < e; i += 2) {
-    swapped.map(block.getArgument(i), block.getArgument(i + 1));
-    swapped.map(block.getArgument(i + 1), block.getArgument(i));
-  }
-  SmallVector<Operation *> bodyOps(
-      llvm::make_pointer_range(block.without_terminator()));
-  for (Operation *op : bodyOps) {
-    rewriter.clone(*op, swapped);
-  }
-  Value before = terminator->getOperand(0);
-  Value after = swapped.lookupOrDefault(before);
-
-  // The comparator orders the elements if it holds in exactly one direction.
-  Value isOrdered = arith::XOrIOp::create(rewriter, loc, before, after);
-  Value lowerPosition =
-      arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::slt,
-                            block.getArgument(2 * indexOperand),
-                            block.getArgument(2 * indexOperand + 1));
-  Value result =
-      arith::SelectOp::create(rewriter, loc, isOrdered, before, lowerPosition);
-  rewriter.modifyOpInPlace(terminator,
-                           [&]() { terminator->setOperand(0, result); });
-}
-
 struct SortOpConversion
     : public OpRewritePattern<mlir::torch::TMTensor::SortOp> {
   using Base::Base;
@@ -179,22 +117,13 @@ struct SortOpConversion
           rewriter, loc, tensor::getMixedSizes(rewriter, loc, input),
           resultType.getElementType()));
     }
+    // Sorts coming from Torch rely on elements that compare equal keeping
+    // their input order, e.g. the lowest index comes first among equal values.
     auto sortOp = IREE::LinalgExt::SortOp::create(
         rewriter, loc, op.getResultTypes(), op.getOutputs(), outputs,
-        op.getDimensionAttr());
+        op.getDimension(), /*is_stable=*/true);
     rewriter.inlineRegionBefore(op.getRegion(), sortOp.getRegion(),
                                 sortOp.getRegion().begin());
-    // iree_linalg_ext.sort does not keep the input order of elements that the
-    // comparator does not order, which sorts coming from Torch rely on (e.g.
-    // the lowest index comes first among equal values). Their index operand
-    // gives that order.
-    int64_t dimension = sortOp.getDimension();
-    for (auto [index, input] : llvm::enumerate(sortOp.getInputs())) {
-      if (isIndexAlongDimension(input, dimension)) {
-        orderTiesByInputPosition(rewriter, sortOp, index);
-        break;
-      }
-    }
     rewriter.replaceOp(op, sortOp->getResults());
     return success();
   }

@@ -600,19 +600,48 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
 
     See https://www.tensorflow.org/xla/operation_semantics#sort.
 
-    The sort is not stable: elements for which the comparator returns false in
-    both orders are placed in unspecified order.
+    The comparator gets two elements, as one pair of scalars per operand, and
+    returns whether the first has to be placed before the second. It does not
+    order two elements if it returns the same value for both argument orders,
+    e.g. for equal keys both `false` with a strict comparison like `slt` and
+    both `true` with a non-strict one like `sle`.
+
+    By default the sort is not stable: elements that the comparator does not
+    order are placed in unspecified order. With `is_stable` set they keep their
+    input order: an element is only moved in front of another one if the
+    comparator returns `true` for that order and `false` for the opposite one.
+    A stable sort lowers to a slower algorithm, so only request it if the
+    order of such elements matters.
+
+    The comparator has to be consistent: if it does not order `a` and `b`, and
+    does not order `b` and `c`, it must not order `a` and `c` either. An
+    ordered floating point comparison is not consistent when the operand
+    contains NaNs, which it does not order with any other value. The result
+    for an inconsistent comparator is some permutation of the elements, in
+    unspecified order.
+
+    Example:
+    ```mlir
+    %sorted = iree_linalg_ext.sort dimension(0) is_stable(true)
+        ins(%arr : tensor<?xi64>) outs(%init : tensor<?xi64>) {
+      ^bb0(%lhs: i64, %rhs: i64):
+        %before = arith.cmpi slt, %lhs, %rhs : i64
+        iree_linalg_ext.yield %before : i1
+    } -> tensor<?xi64>
+    ```
   }];
 
   let arguments = (ins Variadic<AnyRankedTensorOrMemRef>:$inputs,
                        Variadic<AnyRankedTensorOrMemRef>:$outputs,
-                       I64Attr:$dimension
+                       I64Attr:$dimension,
+                       DefaultValuedAttr<BoolAttr, "false">:$is_stable
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
     attr-dict
     `dimension` `(` $dimension `)`
+    (`is_stable` `(` $is_stable^ `)`)?
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?

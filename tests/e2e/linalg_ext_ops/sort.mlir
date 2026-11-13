@@ -93,3 +93,67 @@ func.func @sort1D_ties_ordered_by_index() {
   check.expect_eq_const(%0#1, dense<[0, 2, 3, 6, 10, 1, 5, 8, 9, 12, 4, 7, 11]> : tensor<13xi32>) : tensor<13xi32>
   return
 }
+
+// A stable sort keeps equal keys in input order, here visible in the payload.
+// The comparator is strict: it is false for equal keys in both orders.
+func.func @sort1D_stable_strict_comparator() {
+  %keys = util.unfoldable_constant dense<[2, 1, 2, 2, 0, 1, 2, 0, 1, 1, 2, 0, 1]> : tensor<13xi32>
+  %payload = util.unfoldable_constant dense<[50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62]> : tensor<13xi32>
+  %empty_keys = tensor.empty() : tensor<13xi32>
+  %empty_payload = tensor.empty() : tensor<13xi32>
+  %0:2 = iree_linalg_ext.sort dimension(0) is_stable(true)
+      ins(%keys, %payload : tensor<13xi32>, tensor<13xi32>)
+      outs(%empty_keys, %empty_payload : tensor<13xi32>, tensor<13xi32>) {
+    ^bb0(%arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32):
+      %1 = arith.cmpi sgt, %arg2, %arg3 : i32
+      iree_linalg_ext.yield %1 : i1
+    } -> tensor<13xi32>, tensor<13xi32>
+  check.expect_eq_const(%0#0, dense<[2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 0, 0, 0]> : tensor<13xi32>) : tensor<13xi32>
+  check.expect_eq_const(%0#1, dense<[50, 52, 53, 56, 60, 51, 55, 58, 59, 62, 54, 57, 61]> : tensor<13xi32>) : tensor<13xi32>
+  return
+}
+
+// As above with a non-strict comparator, which is true for equal keys in both
+// orders.
+func.func @sort1D_stable_non_strict_comparator() {
+  %keys = util.unfoldable_constant dense<[2, 1, 2, 2, 0, 1, 2, 0, 1, 1, 2, 0, 1]> : tensor<13xi32>
+  %payload = util.unfoldable_constant dense<[50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62]> : tensor<13xi32>
+  %empty_keys = tensor.empty() : tensor<13xi32>
+  %empty_payload = tensor.empty() : tensor<13xi32>
+  %0:2 = iree_linalg_ext.sort dimension(0) is_stable(true)
+      ins(%keys, %payload : tensor<13xi32>, tensor<13xi32>)
+      outs(%empty_keys, %empty_payload : tensor<13xi32>, tensor<13xi32>) {
+    ^bb0(%arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32):
+      %1 = arith.cmpi sge, %arg2, %arg3 : i32
+      iree_linalg_ext.yield %1 : i1
+    } -> tensor<13xi32>, tensor<13xi32>
+  check.expect_eq_const(%0#0, dense<[2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 0, 0, 0]> : tensor<13xi32>) : tensor<13xi32>
+  check.expect_eq_const(%0#1, dense<[50, 52, 53, 56, 60, 51, 55, 58, 59, 62, 54, 57, 61]> : tensor<13xi32>) : tensor<13xi32>
+  return
+}
+
+// A stable sort whose second operand holds the positions of the elements.
+func.func @sort1D_stable_keys_and_positions() {
+  %keys = util.unfoldable_constant dense<[2, 1, 2, 2, 0, 1, 2, 0, 1, 1, 2, 0, 1]> : tensor<13xi32>
+  %empty_keys = tensor.empty() : tensor<13xi32>
+  %empty_positions = tensor.empty() : tensor<13xi32>
+  %positions = linalg.generic {
+      indexing_maps = [affine_map<(d0) -> (d0)>],
+      iterator_types = ["parallel"]}
+      outs(%empty_positions : tensor<13xi32>) {
+    ^bb0(%out: i32):
+      %i = linalg.index 0 : index
+      %i32 = arith.index_cast %i : index to i32
+      linalg.yield %i32 : i32
+    } -> tensor<13xi32>
+  %0:2 = iree_linalg_ext.sort dimension(0) is_stable(true)
+      ins(%keys, %positions : tensor<13xi32>, tensor<13xi32>)
+      outs(%empty_keys, %empty_positions : tensor<13xi32>, tensor<13xi32>) {
+    ^bb0(%arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32):
+      %1 = arith.cmpi sge, %arg2, %arg3 : i32
+      iree_linalg_ext.yield %1 : i1
+    } -> tensor<13xi32>, tensor<13xi32>
+  check.expect_eq_const(%0#0, dense<[2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 0, 0, 0]> : tensor<13xi32>) : tensor<13xi32>
+  check.expect_eq_const(%0#1, dense<[0, 2, 3, 6, 10, 1, 5, 8, 9, 12, 4, 7, 11]> : tensor<13xi32>) : tensor<13xi32>
+  return
+}
