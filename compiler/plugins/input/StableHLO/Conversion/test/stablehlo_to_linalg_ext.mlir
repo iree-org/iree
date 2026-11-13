@@ -15,8 +15,8 @@ func.func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
 }
 // CHECK:         %[[OUT:.+]] = tensor.empty() : tensor<128xi32>
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
-// CHECK-NOT:       is_stable
 // CHECK-SAME:      dimension(0)
+// CHECK-NOT:       is_stable
 // CHECK-SAME:      ins(%[[ARG0]] : tensor<128xi32>)
 // CHECK-SAME:      outs(%[[OUT]] : tensor<128xi32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
