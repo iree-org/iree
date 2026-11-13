@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/AsmState.h"
@@ -71,10 +72,7 @@ struct Binding {
 };
 
 // Builds a set of fused bindings based on dispatches.
-// Each dispatch may have a unique binding set and we conservatively fuse only
-// those we can prove are the same. We could in the future introduce new entry
-// points if we had minor divergence in order to gain more fusion in the common
-// cases.
+// Only bindings correlated across every supplied dispatch site are fused.
 static SmallVector<Binding>
 findCorrelatedBindings(unsigned bindingCount,
                        ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps,
@@ -325,6 +323,47 @@ fuseDispatchBindings(IREE::Stream::ExecutableOp executableOp,
 
   auto configAttr = IREE::Stream::ResourceConfigAttr::lookup(exportOp);
   bool aliasMutableBindings = configAttr.getAliasMutableBindings();
+
+  // Specialize differing alias patterns before fusing bindings.
+  if (aliasMutableBindings && dispatchOps.size() > 1 &&
+      llvm::hasSingleElement(
+          executableOp.getOps<IREE::Stream::ExecutableExportOp>()) &&
+      llvm::all_of(dispatchOps,
+                   [](auto op) { return op.getEntryPoints().size() == 1; })) {
+    llvm::MapVector<SmallVector<unsigned>,
+                    SmallVector<IREE::Stream::CmdDispatchOp>>
+        groups;
+    for (auto op : dispatchOps) {
+      DenseMap<Value, unsigned> leaders;
+      SmallVector<unsigned> pattern;
+      for (Value resource : op.getResources()) {
+        auto [it, inserted] = leaders.try_emplace(resource, leaders.size());
+        pattern.push_back(it->second);
+      }
+      groups[pattern].push_back(op);
+    }
+    if (groups.size() > 1) {
+      SymbolTable parentSymbols(executableOp->getParentOp());
+      for (auto &group : llvm::drop_begin(groups)) {
+        auto specialized =
+            cast<IREE::Stream::ExecutableOp>(executableOp->clone());
+        parentSymbols.insert(specialized);
+        auto specializedExport =
+            *specialized.getOps<IREE::Stream::ExecutableExportOp>().begin();
+        auto entry = SymbolRefAttr::get(
+            executableOp.getContext(), specialized.getSymName(),
+            {FlatSymbolRefAttr::get(specializedExport.getSymNameAttr())});
+        for (auto op : group.second) {
+          op.setEntryPointsAttr(ArrayAttr::get(op.getContext(), {entry}));
+        }
+        fuseDispatchBindings(specialized, specializedExport, group.second,
+                             memoizedZeros);
+      }
+      fuseDispatchBindings(executableOp, exportOp, groups.front().second,
+                           memoizedZeros);
+      return;
+    }
+  }
 
   LLVM_DEBUG({
     AsmState asmState(executableOp->getParentOp());
