@@ -19,9 +19,9 @@ iree_cc_test(
     LLVMPasses
     LLVMSupport
     gmock
+    gmock_main
     gtest
     iree::compiler::Utils
-    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -34,9 +34,9 @@ iree_cc_test(
     LLVMSupport
     MLIRIR
     gmock
+    gmock_main
     gtest
     iree::compiler::Utils
-    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -49,10 +49,10 @@ iree_cc_test(
     MLIRIR
     MLIRPass
     gmock
+    gmock_main
     gtest
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
-    iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

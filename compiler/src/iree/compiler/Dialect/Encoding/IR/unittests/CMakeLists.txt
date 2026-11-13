@@ -18,9 +18,9 @@ iree_cc_test(
   DEPS
     MLIRIR
     gmock
+    gmock_main
     gtest
     iree::compiler::Dialect::Encoding::IR
-    iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

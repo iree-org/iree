@@ -180,6 +180,8 @@ class TargetConverter:
                 "@com_github_dvidelabs_flatcc//:parsing": ["flatcc::parsing"],
                 "@com_github_dvidelabs_flatcc//:runtime": ["flatcc::runtime"],
                 "@com_google_googletest//:gtest": ["gmock", "gtest"],
+                # Bazel builds googletest's gtest_main from gmock_main.cc.
+                "@com_google_googletest//:gtest_main": ["gmock_main"],
                 "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
                 "@hsa_runtime_headers": ["hsa_runtime::headers"],
                 "@libbacktrace": ["libbacktrace::libbacktrace"],
