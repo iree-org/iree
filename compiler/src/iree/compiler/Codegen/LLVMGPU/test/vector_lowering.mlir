@@ -332,3 +332,39 @@ func.func @transfer_scatter_unroll_transposed_index(
 // becomes 4*8=32 rank-1 stores.
 // CHECK-LABEL: func.func @transfer_scatter_unroll_transposed_index
 // CHECK-COUNT-32: vector.store {{.+}} : memref<4096x64xf16>, vector<64xf16>
+
+// -----
+
+#lhs = affine_map<(p, j, k) -> (p, j, k)>
+#rhs = affine_map<(p, j, k) -> (p, k, j)>
+#out = affine_map<(p, j, k) -> (p)>
+
+// CHECK-LABEL: func.func @permuted_equal_reductions
+// CHECK-SAME: %[[LHS:.*]]: vector<1x2x2xf32>, %[[RHS:.*]]: vector<1x2x2xf32>, %[[ACC:.*]]: vector<1xf32>
+// CHECK: %[[LHS_T:.*]] = vector.transpose %[[LHS]], [1, 2, 0]
+// CHECK: %[[RHS_T:.*]] = vector.transpose %[[RHS]], [2, 1, 0]
+// CHECK: %[[LHS_FIRST:.*]] = vector.extract %[[LHS_T]][1, 1] : vector<1xf32> from vector<2x2x1xf32>
+// CHECK: %[[RHS_FIRST:.*]] = vector.extract %[[RHS_T]][1, 1] : vector<1xf32> from vector<2x2x1xf32>
+// CHECK: math.fma %[[LHS_FIRST]], %[[RHS_FIRST]], %[[ACC]] : vector<1xf32>
+func.func @permuted_equal_reductions(%a: vector<1x2x2xf32>, %b: vector<1x2x2xf32>, %acc: vector<1xf32>) -> vector<1xf32> {
+  %r = vector.contract {indexing_maps = [#lhs, #rhs, #out], iterator_types = ["parallel", "reduction", "reduction"], kind = #vector.kind<add>} %a, %b, %acc : vector<1x2x2xf32>, vector<1x2x2xf32> into vector<1xf32>
+  return %r : vector<1xf32>
+}
+
+// -----
+
+#lhs = affine_map<(p, j, k) -> (p, j, k)>
+#rhs = affine_map<(p, j, k) -> (k, p, j)>
+#out = affine_map<(p, j, k) -> (p)>
+
+// CHECK-LABEL: func.func @permuted_unequal_reductions
+// CHECK-SAME: %[[LHS:.*]]: vector<2x3x4xf32>, %[[RHS:.*]]: vector<4x2x3xf32>, %[[ACC:.*]]: vector<2xf32>
+// CHECK: %[[LHS_T:.*]] = vector.transpose %[[LHS]], [1, 2, 0] : vector<2x3x4xf32> to vector<3x4x2xf32>
+// CHECK: %[[RHS_T:.*]] = vector.transpose %[[RHS]], [2, 0, 1] : vector<4x2x3xf32> to vector<3x4x2xf32>
+// CHECK: %[[LHS_FIRST:.*]] = vector.extract %[[LHS_T]][2, 3] : vector<2xf32> from vector<3x4x2xf32>
+// CHECK: %[[RHS_FIRST:.*]] = vector.extract %[[RHS_T]][2, 3] : vector<2xf32> from vector<3x4x2xf32>
+// CHECK: math.fma %[[LHS_FIRST]], %[[RHS_FIRST]], %[[ACC]] : vector<2xf32>
+func.func @permuted_unequal_reductions(%a: vector<2x3x4xf32>, %b: vector<4x2x3xf32>, %acc: vector<2xf32>) -> vector<2xf32> {
+  %r = vector.contract {indexing_maps = [#lhs, #rhs, #out], iterator_types = ["parallel", "reduction", "reduction"], kind = #vector.kind<add>} %a, %b, %acc : vector<2x3x4xf32>, vector<4x2x3xf32> into vector<2xf32>
+  return %r : vector<2xf32>
+}
