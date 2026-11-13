@@ -985,6 +985,129 @@ static void emitBubbleSortSweep(OpBuilder &b, Location loc, Value zero,
       });
 }
 
+/// Emits an in-place heapsort of `operands` along `sortDim`, at the position
+/// `ivs` of the other dimensions: O(n log n) comparisons and no storage besides
+/// the operands. The comparator region gets the elements of all operands as
+/// interleaved pairs and returns true when the first element has to be placed
+/// before the second. Elements that compare equal end up in unspecified order.
+static void emitHeapSort(OpBuilder &b, Location loc, Value sortDimSize,
+                         int64_t sortDim, ValueRange ivs, ValueRange operands,
+                         Region &comparatorRegion) {
+  Block &cmpBlock = comparatorRegion.front();
+  Value zero = arith::ConstantIndexOp::create(b, loc, 0);
+  Value one = arith::ConstantIndexOp::create(b, loc, 1);
+  Value two = arith::ConstantIndexOp::create(b, loc, 2);
+
+  auto load = [&](OpBuilder &b, Value pos) {
+    SmallVector<Value> indices(ivs);
+    indices[sortDim] = pos;
+    return llvm::map_to_vector(operands, [&](Value operand) -> Value {
+      return memref::LoadOp::create(b, loc, operand, indices);
+    });
+  };
+  auto store = [&](OpBuilder &b, ArrayRef<Value> vals, Value pos) {
+    SmallVector<Value> indices(ivs);
+    indices[sortDim] = pos;
+    for (auto [operand, val] : llvm::zip_equal(operands, vals)) {
+      memref::StoreOp::create(b, loc, val, operand, indices);
+    }
+  };
+  // Returns the i1 "lhs goes before rhs".
+  auto isBefore = [&](OpBuilder &b, ArrayRef<Value> lhs, ArrayRef<Value> rhs) {
+    SmallVector<Value> cmpArgs;
+    for (auto [l, r] : llvm::zip_equal(lhs, rhs)) {
+      cmpArgs.push_back(l);
+      cmpArgs.push_back(r);
+    }
+    IRMapping map;
+    map.map(cmpBlock.getArguments(), cmpArgs);
+    for (Operation &op : cmpBlock.without_terminator()) {
+      b.clone(op, map);
+    }
+    return map.lookup(cmpBlock.getTerminator()->getOperand(0));
+  };
+
+  // Places the element `rootVals` into the heap [0, end), starting at the
+  // vacant position `root` and moving it down until neither child has to be
+  // placed after it. The heap keeps the element that sorts last at position 0.
+  auto siftDown = [&](OpBuilder &b, Value root, ArrayRef<Value> rootVals,
+                      Value end) {
+    Value lastPos = arith::SubIOp::create(b, loc, end, one);
+    Value trueVal = arith::ConstantIntOp::create(b, loc, b.getI1Type(), 1);
+    Value falseVal = arith::ConstantIntOp::create(b, loc, b.getI1Type(), 0);
+    Type indexType = b.getIndexType();
+    auto whileOp = scf::WhileOp::create(
+        b, loc, TypeRange{indexType, b.getI1Type()}, ValueRange{root, trueVal},
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          scf::ConditionOp::create(b, loc, args[1], args);
+        },
+        [&](OpBuilder &b, Location loc, ValueRange args) {
+          Value hole = args[0];
+          Value child = arith::AddIOp::create(
+              b, loc, arith::MulIOp::create(b, loc, hole, two), one);
+          Value hasChild = arith::CmpIOp::create(
+              b, loc, arith::CmpIPredicate::slt, child, end);
+          auto ifOp = scf::IfOp::create(
+              b, loc, hasChild,
+              [&](OpBuilder &b, Location loc) {
+                // The right child may not exist; clamping it to the last
+                // heap position compares the left child with itself then.
+                Value right = arith::MinSIOp::create(
+                    b, loc, arith::AddIOp::create(b, loc, child, one), lastPos);
+                SmallVector<Value> leftVals = load(b, child);
+                SmallVector<Value> rightVals = load(b, right);
+                Value takeRight = isBefore(b, leftVals, rightVals);
+                Value next =
+                    arith::SelectOp::create(b, loc, takeRight, right, child);
+                SmallVector<Value> nextVals;
+                for (auto [l, r] : llvm::zip_equal(leftVals, rightVals)) {
+                  nextVals.push_back(
+                      arith::SelectOp::create(b, loc, takeRight, r, l));
+                }
+                Value moveDown = isBefore(b, rootVals, nextVals);
+                scf::IfOp::create(b, loc, moveDown,
+                                  [&](OpBuilder &b, Location loc) {
+                                    store(b, nextVals, hole);
+                                    scf::YieldOp::create(b, loc);
+                                  });
+                Value newHole =
+                    arith::SelectOp::create(b, loc, moveDown, next, hole);
+                scf::YieldOp::create(b, loc, ValueRange{newHole, moveDown});
+              },
+              [&](OpBuilder &b, Location loc) {
+                scf::YieldOp::create(b, loc, ValueRange{hole, falseVal});
+              });
+          scf::YieldOp::create(b, loc, ifOp.getResults());
+        });
+    store(b, rootVals, whileOp.getResult(0));
+  };
+
+  // Build the heap: sift down the positions n/2-1 ... 0.
+  Value half = arith::DivSIOp::create(b, loc, sortDimSize, two);
+  scf::ForOp::create(b, loc, zero, half, one, ValueRange{},
+                     [&](OpBuilder &b, Location loc, Value iv, ValueRange) {
+                       Value root = arith::SubIOp::create(
+                           b, loc, arith::SubIOp::create(b, loc, half, one),
+                           iv);
+                       SmallVector<Value> rootVals = load(b, root);
+                       siftDown(b, root, rootVals, sortDimSize);
+                       scf::YieldOp::create(b, loc);
+                     });
+  // Move the first element of the heap [0, end] behind the remaining heap
+  // and re-insert the element it replaces: end = n-1 ... 1.
+  Value sizeMinusOne = arith::SubIOp::create(b, loc, sortDimSize, one);
+  scf::ForOp::create(b, loc, zero, sizeMinusOne, one, ValueRange{},
+                     [&](OpBuilder &b, Location loc, Value iv, ValueRange) {
+                       Value end =
+                           arith::SubIOp::create(b, loc, sizeMinusOne, iv);
+                       SmallVector<Value> first = load(b, zero);
+                       SmallVector<Value> last = load(b, end);
+                       store(b, first, end);
+                       siftDown(b, zero, last, end);
+                       scf::YieldOp::create(b, loc);
+                     });
+}
+
 LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
                                                    ValueRange ivs) {
   auto sortDim = getDimension();
@@ -997,29 +1120,37 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
     sortDimSize = arith::ConstantIndexOp::create(
         b, loc, getOperandType(0).getDimSize(sortDim));
   }
-  SmallVector<Value> indices(ivs);
-  Value firstSortPass = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::eq,
-                                              indices[sortDim], zero);
-  scf::IfOp::create(b, loc, firstSortPass, [&](OpBuilder &b, Location loc) {
-    scf::ForOp::create(
-        b, loc, zero, sortDimSize, one, ValueRange{},
-        [&](OpBuilder &b, Location loc, Value iv, ValueRange iters) {
-          SmallVector<Value> indices(ivs);
-          indices[sortDim] = iv;
-          for (auto [input, output] :
-               llvm::zip_equal(getDpsInputs(), getDpsInits())) {
-            Value v = memref::LoadOp::create(b, loc, input, indices);
-            memref::StoreOp::create(b, loc, v, output, indices);
-          }
-          scf::YieldOp::create(b, loc);
-        });
+  // The loop nest built from the iteration domain also iterates over the sort
+  // dimension. A slice is sorted as a whole, so everything happens in the
+  // first of these iterations: copy the inputs to the outputs, then sort the
+  // outputs in place.
+  Value firstIteration = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::eq,
+                                               ivs[sortDim], zero);
+  scf::IfOp::create(b, loc, firstIteration, [&](OpBuilder &b, Location loc) {
+    // Operands that are sorted in place need no copy.
+    SmallVector<std::pair<Value, Value>> copies;
+    for (auto [input, output] :
+         llvm::zip_equal(getDpsInputs(), getDpsInits())) {
+      if (input != output) {
+        copies.emplace_back(input, output);
+      }
+    }
+    if (!copies.empty()) {
+      scf::ForOp::create(
+          b, loc, zero, sortDimSize, one, ValueRange{},
+          [&](OpBuilder &b, Location loc, Value iv, ValueRange iters) {
+            SmallVector<Value> indices(ivs);
+            indices[sortDim] = iv;
+            for (auto [input, output] : copies) {
+              Value v = memref::LoadOp::create(b, loc, input, indices);
+              memref::StoreOp::create(b, loc, v, output, indices);
+            }
+            scf::YieldOp::create(b, loc);
+          });
+    }
+    emitHeapSort(b, loc, sortDimSize, sortDim, ivs, getDpsInits(), getRegion());
     scf::YieldOp::create(b, loc);
   });
-  Value ub = arith::SubIOp::create(b, loc, sortDimSize, one);
-  SmallVector<Value> compareOperands(getDpsInits().begin(),
-                                     getDpsInits().end());
-  emitBubbleSortSweep(b, loc, zero, one, ub, sortDim, ivs, compareOperands,
-                      /*carryOperands=*/{}, getRegion());
   return success();
 }
 

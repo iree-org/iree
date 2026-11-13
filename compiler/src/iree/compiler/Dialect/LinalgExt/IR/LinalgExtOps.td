@@ -599,6 +599,9 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     `dimension` with the given `comparator`.
 
     See https://www.tensorflow.org/xla/operation_semantics#sort.
+
+    The sort is not stable: elements for which the comparator returns false in
+    both orders are placed in unspecified order.
   }];
 
   let arguments = (ins Variadic<AnyRankedTensorOrMemRef>:$inputs,

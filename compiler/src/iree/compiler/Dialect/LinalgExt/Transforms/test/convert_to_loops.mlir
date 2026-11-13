@@ -1,5 +1,8 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-linalg-ext-to-loops))" %s | FileCheck %s
 
+// Sorting lowers to an in-place heapsort that runs in the first iteration of
+// the loop over the sort dimension: build the heap, then repeatedly move its
+// first element behind it. Both loops sift an element down with a scf.while.
 func.func @sort_1d(%arg0: memref<128xi32>) {
   iree_linalg_ext.sort dimension(0)
     ins(%arg0 : memref<128xi32>) outs(%arg0 : memref<128xi32>) {
@@ -12,19 +15,57 @@ func.func @sort_1d(%arg0: memref<128xi32>) {
 // CHECK-LABEL: func.func @sort_1d
 // CHECK-SAME:    %[[BUF:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C128:.+]] = arith.constant 128 : index
+// CHECK-DAG:     %[[C127:.+]] = arith.constant 127 : index
+// CHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
+// CHECK-DAG:     %[[C63:.+]] = arith.constant 63 : index
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:     %[[C127:.+]] = arith.constant 127 : index
-// CHECK:         scf.for %[[ARG1:.+]] = %[[C0]] to %[[C128]] step %[[C1]]
-// CHECK:           scf.for %[[ARG2:.+]] = %[[C0]] to %[[C127]] step %[[C1]]
-// CHECK:             %[[T1:.+]] = arith.addi %[[ARG2]], %[[C1]] : index
-// CHECK:             %[[V1:.+]] = memref.load %[[BUF]][%[[ARG2]]]
-// CHECK:             %[[V2:.+]] = memref.load %[[BUF]][%[[T1]]]
-// CHECK:             %[[COND:.+]] = arith.cmpi sgt, %[[V1]], %[[V2]] : i32
-// CHECK:             %[[NEW1:.+]] = arith.select %[[COND]], %[[V1]], %[[V2]] : i32
-// CHECK:             %[[NEW2:.+]] = arith.select %[[COND]], %[[V2]], %[[V1]] : i32
-// CHECK:             memref.store %[[NEW1]], %[[BUF]][%[[ARG2]]]
-// CHECK:             memref.store %[[NEW2]], %[[BUF]][%[[T1]]]
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[TRUE:.+]] = arith.constant true
+// CHECK-DAG:     %[[FALSE:.+]] = arith.constant false
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C128]] step %[[C1]]
+// CHECK:           %[[FIRST:.+]] = arith.cmpi eq, %[[I]], %[[C0]] : index
+// CHECK:           scf.if %[[FIRST]]
+//                    The operand is sorted in place, there is nothing to copy.
+// CHECK-NOT:         memref.store
+//                    Build the heap.
+// CHECK:             scf.for %[[J:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
+// CHECK:               %[[ROOT:.+]] = arith.subi %[[C63]], %[[J]] : index
+// CHECK:               %[[X:.+]] = memref.load %[[BUF]][%[[ROOT]]]
+// CHECK:               %[[W:.+]]:2 = scf.while (%[[HOLE:.+]] = %[[ROOT]], %[[GO:.+]] = %[[TRUE]])
+// CHECK:                 scf.condition(%[[GO]]) %[[HOLE]], %[[GO]]
+// CHECK:               } do {
+// CHECK:               ^bb0(%[[H:.+]]: index, %{{.+}}: i1):
+// CHECK:                 %[[H2:.+]] = arith.muli %[[H]], %[[C2]] : index
+// CHECK:                 %[[LEFT:.+]] = arith.addi %[[H2]], %[[C1]] : index
+// CHECK:                 %[[HAS_CHILD:.+]] = arith.cmpi slt, %[[LEFT]], %[[C128]] : index
+// CHECK:                 %[[R:.+]]:2 = scf.if %[[HAS_CHILD]] -> (index, i1)
+// CHECK:                   %[[LEFT1:.+]] = arith.addi %[[LEFT]], %[[C1]] : index
+// CHECK:                   %[[RIGHT:.+]] = arith.minsi %[[LEFT1]], %[[C127]] : index
+// CHECK:                   %[[LV:.+]] = memref.load %[[BUF]][%[[LEFT]]]
+// CHECK:                   %[[RV:.+]] = memref.load %[[BUF]][%[[RIGHT]]]
+// CHECK:                   %[[TAKE_RIGHT:.+]] = arith.cmpi sgt, %[[LV]], %[[RV]] : i32
+// CHECK:                   %[[NEXT:.+]] = arith.select %[[TAKE_RIGHT]], %[[RIGHT]], %[[LEFT]] : index
+// CHECK:                   %[[NV:.+]] = arith.select %[[TAKE_RIGHT]], %[[RV]], %[[LV]] : i32
+// CHECK:                   %[[MOVE:.+]] = arith.cmpi sgt, %[[X]], %[[NV]] : i32
+// CHECK:                   scf.if %[[MOVE]]
+// CHECK:                     memref.store %[[NV]], %[[BUF]][%[[H]]]
+// CHECK:                   %[[NEW_HOLE:.+]] = arith.select %[[MOVE]], %[[NEXT]], %[[H]] : index
+// CHECK:                   scf.yield %[[NEW_HOLE]], %[[MOVE]] : index, i1
+// CHECK:                 } else {
+// CHECK:                   scf.yield %[[H]], %[[FALSE]] : index, i1
+// CHECK:                 scf.yield %[[R]]#0, %[[R]]#1 : index, i1
+// CHECK:               memref.store %[[X]], %[[BUF]][%[[W]]#0]
+//                    Move the first heap element behind the shrinking heap.
+// CHECK:             scf.for %[[K:.+]] = %[[C0]] to %[[C127]] step %[[C1]]
+// CHECK:               %[[END:.+]] = arith.subi %[[C127]], %[[K]] : index
+// CHECK:               %[[TOP:.+]] = memref.load %[[BUF]][%[[C0]]]
+// CHECK:               %[[LAST:.+]] = memref.load %[[BUF]][%[[END]]]
+// CHECK:               memref.store %[[TOP]], %[[BUF]][%[[END]]]
+// CHECK:               %[[W2:.+]]:2 = scf.while (%{{.+}} = %[[C0]], %{{.+}} = %[[TRUE]])
+// CHECK:                 arith.cmpi slt, %{{.+}}, %[[END]] : index
+// CHECK:                 arith.cmpi sgt, %[[LAST]], %{{.+}} : i32
+// CHECK:               memref.store %[[LAST]], %[[BUF]][%[[W2]]#0]
 
 // -----
 
@@ -41,56 +82,77 @@ func.func @sort_2d(%arg0: memref<16x32xi32>) {
 // CHECK-SAME:    %[[BUF:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
 // CHECK-DAG:     %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:     %[[C15:.+]] = arith.constant 15 : index
+// CHECK-DAG:     %[[C8:.+]] = arith.constant 8 : index
+// CHECK-DAG:     %[[C7:.+]] = arith.constant 7 : index
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:     %[[C15:.+]] = arith.constant 15 : index
-// CHECK:         scf.for %[[ARG1:.+]] = %[[C0]] to %[[C16]] step %[[C1]]
-// CHECK:           scf.for %[[ARG2:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
-// CHECK:             scf.for %[[ARG3:.+]] = %[[C0]] to %[[C15]] step %[[C1]]
-// CHECK:               %[[T1:.+]] = arith.addi %[[ARG3]], %[[C1]] : index
-// CHECK:               %[[V1:.+]] = memref.load %[[BUF]][%[[ARG3]], %[[ARG2]]]
-// CHECK:               %[[V2:.+]] = memref.load %[[BUF]][%[[T1]], %[[ARG2]]]
-// CHECK:               %[[COND:.+]] = arith.cmpi sgt, %[[V1]], %[[V2]] : i32
-// CHECK:               %[[NEW1:.+]] = arith.select %[[COND]], %[[V1]], %[[V2]] : i32
-// CHECK:               %[[NEW2:.+]] = arith.select %[[COND]], %[[V2]], %[[V1]] : i32
-// CHECK:               memref.store %[[NEW1]], %[[BUF]][%[[ARG3]], %[[ARG2]]]
-// CHECK:               memref.store %[[NEW2]], %[[BUF]][%[[T1]], %[[ARG2]]]
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C16]] step %[[C1]]
+// CHECK:           scf.for %[[J:.+]] = %[[C0]] to %[[C32]] step %[[C1]]
+// CHECK:             %[[FIRST:.+]] = arith.cmpi eq, %[[I]], %[[C0]] : index
+// CHECK:             scf.if %[[FIRST]]
+// CHECK:               scf.for %[[K:.+]] = %[[C0]] to %[[C8]] step %[[C1]]
+// CHECK:                 %[[ROOT:.+]] = arith.subi %[[C7]], %[[K]] : index
+// CHECK:                 %[[X:.+]] = memref.load %[[BUF]][%[[ROOT]], %[[J]]]
+// CHECK:                 %[[W:.+]]:2 = scf.while
+// CHECK:                   %[[LV:.+]] = memref.load %[[BUF]][%[[LEFT:.+]], %[[J]]]
+// CHECK:                   %[[RV:.+]] = memref.load %[[BUF]][%[[RIGHT:.+]], %[[J]]]
+// CHECK:                   arith.cmpi sgt, %[[LV]], %[[RV]] : i32
+// CHECK:                 memref.store %[[X]], %[[BUF]][%[[W]]#0, %[[J]]]
+// CHECK:               scf.for %[[K2:.+]] = %[[C0]] to %[[C15]] step %[[C1]]
+// CHECK:                 %[[END:.+]] = arith.subi %[[C15]], %[[K2]] : index
+// CHECK:                 %[[TOP:.+]] = memref.load %[[BUF]][%[[C0]], %[[J]]]
+// CHECK:                 %[[LAST:.+]] = memref.load %[[BUF]][%[[END]], %[[J]]]
+// CHECK:                 memref.store %[[TOP]], %[[BUF]][%[[END]], %[[J]]]
+// CHECK:                 %[[W2:.+]]:2 = scf.while
+// CHECK:                 memref.store %[[LAST]], %[[BUF]][%[[W2]]#0, %[[J]]]
 
 // -----
 
-func.func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
+// The first operand is not sorted in place and is copied to its output first.
+// All operands are moved together; the comparator only sees the keys.
+func.func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>,
+    %arg2: memref<128xf32>) {
   iree_linalg_ext.sort
     dimension(0)
-    ins(%arg0, %arg1 : memref<128xf32>, memref<128xi32>) outs(%arg0, %arg1 : memref<128xf32>, memref<128xi32>) {
-  ^bb0(%arg2: f32, %arg3: f32, %arg4: i32, %arg5: i32):
-    %0 = arith.cmpf ogt, %arg2, %arg3 : f32
+    ins(%arg0, %arg1 : memref<128xf32>, memref<128xi32>) outs(%arg2, %arg1 : memref<128xf32>, memref<128xi32>) {
+  ^bb0(%arg3: f32, %arg4: f32, %arg5: i32, %arg6: i32):
+    %0 = arith.cmpf ogt, %arg3, %arg4 : f32
     iree_linalg_ext.yield %0 : i1
   }
   return
 }
 // CHECK-LABEL: func.func @sort_multi
-// CHECK-SAME:    %[[BUF1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[IN1:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[BUF2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[BUF1:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C128:.+]] = arith.constant 128 : index
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:     %[[C127:.+]] = arith.constant 127 : index
-// CHECK:         scf.for %[[ARG1:.+]] = %[[C0]] to %[[C128]] step %[[C1]]
-// CHECK:           scf.for %[[ARG2:.+]] = %[[C0]] to %[[C127]] step %[[C1]]
-// CHECK:             %[[T1:.+]] = arith.addi %[[ARG2]], %[[C1]] : index
-// CHECK:             %[[V1:.+]] = memref.load %[[BUF1]][%[[ARG2]]]
-// CHECK:             %[[V2:.+]] = memref.load %[[BUF1]][%[[T1]]]
-// CHECK:             %[[V3:.+]] = memref.load %[[BUF2]][%[[ARG2]]]
-// CHECK:             %[[V4:.+]] = memref.load %[[BUF2]][%[[T1]]]
-// CHECK:             %[[COND:.+]] = arith.cmpf ogt, %[[V1]], %[[V2]] : f32
-// CHECK:             %[[NEW1:.+]] = arith.select %[[COND]], %[[V1]], %[[V2]] : f32
-// CHECK:             %[[NEW2:.+]] = arith.select %[[COND]], %[[V2]], %[[V1]] : f32
-// CHECK:             memref.store %[[NEW1]], %[[BUF1]][%[[ARG2]]]
-// CHECK:             memref.store %[[NEW2]], %[[BUF1]][%[[T1]]]
-// CHECK:             %[[NEW3:.+]] = arith.select %[[COND]], %[[V3]], %[[V4]] : i32
-// CHECK:             %[[NEW4:.+]] = arith.select %[[COND]], %[[V4]], %[[V3]] : i32
-// CHECK:             memref.store %[[NEW3]], %[[BUF2]][%[[ARG2]]]
-// CHECK:             memref.store %[[NEW4]], %[[BUF2]][%[[T1]]]
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C128]] step %[[C1]]
+// CHECK:           %[[FIRST:.+]] = arith.cmpi eq, %[[I]], %[[C0]] : index
+// CHECK:           scf.if %[[FIRST]]
+// CHECK:             scf.for %[[J:.+]] = %[[C0]] to %[[C128]] step %[[C1]]
+// CHECK-NEXT:          %[[V:.+]] = memref.load %[[IN1]][%[[J]]]
+// CHECK-NEXT:          memref.store %[[V]], %[[BUF1]][%[[J]]]
+// CHECK-NEXT:        }
+// CHECK:             scf.for
+// CHECK:               %[[X1:.+]] = memref.load %[[BUF1]][%[[ROOT:.+]]]
+// CHECK:               %[[X2:.+]] = memref.load %[[BUF2]][%[[ROOT]]]
+// CHECK:               %[[W:.+]]:2 = scf.while
+// CHECK:                 %[[L1:.+]] = memref.load %[[BUF1]][%[[LEFT:.+]]]
+// CHECK:                 %[[L2:.+]] = memref.load %[[BUF2]][%[[LEFT]]]
+// CHECK:                 %[[R1:.+]] = memref.load %[[BUF1]][%[[RIGHT:.+]]]
+// CHECK:                 %[[R2:.+]] = memref.load %[[BUF2]][%[[RIGHT]]]
+// CHECK:                 %[[TAKE_RIGHT:.+]] = arith.cmpf ogt, %[[L1]], %[[R1]] : f32
+// CHECK:                 %[[N1:.+]] = arith.select %[[TAKE_RIGHT]], %[[R1]], %[[L1]] : f32
+// CHECK:                 %[[N2:.+]] = arith.select %[[TAKE_RIGHT]], %[[R2]], %[[L2]] : i32
+// CHECK:                 %[[MOVE:.+]] = arith.cmpf ogt, %[[X1]], %[[N1]] : f32
+// CHECK:                 scf.if %[[MOVE]]
+// CHECK:                   memref.store %[[N1]], %[[BUF1]][%[[HOLE:.+]]]
+// CHECK:                   memref.store %[[N2]], %[[BUF2]][%[[HOLE]]]
+// CHECK:               memref.store %[[X1]], %[[BUF1]][%[[W]]#0]
+// CHECK:               memref.store %[[X2]], %[[BUF2]][%[[W]]#0]
 
 // -----
 
