@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "external_executable.mlir"
     "smoketest.mlir"
   TOOLS
     FileCheck
