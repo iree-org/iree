@@ -1,0 +1,220 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Promotes the wheels of a candidate release to a stable version and publishes
+# them to PyPI with trusted publishing
+# (https://docs.pypi.org/trusted-publishers/). No PyPI credentials are stored
+# in GitHub: PyPI exchanges the job's OIDC token for a short-lived upload token
+# and attaches a PEP 740 attestation to every uploaded file.
+#
+# Pushing a stable tag `vX.Y.Z` starts this workflow. The tag must be annotated,
+# and its message names the candidate release to publish:
+# `iree-X.Y.ZrcYYYYMMDD`, or `iree-X.Y.Z` for a patch release. The candidate's
+# tag must point to the same commit. The workflow runs as it is at that commit,
+# so a candidate can only be promoted if this file was in its commit.
+#
+# Setup outside this file:
+#   * Each PyPI project in the publish matrix lists this repository, this
+#     workflow (publish_pypi.yml) and the `pypi` environment as a trusted
+#     publisher.
+#   * The `pypi` environment requires approval by a release maintainer and only
+#     allows deployments from `v*` tags.
+#   * A tag ruleset lets only release maintainers create `v*` tags, so that
+#     nobody else can start this workflow.
+#   * A tag ruleset blocks updates and deletions of release tags (`iree-*` and
+#     `v*`), so that the tag that a release and its attestations name cannot be
+#     moved to another commit.
+
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      # Required by actions/attest to sign and store build provenance.
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Check release tag
+        run: |
+          if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "'${TAG}' is not a stable release tag like v3.14.0."
+            exit 1
+          fi
+          echo "VERSION=${TAG#v}" >> "${GITHUB_ENV}"
+
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: false
+
+      # The message of the annotated stable tag names the candidate release.
+      # Several candidates can share a commit, and anyone with write access can
+      # add `iree-*` tags, so the release maintainer who pushes the stable tag
+      # chooses the candidate, not this workflow.
+      - name: Find candidate release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          commit="$(git rev-parse HEAD)"
+          object="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" \
+            --jq '.object | "\(.type) \(.sha)"')"
+          if [[ "${object%% *}" != tag ]]; then
+            echo "${TAG} must be an annotated tag whose message names the candidate release:"
+            echo "  git tag -a ${TAG} iree-${VERSION}rcYYYYMMDD -m \"Promote iree-${VERSION}rcYYYYMMDD\""
+            exit 1
+          fi
+          message="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${object#* }" --jq .message)"
+          mapfile -t candidates < <(grep -o -w -E "iree-${VERSION//./\\.}(rc[0-9]{8})?" <<< "${message}" | sort -u)
+          if (( ${#candidates[@]} != 1 )); then
+            echo "The message of ${TAG} must name one candidate release for ${VERSION}, found ${#candidates[@]}: ${candidates[*]}"
+            exit 1
+          fi
+          candidate="${candidates[0]}"
+          candidate_commit="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${candidate}" --jq .sha)"
+          if [[ "${candidate_commit}" != "${commit}" ]]; then
+            echo "${candidate} is at ${candidate_commit}, but ${TAG} is at ${commit}."
+            exit 1
+          fi
+          echo "Candidate release: ${candidate}"
+          echo "CANDIDATE=${candidate}" >> "${GITHUB_ENV}"
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      # These tools rewrite the wheels before they are attested. Their versions
+      # and those of their dependencies are pinned by hash, and no source
+      # distribution is built, so that only the pinned files run here.
+      - name: Install requirements
+        run: |
+          pip install --require-hashes --only-binary=:all: \
+            -r build_tools/python_deploy/pypi_deploy_requirements.txt
+
+      # A dry run of pypi_deploy.sh downloads the release's wheels into wheels/,
+      # promotes them and checks them with `twine check --strict`. It fails if a
+      # check fails or if a package is missing, since it cannot ask whether to
+      # continue without it.
+      - name: Download, promote and check wheels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./build_tools/python_deploy/pypi_deploy.sh --wheel-dir wheels "${CANDIDATE}"
+
+      # A patch release rebuilds every package, but only the packages at the
+      # patch version are new. The others are on PyPI already, or have the
+      # nightly version of the iree-tools-* packages.
+      - name: Keep only the packages of a patch release
+        run: |
+          if [[ "${VERSION##*.}" == 0 ]]; then
+            echo "Not a patch release, keeping all packages."
+            exit 0
+          fi
+          for wheel in wheels/*.whl; do
+            wheel_version="$(basename "${wheel}" | cut -d- -f2)"
+            if [[ "${wheel_version}" != "${VERSION}" ]]; then
+              echo "Skipping ${wheel}, which is not at version ${VERSION}."
+              rm "${wheel}"
+            fi
+          done
+          if ! compgen -G "wheels/*.whl" > /dev/null; then
+            echo "No package of ${CANDIDATE} is at version ${VERSION}."
+            exit 1
+          fi
+          ls wheels
+
+      # Lets users verify promoted wheels with `gh attestation verify`, including
+      # the copies uploaded to the stable GitHub release.
+      - name: Attest wheels
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: wheels/*.whl
+
+      # Saves the attestation as a Sigstore bundle, so that the stable GitHub
+      # release can carry it next to the promoted wheels.
+      - name: Save attestation bundle
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          cp "${BUNDLE_PATH}" "wheels/iree-${VERSION}-pypi-wheels.sigstore.json"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pypi-wheels
+          # Both patterns are in wheels/, so the files stay at the artifact's
+          # root, where the publish jobs expect the wheels.
+          path: |
+            wheels/*.whl
+            wheels/*.sigstore.json
+          if-no-files-found: error
+
+  # Publishes each package in its own job, so that a package whose PyPI project
+  # rejects the upload does not block the others.
+  publish:
+    name: "Publish ${{ matrix.package }}"
+    needs: promote
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/project/${{ matrix.project }}/
+    permissions:
+      # Required for trusted publishing and PEP 740 attestations.
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: iree_base_compiler
+            project: iree-base-compiler
+          - package: iree_base_runtime
+            project: iree-base-runtime
+          - package: iree_tools_tf
+            project: iree-tools-tf
+          - package: iree_tools_tflite
+            project: iree-tools-tflite
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pypi-wheels
+          path: wheels
+
+      # A patch release only has wheels for the packages that changed.
+      - name: Select ${{ matrix.package }} wheels
+        id: select
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          shopt -s nullglob
+          wheels=( wheels/"${PACKAGE}"-*.whl )
+          if (( ${#wheels[@]} == 0 )); then
+            echo "This release has no ${PACKAGE} wheels to publish."
+            echo "found=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          mkdir dist
+          mv "${wheels[@]}" dist/
+          ls dist
+          echo "found=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Publish to PyPI
+        if: ${{ steps.select.outputs.found == 'true' }}
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist/

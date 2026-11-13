@@ -33,14 +33,20 @@
 # pass the directory that the dry run printed:
 #   ./pypi_deploy.sh --publish --wheel-dir /tmp/iree_pypi_wheels.XXXXX
 #
+# To download into a directory of your choice instead of a temporary one, pass
+# it together with the release tag. The directory must be new or empty. The
+# Publish to PyPI workflow (publish_pypi.yml) runs a dry run this way:
+#   ./pypi_deploy.sh --wheel-dir wheels iree-3.4.0rc20250430
+#
 # Each package is uploaded separately. If an upload fails (e.g. because your
 # credentials lack permission for that PyPI project), the remaining packages
-# are still uploaded and the failures are listed in a summary at the end.
+# are still uploaded and the failures are listed in a summary at the end. The
+# script exits with an error if a check or an upload failed.
 
 set -euo pipefail
 
 function print_usage() {
-  echo "Usage: $0 [--publish] <release tag, e.g. iree-3.4.0rc20250430>"
+  echo "Usage: $0 [--publish] [--wheel-dir <new directory>] <release tag, e.g. iree-3.4.0rc20250430>"
   echo "       $0 [--publish] --wheel-dir <directory from a previous run>"
 }
 
@@ -84,16 +90,19 @@ while (( $# > 0 )); do
   esac
   shift
 done
-if [[ -n "${WHEEL_DIR}" && -n "${RELEASE}" ]]; then
-  echo "Pass either a release tag or --wheel-dir, not both."
-  print_usage
-  exit 1
-fi
 if [[ -z "${WHEEL_DIR}" && -z "${RELEASE}" ]]; then
   print_usage
   exit 1
 fi
-if [[ -n "${WHEEL_DIR}" && ! -d "${WHEEL_DIR}" ]]; then
+if [[ -n "${WHEEL_DIR}" && -n "${RELEASE}" ]]; then
+  # The release's wheels are downloaded into this directory. It must be empty,
+  # so that no other files are promoted or uploaded with them.
+  mkdir -p -- "${WHEEL_DIR}"
+  if [[ -n "$(ls -A -- "${WHEEL_DIR}")" ]]; then
+    echo "Wheel directory '${WHEEL_DIR}' is not empty."
+    exit 1
+  fi
+elif [[ -n "${WHEEL_DIR}" && ! -d "${WHEEL_DIR}" ]]; then
   echo "Wheel directory '${WHEEL_DIR}' does not exist."
   exit 1
 fi
@@ -107,7 +116,9 @@ EXPECTED_PACKAGES=(
 )
 
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
-REQUIREMENTS_FILE="${SCRIPT_DIR}/pypi_deploy_requirements.txt"
+# The tools that this script needs. pypi_deploy_requirements.txt pins them and
+# their dependencies by hash.
+REQUIREMENTS_FILE="${SCRIPT_DIR}/pypi_deploy_requirements.in"
 if [[ -n "${WHEEL_DIR}" ]]; then
   TMPDIR="$(readlink -f -- "${WHEEL_DIR}")"
 else
@@ -268,6 +279,9 @@ function upload_wheels() {
     echo "To upload these wheels without downloading them again, run:"
     echo "  $0 --publish --wheel-dir ${TMPDIR}"
   fi
+  if (( ${#failed[@]} > 0 )); then
+    exit 1
+  fi
 }
 
 
@@ -284,14 +298,14 @@ function main() {
   set +e
   check_requirements
 
-  if [[ -z "${WHEEL_DIR}" ]] && ! check_command_exists gh; then
+  if [[ -n "${RELEASE}" ]] && ! check_command_exists gh; then
     echo "The GitHub CLI 'gh' is required. See https://github.com/cli/cli#installation."
     echo " Googlers, the PPA should already be on your linux machine."
     exit 1
   fi
   set -e
 
-  if [[ -z "${WHEEL_DIR}" ]]; then
+  if [[ -n "${RELEASE}" ]]; then
     download_wheels
   else
     echo ""
