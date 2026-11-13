@@ -584,6 +584,8 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(memref::createFoldMemRefAliasOpsPass)
       .addPass(createIREEExpandStridedMetadataPass)
       .addPass(createCleanupBufferAllocViewPass)
+      // Stack allocations over the limit use workgroup local memory instead.
+      .addPass(createLLVMCPUMoveStackAllocationsToWorkgroupLocalMemoryPass)
       .addPass(createLLVMCPUAssignWorkgroupLocalMemoryPass)
       // Checking stack allocation before converting to CF dialect is easier.
       .addPass([&]() {
