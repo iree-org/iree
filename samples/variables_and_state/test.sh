@@ -22,10 +22,10 @@ ${ROOT_DIR}/build_tools/testing/run_python_notebook.sh \
 test -f ${ARTIFACTS_DIR}/counter.mlir && echo "counter.mlir exists"
 test -f ${ARTIFACTS_DIR}/counter_vmvx.vmfb && echo "counter_vmvx.vmfb exists"
 
-# 2. Build the `iree_samples_variables_and_state` CMake target.
+# 2. Build the `samples/variables_and_state/all` CMake target.
 cmake -B ${BUILD_DIR} -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ROOT_DIR}
-cmake --build ${BUILD_DIR} --target iree_samples_variables_and_state -- -k 0
+cmake --build ${BUILD_DIR} --target samples/variables_and_state/all -- -k 0
 
 # 3. Run the sample binary.
-${BUILD_DIR}/samples/variables_and_state/variables-and-state \
+${BUILD_DIR}/samples/variables_and_state/variables_and_state \
   ${ARTIFACTS_DIR}/counter_vmvx.vmfb local-task

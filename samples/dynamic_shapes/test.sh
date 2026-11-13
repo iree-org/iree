@@ -42,10 +42,10 @@ iree-compile \
   --iree-hal-local-target-device-backends=llvm-cpu \
   ${ARTIFACTS_DIR}/dynamic_shapes.mlir -o ${ARTIFACTS_DIR}/dynamic_shapes_cpu.vmfb
 
-# 4. Build the `iree_samples_dynamic_shapes` CMake target.
+# 4. Build the `samples/dynamic_shapes/all` CMake target.
 cmake -B ${BUILD_DIR} -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_COMPILER=OFF .
-cmake --build ${BUILD_DIR} --target iree_samples_dynamic_shapes -- -k 0
+cmake --build ${BUILD_DIR} --target samples/dynamic_shapes/all -- -k 0
 
 # 5. Run the sample binary.
-${BUILD_DIR}/samples/dynamic_shapes/dynamic-shapes \
+${BUILD_DIR}/samples/dynamic_shapes/dynamic_shapes \
   ${ARTIFACTS_DIR}/dynamic_shapes_cpu.vmfb local-task
