@@ -60,6 +60,10 @@ def _init_dylib():
     _setsig(_dylib.ireeCompilerInvocationCreate, c_void_p, [c_void_p])
     _setsig(_dylib.ireeCompilerInvocationDestroy, None, [c_void_p])
     _setsig(_dylib.ireeCompilerInvocationEnableConsoleDiagnostics, None, [c_void_p])
+    _setsig(
+        _dylib.ireeCompilerInvocationSetCompileFromPhase, None, [c_void_p, c_char_p]
+    )
+    _setsig(_dylib.ireeCompilerInvocationSetCompileToPhase, None, [c_void_p, c_char_p])
     _setsig(_dylib.ireeCompilerInvocationParseSource, c_bool, [c_void_p, c_void_p])
     _setsig(_dylib.ireeCompilerInvocationPipeline, c_bool, [c_void_p, c_int])
     _setsig(_dylib.ireeCompilerInvocationRunPassPipeline, c_bool, [c_void_p, c_char_p])
@@ -435,6 +439,14 @@ class Invocation(SessionObject):
 
     def enable_console_diagnostics(self):
         _dylib.ireeCompilerInvocationEnableConsoleDiagnostics(self._inv_p)
+
+    def set_compile_from_phase(self, phase: str):
+        """Resumes compilation after the named pipeline phase."""
+        _dylib.ireeCompilerInvocationSetCompileFromPhase(self._inv_p, phase.encode())
+
+    def set_compile_to_phase(self, phase: str):
+        """Stops compilation after the named pipeline phase."""
+        _dylib.ireeCompilerInvocationSetCompileToPhase(self._inv_p, phase.encode())
 
     def export_module(self):
         """Exports the module."""

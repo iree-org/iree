@@ -100,6 +100,46 @@ else:
             session = Session()
             inv = session.invocation()
 
+        def testCompilePhases(self):
+            with Session() as session, session.invocation() as inv:
+                source = Source.wrap_buffer(
+                    session,
+                    b"""
+                    func.func @add(%a: tensor<4xf32>, %b: tensor<4xf32>)
+                        -> tensor<4xf32> {
+                        %result = arith.addf %a, %b : tensor<4xf32>
+                        return %result : tensor<4xf32>
+                    }
+                    """,
+                )
+                self.assertTrue(inv.parse_source(source))
+                inv.set_compile_to_phase("input")
+                self.assertTrue(inv.execute())
+                with Output.open_membuffer() as out:
+                    inv.output_ir(out)
+                    self.assertNotIn(b"hal.tensor.import", bytes(out.map_memory()))
+
+                inv.set_compile_from_phase("input")
+                inv.set_compile_to_phase("abi")
+                self.assertTrue(inv.execute())
+                with Output.open_membuffer() as out:
+                    inv.output_ir(out)
+                    self.assertIn(b"hal.tensor.import", bytes(out.map_memory()))
+
+        def testInvalidCompilePhases(self):
+            for start, end in (
+                ("invalid", "end"),
+                ("start", "invalid"),
+                ("abi", "input"),
+            ):
+                with self.subTest(start=start, end=end):
+                    with Session() as session, session.invocation() as inv:
+                        source = Source.wrap_buffer(session, b"module {}")
+                        self.assertTrue(inv.parse_source(source))
+                        inv.set_compile_from_phase(start)
+                        inv.set_compile_to_phase(end)
+                        self.assertFalse(inv.execute())
+
         def testInputFile(self):
             session = Session()
             inv = session.invocation()
