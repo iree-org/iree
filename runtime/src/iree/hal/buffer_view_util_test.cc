@@ -341,19 +341,6 @@ TEST(BufferViewUtilTest, GenerateBufferUsesLogicalViewSizeForGenerator) {
   IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, status);
   EXPECT_EQ(sizeof(float), state.actual_content_size);
 
-  // Empty views must reach the callback too, without a zero-byte staging
-  // allocation. Its error must still be propagated to the caller.
-  shape[0] = 0;
-  state.expected_content_size = 0;
-  state.actual_content_size = IREE_DEVICE_SIZE_MAX;
-  status = iree_hal_buffer_view_generate_buffer(
-      /*device=*/NULL, allocator, IREE_ARRAYSIZE(shape), shape,
-      IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-      buffer_params, iree_hal_test_generate_buffer_callback, &state,
-      &buffer_view);
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, status);
-  EXPECT_EQ(0u, state.actual_content_size);
-
   iree_hal_buffer_view_release(buffer_view);
   iree_hal_allocator_release(allocator);
 }

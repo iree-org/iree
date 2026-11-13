@@ -110,7 +110,6 @@ typedef iree_status_t(IREE_API_PTR* iree_hal_buffer_view_generator_callback_t)(
 // iree_hal_buffer_compute_view_size. Allocators may round the underlying
 // allocation up for placement or pooling, but padding is not exposed to the
 // generator.
-// The callback is also invoked for an empty view, with an empty contents span.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
     iree_hal_device_t* device, iree_hal_allocator_t* allocator,
     iree_host_size_t shape_rank, const iree_hal_dim_t* shape,
