@@ -160,3 +160,66 @@ func.func @no_emulation() attributes {hal.executable.target = #executable_target
 //       CHECK:   {{%.+}}           = arith.addi {{%.+}} : i64
 //       CHECK:   memref.store {{%.+}}, [[REF_I64_1]][{{%.+}}] : memref<8xi64, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   return
+
+// CHECK-LABEL: func.func @broadcast_i64_1
+// CHECK: %[[PAIR1:.*]] = memref.load {{.*}} : memref<1xvector<2xi32>
+// CHECK-NOT: vector.broadcast
+// CHECK: return
+func.func @broadcast_i64_1() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %c0 = arith.constant 0 : index
+  %src = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1xi64, #spirv.storage_class<StorageBuffer>>
+  %dst = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<1xi32, #spirv.storage_class<StorageBuffer>>
+  %value = memref.load %src[%c0] : memref<1xi64, #spirv.storage_class<StorageBuffer>>
+  %broadcast = vector.broadcast %value : i64 to vector<1xi64>
+  %low = arith.trunci %broadcast : vector<1xi64> to vector<1xi32>
+  vector.store %low, %dst[%c0] : memref<1xi32, #spirv.storage_class<StorageBuffer>>, vector<1xi32>
+  return
+}
+
+// CHECK-LABEL: func.func @broadcast_i64_2
+// CHECK: %[[PAIR2:.*]] = memref.load {{.*}} : memref<1xvector<2xi32>
+// CHECK: vector.shuffle %[[PAIR2]], %[[PAIR2]] [0, 1, 0, 1] : vector<2xi32>, vector<2xi32>
+// CHECK-NOT: vector.broadcast
+// CHECK: return
+func.func @broadcast_i64_2() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %c0 = arith.constant 0 : index
+  %src = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1xi64, #spirv.storage_class<StorageBuffer>>
+  %dst = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<2xi32, #spirv.storage_class<StorageBuffer>>
+  %value = memref.load %src[%c0] : memref<1xi64, #spirv.storage_class<StorageBuffer>>
+  %broadcast = vector.broadcast %value : i64 to vector<2xi64>
+  %low = arith.trunci %broadcast : vector<2xi64> to vector<2xi32>
+  vector.store %low, %dst[%c0] : memref<2xi32, #spirv.storage_class<StorageBuffer>>, vector<2xi32>
+  return
+}
+
+// CHECK-LABEL: func.func @broadcast_i64_4
+// CHECK: %[[PAIR4:.*]] = memref.load {{.*}} : memref<1xvector<2xi32>
+// CHECK: vector.shuffle %[[PAIR4]], %[[PAIR4]] [0, 1, 0, 1, 0, 1, 0, 1] : vector<2xi32>, vector<2xi32>
+// CHECK-NOT: vector.broadcast
+// CHECK: return
+func.func @broadcast_i64_4() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %c0 = arith.constant 0 : index
+  %src = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1xi64, #spirv.storage_class<StorageBuffer>>
+  %dst = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<4xi32, #spirv.storage_class<StorageBuffer>>
+  %value = memref.load %src[%c0] : memref<1xi64, #spirv.storage_class<StorageBuffer>>
+  %broadcast = vector.broadcast %value : i64 to vector<4xi64>
+  %low = arith.trunci %broadcast : vector<4xi64> to vector<4xi32>
+  vector.store %low, %dst[%c0] : memref<4xi32, #spirv.storage_class<StorageBuffer>>, vector<4xi32>
+  return
+}
+
+// CHECK-LABEL: func.func @broadcast_i64_2_3
+// CHECK: %[[PAIR2_3:.*]] = memref.load {{.*}} : memref<1xvector<2xi32>
+// CHECK: vector.shuffle %[[PAIR2_3]], %[[PAIR2_3]] [0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1] : vector<2xi32>, vector<2xi32>
+// CHECK-NOT: vector.broadcast
+// CHECK: return
+func.func @broadcast_i64_2_3() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %c0 = arith.constant 0 : index
+  %src = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<1xi64, #spirv.storage_class<StorageBuffer>>
+  %dst = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<2x3xi32, #spirv.storage_class<StorageBuffer>>
+  %value = memref.load %src[%c0] : memref<1xi64, #spirv.storage_class<StorageBuffer>>
+  %broadcast = vector.broadcast %value : i64 to vector<2x3xi64>
+  %low = arith.trunci %broadcast : vector<2x3xi64> to vector<2x3xi32>
+  vector.store %low, %dst[%c0, %c0] : memref<2x3xi32, #spirv.storage_class<StorageBuffer>>, vector<2x3xi32>
+  return
+}

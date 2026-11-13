@@ -133,6 +133,32 @@ struct ConvertUtilAssumeIntOp final
   }
 };
 
+struct ConvertWideBroadcast final : OpConversionPattern<vector::BroadcastOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(vector::BroadcastOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!op.getSource().getType().isInteger(64)) {
+      return failure();
+    }
+    auto result = dyn_cast_or_null<VectorType>(
+        getTypeConverter()->convertType(op.getType()));
+    if (!result || result.isScalable()) {
+      return rewriter.notifyMatchFailure(op, "expected a fixed-width result");
+    }
+    SmallVector<int64_t> mask;
+    for (int64_t i = 0; i < cast<VectorType>(op.getType()).getNumElements();
+         ++i) {
+      mask.append({0, 1});
+    }
+    Value packed = vector::ShuffleOp::create(
+        rewriter, op.getLoc(), adaptor.getSource(), adaptor.getSource(), mask);
+    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(op, result, packed);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Rewrite patterns
 //===----------------------------------------------------------------------===//
@@ -218,8 +244,8 @@ struct FlattenElementwisePattern final : RewritePattern {
 static void
 populateIreeI64EmulationPatterns(arith::WideIntEmulationConverter &converter,
                                  RewritePatternSet &patterns) {
-  patterns.add<ConvertHalInterfaceBindingSubspan, ConvertUtilAssumeIntOp>(
-      converter, patterns.getContext());
+  patterns.add<ConvertHalInterfaceBindingSubspan, ConvertUtilAssumeIntOp,
+               ConvertWideBroadcast>(converter, patterns.getContext());
 }
 
 static bool supportsI64(FunctionOpInterface op) {
