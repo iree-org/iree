@@ -272,6 +272,10 @@ void iree_uk_make_cpu_data_for_features(const char* cpu_features,
     return;
   }
 #elif defined(IREE_ARCH_RISCV_64)
+  out_cpu_data_fields[0] =
+      iree_cpu_data_field(0) &
+      (IREE_CPU_DATA0_RISCV_64_ZVL256B | IREE_CPU_DATA0_RISCV_64_ZVL1024B |
+       IREE_CPU_DATA0_RISCV_64_ZVL4096B);
   iree_uk_uint64_t v = IREE_CPU_DATA0_RISCV_64_V;
   iree_uk_uint64_t zvfhmin = IREE_CPU_DATA0_RISCV_64_ZVFHMIN;
   iree_uk_uint64_t zvfh = IREE_CPU_DATA0_RISCV_64_ZVFH;
