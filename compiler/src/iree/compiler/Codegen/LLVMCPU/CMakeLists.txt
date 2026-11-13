@@ -64,6 +64,7 @@ iree_cc_library(
     "LLVMCPULinkExecutables.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUMmt4dVectorLowering.cpp"
+    "LLVMCPUMoveStackAllocationsToWorkgroupLocalMemory.cpp"
     "LLVMCPUPeel.cpp"
     "LLVMCPUSelectLoweringStrategy.cpp"
     "LLVMCPUSelectUKernels.cpp"

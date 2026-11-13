@@ -69,6 +69,25 @@ def LLVMCPUAssignWorkgroupLocalMemoryPass :
   }];
 }
 
+def LLVMCPUMoveStackAllocationsToWorkgroupLocalMemoryPass :
+    InterfacePass<"iree-llvmcpu-move-stack-allocations-to-workgroup-local-memory",
+                  "mlir::FunctionOpInterface"> {
+  let summary =
+      "Moves stack allocations that exceed the stack allocation limit to "
+      "workgroup local memory.";
+  let description = [{
+    If the statically sized entry-block memref.alloca operations of a dispatch
+    function need more bytes than the stack allocation limit of the target,
+    replaces the largest of them with memref.alloc operations in the
+    #iree_codegen.workgroup_local memory space until the remaining ones fit.
+    Functions within the limit are left unchanged.
+
+    The moved allocations are laid out by
+    iree-llvmcpu-assign-workgroup-local-memory, which has to run after this
+    pass. Allocations with dynamic sizes are not moved.
+  }];
+}
+
 def LLVMCPUCheckIRBeforeLLVMConversionPass :
     InterfacePass<"iree-llvmcpu-check-ir-before-llvm-conversion", "mlir::FunctionOpInterface"> {
   let summary = "Checks CPU backend specific IR constraints (like no allocas)";
