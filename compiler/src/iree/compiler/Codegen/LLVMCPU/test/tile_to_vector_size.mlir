@@ -84,3 +84,23 @@ func.func @matmul_tiled_MxNxK_to_10x20x60(%arg0 : tensor<?x?xf32>, %arg1 : tenso
 // CHECK-SAME:      step %[[C30]]
 // CHECK-NOT:     scf.for
 // CHECK:           linalg.matmul
+
+// -----
+
+// A fill is tiled to its vector sizes like any other op.
+
+#config = #iree_cpu.lowering_config<vector_common_parallel = [4, 8]>
+func.func @fill_untiled(%value : f32, %init : tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %0 = linalg.fill {lowering_config = #config}
+      ins(%value : f32) outs(%init : tensor<16x16xf32>) -> tensor<16x16xf32>
+  return %0 : tensor<16x16xf32>
+}
+// CHECK-LABEL: func.func @fill_untiled(
+// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG:     %[[C8:.+]] = arith.constant 8 : index
+// CHECK:         scf.for
+// CHECK-SAME:      step %[[C4]]
+// CHECK:           scf.for
+// CHECK-SAME:        step %[[C8]]
+// CHECK:             linalg.fill
+// CHECK-SAME:          outs(%{{.+}} : tensor<4x8xf32>)
