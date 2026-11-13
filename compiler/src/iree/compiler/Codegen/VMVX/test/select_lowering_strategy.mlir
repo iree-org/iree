@@ -38,6 +38,91 @@ func.func @copy_op_dynamic(%0: index, %1: index, %4: index, %5: index, %6: memre
 
 // -----
 
+// Include the outer dynamic loop instead of leaving its extent unbounded.
+#target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+#identity = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+func.func @copy_outer_dynamic_4d(%src: tensor<?x8x14x14xf32>, %dst: tensor<?x8x14x14xf32>) -> tensor<?x8x14x14xf32> attributes {hal.executable.target = #target} {
+  %result = linalg.generic {
+    indexing_maps = [#identity, #identity],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+  } ins(%src : tensor<?x8x14x14xf32>) outs(%dst : tensor<?x8x14x14xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<?x8x14x14xf32>
+  return %result : tensor<?x8x14x14xf32>
+}
+
+// CHECK-DAG: #[[$OUTER_DYNAMIC_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 0, 64, 64]>
+// CHECK-LABEL: func.func @copy_outer_dynamic_4d
+// CHECK: linalg.generic
+// CHECK-SAME: lowering_config = #[[$OUTER_DYNAMIC_CONFIG]]
+
+// -----
+
+// Selecting another dynamic loop must not evict an already selected one.
+#target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+#identity = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+func.func @copy_two_outer_dynamic_4d(%src: tensor<?x?x14x14xf32>, %dst: tensor<?x?x14x14xf32>) -> tensor<?x?x14x14xf32> attributes {hal.executable.target = #target} {
+  %result = linalg.generic {
+    indexing_maps = [#identity, #identity],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+  } ins(%src : tensor<?x?x14x14xf32>) outs(%dst : tensor<?x?x14x14xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<?x?x14x14xf32>
+  return %result : tensor<?x?x14x14xf32>
+}
+
+// CHECK-DAG: #[[$TWO_OUTER_DYNAMIC_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0, 64]>
+// CHECK-LABEL: func.func @copy_two_outer_dynamic_4d
+// CHECK: linalg.generic
+// CHECK-SAME: lowering_config = #[[$TWO_OUTER_DYNAMIC_CONFIG]]
+
+// -----
+
+// Static shapes retain the three innermost partitionable loops.
+#target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+#identity = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+func.func @copy_static_4d(%src: tensor<2x8x14x14xf32>, %dst: tensor<2x8x14x14xf32>) -> tensor<2x8x14x14xf32> attributes {hal.executable.target = #target} {
+  %result = linalg.generic {
+    indexing_maps = [#identity, #identity],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+  } ins(%src : tensor<2x8x14x14xf32>) outs(%dst : tensor<2x8x14x14xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<2x8x14x14xf32>
+  return %result : tensor<2x8x14x14xf32>
+}
+
+// CHECK-DAG: #[[$STATIC_4D_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [0, 64, 64, 64]>
+// CHECK-LABEL: func.func @copy_static_4d
+// CHECK: linalg.generic
+// CHECK-SAME: lowering_config = #[[$STATIC_4D_CONFIG]]
+
+// -----
+
+// Leave the smallest static loop untiled instead of enlarging the temporary
+// along a larger static dimension.
+#target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+#identity = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+func.func @copy_outer_dynamic_large_channel(%src: tensor<?x128x8x14xf32>, %dst: tensor<?x128x8x14xf32>) -> tensor<?x128x8x14xf32> attributes {hal.executable.target = #target} {
+  %result = linalg.generic {
+    indexing_maps = [#identity, #identity],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel"]
+  } ins(%src : tensor<?x128x8x14xf32>) outs(%dst : tensor<?x128x8x14xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<?x128x8x14xf32>
+  return %result : tensor<?x128x8x14xf32>
+}
+
+// CHECK-DAG: #[[$LARGE_CHANNEL_CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [64, 64, 0, 64]>
+// CHECK-LABEL: func.func @copy_outer_dynamic_large_channel
+// CHECK: linalg.generic
+// CHECK-SAME: lowering_config = #[[$LARGE_CHANNEL_CONFIG]]
+
+// -----
+
 #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 func.func @static_1d_fft_stage2(%2: tensor<32xf32>, %3: tensor<32xf32>) -> (tensor<32xf32>, tensor<32xf32>) attributes {hal.executable.target = #executable_target_vmvx_bytecode_fb} {
   %c2 = arith.constant 2 : index
