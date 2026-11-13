@@ -856,6 +856,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-inner-tiled"
+    "--iree-llvmcpu-vscale-range=8,8"
   TARGET_CPU_FEATURES_VARIANTS
     "riscv_64:rvv:+m,+v,+zvl512b,+zvfbfwma"
 )

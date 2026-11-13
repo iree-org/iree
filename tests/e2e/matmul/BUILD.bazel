@@ -381,6 +381,8 @@ iree_generated_e2e_runner_test(
     compiler_flags = [
         "--iree-opt-data-tiling",
         "--iree-llvmcpu-enable-inner-tiled",
+        # Fixed vscale matches +zvl512b. An open range spills the f32 accumulator group.
+        "--iree-llvmcpu-vscale-range=8,8",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [

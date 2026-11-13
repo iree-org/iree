@@ -1017,21 +1017,23 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[VL:.+]] = arith.constant 32 : i64
 //       CHECK:   %[[FRM:.+]] = arith.constant 7 : i64
 //       CHECK:   ub.poison : vector<[8]xf32>
-//       CHECK:   util.hoistable_conversion "data_tiled_acc_distribute"
+//       CHECK:   %[[ACC:.+]] = util.hoistable_conversion "data_tiled_acc_distribute" inverts("data_tiled_acc_reassemble")
 //   CHECK-NOT:   arith.extf
 //       CHECK:     vector.scalable.insert {{.*}} : vector<32xf32> into vector<[8]xf32>
-//       CHECK:   vector.extract {{.*}} : bf16 from vector<{{1x1|1}}xbf16>
+//       CHECK:   %[[SCALAR:.+]] = vector.extract {{.*}} : bf16 from vector<{{1x1|1}}xbf16>
 //   CHECK-NOT:   arith.extf
 //   CHECK-NOT:   vector.broadcast {{.*}} : bf16 to vector<[8]xbf16>
-//       CHECK:   vector.scalable.insert {{.*}} : vector<32xbf16> into vector<[8]xbf16>
+//       CHECK:   %[[VEC:.+]] = vector.scalable.insert {{.*}} : vector<32xbf16> into vector<[8]xbf16>
 //   CHECK-NOT:   arith.extf
 //   CHECK-NOT:   vector.scalable.insert
 //   CHECK-NOT:   vector.scalable.extract
-//       CHECK:   llvm.call_intrinsic "llvm.riscv.vfwmaccbf16"({{.*}}, %[[FRM]], %[[VL]], %[[POL]]) : (vector<[8]xf32>, bf16, vector<[8]xbf16>, i64, i64, i64) -> vector<[8]xf32>
+//       CHECK:   %[[RES:.+]] = llvm.call_intrinsic "llvm.riscv.vfwmaccbf16"(%[[ACC]], %[[SCALAR]], %[[VEC]], %[[FRM]], %[[VL]], %[[POL]]) : (vector<[8]xf32>, bf16, vector<[8]xbf16>, i64, i64, i64) -> vector<[8]xf32>
 //   CHECK-NOT:   vector.scalable.insert
 //   CHECK-NOT:   vector.scalable.extract
-//       CHECK:   util.hoistable_conversion "data_tiled_acc_reassemble"
+//       CHECK:   %[[OUT:.+]] = util.hoistable_conversion "data_tiled_acc_reassemble" inverts("data_tiled_acc_distribute")
+//  CHECK-SAME:     (%{{.*}} = %[[RES]])
 //       CHECK:     vector.scalable.extract {{.*}} : vector<32xf32> from vector<[8]xf32>
+//       CHECK:   return %[[OUT]]
 
 // -----
 
@@ -1070,17 +1072,19 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[VL:.+]] = arith.constant 16 : i64
 //       CHECK:   %[[FRM:.+]] = arith.constant 7 : i64
 //       CHECK:   ub.poison : vector<[8]xf32>
-//       CHECK:   util.hoistable_conversion "data_tiled_acc_distribute"
+//       CHECK:   %[[ACC:.+]] = util.hoistable_conversion "data_tiled_acc_distribute" inverts("data_tiled_acc_reassemble")
 //   CHECK-NOT:   arith.extf
 //       CHECK:     vector.scalable.insert {{.*}} : vector<16xf32> into vector<[8]xf32>
-//       CHECK:   vector.extract {{.*}} : bf16 from vector<{{1x1|1}}xbf16>
+//       CHECK:   %[[SCALAR:.+]] = vector.extract {{.*}} : bf16 from vector<{{1x1|1}}xbf16>
 //   CHECK-NOT:   arith.extf
 //   CHECK-NOT:   vector.broadcast {{.*}} : bf16 to vector<[8]xbf16>
-//       CHECK:   vector.scalable.insert {{.*}} : vector<16xbf16> into vector<[8]xbf16>
+//       CHECK:   %[[VEC:.+]] = vector.scalable.insert {{.*}} : vector<16xbf16> into vector<[8]xbf16>
 //   CHECK-NOT:   arith.extf
-//       CHECK:   llvm.call_intrinsic "llvm.riscv.vfwmaccbf16"({{.*}}, %[[FRM]], %[[VL]], %[[POL]]) : (vector<[8]xf32>, bf16, vector<[8]xbf16>, i64, i64, i64) -> vector<[8]xf32>
-//       CHECK:   util.hoistable_conversion "data_tiled_acc_reassemble"
+//       CHECK:   %[[RES:.+]] = llvm.call_intrinsic "llvm.riscv.vfwmaccbf16"(%[[ACC]], %[[SCALAR]], %[[VEC]], %[[FRM]], %[[VL]], %[[POL]]) : (vector<[8]xf32>, bf16, vector<[8]xbf16>, i64, i64, i64) -> vector<[8]xf32>
+//       CHECK:   %[[OUT:.+]] = util.hoistable_conversion "data_tiled_acc_reassemble" inverts("data_tiled_acc_distribute")
+//  CHECK-SAME:     (%{{.*}} = %[[RES]])
 //       CHECK:     vector.scalable.extract {{.*}} : vector<16xf32> from vector<[8]xf32>
+//       CHECK:   return %[[OUT]]
 
 // -----
 
@@ -1118,14 +1122,16 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[POL:.+]] = arith.constant 1 : i64
 //       CHECK:   %[[VL:.+]] = arith.constant 32 : i64
 //       CHECK:   %[[FRM:.+]] = arith.constant 7 : i64
-//       CHECK:   util.hoistable_conversion "data_tiled_acc_distribute"
+//       CHECK:   %[[ACC:.+]] = util.hoistable_conversion "data_tiled_acc_distribute" inverts("data_tiled_acc_reassemble")
 //   CHECK-NOT:   arith.extf
 //       CHECK:     vector.scalable.insert {{.*}} : vector<32xf32> into vector<[8]xf32>
-//       CHECK:   vector.extract {{.*}} : bf16 from vector<{{1x1|1}}xbf16>
+//       CHECK:   %[[SCALAR:.+]] = vector.extract {{.*}} : bf16 from vector<{{1x1|1}}xbf16>
 //   CHECK-NOT:   arith.extf
 //   CHECK-NOT:   vector.broadcast {{.*}} : bf16 to vector<[8]xbf16>
-//       CHECK:   vector.scalable.insert {{.*}} : vector<32xbf16> into vector<[8]xbf16>
+//       CHECK:   %[[VEC:.+]] = vector.scalable.insert {{.*}} : vector<32xbf16> into vector<[8]xbf16>
 //   CHECK-NOT:   arith.extf
-//       CHECK:   llvm.call_intrinsic "llvm.riscv.vfwmaccbf16"({{.*}}, %[[FRM]], %[[VL]], %[[POL]]) : (vector<[8]xf32>, bf16, vector<[8]xbf16>, i64, i64, i64) -> vector<[8]xf32>
-//       CHECK:   util.hoistable_conversion "data_tiled_acc_reassemble"
+//       CHECK:   %[[RES:.+]] = llvm.call_intrinsic "llvm.riscv.vfwmaccbf16"(%[[ACC]], %[[SCALAR]], %[[VEC]], %[[FRM]], %[[VL]], %[[POL]]) : (vector<[8]xf32>, bf16, vector<[8]xbf16>, i64, i64, i64) -> vector<[8]xf32>
+//       CHECK:   %[[OUT:.+]] = util.hoistable_conversion "data_tiled_acc_reassemble" inverts("data_tiled_acc_distribute")
+//  CHECK-SAME:     (%{{.*}} = %[[RES]])
 //       CHECK:     vector.scalable.extract {{.*}} : vector<32xf32> from vector<[8]xf32>
+//       CHECK:   return %[[OUT]]
