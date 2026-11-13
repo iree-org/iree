@@ -2,10 +2,10 @@
 #   * main-dist-linux (CMake 'install')
 #   * py-compiler-pkg (`iree-base-compiler` Python package)
 #     * Linux, macOS, Windows
-#     * All supported Python versions (e.g. 3.10, 3.11)
+#     * All supported Python versions (e.g. 3.11, 3.12)
 #   * py-runtime-pkg (`iree-base-runtime` Python package)
 #     * Linux, macOS, Windows
-#     * All supported Python versions (e.g. 3.10, 3.11)
+#     * All supported Python versions (e.g. 3.11, 3.12)
 #   * py-tf-compiler-tools-pkg (`iree-tools-[tf, tflite]`, pure Python packages)
 
 name: Build Release Packages
@@ -241,7 +241,7 @@ jobs:
           docker run --rm -w=/work \
             -v $PWD:/work \
             "${MANYLINUX_X86_64_IMAGE}" \
-            bash -c 'export PATH=/opt/python/cp310-cp310/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
+            bash -c 'export PATH=/opt/python/cp311-cp311/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
 
       - name: Main distribution (Linux for Arm64)
         if: "matrix.build-package == 'main-dist-linux' && matrix.build-family == 'linux-aarch64'"
@@ -250,7 +250,7 @@ jobs:
           docker run --rm -w=/work \
             -v $PWD:/work \
             "${MANYLINUX_AARCH64_IMAGE}" \
-            bash -c 'export PATH=/opt/python/cp310-cp310/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
+            bash -c 'export PATH=/opt/python/cp311-cp311/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
 
       ##########################################################################
       # py-runtime-pkg
@@ -350,7 +350,7 @@ jobs:
           docker run --rm -w=/work \
             -v $PWD:/work \
             "${MANYLINUX_X86_64_IMAGE}" \
-            bash -c 'export PATH=/opt/python/cp310-cp310/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
+            bash -c 'export PATH=/opt/python/cp311-cp311/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
