@@ -87,16 +87,11 @@ static bool inlineConstantGlobalStores(GlobalTable &globalTable) {
       return GlobalAction::PRESERVE;
     }
 
-    // Check if the constant value type is compatible with the global type.
-    // util.buffer.constant operations have tensor-typed attributes but produce
-    // !util.buffer results. We can't fold the tensor attribute into a buffer-
-    // typed global's initial_value.
-    if (auto typedAttr = dyn_cast<TypedAttr>(constantValue)) {
-      if (typedAttr.getType() != global.op.getGlobalType()) {
-        // Type mismatch - don't fold. The value will be stored in an
-        // initializer instead.
-        return GlobalAction::PRESERVE;
-      }
+    // Only matching typed attributes can be used as global initial values.
+    // Buffer constants may instead carry tensor or untyped composite attributes.
+    auto typedAttr = dyn_cast<TypedAttr>(constantValue);
+    if (!typedAttr || typedAttr.getType() != global.op.getGlobalType()) {
+      return GlobalAction::PRESERVE;
     }
 
     // Propagate constant into the initial value. Note that there may have been
