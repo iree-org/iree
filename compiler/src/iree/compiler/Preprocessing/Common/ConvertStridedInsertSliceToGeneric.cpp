@@ -79,6 +79,14 @@ public:
     auto srcTy = cast<RankedTensorType>(src.getType());
     auto destTy = cast<RankedTensorType>(dest.getType());
 
+    // The reassociation groups below are built from the destination and used to
+    // index the source, i.e. this assumes source dim i corresponds to dest dim
+    // i. A rank-reduced insert_slice source (unit slice dims dropped) breaks
+    // that assumption and would index the source out of bounds, so decline it.
+    if (srcTy.getRank() != destTy.getRank()) {
+      return failure();
+    }
+
     unsigned origRank = destTy.getRank();
     auto elemTy = destTy.getElementType();
     Location loc = op.getLoc();
