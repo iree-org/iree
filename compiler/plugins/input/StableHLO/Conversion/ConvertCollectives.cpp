@@ -913,7 +913,6 @@ struct CollectivePermuteOpConversion
     // rank to find which ids that rank should send to and recv from, or -1 for
     // no send/recv.
     DenseIntElementsAttr sourceTargetPairs = op.getSourceTargetPairs();
-    llvm::DenseMap<int64_t, int64_t> sendMap, recvMap;
     auto values = sourceTargetPairs.getValues<int64_t>();
     // Find the max rank so we can size our tables.
     int64_t maxRank = 0;

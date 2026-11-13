@@ -1585,7 +1585,7 @@ static void rewriteForallToLanes(RewriterBase &rewriter, scf::ForallOp forallOp,
   auto upperBounds = forallOp.getLoopUpperBounds();
   std::optional<IntegerAttr> upperBound;
   if (upperBounds && upperBounds->size() > 0) {
-    if (auto upperBoundAttr = (*upperBounds)[0].dyn_cast<Attribute>()) {
+    if (auto upperBoundAttr = dyn_cast<Attribute>((*upperBounds)[0])) {
       upperBound = dyn_cast<IntegerAttr>(upperBoundAttr);
     }
   }

@@ -378,7 +378,6 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
     }
     // Before erasing preferCloneToConsumers ops, re-materialize them in nested
     // regions that reference them.
-    DenseMap<Operation *, Operation *> rematerializedOps;
     for (auto *deadOp : deadOps) {
       auto streamableOp = dyn_cast<IREE::Stream::StreamableOpInterface>(deadOp);
       if (!streamableOp || !streamableOp.preferCloneToConsumers()) {

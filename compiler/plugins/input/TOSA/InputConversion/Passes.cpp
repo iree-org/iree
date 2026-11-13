@@ -65,9 +65,14 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   // signature validation rejects for spec version <= 1.0. Disable this,
   // matching upstream tosa-to-linalg pipeline.
   tosaValidationOptions.validateFunctionSignature = false;
+  // Validate here: upstream validates after TosaToLinalgNamed has already
+  // lowered elementwise ops to linalg.elementwise.
+  passManager.addPass(tosa::createTosaAttachTarget(tosaTargetOptions));
+  passManager.addPass(tosa::createTosaValidation(tosaValidationOptions));
   tosa::addTosaToLinalgPasses(passManager, TosaToLinalgOptions(),
-                              tosaToLinalgNamedOptions, tosaValidationOptions,
-                              tosaTargetOptions);
+                              tosaToLinalgNamedOptions,
+                              /*validationOptions=*/std::nullopt,
+                              /*attachTargetOptions=*/std::nullopt);
   passManager.addNestedPass<func::FuncOp>(
       iree_compiler::createConverti48Toi64Pass());
 
