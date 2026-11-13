@@ -117,9 +117,11 @@ struct SortOpConversion
           rewriter, loc, tensor::getMixedSizes(rewriter, loc, input),
           resultType.getElementType()));
     }
+    // Sorts coming from Torch rely on elements that compare equal keeping
+    // their input order, e.g. the lowest index comes first among equal values.
     auto sortOp = IREE::LinalgExt::SortOp::create(
         rewriter, loc, op.getResultTypes(), op.getOutputs(), outputs,
-        op.getDimensionAttr());
+        op.getDimension(), /*is_stable=*/true);
     rewriter.inlineRegionBefore(op.getRegion(), sortOp.getRegion(),
                                 sortOp.getRegion().begin());
     rewriter.replaceOp(op, sortOp->getResults());

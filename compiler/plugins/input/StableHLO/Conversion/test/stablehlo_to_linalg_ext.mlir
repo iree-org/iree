@@ -16,12 +16,27 @@ func.func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
 // CHECK:         %[[OUT:.+]] = tensor.empty() : tensor<128xi32>
 // CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
 // CHECK-SAME:      dimension(0)
+// CHECK-NOT:       is_stable
 // CHECK-SAME:      ins(%[[ARG0]] : tensor<128xi32>)
 // CHECK-SAME:      outs(%[[OUT]] : tensor<128xi32>)
 // CHECK:           ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
 // CHECK:             %[[CMP:.+]] = arith.cmpi sgt, %[[ARG1]], %[[ARG2]]
 // CHECK:             iree_linalg_ext.yield %[[CMP]]
 // CHECK:         return %[[SORT]]
+
+// -----
+
+// CHECK-LABEL: func.func @sort_1d_stable(
+func.func @sort_1d_stable(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
+  %0 = "stablehlo.sort"(%arg0) ( {
+  ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
+    %1 = "stablehlo.compare"(%arg2, %arg3) {comparison_direction = #stablehlo<comparison_direction GT>} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    "stablehlo.return"(%1) : (tensor<i1>) -> ()
+  }) {dimension = 0 : i64, is_stable = true} : (tensor<128xi32>) -> (tensor<128xi32>)
+  return %0 : tensor<128xi32>
+}
+// CHECK:         iree_linalg_ext.sort
+// CHECK-SAME:      dimension(0) is_stable(true)
 
 // -----
 

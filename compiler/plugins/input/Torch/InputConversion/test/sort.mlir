@@ -14,7 +14,7 @@ func.func @sort(%arg0: tensor<3x4xf32>, %arg1: tensor<3x4xi64>) -> (tensor<3x4xf
 // CHECK:        %[[EMPTY_INPUT:.+]] = tensor.empty() : tensor<3x4xf32>
 // CHECK:        %[[EMPTY_INDICES:.+]] = tensor.empty() : tensor<3x4xi64>
 // CHECK:        %[[SORT:.+]]:2 = iree_linalg_ext.sort
-// CHECK-SAME:     dimension(1)
+// CHECK-SAME:     dimension(1) is_stable(true)
 // CHECK-SAME:     ins(%[[INPUT]], %[[INDICES]] : tensor<3x4xf32>, tensor<3x4xi64>)
 // CHECK-SAME:     outs(%[[EMPTY_INPUT]], %[[EMPTY_INDICES]] : tensor<3x4xf32>, tensor<3x4xi64>) {
 // CHECK:        ^bb0(%[[INP1:.+]]: f32, %[[INP2:.+]]: f32, %{{.*}}: i64, %{{.*}}: i64):
