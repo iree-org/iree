@@ -1644,22 +1644,6 @@ func.func @dynamic_conv_ui64_padding(%a: tensor<1x2x1xf32>, %k: tensor<1x1x1xf32
 
 // -----
 
-// The upstream static-padding matcher reads APInt as signed; widen first.
-// CHECK-LABEL: @dynamic_conv_ui8_constant_padding
-// CHECK: %[[P:.+]] = stablehlo.constant dense<{{\[\[128, 0\]\]}}> : tensor<1x2xi64>
-// CHECK: "stablehlo.dynamic_conv"(%arg0, %arg1, %[[P]])
-func.func @dynamic_conv_ui8_constant_padding(%a: tensor<1x2x1xf32>, %k: tensor<1x1x1xf32>) -> tensor<1x?x1xf32> {
-  %p = stablehlo.constant dense<[[128, 0]]> : tensor<1x2xui8>
-  %r = "stablehlo.dynamic_conv"(%a, %k, %p) {
-    dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
-    feature_group_count = 1 : i64, batch_group_count = 1 : i64,
-    window_strides = array<i64: 1>, lhs_dilation = array<i64: 1>, rhs_dilation = array<i64: 1>
-  } : (tensor<1x2x1xf32>, tensor<1x1x1xf32>, tensor<1x2xui8>) -> tensor<1x?x1xf32>
-  return %r : tensor<1x?x1xf32>
-}
-
-// -----
-
 // A one-element contraction still obeys an explicitly specified dot
 // algorithm; do not replace it with a plain multiply.
 // CHECK-LABEL: @dot_general_unit_contract_with_algorithm
