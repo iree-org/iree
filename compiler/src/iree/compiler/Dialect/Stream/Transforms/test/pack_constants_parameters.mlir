@@ -4,8 +4,9 @@
 // parameter scope and key strings when converting NamedParameterAttr values to
 // cmd.parameter.load / cmd.parameter.gather ops.
 
-// Verifies a single named parameter with scope produces util.buffer.constant
-// ops for both scope and key, passed to stream.cmd.parameter.load.
+// Verifies a single named parameter subrange with scope produces
+// util.buffer.constant ops for both scope and key and preserves the configured
+// offset when passed to stream.cmd.parameter.load.
 
 // CHECK-LABEL: @parameterLoadScoped
 util.func public @parameterLoadScoped() -> (!stream.resource<constant>, !stream.timepoint) {
@@ -13,12 +14,15 @@ util.func public @parameterLoadScoped() -> (!stream.resource<constant>, !stream.
   // CHECK-DAG: %[[IMMEDIATE:.+]] = stream.timepoint.immediate
   // CHECK-DAG: %[[KEY:.+]] = util.buffer.constant : !util.buffer = "weights"
   // CHECK-DAG: %[[SCOPE:.+]] = util.buffer.constant : !util.buffer = "model"
+  // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 2048 : i64
   // CHECK: stream.cmd.parameter.load await(%[[IMMEDIATE]]) => {
-  // CHECK-NEXT:   %[[SCOPE]]::%[[KEY]]
+  // CHECK-NEXT:   %[[SCOPE]]::%[[KEY]][%[[OFFSET]]]
   // CHECK-SAME:     : !stream.resource<constant>
   // CHECK-NEXT: } =>
   %0:2 = stream.resource.constants :
-    !stream.resource<constant>{%c40} = #stream.parameter.named<"model"::"weights"> : tensor<10xf32>
+    !stream.resource<constant>{%c40} = #stream.parameter.named<"model"::"weights", {
+      offset = 2048 : i64, length = 40 : i64
+    }> : tensor<10xf32>
     => !stream.timepoint
   util.return %0#0, %0#1 : !stream.resource<constant>, !stream.timepoint
 }
