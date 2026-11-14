@@ -430,7 +430,7 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
       // by right-shifting the subnormal mantissa.
       int shift_amount = f32_mantissa_bits - dst_mantissa_bits -
                          arithmetic_exp + dst_arithmetic_exp;
-      if (shift_amount < 0 || shift_amount > f32_mantissa_bits) {
+      if (shift_amount < 0 || shift_amount > f32_mantissa_bits + 1) {
         dst_mantissa = 0;
       } else {
         // Source f32 value is normal so has an implied 1... leading bit.
@@ -467,12 +467,12 @@ static inline uint32_t iree_math_truncate_f32_to_bits_rounding_to_nearest_even(
       // case: the above if() branch already set biased_f32_mantissa=0, so we
       // will be generating a 0 mantissa, as needed for infinite values. The one
       // case where special handling is needed is when the destination type has
-      // no infinities and we need to generate NaN.
+      // no infinities and needs to saturate or generate NaN.
       dst_exp = (arithmetic_exp + dst_exp_bias) << dst_exp_shift;
       dst_mantissa =
           biased_f32_mantissa >> (f32_mantissa_bits - dst_mantissa_bits);
       if (!have_infinity && dst_exp > dst_exp_mask) {
-        generate_nan = true;
+        generate_inf = true;
       }
     }
   }

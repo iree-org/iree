@@ -210,6 +210,17 @@ static void CheckDenormals(
     std::function<UintType(float)> convert_f32_to_small,
     std::function<float(UintType)> convert_small_to_f32) {
   IREE_MATH_FP_FORMAT_CONSTANTS(small_, exp_bits, mantissa_bits, bias_tweak)
+  const float min_subnormal = convert_small_to_f32(1);
+  const float midpoint = min_subnormal / 2;
+  for (float value :
+       {std::nextafter(midpoint, 0.f), midpoint,
+        std::nextafter(midpoint, INFINITY), min_subnormal * 0.75f}) {
+    const UintType expected = value > midpoint ? 1 : 0;
+    EXPECT_EQ(expected, convert_f32_to_small(value)) << value;
+    EXPECT_EQ(expected || have_neg_zero ? expected | small_sign_mask : 0,
+              convert_f32_to_small(-value))
+        << -value;
+  }
   for (UintType m = 0; m <= small_mantissa_mask; ++m) {
     float value = std::ldexp(m, 1 - small_exp_bias - small_mantissa_bits);
     EXPECT_EQ(value, convert_small_to_f32(m));
@@ -826,6 +837,11 @@ TEST(F6E3M2FNConversionTest, F32ToF6E3M2FN) {
   // Extra large finite values thanks to not having infinities.
   EXPECT_EQ(0x1F, iree_math_f32_to_f6e3m2fn(kF6E3M2FNMax));
   EXPECT_EQ(0x3F, iree_math_f32_to_f6e3m2fn(-kF6E3M2FNMax));
+  for (float value :
+       {std::nextafter(30.f, 0.f), 30.f, std::nextafter(30.f, INFINITY)}) {
+    EXPECT_EQ(0x1F, iree_math_f32_to_f6e3m2fn(value));
+    EXPECT_EQ(0x3F, iree_math_f32_to_f6e3m2fn(-value));
+  }
   // Min normal values.
   EXPECT_EQ(0x04, iree_math_f32_to_f6e3m2fn(kF6E3M2FNMin));
   EXPECT_EQ(0x24, iree_math_f32_to_f6e3m2fn(-kF6E3M2FNMin));
@@ -914,6 +930,11 @@ TEST(F6E2M3FNConversionTest, F32ToF6E2M3FN) {
   // Extra large finite values thanks to not having infinities.
   EXPECT_EQ(0x1F, iree_math_f32_to_f6e2m3fn(kF6E2M3FNMax));
   EXPECT_EQ(0x3F, iree_math_f32_to_f6e2m3fn(-kF6E2M3FNMax));
+  for (float value :
+       {std::nextafter(7.75f, 0.f), 7.75f, std::nextafter(7.75f, INFINITY)}) {
+    EXPECT_EQ(0x1F, iree_math_f32_to_f6e2m3fn(value));
+    EXPECT_EQ(0x3F, iree_math_f32_to_f6e2m3fn(-value));
+  }
   // Min normal values.
   EXPECT_EQ(0x08, iree_math_f32_to_f6e2m3fn(kF6E2M3FNMin));
   EXPECT_EQ(0x28, iree_math_f32_to_f6e2m3fn(-kF6E2M3FNMin));
@@ -1002,6 +1023,11 @@ TEST(F4E2M1FNConversionTest, F32ToF4E2M1FN) {
   // Extra large finite values thanks to not having infinities.
   EXPECT_EQ(0x07, iree_math_f32_to_f4e2m1fn(kF4E2M1FNMax));
   EXPECT_EQ(0x0F, iree_math_f32_to_f4e2m1fn(-kF4E2M1FNMax));
+  for (float value :
+       {std::nextafter(7.f, 0.f), 7.f, std::nextafter(7.f, INFINITY)}) {
+    EXPECT_EQ(0x07, iree_math_f32_to_f4e2m1fn(value));
+    EXPECT_EQ(0x0F, iree_math_f32_to_f4e2m1fn(-value));
+  }
   // Min normal values.
   EXPECT_EQ(0x02, iree_math_f32_to_f4e2m1fn(kF4E2M1FNMin));
   EXPECT_EQ(0x0A, iree_math_f32_to_f4e2m1fn(-kF4E2M1FNMin));
