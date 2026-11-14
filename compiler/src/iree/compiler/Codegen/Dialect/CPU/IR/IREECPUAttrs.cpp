@@ -1367,9 +1367,9 @@ static LogicalResult lowerGenericScalarToVectorContract(
   return success();
 }
 
-LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
+LogicalResult DataTiledMMAAttr::buildUnderlyingOperationsWithOptions(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
-    SmallVectorImpl<Value> &results) const {
+    SmallVectorImpl<Value> &results, bool skipIntermediateRoundings) const {
   SmallVector<VectorType> regTypes;
   getDistributedTileTypes(regTypes);
   if (inputs.size() != 2 || outputs.size() != 1 ||
@@ -1411,9 +1411,6 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
         intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32;
     auto legalizeAcc = [widenF16Acc](OpBuilder &b, Location loc,
                                      Value v) -> Value {
-      // Zvfhmin has no f16 MAC. This pair is lossy (extf(truncf(x)) != x):
-      // hoisting keeps the acc in f32 across K and skips per-K f16 rounding.
-      // TODO(#25058): honor --iree-llvmcpu-skip-intermediate-roundings=false.
       if (widenF16Acc) {
         Type f32 = b.getF32Type();
         auto vt = cast<VectorType>(v.getType());
@@ -1432,6 +1429,27 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
       }
       return v;
     };
+    // Zvfhmin has no f16 MAC, so the accumulator is widened to f32 for the
+    // intrinsic and truncated back to f16 for the next K iteration. That pair
+    // is lossy (extf(truncf(x)) != x). When intermediate roundings must be
+    // kept, materialize the pair around every intrinsic here so it stays in
+    // the reduction loop instead of being hoisted out through the otherwise
+    // invertible accumulator distribute/reassemble conversions.
+    bool applyIntermediateRoundings = widenF16Acc && !skipIntermediateRoundings;
+    auto emitRoundedIntrinsic = [&](OpBuilder &b, Location loc, Value lhs,
+                                    Value rhs, Value acc) -> Value {
+      Value widenedAcc = legalizeAcc(b, loc, acc);
+      Value newAcc = emitIntrinsic(b, loc, lhs, rhs, widenedAcc);
+      return restoreAcc(b, loc, newAcc);
+    };
+    if (applyIntermediateRoundings) {
+      return Codegen::buildDataTiledMMAUnderlyingOperations(
+          builder, loc, getSwizzle(*this, /*operandIdx=*/0),
+          getSwizzle(*this, /*operandIdx=*/1),
+          getSwizzle(*this, /*operandIdx=*/2), getIntrinsicsM(),
+          getIntrinsicsN(), getIntrinsicsK(), inputs, outputs,
+          emitRoundedIntrinsic, results);
+    }
     return Codegen::buildDataTiledMMAUnderlyingOperations(
         builder, loc, getSwizzle(*this, /*operandIdx=*/0),
         getSwizzle(*this, /*operandIdx=*/1),
