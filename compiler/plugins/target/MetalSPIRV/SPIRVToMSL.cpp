@@ -49,15 +49,8 @@ public:
   // these additions for SPIRV-Cross's invariant-add helper. The global
   // invariant-math option also rewrites multiplication using an added +0.
   void preservePositiveZeroAdditions() {
-    auto isPositiveZero = [this](uint32_t id) {
-      auto *constant = maybe_get<SPIRV_CROSS_NAMESPACE::SPIRConstant>(id);
-      // FAdd operands are floating point. A null constant has all-zero bits;
-      // negative zero is non-null, and specialization constants are declined.
-      return constant && constant->constant_is_null();
-    };
     ir.for_each_typed_id<SPIRV_CROSS_NAMESPACE::SPIRBlock>(
-        [this, &isPositiveZero](uint32_t,
-                                SPIRV_CROSS_NAMESPACE::SPIRBlock &block) {
+        [this](uint32_t, SPIRV_CROSS_NAMESPACE::SPIRBlock &block) {
           for (const auto &instruction : block.ops) {
             if (instruction.op != spv::OpFAdd) {
               continue;
@@ -67,11 +60,20 @@ public:
             uint32_t resultId = operands[1];
             uint32_t lhsId = operands[2];
             uint32_t rhsId = operands[3];
-            if (isPositiveZero(lhsId) || isPositiveZero(rhsId)) {
+            if (isPositiveZeroConstant(lhsId) ||
+                isPositiveZeroConstant(rhsId)) {
               set_decoration(resultId, spv::DecorationNoContraction);
             }
           }
         });
+  }
+
+  // Returns whether `id` names a +0 constant. FAdd operands are floating
+  // point. A null constant has all-zero bits; negative zero is non-null, and
+  // specialization constants are declined.
+  bool isPositiveZeroConstant(uint32_t id) const {
+    const auto *constant = maybe_get<SPIRV_CROSS_NAMESPACE::SPIRConstant>(id);
+    return constant && constant->constant_is_null();
   }
 
   MetalShader::ThreadGroupSize
