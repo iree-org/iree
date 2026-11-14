@@ -227,14 +227,41 @@ func.func @scatter_update_scalar_1D(
 // CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0_I64:.+]] = arith.constant 0 : i64
+// CHECK-DAG:     %[[C8_I64:.+]] = arith.constant 8 : i64
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {
 // CHECK:           %[[T1:.+]] = memref.load %[[UPDATES]][%[[I]]] : memref<3xi32>
 // CHECK:           %[[T2:.+]] =  memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<3x1xi32>
-// CHECK:           %[[IDX:.+]] = arith.index_cast %[[T2]] : i32 to index
-// CHECK:           memref.store %[[T1]], %[[ORIGINAL]][%[[IDX]]]
+// CHECK:           %[[IDX64:.+]] = arith.extsi %[[T2]] : i32 to i64
+// CHECK:           %[[LOWER_OK:.+]] = arith.cmpi sge, %[[IDX64]], %[[C0_I64]] : i64
+// CHECK:           %[[UPPER_OK:.+]] = arith.cmpi slt, %[[IDX64]], %[[C8_I64]] : i64
+// CHECK:           %[[IN_BOUNDS:.+]] = arith.andi %[[LOWER_OK]], %[[UPPER_OK]] : i1
+// CHECK:           scf.if %[[IN_BOUNDS]] {
+// CHECK:             %[[IDX:.+]] = arith.index_cast %[[IDX64]] : i64 to index
+// CHECK:             memref.store %[[T1]], %[[ORIGINAL]][%[[IDX]]]
+
+// -----
+
+func.func @scatter_update_scalar_i128_indices(
+    %original: memref<8xi32>, %indices: memref<3x1xi128>,
+    %updates: memref<3xi32>) {
+  iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%updates, %indices : memref<3xi32>, memref<3x1xi128>)
+    outs(%original : memref<8xi32>)  {
+  ^bb0(%arg0: i32, %arg1: i32):
+    iree_linalg_ext.yield %arg0 : i32
+  }
+  return
+}
+// CHECK-LABEL: func.func @scatter_update_scalar_i128_indices
+// CHECK:           %[[IDX128:.+]] = memref.load %{{.+}} : memref<3x1xi128>
+// CHECK:           arith.cmpi sge, %[[IDX128]], %{{.+}} : i128
+// CHECK:           arith.cmpi slt, %[[IDX128]], %{{.+}} : i128
+// CHECK:           scf.if
+// CHECK:             arith.index_cast %[[IDX128]] : i128 to index
 
 // -----
 
@@ -255,14 +282,21 @@ func.func @scatter_update_scalar_1D_masked(
 // CHECK-SAME:    %[[MASK:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C0_I64:.+]] = arith.constant 0 : i64
+// CHECK-DAG:     %[[C8_I64:.+]] = arith.constant 8 : i64
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {
 // CHECK:           %[[T1:.+]] = memref.load %[[UPDATES]][%[[I]]] : memref<3xi32>
 // CHECK:           %[[T2:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<3x1xi32>
-// CHECK:           %[[IDX:.+]] = arith.index_cast %[[T2]] : i32 to index
+// CHECK:           %[[IDX64:.+]] = arith.extsi %[[T2]] : i32 to i64
+// CHECK:           %[[LOWER_OK:.+]] = arith.cmpi sge, %[[IDX64]], %[[C0_I64]] : i64
+// CHECK:           %[[UPPER_OK:.+]] = arith.cmpi slt, %[[IDX64]], %[[C8_I64]] : i64
+// CHECK:           %[[BOUNDS_OK:.+]] = arith.andi %[[LOWER_OK]], %[[UPPER_OK]] : i1
 // CHECK:           %[[MASK_VAL:.+]] = memref.load %[[MASK]][%[[I]]] : memref<3xi1>
-// CHECK:           scf.if %[[MASK_VAL]] {
+// CHECK:           %[[IN_BOUNDS:.+]] = arith.andi %[[BOUNDS_OK]], %[[MASK_VAL]] : i1
+// CHECK:           scf.if %[[IN_BOUNDS]] {
+// CHECK:             %[[IDX:.+]] = arith.index_cast %[[IDX64]] : i64 to index
 // CHECK:             memref.store %[[T1]], %[[ORIGINAL]][%[[IDX]]]
 
 // -----
@@ -280,9 +314,14 @@ func.func @scatter_update_scalar_1D_masked_i8(
 }
 // CHECK-LABEL: func.func @scatter_update_scalar_1D_masked_i8
 // CHECK:         scf.for
+// CHECK:           %[[IDX64:.+]] = arith.extsi %{{.+}} : i32 to i64
+// CHECK:           arith.cmpi sge, %[[IDX64]], %{{.+}} : i64
+// CHECK:           arith.cmpi slt, %[[IDX64]], %{{.+}} : i64
 // CHECK:           %[[MASK_VAL:.+]] = memref.load %{{.+}}[%{{.+}}] : memref<3xi8>
 // CHECK:           %[[MASK_I1:.+]] = arith.trunci %[[MASK_VAL]] : i8 to i1
-// CHECK:           scf.if %[[MASK_I1]] {
+// CHECK:           %[[IN_BOUNDS:.+]] = arith.andi %{{.+}}, %[[MASK_I1]] : i1
+// CHECK:           scf.if %[[IN_BOUNDS]] {
+// CHECK:             arith.index_cast %[[IDX64]] : i64 to index
 
 // -----
 
@@ -301,6 +340,8 @@ func.func @scatter_batch_2D(
 // CHECK-SAME:    %[[ORIGINAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0_I64:.+]] = arith.constant 0 : i64
+// CHECK-DAG:     %[[C8_I64:.+]] = arith.constant 8 : i64
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
@@ -308,8 +349,12 @@ func.func @scatter_batch_2D(
 // CHECK:           scf.for %[[I1:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {
 // CHECK:             %[[T1:.+]] = memref.load %[[UPDATES]][%[[I0]], %[[I1]]] : memref<1x3xi32>
 // CHECK:             %[[T2:.+]] =  memref.load %[[INDICES]][%[[I0]], %[[I1]], %[[C0]]] : memref<1x3x1xi32>
-// CHECK:             %[[IDX:.+]] = arith.index_cast %[[T2]] : i32 to index
-// CHECK:             memref.store %[[T1]], %[[ORIGINAL]][%[[IDX]]]
+// CHECK:             %[[IDX64:.+]] = arith.extsi %[[T2]] : i32 to i64
+// CHECK:             arith.cmpi sge, %[[IDX64]], %[[C0_I64]] : i64
+// CHECK:             arith.cmpi slt, %[[IDX64]], %[[C8_I64]] : i64
+// CHECK:             scf.if
+// CHECK:               %[[IDX:.+]] = arith.index_cast %[[IDX64]] : i64 to index
+// CHECK:               memref.store %[[T1]], %[[ORIGINAL]][%[[IDX]]]
 
 // -----
 
@@ -335,10 +380,17 @@ func.func @scatter_add_scalar_2D(
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {
 // CHECK:           %[[T1:.+]] = memref.load %[[UPDATES]][%[[I]]] : memref<3xi32>
 // CHECK:           %[[T2:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<3x2xi32>
-// CHECK:           %[[IDX1:.+]] = arith.index_cast %[[T2]] : i32 to index
+// CHECK:           %[[IDX1_64:.+]] = arith.extsi %[[T2]] : i32 to i64
 // CHECK:           %[[T3:.+]] = memref.load %[[INDICES]][%[[I]], %[[C1]]] : memref<3x2xi32>
-// CHECK:           %[[IDX2:.+]] = arith.index_cast %[[T3]] : i32 to index
-// CHECK:           %[[ORI:.+]] = memref.load %[[ORIGINAL]][%[[IDX1]], %[[IDX2]]] : memref<4x3xi32>
+// CHECK:           %[[IDX2_64:.+]] = arith.extsi %[[T3]] : i32 to i64
+// CHECK:           arith.cmpi sge, %[[IDX1_64]], %{{.+}} : i64
+// CHECK:           arith.cmpi slt, %[[IDX1_64]], %{{.+}} : i64
+// CHECK:           arith.cmpi sge, %[[IDX2_64]], %{{.+}} : i64
+// CHECK:           arith.cmpi slt, %[[IDX2_64]], %{{.+}} : i64
+// CHECK:           scf.if
+// CHECK:             %[[IDX1:.+]] = arith.index_cast %[[IDX1_64]] : i64 to index
+// CHECK:             %[[IDX2:.+]] = arith.index_cast %[[IDX2_64]] : i64 to index
+// CHECK:             %[[ORI:.+]] = memref.load %[[ORIGINAL]][%[[IDX1]], %[[IDX2]]] : memref<4x3xi32>
 // CHECK:           %[[ADD:.+]] = arith.addi %[[ORI]], %[[T1]] : i32
 // CHECK:           memref.store %[[ADD]], %[[ORIGINAL]][%[[IDX1]], %[[IDX2]]]
 
@@ -360,6 +412,7 @@ func.func @scatter_update_slice_2D(
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C0_I64:.+]] = arith.constant 0 : i64
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
 // CHECK-DAG:     %[[C3:.+]] = arith.constant 3 : index
@@ -367,8 +420,12 @@ func.func @scatter_update_slice_2D(
 // CHECK:           scf.for %[[J:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {
 // CHECK:             %[[UPDATE:.+]] = memref.load %[[UPDATES]][%[[I]], %[[J]]]
 // CHECK:             %[[INDEX:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]]
-// CHECK:             %[[LOC:.+]] = arith.index_cast %[[INDEX]] : i32 to index
-// CHECK:             memref.store %[[UPDATE]], %[[ORIGINAL]][%[[LOC]], %[[J]]]
+// CHECK:             %[[INDEX64:.+]] = arith.extsi %[[INDEX]] : i32 to i64
+// CHECK:             arith.cmpi sge, %[[INDEX64]], %{{.+}} : i64
+// CHECK:             arith.cmpi slt, %[[INDEX64]], %{{.+}} : i64
+// CHECK:             scf.if
+// CHECK:               %[[LOC:.+]] = arith.index_cast %[[INDEX64]] : i64 to index
+// CHECK:               memref.store %[[UPDATE]], %[[ORIGINAL]][%[[LOC]], %[[J]]]
 // CHECK:           }
 // CHECK:         }
 
@@ -396,8 +453,12 @@ func.func @scatter_add_scalar_1D(
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {
 // CHECK:           %[[T1:.+]] = memref.load %[[UPDATES]][%[[I]]] : memref<3xi32>
 // CHECK:           %[[T2:.+]] =  memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<3x1xi32>
-// CHECK:           %[[IDX:.+]] = arith.index_cast %[[T2]] : i32 to index
-// CHECK:           %[[ORI:.+]] = memref.load %[[ORIGINAL]][%[[IDX]]] : memref<8xi32>
+// CHECK:           %[[IDX64:.+]] = arith.extsi %[[T2]] : i32 to i64
+// CHECK:           arith.cmpi sge, %[[IDX64]], %{{.+}} : i64
+// CHECK:           arith.cmpi slt, %[[IDX64]], %{{.+}} : i64
+// CHECK:           scf.if
+// CHECK:             %[[IDX:.+]] = arith.index_cast %[[IDX64]] : i64 to index
+// CHECK:             %[[ORI:.+]] = memref.load %[[ORIGINAL]][%[[IDX]]] : memref<8xi32>
 // CHECK:           %[[ADD:.+]] = arith.addi %[[ORI]], %[[T1]] : i32
 // CHECK:           memref.store %[[ADD]], %[[ORIGINAL]][%[[IDX]]]
 
@@ -426,8 +487,12 @@ func.func @scatter_add_slice_2D(
 // CHECK:           scf.for %[[J:.+]] = %[[C0]] to %[[C3]] step %[[C1]] {
 // CHECK:             %[[UPDATEVAL:.+]] = memref.load %[[UPDATES]][%[[I]], %[[J]]]
 // CHECK:             %[[INDEXVAL:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]]
-// CHECK:             %[[INDEX:.+]] = arith.index_cast %[[INDEXVAL]] : i32 to index
-// CHECK:             %[[ORIGINALVAL:.+]] = memref.load %[[ORIGINAL]][%[[INDEX]], %[[J]]]
+// CHECK:             %[[INDEX64:.+]] = arith.extsi %[[INDEXVAL]] : i32 to i64
+// CHECK:             arith.cmpi sge, %[[INDEX64]], %{{.+}} : i64
+// CHECK:             arith.cmpi slt, %[[INDEX64]], %{{.+}} : i64
+// CHECK:             scf.if
+// CHECK:               %[[INDEX:.+]] = arith.index_cast %[[INDEX64]] : i64 to index
+// CHECK:               %[[ORIGINALVAL:.+]] = memref.load %[[ORIGINAL]][%[[INDEX]], %[[J]]]
 // CHECK:             %[[STOREVAL:.+]] = arith.addi %[[ORIGINALVAL]], %[[UPDATEVAL]]
 // CHECK:             memref.store %[[STOREVAL]], %[[ORIGINAL]][%[[INDEX]], %[[J]]]
 
@@ -451,11 +516,18 @@ func.func @scatter_update_scalar_dynamic_1D(
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[UB:.+]] = memref.dim %[[UPDATES]], %[[C0]] : memref<?xi32>
+// CHECK-DAG:     %[[C0_I64:.+]] = arith.constant 0 : i64
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[UB]] step %[[C1]] {
 // CHECK:           %[[T1:.+]] = memref.load %[[UPDATES]][%[[I]]] : memref<?xi32>
 // CHECK:           %[[T2:.+]] =  memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<?x1xi32>
-// CHECK:           %[[IDX:.+]] = arith.index_cast %[[T2]] : i32 to index
-// CHECK:           memref.store %[[T1]], %[[ORIGINAL]][%[[IDX]]]
+// CHECK:           %[[IDX64:.+]] = arith.extsi %[[T2]] : i32 to i64
+// CHECK:           %[[DIM:.+]] = memref.dim %[[ORIGINAL]], %[[C0]] : memref<?xi32>
+// CHECK:           %[[DIM64:.+]] = arith.index_cast %[[DIM]] : index to i64
+// CHECK:           arith.cmpi sge, %[[IDX64]], %[[C0_I64]] : i64
+// CHECK:           arith.cmpi slt, %[[IDX64]], %[[DIM64]] : i64
+// CHECK:           scf.if
+// CHECK:             %[[IDX:.+]] = arith.index_cast %[[IDX64]] : i64 to index
+// CHECK:             memref.store %[[T1]], %[[ORIGINAL]][%[[IDX]]]
 
 // -----
 
@@ -478,15 +550,23 @@ func.func @scatter_add_scalar_dynamic_2D(
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[UB:.+]] = memref.dim %[[UPDATES]], %[[C0]] : memref<?xi32>
+// CHECK-DAG:     %[[C0_I64:.+]] = arith.constant 0 : i64
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[UB]] step %[[C1]] {
 // CHECK:           %[[T1:.+]] = memref.load %[[UPDATES]][%[[I]]] : memref<?xi32>
 // CHECK:           %[[T2:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]] : memref<?x2xi32>
-// CHECK:           %[[IDX1:.+]] = arith.index_cast %[[T2]] : i32 to index
+// CHECK:           %[[IDX1_64:.+]] = arith.extsi %[[T2]] : i32 to i64
 // CHECK:           %[[T3:.+]] = memref.load %[[INDICES]][%[[I]], %[[C1]]] : memref<?x2xi32>
-// CHECK:           %[[IDX2:.+]] = arith.index_cast %[[T3]] : i32 to index
-// CHECK:           %[[ORI:.+]] = memref.load %[[ORIGINAL]][%[[IDX1]], %[[IDX2]]] : memref<?x?xi32>
-// CHECK:           %[[ADD:.+]] = arith.addi %[[ORI]], %[[T1]] : i32
-// CHECK:           memref.store %[[ADD]], %[[ORIGINAL]][%[[IDX1]], %[[IDX2]]]
+// CHECK:           %[[IDX2_64:.+]] = arith.extsi %[[T3]] : i32 to i64
+// CHECK:           arith.cmpi sge, %[[IDX1_64]], %[[C0_I64]] : i64
+// CHECK:           arith.cmpi slt, %[[IDX1_64]], %{{.+}} : i64
+// CHECK:           arith.cmpi sge, %[[IDX2_64]], %[[C0_I64]] : i64
+// CHECK:           arith.cmpi slt, %[[IDX2_64]], %{{.+}} : i64
+// CHECK:           scf.if
+// CHECK:             %[[IDX1:.+]] = arith.index_cast %[[IDX1_64]] : i64 to index
+// CHECK:             %[[IDX2:.+]] = arith.index_cast %[[IDX2_64]] : i64 to index
+// CHECK:             %[[ORI:.+]] = memref.load %[[ORIGINAL]][%[[IDX1]], %[[IDX2]]] : memref<?x?xi32>
+// CHECK:             %[[ADD:.+]] = arith.addi %[[ORI]], %[[T1]] : i32
+// CHECK:             memref.store %[[ADD]], %[[ORIGINAL]][%[[IDX1]], %[[IDX2]]]
 
 // -----
 
@@ -506,6 +586,7 @@ func.func @scatter_update_slice_dynamic_2D(
 // CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C0_I64:.+]] = arith.constant 0 : i64
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[UB1:.+]] = memref.dim %[[UPDATES]], %[[C0]] : memref<?x?xi32>
 // CHECK-DAG:     %[[UB2:.+]] = memref.dim %[[UPDATES]], %[[C1]] : memref<?x?xi32>
@@ -513,8 +594,18 @@ func.func @scatter_update_slice_dynamic_2D(
 // CHECK:           scf.for %[[J:.+]] = %[[C0]] to %[[UB2]] step %[[C1]] {
 // CHECK:             %[[UPDATEVAL:.+]] = memref.load %[[UPDATES]][%[[I]], %[[J]]]
 // CHECK:             %[[INDEXVAL:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]]
-// CHECK:             %[[INDEX:.+]] = arith.index_cast %[[INDEXVAL]] : i32 to index
-// CHECK:             memref.store %[[UPDATEVAL]], %[[ORIGINAL]][%[[INDEX]], %[[J]]]
+// CHECK:             %[[INDEX64:.+]] = arith.extsi %[[INDEXVAL]] : i32 to i64
+// CHECK:             %[[INDEX_BOUND:.+]] = memref.dim %[[ORIGINAL]], %[[C0]] : memref<?x?xi32>
+// CHECK:             %[[INDEX_BOUND64:.+]] = arith.index_cast %[[INDEX_BOUND]] : index to i64
+// CHECK:             arith.cmpi sge, %[[INDEX64]], %[[C0_I64]] : i64
+// CHECK:             arith.cmpi slt, %[[INDEX64]], %[[INDEX_BOUND64]] : i64
+// CHECK:             %[[WINDOW_BOUND:.+]] = memref.dim %[[ORIGINAL]], %[[C1]] : memref<?x?xi32>
+// CHECK:             %[[WINDOW_BOUND64:.+]] = arith.index_cast %[[WINDOW_BOUND]] : index to i64
+// CHECK:             arith.cmpi sge, %{{.+}}, %[[C0_I64]] : i64
+// CHECK:             arith.cmpi slt, %{{.+}}, %[[WINDOW_BOUND64]] : i64
+// CHECK:             scf.if
+// CHECK:               %[[INDEX:.+]] = arith.index_cast %[[INDEX64]] : i64 to index
+// CHECK:               memref.store %[[UPDATEVAL]], %[[ORIGINAL]][%[[INDEX]], %[[J]]]
 
 // -----
 
@@ -1607,3 +1698,48 @@ func.func @map_load_memref(
 //      CHECK:       scf.yield %[[PAD]] : f32
 //      CHECK:     }
 //      CHECK:     memref.store %[[IF_RESULT]], %[[OUTPUT]][%[[IV]]]
+
+// -----
+
+// Each update element goes to its loaded start plus its window offset. The
+// bounds check compares the start with bounds shifted by the offset, and the
+// reducer reads every original before any store.
+func.func @general_scatter_window(%updates0: memref<2x2xi32>, %updates1: memref<2x2xf32>, %indices: memref<2x1xi32>, %original0: memref<4xi32>, %original1: memref<4xf32>) {
+  iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [1], inserted_window_dims = [], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates0, %updates1 : memref<2x2xi32>, memref<2x2xf32>)
+    indices(%indices : memref<2x1xi32>)
+    outs(%original0, %original1 : memref<4xi32>, memref<4xf32>) {
+  ^bb0(%current0: i32, %current1: f32, %update0: i32, %update1: f32):
+    %sum = arith.addi %current0, %update0 : i32
+    iree_linalg_ext.yield %sum, %current1 : i32, f32
+  }
+  return
+}
+// CHECK-LABEL: func.func @general_scatter_window
+// CHECK-SAME:    %[[UPDATES0:[a-zA-Z0-9]+]]: memref<2x2xi32>
+// CHECK-SAME:    %[[UPDATES1:[a-zA-Z0-9]+]]: memref<2x2xf32>
+// CHECK-SAME:    %[[INDICES:[a-zA-Z0-9]+]]: memref<2x1xi32>
+// CHECK-SAME:    %[[ORIGINAL0:[a-zA-Z0-9]+]]: memref<4xi32>
+// CHECK-SAME:    %[[ORIGINAL1:[a-zA-Z0-9]+]]: memref<4xf32>
+// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : i64
+// CHECK-DAG:     %[[ZERO:.+]] = arith.constant 0 : i64
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         scf.for %[[I:.+]] =
+// CHECK:           scf.for %[[J:.+]] =
+// CHECK:             %[[RAW:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]]
+// CHECK:             %[[START:.+]] = arith.extsi %[[RAW]] : i32 to i64
+// CHECK:             %[[OFFSET:.+]] = arith.index_cast %[[J]] : index to i64
+// CHECK:             %[[LOWER:.+]] = arith.subi %[[ZERO]], %[[OFFSET]]
+// CHECK:             %[[UPPER:.+]] = arith.subi %[[C4]], %[[OFFSET]]
+// CHECK:             %[[GE:.+]] = arith.cmpi sge, %[[START]], %[[LOWER]]
+// CHECK:             %[[LT:.+]] = arith.cmpi slt, %[[START]], %[[UPPER]]
+// CHECK:             %[[IN:.+]] = arith.andi %[[GE]], %[[LT]]
+// CHECK:             scf.if %[[IN]] {
+// CHECK:               %[[SUM:.+]] = arith.addi %[[START]], %[[OFFSET]] : i64
+// CHECK:               %[[DEST:.+]] = arith.index_cast %[[SUM]] : i64 to index
+// CHECK:               %[[UPDATE:.+]] = memref.load %[[UPDATES0]][%[[I]], %[[J]]]
+// CHECK:               %[[CUR0:.+]] = memref.load %[[ORIGINAL0]][%[[DEST]]]
+// CHECK:               %[[CUR1:.+]] = memref.load %[[ORIGINAL1]][%[[DEST]]]
+// CHECK:               %[[NEW:.+]] = arith.addi %[[CUR0]], %[[UPDATE]] : i32
+// CHECK:               memref.store %[[NEW]], %[[ORIGINAL0]][%[[DEST]]]
+// CHECK:               memref.store %[[CUR1]], %[[ORIGINAL1]][%[[DEST]]]

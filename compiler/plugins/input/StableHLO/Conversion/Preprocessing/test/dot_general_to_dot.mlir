@@ -224,3 +224,70 @@ func.func @vecdot(%arg0 : tensor<1x32xf64>, %arg1 : tensor<32x1xf64>) -> tensor<
   // CHECK: %[[R2]]
   return %0 : tensor<1x1xf64>
 }
+
+// -----
+
+// A static reshape cannot preserve this dynamic dimension.
+// CHECK-LABEL: func.func @dynamic_contracting_lhs(
+// CHECK-SAME: %[[LHS:.+]]: tensor<1x?xf32>, %[[RHS:.+]]: tensor<?x4xf32>
+// CHECK-NOT: stablehlo.reshape
+// CHECK: %[[RESULT:.+]] = stablehlo.dot %[[LHS]], %[[RHS]]
+// CHECK-NOT: stablehlo.reshape
+// CHECK: return %[[RESULT]]
+func.func @dynamic_contracting_lhs(%lhs: tensor<1x?xf32>, %rhs: tensor<?x4xf32>) -> tensor<1x4xf32> {
+  %result = stablehlo.dot %lhs, %rhs : (tensor<1x?xf32>, tensor<?x4xf32>) -> tensor<1x4xf32>
+  return %result : tensor<1x4xf32>
+}
+
+// -----
+
+// A static reshape cannot preserve this dynamic dimension.
+// CHECK-LABEL: func.func @dynamic_contracting_rhs(
+// CHECK-SAME: %[[LHS:.+]]: tensor<4x?xf32>, %[[RHS:.+]]: tensor<?x1xf32>
+// CHECK-NOT: stablehlo.reshape
+// CHECK: %[[RESULT:.+]] = stablehlo.dot %[[LHS]], %[[RHS]]
+// CHECK-NOT: stablehlo.reshape
+// CHECK: return %[[RESULT]]
+func.func @dynamic_contracting_rhs(%lhs: tensor<4x?xf32>, %rhs: tensor<?x1xf32>) -> tensor<4x1xf32> {
+  %result = stablehlo.dot %lhs, %rhs : (tensor<4x?xf32>, tensor<?x1xf32>) -> tensor<4x1xf32>
+  return %result : tensor<4x1xf32>
+}
+
+// -----
+
+// A static reshape cannot preserve this dynamic dimension.
+// CHECK-LABEL: func.func @dynamic_result_lhs_unit(
+// CHECK-SAME: %[[LHS:.+]]: tensor<1x4xf32>, %[[RHS:.+]]: tensor<4x?xf32>
+// CHECK-NOT: stablehlo.reshape
+// CHECK: %[[RESULT:.+]] = stablehlo.dot %[[LHS]], %[[RHS]]
+// CHECK-NOT: stablehlo.reshape
+// CHECK: return %[[RESULT]]
+func.func @dynamic_result_lhs_unit(%lhs: tensor<1x4xf32>, %rhs: tensor<4x?xf32>) -> tensor<1x?xf32> {
+  %result = stablehlo.dot %lhs, %rhs : (tensor<1x4xf32>, tensor<4x?xf32>) -> tensor<1x?xf32>
+  return %result : tensor<1x?xf32>
+}
+
+// -----
+
+// A static reshape cannot preserve this dynamic dimension.
+// CHECK-LABEL: func.func @dynamic_result_rhs_unit(
+// CHECK-SAME: %[[LHS:.+]]: tensor<?x4xf32>, %[[RHS:.+]]: tensor<4x1xf32>
+// CHECK-NOT: stablehlo.reshape
+// CHECK: %[[RESULT:.+]] = stablehlo.dot %[[LHS]], %[[RHS]]
+// CHECK-NOT: stablehlo.reshape
+// CHECK: return %[[RESULT]]
+func.func @dynamic_result_rhs_unit(%lhs: tensor<?x4xf32>, %rhs: tensor<4x1xf32>) -> tensor<?x1xf32> {
+  %result = stablehlo.dot %lhs, %rhs : (tensor<?x4xf32>, tensor<4x1xf32>) -> tensor<?x1xf32>
+  return %result : tensor<?x1xf32>
+}
+
+// -----
+
+// The legacy dot operation cannot represent an explicit arithmetic algorithm.
+// CHECK-LABEL: @dot_general_matrix_with_algorithm
+// CHECK: stablehlo.dot_general
+// CHECK-SAME: algorithm = <lhs_precision_type = f8E4M3FN, rhs_precision_type = f8E4M3FN, accumulation_type = f32, lhs_component_count = 1, rhs_component_count = 1, num_primitive_operations = 3, allow_imprecise_accumulation = false>
+func.func @dot_general_matrix_with_algorithm(%lhs: tensor<2x4xf32>, %rhs: tensor<4x3xf32>) -> tensor<2x3xf32> {
+  %0 = stablehlo.dot_general %lhs, %rhs, contracting_dims = [1] x [0], precision = [DEFAULT, DEFAULT], algorithm = <lhs_precision_type = f8E4M3FN, rhs_precision_type = f8E4M3FN, accumulation_type = f32, lhs_component_count = 1, rhs_component_count = 1, num_primitive_operations = 3, allow_imprecise_accumulation = false> : (tensor<2x4xf32>, tensor<4x3xf32>) -> tensor<2x3xf32>
+  return %0 : tensor<2x3xf32>
+}

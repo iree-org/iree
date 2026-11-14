@@ -20,3 +20,11 @@ func.func @pad_no_op() {
   check.expect_eq(%res, %input) : tensor<2x3xi32>
   return
 }
+
+func.func @pad_static_extreme_crop() {
+  %input = util.unfoldable_constant dense<[1, 2, 3]> : tensor<3xi32>
+  %pad = stablehlo.constant dense<7> : tensor<i32>
+  %r = stablehlo.pad %input, %pad, low = [-9223372036854775804], high = [-9223372036854775806], interior = [9223372036854775805] : (tensor<3xi32>, tensor<i32>) -> tensor<3xi32>
+  check.expect_eq_const(%r, dense<[7, 7, 2]> : tensor<3xi32>) : tensor<3xi32>
+  return
+}

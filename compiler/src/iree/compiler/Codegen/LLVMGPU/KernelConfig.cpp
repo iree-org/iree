@@ -1843,22 +1843,41 @@ static LogicalResult setSortConfig(IREE::GPU::TargetAttr target,
 // Default Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
+/// Runs |rootOp|'s dispatch on one thread of one workgroup, without workgroup
+/// tiling.
+static LogicalResult setSingleThreadConfig(mlir::FunctionOpInterface entryPoint,
+                                           Operation *rootOp) {
+  MLIRContext *context = rootOp->getContext();
+  TileSizesListType tileSizes;
+  tileSizes.push_back({});
+  auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, rootOp, config,
+      getGPUTranslationInfo(context, GPUPipeline::Distribute, {1, 1, 1}));
+}
+
 // Basic default properties for linalg ops that haven't been tuned.
+// Returns whether `op` must run on a single thread under the default
+// configuration: Distribute only distributes linalg ops, so others would run
+// on every thread, and an op without partitionable loops has nothing to
+// distribute.
+static bool needsSingleThread(Operation *op) {
+  return !isa<linalg::LinalgOp>(op) || cast<PartitionableLoopsInterface>(op)
+                                           .getPartitionableLoops(std::nullopt)
+                                           .empty();
+}
+
 static LogicalResult setRootDefaultConfig(IREE::GPU::TargetAttr target,
                                           mlir::FunctionOpInterface entryPoint,
                                           Operation *op) {
+  if (needsSingleThread(op)) {
+    return setSingleThreadConfig(entryPoint, op);
+  }
   MLIRContext *context = op->getContext();
   GPUPipeline passPipeline = GPUPipeline::Distribute;
   TileSizesListType tileSizes;
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops = interfaceOp.getPartitionableLoops(std::nullopt);
-  if (partitionedLoops.empty()) {
-    tileSizes.push_back({});
-    auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
-    return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, config,
-        getGPUTranslationInfo(context, passPipeline, {1, 1, 1}));
-  }
 
   const int preferredSubgroupSize = target.getPreferredSubgroupSize();
   size_t numLoops = partitionedLoops.back() + 1;

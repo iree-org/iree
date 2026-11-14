@@ -828,10 +828,11 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
   funcPassManager.addPass(tensor::createFoldTensorSubsetOpsPass());
 
-  // Linalg -> Vector
+  // Linalg -> Vector. A dynamic identity slice left in place bufferizes to a
+  // private copy that every thread writes whole.
   addGPUVectorizationPasses(funcPassManager, /*vectorizeCopies=*/true,
                             /*enableMasking=*/true,
-                            /*foldIdentitySlices=*/false,
+                            /*foldIdentitySlices=*/true,
                             /*decomposeMasks=*/true);
 
   // Allocate tensors for copies to shared memory.

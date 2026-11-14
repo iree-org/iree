@@ -65,7 +65,14 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &modulePassManager) {
         options.includeMinMaxF = true;
         return arith::createArithExpandOpsPass(options);
       })
-      .addPass(createConvertUnsupportedFloatArithPass)
+      .addPass([]() {
+        // VM arithmetic and math operate on f32 and f64 only, so f16
+        // arithmetic and math are computed in f32.
+        ConvertUnsupportedFloatArithPassOptions options;
+        options.includeF16 = true;
+        options.includeMath = true;
+        return createConvertUnsupportedFloatArithPass(options);
+      })
       .addPass([]() {
         return createEmulateNarrowTypePass(
             EmulateNarrowTypePassOptions{/*disableAtomicRMW=*/true});

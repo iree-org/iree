@@ -75,3 +75,49 @@ vhlo.func_v1 @compare_vhlo_example(%arg0: !vhlo.tensor_v1<!vhlo.f32_v1>, %arg1: 
   // CHECK: return
   "vhlo.return_v1"(%0) : (!vhlo.tensor_v1<!vhlo.bool_v1>) -> ()
 } {arg_attrs = #vhlo.array_v1<[]>, res_attrs = #vhlo.array_v1<[]>, sym_visibility = #vhlo.string_v1<"">}
+
+// -----
+
+// A tensor encoding must trigger conversion without any StableHLO operations.
+// CHECK-LABEL: util.func public @bounds_identity
+// CHECK-SAME: (%{{.+}}: tensor<?xf32>) -> tensor<?xf32>
+// CHECK: util.assume.int %{{.+}}<umax = 16>
+func.func @bounds_identity(%a: tensor<?xf32, #stablehlo.bounds<16>>) -> tensor<?xf32, #stablehlo.bounds<16>> {
+  return %a : tensor<?xf32, #stablehlo.bounds<16>>
+}
+
+// -----
+
+// Nested encodings must select the tuple-flattening pipeline.
+// CHECK-LABEL: util.func public @bounds_tuple_identity
+// CHECK-SAME: (%{{.+}}: tensor<?xf32>) -> tensor<?xf32>
+// CHECK: util.assume.int %{{.+}}<umax = 16>
+func.func @bounds_tuple_identity(%a: tuple<tuple<tensor<?xf32, #stablehlo.bounds<16>>>>) -> tuple<tuple<tensor<?xf32, #stablehlo.bounds<16>>>> {
+  return %a : tuple<tuple<tensor<?xf32, #stablehlo.bounds<16>>>>
+}
+
+// -----
+
+// A tuple alone does not select an input dialect conversion.
+// CHECK-LABEL: util.func public @plain_tuple_identity
+// CHECK-SAME: (%[[VALUE:.+]]: tuple<tensor<?xf32>>) -> tuple<tensor<?xf32>>
+// CHECK: util.return %[[VALUE]] : tuple<tensor<?xf32>>
+func.func @plain_tuple_identity(%a: tuple<tensor<?xf32>>) -> tuple<tensor<?xf32>> {
+  return %a : tuple<tensor<?xf32>>
+}
+
+// -----
+
+// An unused input has no SSA use exposing its bounds to the detector.
+// CHECK-LABEL: util.func public @unused_bounded_input
+// CHECK-SAME: (%{{.+}}: tensor<?xf32>) -> i32
+func.func @unused_bounded_input(%arg: tensor<?xf32, #stablehlo.bounds<16>>) -> i32 {
+  %c = arith.constant 0 : i32
+  return %c : i32
+}
+
+// -----
+
+// External inputs have no entry block exposing their types.
+// CHECK-LABEL: util.func private @external_bounds_input(%{{.+}}: tensor<?xf32>)
+func.func private @external_bounds_input(tensor<?xf32, #stablehlo.bounds<16>>)

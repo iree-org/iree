@@ -287,6 +287,107 @@ func.func @scatter_update_scalar_1D(%arg0: tensor<8xi32>, %arg1: tensor<4x1xi32>
 
 // -----
 
+// CHECK-LABEL: func.func @scatter_overlapping_window_dynamic
+func.func @scatter_overlapping_window_dynamic(
+    %input: tensor<?xi32>, %indices: tensor<?x1xi64>,
+    %updates: tensor<?x?xi32>) -> tensor<?xi32> {
+  %result = "stablehlo.scatter"(%input, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    %sum = stablehlo.add %current, %update : tensor<i32>
+    "stablehlo.return"(%sum) : (tensor<i32>) -> ()
+  }) {
+    indices_are_sorted = false,
+    scatter_dimension_numbers = #stablehlo.scatter<
+      update_window_dims = [1],
+      scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 1,
+    >,
+    unique_indices = false
+  } : (tensor<?xi32>, tensor<?x1xi64>, tensor<?x?xi32>) -> tensor<?xi32>
+  return %result : tensor<?xi32>
+}
+// CHECK: iree_linalg_ext.general_scatter
+// CHECK-SAME: update_window_dims = [1]
+// CHECK-SAME: ins({{.*}} : tensor<?x?xi32>)
+// CHECK-SAME: indices({{.*}} : tensor<?x1xi64>)
+// CHECK-SAME: outs({{.*}} : tensor<?xi32>)
+// CHECK: iree_linalg_ext.yield %{{.*}} : i32
+
+// -----
+
+// CHECK-LABEL: func.func @scatter_dynamic_vector_extent
+func.func @scatter_dynamic_vector_extent(%input: tensor<?xi32>,
+    %indices: tensor<?x?xi64>, %updates: tensor<?x?xi32>) -> tensor<?xi32> {
+  %result = "stablehlo.scatter"(%input, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %new: tensor<i32>):
+    %sum = stablehlo.add %current, %new : tensor<i32>
+    "stablehlo.return"(%sum) : (tensor<i32>) -> ()
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [1],
+        scatter_dims_to_operand_dims = [0], index_vector_dim = 1>,
+    indices_are_sorted = false, unique_indices = false
+  } : (tensor<?xi32>, tensor<?x?xi64>, tensor<?x?xi32>) -> tensor<?xi32>
+  return %result : tensor<?xi32>
+}
+// CHECK: iree_linalg_ext.general_scatter
+// CHECK: iree_linalg_ext.yield
+
+// -----
+
+// CHECK-LABEL: func.func @scatter_coupled_variadic_dynamic
+func.func @scatter_coupled_variadic_dynamic(
+    %input0: tensor<?xi32>, %input1: tensor<?xi32>,
+    %indices: tensor<?x1xi64>, %updates0: tensor<?x?xi32>,
+    %updates1: tensor<?x?xi32>) -> (tensor<?xi32>, tensor<?xi32>) {
+  %result:2 = "stablehlo.scatter"(
+      %input0, %input1, %indices, %updates0, %updates1) ({
+  ^bb0(%current0: tensor<i32>, %current1: tensor<i32>,
+       %update0: tensor<i32>, %update1: tensor<i32>):
+    %next0 = stablehlo.add %current0, %update1 : tensor<i32>
+    %next1 = stablehlo.add %current1, %update0 : tensor<i32>
+    "stablehlo.return"(%next0, %next1) : (tensor<i32>, tensor<i32>) -> ()
+  }) {
+    indices_are_sorted = false,
+    scatter_dimension_numbers = #stablehlo.scatter<
+      update_window_dims = [1],
+      scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 1,
+    >,
+    unique_indices = false
+  } : (tensor<?xi32>, tensor<?xi32>, tensor<?x1xi64>, tensor<?x?xi32>,
+       tensor<?x?xi32>) -> (tensor<?xi32>, tensor<?xi32>)
+  return %result#0, %result#1 : tensor<?xi32>, tensor<?xi32>
+}
+// CHECK: iree_linalg_ext.general_scatter
+// CHECK-SAME: ins({{.*}}, {{.*}} : tensor<?x?xi32>, tensor<?x?xi32>)
+// CHECK-SAME: indices({{.*}} : tensor<?x1xi64>)
+// CHECK-SAME: outs({{.*}}, {{.*}} : tensor<?xi32>, tensor<?xi32>)
+// CHECK: arith.addi
+// CHECK: arith.addi
+// CHECK: iree_linalg_ext.yield
+
+// -----
+
+// The preprocessing pass adds this unit update batch to a scalar scatter.
+// CHECK-LABEL: func.func @scatter_scalar_preprocessed
+func.func @scatter_scalar_preprocessed(%input: tensor<i32>,
+    %indices: tensor<1x0xi64>, %update: tensor<1xi32>) -> tensor<i32> {
+  %result = "stablehlo.scatter"(%input, %indices, %update) ({
+  ^bb0(%current: tensor<i32>, %new: tensor<i32>):
+    %sum = stablehlo.add %current, %new : tensor<i32>
+    "stablehlo.return"(%sum) : (tensor<i32>) -> ()
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<index_vector_dim = 1>,
+    indices_are_sorted = false, unique_indices = false
+  } : (tensor<i32>, tensor<1x0xi64>, tensor<1xi32>) -> tensor<i32>
+  return %result : tensor<i32>
+}
+// CHECK: iree_linalg_ext.general_scatter
+// CHECK: arith.addi
+// CHECK: iree_linalg_ext.yield
+
+// -----
+
 // CHECK-LABEL: func.func @scatter_update_scalar_2D
 func.func @scatter_update_scalar_2D(%arg0: tensor<4x3xi32>, %arg1: tensor<3x2xi32>,
     %arg2: tensor<3xi32>) -> tensor<4x3xi32> {
@@ -981,8 +1082,8 @@ func.func @chlo_top_k_float(%arg : tensor<16x16xf32>) -> (tensor<16x8xf32>, tens
 
 // CHECK-LABEL: @prefix
 // CHECK-SAME: %[[ARG0:.+]]: tensor<7x5xi32>
-// CHECK-SAME: %[[ARG1:.+]]: tensor<i32>
-func.func @prefix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32> {
+func.func @prefix(%arg0: tensor<7x5xi32>) -> tensor<7x5xi32> {
+  %arg1 = stablehlo.constant dense<0> : tensor<i32>
   %reduce = "stablehlo.reduce_window"(%arg0, %arg1) ({
     ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
     %787 = "stablehlo.add"(%arg2, %arg3) : (tensor<i32>, tensor<i32>) -> tensor<i32>
@@ -992,7 +1093,7 @@ func.func @prefix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32>
 }
 // CHECK:       %[[OUT0:.+]] = tensor.empty() : tensor<7x5xi32>
 // CHECK:       %[[OUT1:.+]] = tensor.empty() : tensor<7xi32>
-// CHECK:       %[[FILL:.+]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel"]} ins(%[[ARG1]] : tensor<i32>) outs(%[[OUT1]] : tensor<7xi32>)
+// CHECK:       %[[FILL:.+]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel"]} ins(%{{.+}} : tensor<i32>) outs(%[[OUT1]] : tensor<7xi32>)
 // CHECK:       ^bb0(%[[IN:.+]]: i32, %[[OUT:.+]]: i32):
 // CHECK:         linalg.yield %[[IN]]
 // CHECK:       %[[SCAN:.+]]:2 = iree_linalg_ext.scan dimension(1) inclusive(true) ins(%[[ARG0]] : tensor<7x5xi32>) outs(%[[OUT0]], %[[FILL]] : tensor<7x5xi32>, tensor<7xi32>)
@@ -1004,10 +1105,47 @@ func.func @prefix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32>
 
 // -----
 
+// A dynamic dimension other than the scanned one sizes the scan output.
+// CHECK-LABEL: @prefix_dynamic_rows
+// CHECK-SAME: %[[ARG0:.+]]: tensor<?x5xi32>
+func.func @prefix_dynamic_rows(%arg0: tensor<?x5xi32>) -> tensor<?x5xi32> {
+  %arg1 = stablehlo.constant dense<0> : tensor<i32>
+  %reduce = "stablehlo.reduce_window"(%arg0, %arg1) ({
+    ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
+    %787 = "stablehlo.add"(%arg2, %arg3) : (tensor<i32>, tensor<i32>) -> tensor<i32>
+    "stablehlo.return"(%787) : (tensor<i32>) -> ()
+  }) {base_dilations = array<i64: 1, 1>, padding = dense<[[0, 0], [4, 0]]> : tensor<2x2xi64>, window_dilations = array<i64: 1, 1>, window_dimensions = array<i64: 1, 5>, window_strides = array<i64: 1, 1>} : (tensor<?x5xi32>, tensor<i32>) -> tensor<?x5xi32>
+  return %reduce : tensor<?x5xi32>
+}
+// CHECK:       %[[ROWS:.+]] = tensor.dim %[[ARG0]], %{{.+}} : tensor<?x5xi32>
+// CHECK:       %[[ACC_ROWS:.+]] = tensor.dim %[[ARG0]], %{{.+}} : tensor<?x5xi32>
+// CHECK:       %[[OUT0:.+]] = tensor.empty(%[[ROWS]]) : tensor<?x5xi32>
+// CHECK:       %[[OUT1:.+]] = tensor.empty(%[[ACC_ROWS]]) : tensor<?xi32>
+// CHECK:       iree_linalg_ext.scan dimension(1) inclusive(true) ins(%[[ARG0]] : tensor<?x5xi32>) outs(%[[OUT0]], %{{.+}} : tensor<?x5xi32>, tensor<?xi32>)
+
+// -----
+
+// A scan never combines the init, so one the reducer does not ignore keeps
+// the window.
+// CHECK-LABEL: @prefix_non_identity_init
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+func.func @prefix_non_identity_init(%arg0: tensor<7x5xi32>) -> tensor<7x5xi32> {
+  %arg1 = stablehlo.constant dense<1> : tensor<i32>
+  %reduce = "stablehlo.reduce_window"(%arg0, %arg1) ({
+    ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
+    %787 = "stablehlo.add"(%arg2, %arg3) : (tensor<i32>, tensor<i32>) -> tensor<i32>
+    "stablehlo.return"(%787) : (tensor<i32>) -> ()
+  }) {base_dilations = array<i64: 1, 1>, padding = dense<[[0, 0], [4, 0]]> : tensor<2x2xi64>, window_dilations = array<i64: 1, 1>, window_dimensions = array<i64: 1, 5>, window_strides = array<i64: 1, 1>} : (tensor<7x5xi32>, tensor<i32>) -> tensor<7x5xi32>
+  return %reduce : tensor<7x5xi32>
+}
+
+// -----
+
 // CHECK-LABEL: @suffix
 // CHECK-SAME: %[[ARG0:.+]]: tensor<7x5xi32>
-// CHECK-SAME: %[[ARG1:.+]]: tensor<i32>
-func.func @suffix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32> {
+func.func @suffix(%arg0: tensor<7x5xi32>) -> tensor<7x5xi32> {
+  %arg1 = stablehlo.constant dense<0> : tensor<i32>
   %reduce = "stablehlo.reduce_window"(%arg0, %arg1) ({
     ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
     %787 = "stablehlo.add"(%arg2, %arg3) : (tensor<i32>, tensor<i32>) -> tensor<i32>
@@ -1017,7 +1155,7 @@ func.func @suffix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32>
 }
 // CHECK:       %[[OUT0:.+]] = tensor.empty() : tensor<7x5xi32>
 // CHECK:       %[[OUT1:.+]] = tensor.empty() : tensor<7xi32>
-// CHECK:       %[[FILL:.+]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel"]} ins(%[[ARG1]] : tensor<i32>) outs(%[[OUT1]] : tensor<7xi32>)
+// CHECK:       %[[FILL:.+]] = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel"]} ins(%{{.+}} : tensor<i32>) outs(%[[OUT1]] : tensor<7xi32>)
 // CHECK:       ^bb0(%[[IN:.+]]: i32, %[[OUT:.+]]: i32):
 // CHECK:         linalg.yield %[[IN]]
 // CHECK:       %[[REV_IN_INIT:.+]] = tensor.empty() : tensor<7x5xi32>
@@ -1036,3 +1174,323 @@ func.func @suffix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32>
 // CHECK:         linalg.yield
 // CHECK:       } -> tensor<7x5xi32>
 // CHECK:       return %[[REV_OUT]] : tensor<7x5xi32>
+
+// -----
+
+// Padding on the opposite edge changes the output extent and must keep
+// the general window reduction.
+// CHECK-LABEL: func.func @negative_scan_prefix_high_padding(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_prefix_high_padding(%input: tensor<5xi32>) -> tensor<6xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, 1]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<6xi32>
+  return %result : tensor<6xi32>
+}
+
+// -----
+
+// Padding on the opposite edge changes the output extent and must keep
+// the general window reduction.
+// CHECK-LABEL: func.func @negative_scan_prefix_high_crop(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_prefix_high_crop(%input: tensor<5xi32>) -> tensor<4xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, -1]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}
+
+// -----
+
+// Padding on the opposite edge changes the output extent and must keep
+// the general window reduction.
+// CHECK-LABEL: func.func @negative_scan_suffix_low_padding(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_suffix_low_padding(%input: tensor<5xi32>) -> tensor<6xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[1, 4]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<6xi32>
+  return %result : tensor<6xi32>
+}
+
+// -----
+
+// Padding on the opposite edge changes the output extent and must keep
+// the general window reduction.
+// CHECK-LABEL: func.func @negative_scan_suffix_low_crop(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_suffix_low_crop(%input: tensor<5xi32>) -> tensor<4xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[-1, 4]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}
+
+// -----
+
+// A shape-preserving scan still returns the declared tensor type.
+// CHECK-LABEL: func.func @prefix_relaxed_result(
+// CHECK: %[[SCAN:.+]]:2 = iree_linalg_ext.scan
+// CHECK: %[[CAST:.+]] = tensor.cast %[[SCAN]]#0 : tensor<5xi32> to tensor<?xi32>
+// CHECK: return %[[CAST]] : tensor<?xi32>
+func.func @prefix_relaxed_result(%input: tensor<5xi32>) -> tensor<?xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, 0]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<?xi32>
+  return %result : tensor<?xi32>
+}
+
+// -----
+
+// A shape-preserving scan still returns the declared tensor type.
+// CHECK-LABEL: func.func @suffix_relaxed_result(
+// CHECK: %[[SCAN:.+]]:2 = iree_linalg_ext.scan
+// CHECK: %[[REVERSED:.+]] = linalg.generic
+// CHECK: tensor.extract %[[SCAN]]#0
+// CHECK: %[[CAST:.+]] = tensor.cast %[[REVERSED]] : tensor<5xi32> to tensor<?xi32>
+// CHECK: return %[[CAST]] : tensor<?xi32>
+func.func @suffix_relaxed_result(%input: tensor<5xi32>) -> tensor<?xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[0, 4]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<?xi32>
+  return %result : tensor<?xi32>
+}
+
+// -----
+
+// The declared result may also refine a dynamic non-reduction dimension.
+// CHECK-LABEL: func.func @prefix_refined_batch_result(
+// CHECK: %[[SCAN:.+]]:2 = iree_linalg_ext.scan
+// CHECK: %[[CAST:.+]] = tensor.cast %[[SCAN]]#0 : tensor<?x5xi32> to tensor<7x5xi32>
+// CHECK: return %[[CAST]] : tensor<7x5xi32>
+func.func @prefix_refined_batch_result(%input: tensor<?x5xi32>) -> tensor<7x5xi32> {
+  %init = stablehlo.constant dense<0> : tensor<i32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<i32>, %rhs: tensor<i32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<i32>
+    stablehlo.return %sum : tensor<i32>
+  }) {window_dimensions = array<i64: 1, 5>, padding = dense<[[0, 0], [4, 0]]> : tensor<2x2xi64>} : (tensor<?x5xi32>, tensor<i32>) -> tensor<7x5xi32>
+  return %result : tensor<7x5xi32>
+}
+
+// -----
+
+// Scalar scan construction cannot represent this reducer/input type contract.
+// Keep the window for the general lowering before mutating the reducer.
+// CHECK-LABEL: func.func @negative_scan_promoted_input(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_promoted_input(%input: tensor<5xf16>) -> tensor<5xf32> {
+  %init = stablehlo.constant dense<0.0> : tensor<f32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<f32>, %rhs: tensor<f32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<f32>
+    stablehlo.return %sum : tensor<f32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, 0]]> : tensor<1x2xi64>} : (tensor<5xf16>, tensor<f32>) -> tensor<5xf32>
+  return %result : tensor<5xf32>
+}
+
+// -----
+
+// Scalar scan construction cannot represent this reducer/input type contract.
+// Keep the window for the general lowering before mutating the reducer.
+// CHECK-LABEL: func.func @negative_scan_promoted_init(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_promoted_init(%input: tensor<5xf32>) -> tensor<5xf32> {
+  %init = stablehlo.constant dense<0.0> : tensor<f16>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<f32>, %rhs: tensor<f32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<f32>
+    stablehlo.return %sum : tensor<f32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, 0]]> : tensor<1x2xi64>} : (tensor<5xf32>, tensor<f16>) -> tensor<5xf32>
+  return %result : tensor<5xf32>
+}
+
+// -----
+
+// Scalar scan construction cannot represent this reducer/input type contract.
+// Keep the window for the general lowering before mutating the reducer.
+// CHECK-LABEL: func.func @negative_scan_nonscalar_init(
+// CHECK-NOT: iree_linalg_ext.scan
+// CHECK: stablehlo.reduce_window
+// CHECK-NOT: iree_linalg_ext.scan
+func.func @negative_scan_nonscalar_init(%input: tensor<5xi32>) -> tensor<5xi32> {
+  %init = stablehlo.constant dense<0> : tensor<5xi32>
+  %result = "stablehlo.reduce_window"(%input, %init) ({
+  ^bb0(%lhs: tensor<5xi32>, %rhs: tensor<5xi32>):
+    %sum = stablehlo.add %lhs, %rhs : tensor<5xi32>
+    stablehlo.return %sum : tensor<5xi32>
+  }) {window_dimensions = array<i64: 5>, padding = dense<[[4, 0]]> : tensor<1x2xi64>} : (tensor<5xi32>, tensor<5xi32>) -> tensor<5xi32>
+  return %result : tensor<5xi32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @scatter_rank_zero_indices
+func.func @scatter_rank_zero_indices(%input: tensor<4xi32>,
+    %index: tensor<i64>, %update: tensor<i32>) -> tensor<4xi32> {
+  %result = "stablehlo.scatter"(%input, %index, %update) ({
+  ^bb0(%current: tensor<i32>, %new: tensor<i32>):
+    "stablehlo.return"(%new) : (tensor<i32>) -> ()
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<
+      inserted_window_dims = [0], scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 0>,
+    indices_are_sorted = false, unique_indices = false
+  } : (tensor<4xi32>, tensor<i64>, tensor<i32>) -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}
+// CHECK: iree_linalg_ext.general_scatter
+// CHECK: iree_linalg_ext.yield
+
+// -----
+
+// CHECK-LABEL: func.func @scatter_zero_index_depth
+func.func @scatter_zero_index_depth(%input: tensor<i32>,
+    %indices: tensor<0xi64>, %update: tensor<i32>) -> tensor<i32> {
+  %result = "stablehlo.scatter"(%input, %indices, %update) ({
+  ^bb0(%current: tensor<i32>, %new: tensor<i32>):
+    %sum = stablehlo.add %current, %new : tensor<i32>
+    "stablehlo.return"(%sum) : (tensor<i32>) -> ()
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<index_vector_dim = 0>,
+    indices_are_sorted = false, unique_indices = false
+  } : (tensor<i32>, tensor<0xi64>, tensor<i32>) -> tensor<i32>
+  return %result : tensor<i32>
+}
+// CHECK: iree_linalg_ext.general_scatter
+// CHECK: arith.addi
+// CHECK: iree_linalg_ext.yield
+
+// -----
+
+// CHECK-LABEL: func.func @scatter_coupled_current
+func.func @scatter_coupled_current(%input0: tensor<?xi32>,
+    %input1: tensor<?xi32>, %indices: tensor<?x1xi64>,
+    %updates0: tensor<?xi32>, %updates1: tensor<?xi32>)
+    -> (tensor<?xi32>, tensor<?xi32>) {
+  %result:2 = "stablehlo.scatter"(
+      %input0, %input1, %indices, %updates0, %updates1) ({
+  ^bb0(%current0: tensor<i32>, %current1: tensor<i32>,
+       %update0: tensor<i32>, %update1: tensor<i32>):
+    %sum = stablehlo.add %current0, %current1 : tensor<i32>
+    %next0 = stablehlo.add %sum, %update0 : tensor<i32>
+    %next1 = stablehlo.add %sum, %update1 : tensor<i32>
+    "stablehlo.return"(%next0, %next1) : (tensor<i32>, tensor<i32>) -> ()
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<inserted_window_dims = [0],
+        scatter_dims_to_operand_dims = [0], index_vector_dim = 1>,
+    indices_are_sorted = false, unique_indices = false
+  } : (tensor<?xi32>, tensor<?xi32>, tensor<?x1xi64>, tensor<?xi32>,
+       tensor<?xi32>) -> (tensor<?xi32>, tensor<?xi32>)
+  return %result#0, %result#1 : tensor<?xi32>, tensor<?xi32>
+}
+// CHECK: iree_linalg_ext.general_scatter
+// CHECK: ^bb0(%[[CURRENT0:[a-zA-Z0-9]+]]: i32, %[[CURRENT1:[a-zA-Z0-9]+]]: i32, %[[UPDATE0:[a-zA-Z0-9]+]]: i32, %[[UPDATE1:[a-zA-Z0-9]+]]: i32):
+// CHECK: %[[SUM:.*]] = arith.addi %[[CURRENT0]], %[[CURRENT1]] : i32
+// CHECK: %[[NEXT0:.*]] = arith.addi %[[SUM]], %[[UPDATE0]] : i32
+// CHECK: %[[NEXT1:.*]] = arith.addi %[[SUM]], %[[UPDATE1]] : i32
+// CHECK: iree_linalg_ext.yield %[[NEXT0]], %[[NEXT1]]
+
+// -----
+
+// Batching dims keep every dim of the rank-3 operands.
+// CHECK-LABEL: func.func @scatter_batching_rank3
+// CHECK: iree_linalg_ext.general_scatter <update_window_dims = [2], inserted_window_dims = [1], input_batching_dims = [0], scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1], index_vector_dim = 2>
+// CHECK-SAME: ins(%{{.+}} : tensor<2x4x3xi32>) indices(%{{.+}} : tensor<2x4x1xi64>) outs(%{{.+}} : tensor<2x5x3xi32>)
+// CHECK: arith.addi
+func.func @scatter_batching_rank3(%input: tensor<2x5x3xi32>, %indices: tensor<2x4x1xi64>, %updates: tensor<2x4x3xi32>) -> tensor<2x5x3xi32> {
+  %result = "stablehlo.scatter"(%input, %indices, %updates) ({
+  ^bb0(%current: tensor<i32>, %update: tensor<i32>):
+    %sum = stablehlo.add %current, %update : tensor<i32>
+    "stablehlo.return"(%sum) : (tensor<i32>) -> ()
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [2],
+        inserted_window_dims = [1], input_batching_dims = [0],
+        scatter_indices_batching_dims = [0], scatter_dims_to_operand_dims = [1],
+        index_vector_dim = 2>,
+    indices_are_sorted = false, unique_indices = false
+  } : (tensor<2x5x3xi32>, tensor<2x4x1xi64>, tensor<2x4x3xi32>) -> tensor<2x5x3xi32>
+  return %result : tensor<2x5x3xi32>
+}
+
+// -----
+
+// A runtime window extent selects the whole-window scatter when it matches the
+// operand and the general lowering otherwise.
+// CHECK-LABEL: func.func @scatter_dynamic_window
+// CHECK-SAME:    %[[INPUT:[a-zA-Z0-9]+]]: tensor<?x?x7xf32>
+// CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]: tensor<?x?x7xf32>
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[OPERAND_DIM:.+]] = tensor.dim %[[INPUT]], %[[C1]]
+// CHECK-DAG:     %[[UPDATE_DIM:.+]] = tensor.dim %[[UPDATES]], %[[C1]]
+// CHECK:         %[[WHOLE:.+]] = arith.cmpi eq, %[[UPDATE_DIM]], %[[OPERAND_DIM]]
+// CHECK:         %[[RESULT:.+]] = scf.if %[[WHOLE]] -> (tensor<?x?x7xf32>)
+// CHECK:           %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:        ins(%[[UPDATES]], %{{.+}} : tensor<?x?x7xf32>, tensor<?x1xi32>)
+// CHECK:           scf.yield %[[SCATTER]]
+// CHECK:         } else {
+// CHECK:           %[[GENERAL:.+]] = iree_linalg_ext.general_scatter
+// CHECK:           scf.yield %[[GENERAL]]
+// CHECK:         return %[[RESULT]]
+func.func @scatter_dynamic_window(%input: tensor<?x?x7xf32>, %indices: tensor<?x1xi32>, %updates: tensor<?x?x7xf32>) -> tensor<?x?x7xf32> {
+  %0 = "stablehlo.scatter"(%input, %indices, %updates) ({
+    ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
+      %sum = stablehlo.add %arg0, %arg1 : tensor<f32>
+      stablehlo.return %sum : tensor<f32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [1, 2], inserted_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>,
+    indices_are_sorted = false, unique_indices = false
+  } : (tensor<?x?x7xf32>, tensor<?x1xi32>, tensor<?x?x7xf32>) -> tensor<?x?x7xf32>
+  return %0 : tensor<?x?x7xf32>
+}
+
+// -----
+
+// Window extents read from the operand itself are equal without a runtime
+// check.
+// CHECK-LABEL: func.func @scatter_dynamic_window_proven
+// CHECK-NOT:     scf.if
+// CHECK-NOT:     iree_linalg_ext.general_scatter
+// CHECK:         iree_linalg_ext.scatter
+// CHECK-SAME:      ins(%{{.+}}, %{{.+}} : tensor<?x?xf32>, tensor<?x1xi32>)
+func.func @scatter_dynamic_window_proven(%input: tensor<?x?xf32>, %indices: tensor<?x1xi32>) -> tensor<?x?xf32> {
+  %0 = "stablehlo.scatter"(%input, %indices, %input) ({
+    ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
+      stablehlo.return %arg1 : tensor<f32>
+  }) {
+    scatter_dimension_numbers = #stablehlo.scatter<update_window_dims = [1], inserted_window_dims = [0], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>,
+    indices_are_sorted = false, unique_indices = false
+  } : (tensor<?x?xf32>, tensor<?x1xi32>, tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}

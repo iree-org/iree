@@ -13,6 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -159,76 +161,109 @@ calculateMemRefVectorNumBits(SmallVectorImpl<Operation *> &uses) {
   return minBits;
 }
 
-/// If the memref is vectorizable return the vector bit count we want to use,
-/// otherwise return 0. If it returns a value greater than 0 it also returns the
-/// memref uses.
-static unsigned isMemRefVectorizable(Value value,
-                                     SmallVectorImpl<Operation *> &uses) {
-  auto memrefType = dyn_cast<MemRefType>(value.getType());
-
-  // Require scalar element type
-  if (!memrefType || (!isa<IntegerType>(memrefType.getElementType()) &&
-                      !isa<FloatType>(memrefType.getElementType()))) {
-    LLVM_DEBUG(llvm::dbgs() << "failed: not (scalar) memref\n");
-    return 0;
+// Unconfigured targets retain the existing vectorization policy. Configured
+// 16-bit storage must support the element arithmetic before vectorization.
+static bool needs16BitStorageEmulation(MemRefType memrefType,
+                                       IREE::GPU::TargetAttr target) {
+  if (memrefType.getElementTypeBitWidth() != 16 || !target) {
+    return false;
   }
+  if (isa<FloatType>(memrefType.getElementType())) {
+    return !supportsNativeSPIRVF16(target);
+  }
+  auto wgp = target.getWgp();
+  return !IREE::GPU::bitEnumContainsAll(wgp.getStorage().getValue(),
+                                        IREE::GPU::StorageBitwidths::B16) ||
+         !IREE::GPU::bitEnumContainsAll(wgp.getCompute().getValue(),
+                                        IREE::GPU::ComputeBitwidths::Int16);
+}
 
-  // Require static innermost dimension.
+// Returns whether `memrefType` has a static innermost dimension with an even
+// number of elements; an odd number would require padding in the buffer.
+static bool hasEvenStaticInnermostDim(MemRefType memrefType) {
   if (memrefType.getRank() == 0 ||
       ShapedType::isDynamic(memrefType.getShape().back())) {
     LLVM_DEBUG(llvm::dbgs() << "failed: 0 rank or dynamic shape\n");
-    return 0;
+    return false;
   }
-  const int64_t lastDimSize = memrefType.getShape().back();
-  LLVM_DEBUG(llvm::dbgs() << "lastDimSize=" << lastDimSize << "\n");
-
-  // If we have an odd number of elements, it will require padding in the
-  // buffer.
-  if (lastDimSize % 2 != 0) {
+  if (memrefType.getShape().back() % 2 != 0) {
     LLVM_DEBUG(llvm::dbgs() << "failed: innermost dim not divisible by 2\n");
-    return 0;
+    return false;
   }
+  return true;
+}
 
+// Returns whether whole elements of `memrefType` fill a vector exactly.
+static bool hasVectorizableElementWidth(MemRefType memrefType) {
   unsigned elementNumBits = memrefType.getElementTypeBitWidth();
-  LLVM_DEBUG(llvm::dbgs() << "elementNumBits=" << elementNumBits << "\n");
   if (elementNumBits < 8 && !llvm::isPowerOf2_32(elementNumBits)) {
     LLVM_DEBUG(llvm::dbgs()
                << "failed: not power-of-two sub-byte element type\n");
-    return 0;
+    return false;
   }
   if (kMaxVectorNumBits % elementNumBits != 0) {
     LLVM_DEBUG(llvm::dbgs() << "failed: element not fitting in vector4\n");
+    return false;
+  }
+  return true;
+}
+
+// Returns whether the scalar int or float memref `value` of type `memrefType`
+// can be accessed in vectors: storage that needs no 16-bit emulation, a
+// static, even innermost dimension, and elements that fill a vector exactly.
+static bool hasVectorizableMemRefType(MemRefType memrefType, Value value) {
+  if (!isa<IntegerType, FloatType>(memrefType.getElementType())) {
+    LLVM_DEBUG(llvm::dbgs() << "failed: not (scalar) memref\n");
+    return false;
+  }
+  // Defer unsupported narrow storage until binding offsets become indices.
+  IREE::GPU::TargetAttr target =
+      getGPUTargetAttr(value.getParentBlock()->getParentOp());
+  return !needs16BitStorageEmulation(memrefType, target) &&
+         hasEvenStaticInnermostDim(memrefType) &&
+         hasVectorizableElementWidth(memrefType);
+}
+
+// Returns the vector width in bits that all transfer `uses` of a memref of
+// `memrefType` can share, or 0 if none: whole 32-bit words, an even element
+// count, and a width dividing the innermost dimension.
+static unsigned getVectorBitsForUses(SmallVectorImpl<Operation *> &uses,
+                                     MemRefType memrefType) {
+  unsigned vectorBits = calculateMemRefVectorNumBits(uses);
+  LLVM_DEBUG(llvm::dbgs() << "vectorBits=" << vectorBits << "\n");
+  if (!vectorBits) {
     return 0;
   }
-
-  if (getUsesIfAllTransferOp(value, uses)) {
-    unsigned vectorBits = calculateMemRefVectorNumBits(uses);
-    LLVM_DEBUG(llvm::dbgs() << "vectorBits=" << vectorBits << "\n");
-    if (!vectorBits) {
-      return 0;
-    }
-
-    // TODO: Fix sub-byte type support in vector.bitcast lowering.
-    if (vectorBits % 32 != 0) {
-      LLVM_DEBUG(llvm::dbgs() << "failed: less than 32-bit vector\n");
-      return 0;
-    }
-
-    unsigned vectorSize = vectorBits / elementNumBits;
-    // Again make sure we don't have vectors of odd numbers.
-    if (vectorSize % 2 != 0) {
-      LLVM_DEBUG(llvm::dbgs() << "failed: odd element count after grouping\n");
-      return 0;
-    }
-    if ((lastDimSize * elementNumBits) % vectorBits != 0) {
-      LLVM_DEBUG(llvm::dbgs()
-                 << "failed: innermost dim not divisible by vector size\n");
-      return 0;
-    }
-    return vectorBits;
+  // TODO: Fix sub-byte type support in vector.bitcast lowering.
+  if (vectorBits % 32 != 0) {
+    LLVM_DEBUG(llvm::dbgs() << "failed: less than 32-bit vector\n");
+    return 0;
   }
+  unsigned elementNumBits = memrefType.getElementTypeBitWidth();
+  // Again make sure we don't have vectors of odd numbers.
+  if ((vectorBits / elementNumBits) % 2 != 0) {
+    LLVM_DEBUG(llvm::dbgs() << "failed: odd element count after grouping\n");
+    return 0;
+  }
+  if ((memrefType.getShape().back() * elementNumBits) % vectorBits != 0) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "failed: innermost dim not divisible by vector size\n");
+    return 0;
+  }
+  return vectorBits;
+}
 
-  return 0;
+/// Collects memref uses for vectorization and returns the vector width in bits.
+/// Returns zero when vectorization is unsupported. The uses may contain partial
+/// analysis in that case and must be ignored.
+static unsigned
+collectVectorizableMemRefUses(Value value, SmallVectorImpl<Operation *> &uses) {
+  auto memrefType = dyn_cast<MemRefType>(value.getType());
+  if (!memrefType || !hasVectorizableMemRefType(memrefType, value) ||
+      !getUsesIfAllTransferOp(value, uses)) {
+    return 0;
+  }
+  return getVectorBitsForUses(uses, memrefType);
 }
 
 namespace {
@@ -287,7 +322,7 @@ MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
 void MemRefUsageAnalysis::analyzeMemRefValue(Value value) {
   SmallVector<Operation *> vectorUses;
   LLVM_DEBUG(llvm::dbgs() << "analyzing value: " << value << "\n");
-  if (unsigned vectorSize = isMemRefVectorizable(value, vectorUses)) {
+  if (unsigned vectorSize = collectVectorizableMemRefUses(value, vectorUses)) {
     valueToVectorBitsMap.insert(std::make_pair(value, vectorSize));
     transferOps.insert(vectorUses.begin(), vectorUses.end());
   }

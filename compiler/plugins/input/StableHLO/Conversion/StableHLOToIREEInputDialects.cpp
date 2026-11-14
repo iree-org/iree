@@ -59,9 +59,8 @@ struct ConcatenateOpConversion final
                   ConversionPatternRewriter &rewriter) const override {
     auto resultType =
         getTypeConverter()->convertType<RankedTensorType>(op.getType());
-    if (!resultType || !resultType.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(op,
-                                         "expected static shape for output");
+    if (!resultType) {
+      return rewriter.notifyMatchFailure(op, "expected ranked output");
     }
 
     Location loc = op.getLoc();
@@ -86,8 +85,15 @@ struct ConcatenateOpConversion final
     }
     sizes[dim] = resultDimSize;
 
-    Value result = tensor::EmptyOp::create(rewriter, loc, resultType.getShape(),
-                                           resultType.getElementType());
+    SmallVector<Value> dynamicSizes;
+    for (int64_t i = 0; i < rank; ++i) {
+      if (resultType.isDynamicDim(i)) {
+        dynamicSizes.push_back(sizes[i]);
+      }
+    }
+    Value result =
+        tensor::EmptyOp::create(rewriter, loc, resultType.getShape(),
+                                resultType.getElementType(), dynamicSizes);
 
     auto toOpFoldResult = [](Value v) -> OpFoldResult {
       auto op = v.getDefiningOp<arith::ConstantIndexOp>();
@@ -100,7 +106,10 @@ struct ConcatenateOpConversion final
     Value accBound = arith::ConstantIndexOp::create(rewriter, loc, 0);
     for (Value arg : adaptor.getOperands()) {
       offsets[dim] = accBound;
-      sizes[dim] = rewriter.createOrFold<tensor::DimOp>(loc, arg, dim);
+      // An operand may be static where another is dynamic.
+      for (int64_t i = 0; i < rank; ++i) {
+        sizes[i] = rewriter.createOrFold<tensor::DimOp>(loc, arg, i);
+      }
       result = tensor::InsertSliceOp::create(
           rewriter, loc, arg, result,
           llvm::map_to_vector(offsets, toOpFoldResult),
@@ -498,6 +507,19 @@ static void stripFrontendAttrs(mlir::ModuleOp moduleOp) {
   }
 }
 
+// Producer-specific and shape-assertion rewrites run before final conversion.
+// Report every remaining target before conversion can erase dead calls or
+// replace their operands, obscuring the unsupported producer contract.
+static LogicalResult verifyCustomCallsAreResolved(ModuleOp module) {
+  bool hasUnresolvedCustomCalls = false;
+  module.walk([&hasUnresolvedCustomCalls](mlir::stablehlo::CustomCallOp call) {
+    call.emitOpError() << "no applicable lowering for custom call target '"
+                       << call.getCallTargetName() << "'";
+    hasUnresolvedCustomCalls = true;
+  });
+  return failure(hasUnresolvedCustomCalls);
+}
+
 struct ConvertStableHloToIreeInputDialects final
     : impl::ConvertStableHloToIreeInputDialectsBase<
           ConvertStableHloToIreeInputDialects> {
@@ -509,7 +531,30 @@ struct ConvertStableHloToIreeInputDialects final
                     complex::ComplexDialect, scf::SCFDialect>();
   }
 
+  // Returns whether `funcOp` has only valid argument and result attributes
+  // and legal argument, result and block argument types.
+  static bool isLegalFunction(func::FuncOp funcOp,
+                              const TypeConverter &typeConverter) {
+    auto hasValidAttrs = [](ArrayAttr attrs) {
+      return !attrs ||
+             llvm::all_of(attrs.getAsRange<DictionaryAttr>(), isValidFuncAttr);
+    };
+    auto isLegal = [&](Type type) { return typeConverter.isLegal(type); };
+    if (!hasValidAttrs(funcOp.getAllArgAttrs()) ||
+        !hasValidAttrs(funcOp.getAllResultAttrs()) ||
+        !llvm::all_of(funcOp.getFunctionType().getInputs(), isLegal) ||
+        !llvm::all_of(funcOp.getFunctionType().getResults(), isLegal)) {
+      return false;
+    }
+    return llvm::all_of(funcOp.getFunctionBody(), [&](Block &block) {
+      return llvm::all_of(block.getArgumentTypes(), isLegal);
+    });
+  }
+
   void runOnOperation() override {
+    if (failed(verifyCustomCallsAreResolved(getOperation()))) {
+      return signalPassFailure();
+    }
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
 
@@ -520,12 +565,14 @@ struct ConvertStableHloToIreeInputDialects final
 
     // Run stablehlo canonicalization patterns with a high benefit to avoid some
     // expensive expansions.
-    populateCanonicalizationPatterns(context, &patterns, /*benefit=*/1024);
+    populateCanonicalizationPatterns(context, &patterns, /*benefit=*/1024,
+                                     /*reorderElementwiseAndShape=*/false);
 
     // Run custom patterns with a high benefit to override stablehlo patterns.
     patterns.add<ConcatenateOpConversion, FftOpConversion,
                  OptimizationBarrierOpConversion>(*typeConverter, context,
                                                   PatternBenefit{1000});
+    populateDynamicShapeConversionPatterns(context, *typeConverter, &patterns);
 
     // Run upstream stablehlo patterns with a default benefit.
     ::mlir::stablehlo::populateStablehloToLinalgConversionPatterns(
@@ -553,7 +600,10 @@ struct ConvertStableHloToIreeInputDialects final
         GenericTypeConvert<scf::ForOp>, GenericTypeConvert<scf::IfOp>,
         GenericTypeConvert<scf::YieldOp>, GenericTypeConvert<scf::ConditionOp>,
         GenericTypeConvert<scf::WhileOp>,
+        GenericTypeConvert<IREE::Flow::TensorTieShapeOp>,
+        GenericTypeConvert<tensor::DimOp>,
         GenericTypeConvert<tensor::FromElementsOp>,
+        GenericTypeConvert<tensor::ExtractOp>,
         GenericTypeConvert<tensor::CollapseShapeOp>,
         GenericTypeConvert<tensor::ExpandShapeOp>,
         GenericTypeConvert<arith::IndexCastUIOp>,
@@ -580,36 +630,7 @@ struct ConvertStableHloToIreeInputDialects final
 
     // Functions must have legal types.
     target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
-      if (auto attrs = funcOp.getAllArgAttrs()) {
-        if (!llvm::all_of(attrs.getAsRange<DictionaryAttr>(),
-                          isValidFuncAttr)) {
-          return false;
-        }
-      }
-      if (auto attrs = funcOp.getAllResultAttrs()) {
-        if (!llvm::all_of(attrs.getAsRange<DictionaryAttr>(),
-                          isValidFuncAttr)) {
-          return false;
-        }
-      }
-      for (Type type : funcOp.getFunctionType().getInputs()) {
-        if (isIllegalType(type)) {
-          return false;
-        }
-      }
-      for (Type type : funcOp.getFunctionType().getResults()) {
-        if (isIllegalType(type)) {
-          return false;
-        }
-      }
-      for (Block &block : funcOp.getFunctionBody()) {
-        for (Type type : block.getArgumentTypes()) {
-          if (isIllegalType(type)) {
-            return false;
-          }
-        }
-      }
-      return true;
+      return isLegalFunction(funcOp, *typeConverter);
     });
     target.addDynamicallyLegalOp<ml_program::GlobalOp>(
         [&](ml_program::GlobalOp op) {

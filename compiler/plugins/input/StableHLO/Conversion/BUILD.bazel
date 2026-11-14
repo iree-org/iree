@@ -43,10 +43,22 @@ iree_compiler_cc_library(
 )
 
 iree_compiler_cc_library(
+    name = "PaddingUtils",
+    srcs = ["StableHLOPaddingUtils.cpp"],
+    hdrs = ["StableHLOPaddingUtils.h"],
+    deps = [
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "StableHLOLegalization",
     srcs = [
         "CheckVHLOStableHloMixUsage.cpp",
         "ConvertCollectives.cpp",
+        "DynamicShapeOps.cpp",
+        "InlineShapeAssertionHelpers.cpp",
         "LegalizeControlFlow.cpp",
         "LegalizeShapeComputations.cpp",
         "LegalizeToLinalgUtils.cpp",
@@ -58,6 +70,7 @@ iree_compiler_cc_library(
         "VerifyCompilerInputLegality.cpp",
     ],
     deps = [
+        ":PaddingUtils",
         ":PassHeaders",
         "//compiler/plugins/input/StableHLO/Conversion/Preprocessing",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
@@ -70,6 +83,7 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ComplexDialect",
@@ -78,6 +92,8 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:InferIntRangeCommon",
+        "@llvm-project//mlir:InliningUtils",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:LinalgUtils",
@@ -85,14 +101,17 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:ShapeDialect",
         "@llvm-project//mlir:ShapeTransforms",
+        "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:SparseTensorDialect",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:ValueBoundsOpInterface",
         "@llvm-project//mlir:VectorDialect",
         "@stablehlo//:broadcast_utils",
         "@stablehlo//:chlo_ops",
@@ -105,6 +124,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "Conversion",
     srcs = [
+        "LegalizeDeprecatedOps.cpp",
         "Passes.cpp",
     ],
     hdrs = [
@@ -121,6 +141,7 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FunctionInterfaces",
+        "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MLProgramDialect",
         "@llvm-project//mlir:Pass",
@@ -130,6 +151,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ShapeToStandard",
         "@llvm-project//mlir:ShapeTransforms",
         "@llvm-project//mlir:Transforms",
+        "@stablehlo//:stablehlo_ops",
         "@stablehlo//:stablehlo_passes",
     ],
 )

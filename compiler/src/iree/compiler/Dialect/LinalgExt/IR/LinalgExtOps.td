@@ -94,6 +94,10 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     pipelines). A `false` mask value suppresses the corresponding scatter
     update, leaving `original` unchanged for that batch element.
 
+    Each update element is applied only when its computed result index is in
+    bounds for `original`; out-of-bounds elements leave `original` unchanged.
+    Any error a frontend raises for such indices is a separate check.
+
     The unique_indices attribute carries the information whether all the
     indices are unique. If `unique_indices` is `true` and two or more updates
     scatter to the same location in `original` the final value in `original` is
@@ -113,6 +117,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
+  let hasFolder = 1;
   let assemblyFormat = [{
     attr-dict `dimension_map` `=` $dimension_map
               `unique_indices` `(` $unique_indices `)`
@@ -171,6 +176,81 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     MutableOperandRange getDpsInitsMutable() {
       return getOriginalMutable();
     }
+  }];
+}
+
+def IREELinalgExt_GeneralScatterOp : IREELinalgExt_Op<"general_scatter",
+    [AttrSizedOperandSegments, RecursiveMemoryEffects,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface, ["reifyResultShapes"]>,
+     DeclareOpInterfaceMethods<LinalgFusionInterface,
+      ["getIndexingMapsForResults", "getIndexingMapsForOperands",
+       "getStaticLoopRanges"]>,
+     DeclareOpInterfaceMethods<TilingInterface,
+        ["generateScalarImplementation", "getIterationDomain",
+         "getLoopIteratorTypes", "getResultTilePosition",
+         "getTiledImplementation", "getIterationDomainTileFromOperandTiles",
+         "getTiledImplementationFromOperandTiles"]>]> {
+  let summary = [{General variadic scatter with full dimension-number mapping.}];
+  let description = [{
+    Combines each element of `updates` into `originals` at positions that
+    `indices` selects, with the dimension numbers of `stablehlo.scatter`.
+    Unlike `iree_linalg_ext.scatter`, the operand pairs may be coupled: the
+    i-th update operand pairs with the i-th original, and one reducer
+    application reads and writes every pair at the same position.
+
+    Each position of the update domain (the update shape) has two kinds of
+    update dimensions:
+
+    * `update_window_dims` are the update dimensions inside the window. In
+      order, they offset the original dimensions that are neither in
+      `inserted_window_dims` nor in `input_batching_dims`.
+    * The other update dimensions, in order, index the dimensions of
+      `indices` other than `index_vector_dim`. If `index_vector_dim` equals
+      the rank of `indices`, the index vector is implicitly of size one.
+
+    The index vector at that indices position supplies, for each entry of
+    `scatter_dims_to_operand_dims`, the start along that original dimension.
+    `input_batching_dims` pair with `scatter_indices_batching_dims`: along a
+    batching dimension the original position is the paired indices position.
+    `inserted_window_dims` are original dimensions of window size one.
+
+    The destination along each original dimension is the start plus the
+    window offset (or batching position). An update whose destination lies
+    outside the original along any dimension is skipped and leaves the
+    originals unchanged; there is no clamping.
+
+    The reducer region takes the current original values, one per pair,
+    followed by the update values, one per pair, and yields the new original
+    values in pair order. Updates are applied one at a time over the update
+    domain, so several updates may write the same destination and each sees
+    the result of the previous one.
+
+    In tensor form the op returns the updated originals; in memref form it
+    updates them in place and has no results.
+  }];
+  let arguments = (ins
+    Variadic<AnyRankedTensorOrMemRef>:$updates,
+    AnyRankedTensorOrMemRef:$indices,
+    Variadic<AnyRankedTensorOrMemRef>:$originals,
+    DenseI64ArrayAttr:$update_window_dims,
+    DenseI64ArrayAttr:$inserted_window_dims,
+    DenseI64ArrayAttr:$input_batching_dims,
+    DenseI64ArrayAttr:$scatter_indices_batching_dims,
+    DenseI64ArrayAttr:$scatter_dims_to_operand_dims,
+    I64Attr:$index_vector_dim);
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$region);
+  let hasFolder = 1;
+  let hasVerifier = 1;
+  let assemblyFormat = [{
+    prop-dict attr-dict
+    `ins` `(` $updates `:` type($updates) `)`
+    `indices` `(` $indices `:` type($indices) `)`
+    `outs` `(` $originals `:` type($originals) `)`
+    $region (`->` type($results)^)?
+  }];
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    MutableOperandRange getDpsInitsMutable() { return getOriginalsMutable(); }
   }];
 }
 

@@ -10,10 +10,12 @@
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir::iree_compiler {
@@ -36,6 +38,23 @@ static llvm::cl::opt<bool> clEnableUKernelsDecomposeLinalgGeneric(
     llvm::cl::desc("Enables decomposition of linalg.generic ops when "
                    "ukernels are enabled (experimental)"),
     llvm::cl::init(true));
+
+// VMVX allocates on the heap, so a buffer takes its run-time extent: the static
+// upper bound of an unbounded dimension is no usable size.
+static FailureOr<Value> vmvxAllocationFn(OpBuilder &builder, Location loc,
+                                         MemRefType memRefType,
+                                         ValueRange dynamicSizes,
+                                         unsigned alignment) {
+  return memref::AllocaOp::create(builder, loc, memRefType, dynamicSizes,
+                                  builder.getI64IntegerAttr(alignment))
+      .getResult();
+}
+
+static LogicalResult vmvxCopyFn(OpBuilder &builder, Location loc, Value from,
+                                Value to) {
+  createLinalgCopyOp(builder, loc, from, to);
+  return success();
+}
 
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(
@@ -69,7 +88,8 @@ void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
   }
 
   // Lower to buffers.
-  addCPUBufferizePasses(funcPassManager);
+  addIREEComprehensiveBufferizePasses(funcPassManager, vmvxAllocationFn,
+                                      vmvxCopyFn);
 
   // Cleanup the IR that may now have unused loops.
   funcPassManager.addPass(createPropagateDispatchSizeBoundsPass());

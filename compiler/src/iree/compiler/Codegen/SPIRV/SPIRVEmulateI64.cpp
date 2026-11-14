@@ -25,6 +25,8 @@
 #include "mlir/Dialect/Arith/Transforms/WideIntEmulationConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -236,7 +238,7 @@ static bool supportsI64(FunctionOpInterface op) {
 struct SPIRVEmulateI64Pass final
     : impl::SPIRVEmulateI64PassBase<SPIRVEmulateI64Pass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<vector::VectorDialect>();
+    registry.insert<scf::SCFDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override {
@@ -271,6 +273,8 @@ struct SPIRVEmulateI64Pass final
       arith::populateArithWideIntEmulationPatterns(typeConverter, patterns);
       memref::populateMemRefWideIntEmulationPatterns(typeConverter, patterns);
       populateIreeI64EmulationPatterns(typeConverter, patterns);
+      scf::populateSCFStructuralTypeConversionsAndLegality(typeConverter,
+                                                           patterns, target);
 
       if (failed(applyPartialConversion(op, target, std::move(patterns)))) {
         signalPassFailure();

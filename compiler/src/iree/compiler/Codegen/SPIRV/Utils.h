@@ -22,6 +22,14 @@
 
 namespace mlir::iree_compiler {
 
+namespace IREE::GPU {
+class TargetAttr;
+}
+
+/// Returns whether f16 arithmetic and storage are native.
+/// A missing target does not establish native support.
+bool supportsNativeSPIRVF16(IREE::GPU::TargetAttr target);
+
 // Returns true if the given variant op uses SPIR-V CodeGen.
 bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp);
 

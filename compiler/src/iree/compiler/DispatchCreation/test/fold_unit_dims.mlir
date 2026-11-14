@@ -805,6 +805,62 @@ util.func public @dequantize_conv_unit_batch(%q: tensor<1x4x4x2xi8>, %s: tensor<
 
 // -----
 
+// The stride-2 window of the single output column reads columns 0 and 1 of 3.
+util.func public @keep_unit_dim_of_strided_access_with_unread_tail(
+    %input: tensor<2x7x3x4xf32>, %filter: tensor<3x2x4x6xf32>,
+    %init: tensor<2x5x1x6xf32>) -> tensor<2x5x1x6xf32> {
+  %0 = linalg.generic {
+      indexing_maps = [
+        affine_map<(n, oh, ow, f, kh, kw, c) -> (n, oh + kh, ow * 2 + kw, c)>,
+        affine_map<(n, oh, ow, f, kh, kw, c) -> (kh, kw, c, f)>,
+        affine_map<(n, oh, ow, f, kh, kw, c) -> (n, oh, ow, f)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel",
+                        "reduction", "reduction", "reduction"]}
+      ins(%input, %filter : tensor<2x7x3x4xf32>, tensor<3x2x4x6xf32>)
+      outs(%init : tensor<2x5x1x6xf32>) {
+  ^bb0(%in: f32, %weight: f32, %out: f32):
+    %1 = arith.mulf %in, %weight : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<2x5x1x6xf32>
+  util.return %0 : tensor<2x5x1x6xf32>
+}
+// CHECK-LABEL: func public @keep_unit_dim_of_strided_access_with_unread_tail
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 * 2 + d5, d6)>
+//  CHECK-SAME:     ins({{.+}} : tensor<2x7x3x4xf32>, tensor<3x2x4x6xf32>)
+//  CHECK-SAME:     outs({{.+}} : tensor<2x5x1x6xf32>)
+
+// -----
+
+// The stride-2 window of the single output column reads both columns.
+util.func public @fold_unit_dim_of_strided_access_reading_all(
+    %input: tensor<2x7x2x4xf32>, %filter: tensor<3x2x4x6xf32>,
+    %init: tensor<2x5x1x6xf32>) -> tensor<2x5x1x6xf32> {
+  %0 = linalg.generic {
+      indexing_maps = [
+        affine_map<(n, oh, ow, f, kh, kw, c) -> (n, oh + kh, ow * 2 + kw, c)>,
+        affine_map<(n, oh, ow, f, kh, kw, c) -> (kh, kw, c, f)>,
+        affine_map<(n, oh, ow, f, kh, kw, c) -> (n, oh, ow, f)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel",
+                        "reduction", "reduction", "reduction"]}
+      ins(%input, %filter : tensor<2x7x2x4xf32>, tensor<3x2x4x6xf32>)
+      outs(%init : tensor<2x5x1x6xf32>) {
+  ^bb0(%in: f32, %weight: f32, %out: f32):
+    %1 = arith.mulf %in, %weight : f32
+    %2 = arith.addf %out, %1 : f32
+    linalg.yield %2 : f32
+  } -> tensor<2x5x1x6xf32>
+  util.return %0 : tensor<2x5x1x6xf32>
+}
+// CHECK-LABEL: func public @fold_unit_dim_of_strided_access_reading_all
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1 + d3, d4, d5)>
+//  CHECK-SAME:     ins({{.+}} : tensor<2x7x2x4xf32>, tensor<3x2x4x6xf32>)
+//  CHECK-SAME:     outs({{.+}} : tensor<2x5x6xf32>)
+
+// -----
+
 // A constant value may supply a dimension whose tensor type is still dynamic.
 // Folding unit dimensions must preserve that type while shortening the reshape.
 util.func public @fold_constant_dynamic_size(%arg0: tensor<?xf32>) -> tensor<?x784xf32> {

@@ -70,10 +70,12 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRLinalgDialect
     MLIRMathDialect
     MLIRPass
     MLIRSCFDialect
     MLIRShapeDialect
+    MLIRSideEffectInterfaces
     MLIRSparseTensorDialect
     MLIRSupport
     MLIRTensorDialect
@@ -83,6 +85,7 @@ iree_cc_library(
     StablehloOps
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
+    iree::compiler::plugins::input::StableHLO::Conversion::PaddingUtils
   PUBLIC
 )
 

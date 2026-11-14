@@ -15,26 +15,64 @@ iree_lit_test_suite(
     lit
   SRCS
     "auto_input_conversion.mlir"
+    "auto_input_conversion_vhlo.mlir"
     "canonicalize_dynamism.mlir"
-    "canonicalize_dynamism_invalid.mlir"
     "convert_collectives.mlir"
+    "dynamic_broadcast_identity.mlir"
+    "dynamic_convolution.mlir"
+    "dynamic_reshape.mlir"
+    "dynamic_shape_ops.mlir"
+    "einsum.mlir"
+    "inline_shape_assertion_helpers.mlir"
     "legalize_chlo_decomposition.mlir"
     "legalize_chlo_no_broadcast.mlir"
     "legalize_chlo_with_broadcast.mlir"
     "legalize_composite.mlir"
     "legalize_control_flow.mlir"
+    "legalize_deprecated_ops.mlir"
+    "legalize_deprecated_ops_invalid.mlir"
+    "legalize_dynamic_reduce_window.mlir"
     "legalize_shape_computations.mlir"
     "lower_bounds_pipeline.mlir"
     "lower_bounds_tuple.mlir"
+    "scatter_region_captures.mlir"
+    "shape_assertion_dispatch.mlir"
+    "shape_assertion_pipeline.mlir"
+    "shape_assertion_scatter_scalar.mlir"
     "stablehlo_custom_calls.mlir"
     "stablehlo_to_iree_input_dialects.mlir"
     "stablehlo_to_linalg_ext.mlir"
+    "stablehlo_to_linalg_ext_invalid.mlir"
+    "unsupported_custom_call.mlir"
     "verify_compiler_input_legality.mlir"
     "vhlo_stablehlo_mix_invalid.mlir"
   TOOLS
+    ${IREE_LLD_TARGET}
     FileCheck
     iree-compile
     iree-opt
+    split-file
+)
+
+iree_cc_test(
+  NAME
+    DynamicReduceWindowTest
+  SRCS
+    "DynamicReduceWindowTest.cpp"
+  DEPS
+    MLIRArithDialect
+    MLIRFuncDialect
+    MLIRIR
+    MLIRParser
+    MLIRPass
+    MLIRTensorDialect
+    StablehloOps
+    gmock
+    gtest
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::plugins::input::StableHLO::Conversion::PassHeaders
+    iree::compiler::plugins::input::StableHLO::Conversion::StableHLOLegalization
+    iree::testing::gtest_main
 )
 
 iree_cc_test(
@@ -111,6 +149,21 @@ iree_cc_test(
     iree::compiler::plugins::input::StableHLO::Conversion::CustomCallAndCompositePreprocessing
     iree::compiler::plugins::input::StableHLO::Conversion::CustomCallMetadata
     iree::compiler::plugins::input::StableHLO::Conversion::TargetRegistry
+    iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    StableHLOPaddingUtilsTest
+  SRCS
+    "StableHLOPaddingUtilsTest.cpp"
+  DEPS
+    LLVMSupport
+    MLIRArithDialect
+    MLIRIR
+    gmock
+    gtest
+    iree::compiler::plugins::input::StableHLO::Conversion::PaddingUtils
     iree::testing::gtest_main
 )
 

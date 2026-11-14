@@ -124,4 +124,15 @@ void IntegerDivisibilityAnalysis::visitNonControlFlowArguments(
       op, successor, successorInputs, argLattices, getLattice);
 }
 
+bool isProvenMultipleOf(Value value, int64_t divisor, DataFlowSolver &solver) {
+  if (std::optional<int64_t> constant = getConstantIntValue(value)) {
+    return *constant % divisor == 0;
+  }
+  auto *lattice = solver.lookupState<IntegerDivisibilityLattice>(value);
+  if (!lattice || lattice->getValue().isUninitialized()) {
+    return false;
+  }
+  return lattice->getValue().getValue().udiv() % divisor == 0;
+}
+
 } // namespace mlir::iree_compiler::IREE::Util

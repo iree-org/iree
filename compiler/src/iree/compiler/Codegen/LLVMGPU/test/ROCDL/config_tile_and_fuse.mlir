@@ -528,11 +528,13 @@ func.func @only_scattered_dim(%arg0: tensor<48xf32>,
   return %1 : tensor<100x100xf32>
 }
 
+// TileAndFuse does not handle this scatter, and Distribute only distributes
+// linalg ops to threads, so it runs on a single thread.
 // CHECK-LABEL: func.func @only_scattered_dim(
-//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<Distribute> workgroup_size = [128, 1, 1] subgroup_size = 64
+//  CHECK-SAME:   #iree_codegen.translation_info<pipeline = #iree_gpu.pipeline<Distribute> workgroup_size = [1, 1, 1]
 
 //       CHECK:   linalg_ext.scatter {{.*}}lowering_config = #iree_codegen.lowering_config
-//  CHECK-SAME:     tile_sizes = {{\[}}[128]]
+//  CHECK-SAME:     tile_sizes = {{\[}}[]]
 
 // -----
 

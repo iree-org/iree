@@ -16,10 +16,13 @@ namespace mlir::iree_compiler::stablehlo {
 // General StableHLO/CHLO preprocessing patterns.
 //===----------------------------------------------------------------------===//
 
-/// Collection of canonicalization patterns for StableHLO.
+/// Collection of canonicalization patterns for StableHLO. The reorder of a
+/// unary elementwise op before a shape op changes types in place, which a
+/// dialect conversion does not track, so conversions leave it out.
 void populateCanonicalizationPatterns(MLIRContext *context,
                                       RewritePatternSet *patterns,
-                                      PatternBenefit benefit = 1);
+                                      PatternBenefit benefit = 1,
+                                      bool reorderElementwiseAndShape = true);
 
 /// Collection of rewrite patterns for lowering of StableHLO dot general
 /// operations.

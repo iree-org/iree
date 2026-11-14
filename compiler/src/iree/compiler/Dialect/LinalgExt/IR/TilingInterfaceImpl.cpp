@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -289,76 +290,452 @@ FailureOr<TilingResult> ScatterOp::getTiledImplementationFromOperandTiles(
   return getTiledImplementation(b, mappedOffsets, mappedSizes);
 }
 
+// Widens an index or integer to |wideTy|, extending by the source signedness.
+static Value widenIndex(OpBuilder &b, Location loc, Value value,
+                        IntegerType wideTy) {
+  if (isa<IndexType>(value.getType())) {
+    return arith::IndexCastOp::create(b, loc, wideTy, value);
+  }
+  auto integerTy = cast<IntegerType>(value.getType());
+  if (integerTy.getWidth() == wideTy.getWidth()) {
+    return value;
+  }
+  if (integerTy.isUnsigned()) {
+    return arith::ExtUIOp::create(b, loc, wideTy, value);
+  }
+  return arith::ExtSIOp::create(b, loc, wideTy, value);
+}
+
+// Returns whether lowerBound <= value < upperBound, as signed integers.
+static Value createIsInHalfOpenRange(OpBuilder &b, Location loc, Value value,
+                                     Value lowerBound, Value upperBound) {
+  Value isAtOrAboveLowerBound = arith::CmpIOp::create(
+      b, loc, arith::CmpIPredicate::sge, value, lowerBound);
+  Value isBelowUpperBound = arith::CmpIOp::create(
+      b, loc, arith::CmpIPredicate::slt, value, upperBound);
+  return arith::AndIOp::create(b, loc, isAtOrAboveLowerBound,
+                               isBelowUpperBound);
+}
+
+// Returns whether start + offset lies in [0, extent). Compares start with
+// bounds shifted by the offset instead of forming the sum, which could
+// overflow even a 64-bit intermediate for a large signed start.
+static Value createIsWindowElementInBounds(OpBuilder &b, Location loc,
+                                           Value start, Value offset,
+                                           Value extent, Value zero) {
+  Value lowerBound = arith::SubIOp::create(b, loc, zero, offset);
+  Value upperBound = arith::SubIOp::create(b, loc, extent, offset);
+  return createIsInHalfOpenRange(b, loc, start, lowerBound, upperBound);
+}
+
+// Returns the element type wide enough to compare scatter coordinates before
+// narrowing them to the target index width: 64 bits, or the indices' width if
+// wider.
+static IntegerType getWideCoordinateType(OpBuilder &b, ShapedType indicesType) {
+  auto elementType = dyn_cast<IntegerType>(indicesType.getElementType());
+  unsigned width = elementType ? elementType.getWidth() : 64;
+  return b.getIntegerType(std::max(width, 64u));
+}
+
+// Applies the reducer of `op` to `update` and the original element at
+// `destination`, and stores the result there.
+static void createScatterUpdate(ScatterOp op, OpBuilder &b, Location loc,
+                                Value update, ArrayRef<Value> destination) {
+  Value init = memref::LoadOp::create(b, loc, op.getOriginal(), destination);
+  IRMapping bvm;
+  Block &block = op.getRegion().front();
+  bvm.map(block.getArgument(0), update);
+  bvm.map(block.getArgument(1), init);
+  for (auto &blockOp : block.without_terminator()) {
+    b.clone(blockOp, bvm);
+  }
+  // The last op is linalg_ext.yield op. Store the operand to destination.
+  memref::StoreOp::create(
+      b, loc, bvm.lookupOrDefault(block.getTerminator()->getOperand(0)),
+      op.getOriginal(), destination);
+}
+
+// Returns whether every destination coordinate, the optional index plus the
+// optional window offset of each dimension, lies inside the original.
+static Value createScatterBoundsCheck(ScatterOp op, OpBuilder &b, Location loc,
+                                      ArrayRef<Value> wideIndices,
+                                      ArrayRef<Value> wideOffsets,
+                                      IntegerType wideTy) {
+  Value isInBounds = arith::ConstantIntOp::create(b, loc, 1, 1);
+  for (auto [dim, index, offset] : llvm::enumerate(wideIndices, wideOffsets)) {
+    Value wideDimSize = widenIndex(
+        b, loc, memref::DimOp::create(b, loc, op.getOriginal(), dim), wideTy);
+    Value offsetValue =
+        offset ? offset : arith::ConstantIntOp::create(b, loc, wideTy, 0);
+    Value wideZero = arith::ConstantIntOp::create(b, loc, wideTy, 0);
+    Value isDimensionInBounds =
+        index ? createIsWindowElementInBounds(b, loc, index, offsetValue,
+                                              wideDimSize, wideZero)
+              : createIsInHalfOpenRange(b, loc, offsetValue, wideZero,
+                                        wideDimSize);
+    isInBounds = arith::AndIOp::create(b, loc, isInBounds, isDimensionInBounds);
+  }
+  return isInBounds;
+}
+
+// Loads the index vector component of each indexed dimension for the update
+// at `ivs`, widened to `wideTy`.
+static SmallVector<Value> loadWideScatterIndices(ScatterOp op, OpBuilder &b,
+                                                 Location loc, ValueRange ivs,
+                                                 IntegerType wideTy) {
+  SmallVector<Value> loadIndices(ivs.take_front(op.getBatchRank()));
+  bool hasIndexVector = op.getIndicesType().getRank() > op.getBatchRank();
+  if (hasIndexVector) {
+    loadIndices.push_back(Value());
+  }
+  SmallVector<Value> wideIndices;
+  for (auto i : llvm::seq<unsigned>(0, op.getIndexDepth())) {
+    if (hasIndexVector) {
+      loadIndices.back() = arith::ConstantIndexOp::create(b, loc, i);
+    }
+    Value index = memref::LoadOp::create(b, loc, op.getIndices(), loadIndices);
+    wideIndices.push_back(widenIndex(b, loc, index, wideTy));
+  }
+  return wideIndices;
+}
+
 LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
                                                       Location loc,
                                                       ValueRange ivs) {
-  auto indexDepth = getIndexDepth();
   Value update = memref::LoadOp::create(b, loc, getUpdates(), ivs);
-  SmallVector<Value> starts;
-  SmallVector<Value> loadIndices;
-  append_range(loadIndices, ivs.take_front(getBatchRank()));
-
-  // Populate with empty values.
   auto originalTy = getOriginalType();
-  starts.resize(originalTy.getRank(), Value());
   auto updateIvs = ivs.drop_front(getBatchRank());
 
-  int64_t offset = starts.size() - updateIvs.size();
+  // Check bounds before converting indices to the target index width. In
+  // particular, narrowing an i64 index on a 32-bit target can wrap an
+  // out-of-bounds value into a valid coordinate.
+  IntegerType wideTy = getWideCoordinateType(b, getIndicesType());
+  auto toWide = [&](Value value) { return widenIndex(b, loc, value, wideTy); };
+  SmallVector<Value> wideOffsets(originalTy.getRank());
+  int64_t offset = originalTy.getRank() - updateIvs.size();
   for (auto [idx, iv] : llvm::enumerate(updateIvs)) {
-    starts[idx + offset] = iv;
+    wideOffsets[idx + offset] = toWide(iv);
+  }
+  SmallVector<Value> wideIndices(originalTy.getRank());
+  for (auto [i, index] :
+       llvm::enumerate(loadWideScatterIndices(*this, b, loc, ivs, wideTy))) {
+    wideIndices[getDimensionMap()[i]] = index;
   }
 
-  ArrayRef<int64_t> dimMap = getDimensionMap();
-
-  if (getIndicesType().getRank() > getBatchRank()) {
-    loadIndices.push_back(Value());
-  }
-  for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
-    if (getIndicesType().getRank() > getBatchRank()) {
-      loadIndices.back() = arith::ConstantIndexOp::create(b, loc, i);
-    }
-    Value idx = memref::LoadOp::create(b, loc, getIndices(), loadIndices);
-    Value ret = arith::IndexCastOp::create(b, loc, b.getIndexType(), idx);
-
-    auto dim = dimMap[i];
-
-    if (starts[dim]) {
-      ret = arith::AddIOp::create(b, loc, ret, starts[dim]);
-    }
-    starts[dim] = ret;
-  }
-
-  auto emitScatterUpdate = [&](OpBuilder &builder, Location nestedLoc) {
-    Value init =
-        memref::LoadOp::create(builder, nestedLoc, getOriginal(), starts);
-
-    IRMapping bvm;
-    Block &block = getRegion().front();
-    bvm.map(block.getArgument(0), update);
-    bvm.map(block.getArgument(1), init);
-    for (auto &blockOp : block.without_terminator()) {
-      builder.clone(blockOp, bvm);
-    }
-    // The last op is linalg_ext.yield op. Store the operand to destination.
-    memref::StoreOp::create(
-        builder, nestedLoc,
-        bvm.lookupOrDefault(block.getTerminator()->getOperand(0)),
-        getOriginal(), starts);
-  };
-
+  Value isInBounds =
+      createScatterBoundsCheck(*this, b, loc, wideIndices, wideOffsets, wideTy);
   if (Value mask = getMask()) {
     SmallVector<Value> maskIndices(ivs.take_front(getBatchRank()));
     Value maskValue = memref::LoadOp::create(b, loc, mask, maskIndices);
     maskValue = normalizeMaskValue(b, loc, maskValue);
-    scf::IfOp::create(b, loc, maskValue,
-                      [&](OpBuilder &thenBuilder, Location thenLoc) {
-                        emitScatterUpdate(thenBuilder, thenLoc);
-                        scf::YieldOp::create(thenBuilder, thenLoc);
-                      });
-    return success();
+    isInBounds = arith::AndIOp::create(b, loc, isInBounds, maskValue);
   }
 
-  emitScatterUpdate(b, loc);
+  scf::IfOp::create(
+      b, loc, isInBounds, [&](OpBuilder &thenBuilder, Location thenLoc) {
+        SmallVector<Value> boundedStarts;
+        for (auto [dim, index] : llvm::enumerate(wideIndices)) {
+          Value start = wideOffsets[dim];
+          if (!start) {
+            start =
+                arith::ConstantIntOp::create(thenBuilder, thenLoc, wideTy, 0);
+          }
+          if (index) {
+            start = arith::AddIOp::create(thenBuilder, thenLoc, index, start);
+          }
+          boundedStarts.push_back(arith::IndexCastOp::create(
+              thenBuilder, thenLoc, thenBuilder.getIndexType(), start));
+        }
+        createScatterUpdate(*this, thenBuilder, thenLoc, update, boundedStarts);
+        scf::YieldOp::create(thenBuilder, thenLoc);
+      });
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// GeneralScatterOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<utils::IteratorType> GeneralScatterOp::getLoopIteratorTypes() {
+  // Use a sequential update schedule because expanded window coordinates may
+  // overlap.
+  return SmallVector<utils::IteratorType>(
+      cast<ShapedType>(getUpdates().front().getType()).getRank(),
+      utils::IteratorType::reduction);
+}
+
+SmallVector<Range> GeneralScatterOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  SmallVector<Range> ranges;
+  auto updateRank = cast<ShapedType>(getUpdates().front().getType()).getRank();
+  for (int64_t dim = 0; dim < updateRank; ++dim) {
+    ranges.push_back(
+        Range{zero, getDim(builder, loc, getUpdates().front(), dim), one});
+  }
+  return ranges;
+}
+
+/// Returns true if `size` is the full extent of dimension `dim` of `source`:
+/// the static extent, or a dim query of the same source and dimension. Creates
+/// no IR, so callers can decline without leaving operations behind.
+static bool isFullExtent(OpFoldResult size, Value source, int64_t dim) {
+  int64_t staticExtent = cast<ShapedType>(source.getType()).getDimSize(dim);
+  if (ShapedType::isStatic(staticExtent)) {
+    return getConstantIntValue(size) == staticExtent;
+  }
+  auto sizeValue = dyn_cast<Value>(size);
+  if (!sizeValue) {
+    return false;
+  }
+  if (auto dimOp = sizeValue.getDefiningOp<tensor::DimOp>()) {
+    return dimOp.getSource() == source && dimOp.getConstantIndex() == dim;
+  }
+  if (auto dimOp = sizeValue.getDefiningOp<memref::DimOp>()) {
+    return dimOp.getSource() == source && dimOp.getConstantIndex() == dim;
+  }
+  return false;
+}
+
+FailureOr<TilingResult>
+GeneralScatterOp::getTiledImplementation(OpBuilder &builder,
+                                         ArrayRef<OpFoldResult> offsets,
+                                         ArrayRef<OpFoldResult> sizes) {
+  // The operation has data-dependent destinations. Its only supported tile is
+  // the full update domain with the full output tensors.
+  Value updates = getUpdates().front();
+  auto updateRank = cast<ShapedType>(updates.getType()).getRank();
+  if (offsets.size() != updateRank || sizes.size() != updateRank) {
+    return failure();
+  }
+  for (int64_t dim = 0; dim < updateRank; ++dim) {
+    if (!isZeroInteger(offsets[dim]) ||
+        !isFullExtent(sizes[dim], updates, dim)) {
+      return failure();
+    }
+  }
+  Operation *tiledOp = builder.clone(*getOperation());
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults()), {}};
+}
+
+LogicalResult GeneralScatterOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  if (resultNumber >= getNumResults()) {
+    return failure();
+  }
+  resultOffsets.clear();
+  resultSizes.clear();
+  auto resultType = cast<ShapedType>(getResults()[resultNumber].getType());
+  for (int64_t dim = 0; dim < resultType.getRank(); ++dim) {
+    resultOffsets.push_back(builder.getIndexAttr(0));
+    resultSizes.push_back(
+        getDim(builder, getLoc(), getOriginals()[resultNumber], dim));
+  }
+  return success();
+}
+
+LogicalResult GeneralScatterOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &, ArrayRef<unsigned>, ArrayRef<SmallVector<OpFoldResult>>,
+    ArrayRef<SmallVector<OpFoldResult>>, SmallVectorImpl<OpFoldResult> &,
+    SmallVectorImpl<OpFoldResult> &) {
+  return failure();
+}
+
+FailureOr<TilingResult>
+GeneralScatterOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &, ArrayRef<unsigned>, ArrayRef<SmallVector<OpFoldResult>>,
+    ArrayRef<SmallVector<OpFoldResult>>) {
+  return failure();
+}
+
+namespace {
+// Where the update at given loop ivs goes: per input dimension, the start the
+// indices select and the offset the update adds within its window. The
+// destination is their sum.
+struct GeneralScatterCoordinates {
+  SmallVector<Value> wideStarts;
+  SmallVector<Value> wideOffsets;
+};
+
+// The update and indices dimensions that a general scatter pairs: update
+// dimensions outside the window, in order, with indices dimensions other than
+// the index vector.
+struct GeneralScatterIndexedDims {
+  SmallVector<int64_t> updateScatterDims;
+  SmallVector<int64_t> indicesNonVectorDims;
+};
+} // namespace
+
+static FailureOr<GeneralScatterIndexedDims>
+getGeneralScatterIndexedDims(GeneralScatterOp op) {
+  auto updateRank =
+      cast<ShapedType>(op.getUpdates().front().getType()).getRank();
+  auto indicesRank = cast<ShapedType>(op.getIndices().getType()).getRank();
+  int64_t indexVectorDim = op.getIndexVectorDim();
+  if (indexVectorDim < 0 || indexVectorDim > indicesRank) {
+    return failure();
+  }
+  GeneralScatterIndexedDims dims;
+  dims.updateScatterDims =
+      llvm::filter_to_vector(llvm::seq<int64_t>(updateRank), [&](int64_t dim) {
+        return !llvm::is_contained(op.getUpdateWindowDims(), dim);
+      });
+  dims.indicesNonVectorDims =
+      llvm::filter_to_vector(llvm::seq<int64_t>(indicesRank), [&](int64_t dim) {
+        return dim != indexVectorDim;
+      });
+  if (dims.updateScatterDims.size() != dims.indicesNonVectorDims.size()) {
+    return failure();
+  }
+  return dims;
+}
+
+// Loads the start of each scattered input dimension from the index vector the
+// update at `ivs` selects. Unscattered dimensions start at `zero`.
+static SmallVector<Value>
+loadGeneralScatterStarts(GeneralScatterOp op, OpBuilder &b, Location loc,
+                         ValueRange ivs, const GeneralScatterIndexedDims &dims,
+                         Value zero) {
+  auto indicesType = cast<ShapedType>(op.getIndices().getType());
+  int64_t indexVectorDim = op.getIndexVectorDim();
+  SmallVector<Value> indices(indicesType.getRank());
+  for (auto [updateDim, indicesDim] :
+       llvm::zip_equal(dims.updateScatterDims, dims.indicesNonVectorDims)) {
+    indices[indicesDim] = ivs[updateDim];
+  }
+  auto inputRank =
+      cast<ShapedType>(op.getOriginals().front().getType()).getRank();
+  SmallVector<Value> wideStarts(inputRank, zero);
+  auto wideTy = cast<IntegerType>(zero.getType());
+  for (auto [component, inputDim] :
+       llvm::enumerate(op.getScatterDimsToOperandDims())) {
+    if (indexVectorDim < indicesType.getRank()) {
+      indices[indexVectorDim] = arith::ConstantIndexOp::create(
+          b, loc, static_cast<int64_t>(component));
+    }
+    Value indexValue = memref::LoadOp::create(b, loc, op.getIndices(), indices);
+    wideStarts[inputDim] = widenIndex(b, loc, indexValue, wideTy);
+  }
+  return wideStarts;
+}
+
+// Returns the offset of the update at `ivs` within its window along each input
+// dimension: window dimensions take their update iv and batching dimensions
+// the iv of their paired indices dimension. Inserted dimensions stay `zero`.
+static FailureOr<SmallVector<Value>>
+getGeneralScatterOffsets(GeneralScatterOp op, OpBuilder &b, Location loc,
+                         ValueRange ivs, const GeneralScatterIndexedDims &dims,
+                         Value zero) {
+  auto wideTy = cast<IntegerType>(zero.getType());
+  auto inputRank =
+      cast<ShapedType>(op.getOriginals().front().getType()).getRank();
+  SmallVector<int64_t> windowInputDims =
+      llvm::filter_to_vector(llvm::seq<int64_t>(inputRank), [&](int64_t dim) {
+        return !llvm::is_contained(op.getInsertedWindowDims(), dim) &&
+               !llvm::is_contained(op.getInputBatchingDims(), dim);
+      });
+  if (windowInputDims.size() != op.getUpdateWindowDims().size()) {
+    return failure();
+  }
+  SmallVector<Value> wideOffsets(inputRank, zero);
+  for (auto [updateDim, inputDim] :
+       llvm::zip_equal(op.getUpdateWindowDims(), windowInputDims)) {
+    wideOffsets[inputDim] = widenIndex(b, loc, ivs[updateDim], wideTy);
+  }
+  for (auto [inputBatchDim, indicesBatchDim] : llvm::zip(
+           op.getInputBatchingDims(), op.getScatterIndicesBatchingDims())) {
+    auto it = llvm::find(dims.indicesNonVectorDims, indicesBatchDim);
+    if (it == dims.indicesNonVectorDims.end()) {
+      return failure();
+    }
+    int64_t updateDim = dims.updateScatterDims[std::distance(
+        dims.indicesNonVectorDims.begin(), it)];
+    wideOffsets[inputBatchDim] = widenIndex(b, loc, ivs[updateDim], wideTy);
+  }
+  return wideOffsets;
+}
+
+// Applies the reducer of `op` to the originals at `destination` and the
+// updates at `ivs`, loading all values before the reducer runs, and stores
+// every result.
+static void createGeneralScatterUpdate(GeneralScatterOp op, OpBuilder &b,
+                                       Location loc, ValueRange ivs,
+                                       ArrayRef<Value> destination) {
+  SmallVector<Value> updateValues;
+  for (Value update : op.getUpdates()) {
+    updateValues.push_back(memref::LoadOp::create(b, loc, update, ivs));
+  }
+  SmallVector<Value> currentValues;
+  for (Value original : op.getOriginals()) {
+    currentValues.push_back(
+        memref::LoadOp::create(b, loc, original, destination));
+  }
+  // The reducer takes the original values first, then the update values.
+  IRMapping mapping;
+  Block &body = op.getRegion().front();
+  mapping.map(body.getArguments().take_front(currentValues.size()),
+              currentValues);
+  mapping.map(body.getArguments().drop_front(currentValues.size()),
+              updateValues);
+  for (Operation &bodyOp : body.without_terminator()) {
+    b.clone(bodyOp, mapping);
+  }
+  auto yieldOp = cast<YieldOp>(body.getTerminator());
+  for (auto [original, value] :
+       llvm::zip_equal(op.getOriginals(), yieldOp->getOperands())) {
+    memref::StoreOp::create(b, loc, mapping.lookupOrDefault(value), original,
+                            destination);
+  }
+}
+
+LogicalResult GeneralScatterOp::generateScalarImplementation(OpBuilder &b,
+                                                             Location loc,
+                                                             ValueRange ivs) {
+  auto updateRank = cast<ShapedType>(getUpdates().front().getType()).getRank();
+  if (ivs.size() != updateRank) {
+    return failure();
+  }
+  FailureOr<GeneralScatterIndexedDims> dims =
+      getGeneralScatterIndexedDims(*this);
+  if (failed(dims)) {
+    return failure();
+  }
+  auto wideTy = b.getIntegerType(64);
+  Value zero = arith::ConstantIntOp::create(b, loc, wideTy, 0);
+  SmallVector<Value> wideStarts =
+      loadGeneralScatterStarts(*this, b, loc, ivs, *dims, zero);
+  FailureOr<SmallVector<Value>> wideOffsets =
+      getGeneralScatterOffsets(*this, b, loc, ivs, *dims, zero);
+  if (failed(wideOffsets)) {
+    return failure();
+  }
+
+  Value inBounds = arith::ConstantIntOp::create(b, loc, 1, 1);
+  for (auto [dim, start, offset] : llvm::enumerate(wideStarts, *wideOffsets)) {
+    Value extent = widenIndex(
+        b, loc, memref::DimOp::create(b, loc, getOriginals().front(), dim),
+        wideTy);
+    inBounds = arith::AndIOp::create(
+        b, loc, inBounds,
+        createIsWindowElementInBounds(b, loc, start, offset, extent, zero));
+  }
+
+  scf::IfOp::create(
+      b, loc, inBounds, [&](OpBuilder &thenBuilder, Location thenLoc) {
+        SmallVector<Value> destination;
+        for (auto [start, offset] : llvm::zip_equal(wideStarts, *wideOffsets)) {
+          Value element =
+              arith::AddIOp::create(thenBuilder, thenLoc, start, offset);
+          destination.push_back(arith::IndexCastOp::create(
+              thenBuilder, thenLoc, thenBuilder.getIndexType(), element));
+        }
+        createGeneralScatterUpdate(*this, thenBuilder, thenLoc, ivs,
+                                   destination);
+        scf::YieldOp::create(thenBuilder, thenLoc);
+      });
   return success();
 }
 
@@ -4291,6 +4668,12 @@ FailureOr<TilingResult> FftOp::getTiledImplementation(
   return getTiledImplementation(builder, offsets, sizes);
 }
 
+FailureOr<TilingResult> GeneralScatterOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
 FailureOr<TilingResult> GatherOp::getTiledImplementation(
     OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
@@ -4403,6 +4786,28 @@ FailureOr<TilingResult> Im2colOp::generateResultTileValue(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) {
   return generateResultTileValue(builder, resultNumber, offsets, sizes);
+}
+
+FailureOr<TilingResult>
+GeneralScatterOp::getTiledImplementationFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
+    ArrayRef<mlir::InnerTileAlignment>) {
+  return getTiledImplementationFromOperandTiles(b, operandNumbers, allOffsets,
+                                                allSizes);
+}
+
+LogicalResult GeneralScatterOp::getIterationDomainTileFromOperandTiles(
+    OpBuilder &b, ArrayRef<unsigned> operandNumbers,
+    ArrayRef<SmallVector<OpFoldResult>> allOffsets,
+    ArrayRef<SmallVector<OpFoldResult>> allSizes,
+    SmallVectorImpl<OpFoldResult> &iterDomainOffsets,
+    SmallVectorImpl<OpFoldResult> &iterDomainSizes,
+    ArrayRef<mlir::InnerTileAlignment>) {
+  return getIterationDomainTileFromOperandTiles(b, operandNumbers, allOffsets,
+                                                allSizes, iterDomainOffsets,
+                                                iterDomainSizes);
 }
 
 FailureOr<TilingResult> MapLoadOp::getTiledImplementationFromOperandTiles(

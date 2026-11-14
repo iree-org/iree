@@ -271,10 +271,94 @@ static void captureDims(scf::ForOp forOp) {
   forOp->erase();
 }
 
+// Returns the dimensions of every dynamic tensor result of 'ifOp' as additional
+// results, yielded by both branches, and ties them to the result tensors using
+// 'flow.tensor.tie_shape'.
+static void captureDims(scf::IfOp ifOp) {
+  // Dispatch bodies capture their dims through the dispatch operands.
+  if (ifOp.getNumResults() == 0 ||
+      ifOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+    return;
+  }
+  scf::YieldOp thenYield = ifOp.thenYield();
+  scf::YieldOp elseYield = ifOp.elseYield();
+
+  struct DynamicResult {
+    OpResult result;
+    SmallVector<Value> thenDims;
+    SmallVector<Value> elseDims;
+  };
+  SmallVector<DynamicResult> dynamicResults;
+  for (OpResult result : ifOp->getResults()) {
+    auto tensorType = dyn_cast<TensorType>(result.getType());
+    if (!tensorType || tensorType.hasStaticShape()) {
+      continue;
+    }
+
+    // Make the transform idempotent by not caring about tensors only used
+    // within 'flow.tensor.tie_shape' operations.
+    if (llvm::all_of(result.getUsers(),
+                     llvm::IsaPred<Flow::TensorTieShapeOp>)) {
+      continue;
+    }
+
+    unsigned index = result.getResultNumber();
+    std::optional<ValueRange> thenDims = IREE::Util::findDynamicDims(
+        thenYield.getOperand(index), thenYield->getBlock(),
+        Block::iterator(thenYield));
+    std::optional<ValueRange> elseDims = IREE::Util::findDynamicDims(
+        elseYield.getOperand(index), elseYield->getBlock(),
+        Block::iterator(elseYield));
+    if (!thenDims || !elseDims || thenDims->size() != elseDims->size()) {
+      continue;
+    }
+    dynamicResults.push_back(
+        {result, llvm::to_vector(*thenDims), llvm::to_vector(*elseDims)});
+  }
+
+  if (dynamicResults.empty()) {
+    return;
+  }
+
+  // A new 'scf.if' has to be created to replace the old one as new results
+  // are being added.
+  SmallVector<Type> resultTypes = llvm::to_vector(ifOp.getResultTypes());
+  for (DynamicResult &dynamicResult : dynamicResults) {
+    resultTypes.append(dynamicResult.thenDims.size(),
+                       IndexType::get(ifOp.getContext()));
+    thenYield.getResultsMutable().append(dynamicResult.thenDims);
+    elseYield.getResultsMutable().append(dynamicResult.elseDims);
+  }
+  OpBuilder builder(ifOp);
+  auto newIfOp =
+      scf::IfOp::create(builder, ifOp.getLoc(), resultTypes,
+                        ifOp.getCondition(), /*withElseRegion=*/true);
+  newIfOp.getThenRegion().takeBody(ifOp.getThenRegion());
+  newIfOp.getElseRegion().takeBody(ifOp.getElseRegion());
+
+  builder.setInsertionPointAfter(newIfOp);
+  SmallVector<Value> results = llvm::to_vector_of<Value>(
+      newIfOp.getResults().take_front(ifOp.getNumResults()));
+  unsigned dimIndex = ifOp.getNumResults();
+  for (DynamicResult &dynamicResult : dynamicResults) {
+    unsigned dimCount = dynamicResult.thenDims.size();
+    Value &replacement = results[dynamicResult.result.getResultNumber()];
+    replacement = Flow::TensorTieShapeOp::create(
+        builder, ifOp.getLoc(), replacement,
+        llvm::to_vector_of<Value>(
+            newIfOp.getResults().slice(dimIndex, dimCount)));
+    dimIndex += dimCount;
+  }
+
+  ifOp.replaceAllUsesWith(results);
+  ifOp->erase();
+}
+
 struct CaptureDynamicDimsPass
     : IREE::Flow::impl::CaptureDynamicDimsPassBase<CaptureDynamicDimsPass> {
   void runOnOperation() override {
     getOperation()->walk([&](scf::ForOp forOp) { captureDims(forOp); });
+    getOperation()->walk([&](scf::IfOp ifOp) { captureDims(ifOp); });
     getOperation()->walk([&](IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
       captureDims(dispatchOp);
     });

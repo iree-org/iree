@@ -46,6 +46,7 @@ void buildStableHLOInputConversionPassPipelineImpl(
   // If the input is StableHLO, this pass is considered a NOP.
   passManager.addPass(stablehlo::createCheckVHLOStableHloMixUsage());
   ::mlir::stablehlo::createStablehloDeserializePipeline(passManager);
+  passManager.addPass(createLegalizeDeprecatedOpsPass());
   // Composite ops carry a symbol reference to a function implementing their
   // decomposition. Replace them with a call to that function so that the
   // conversions below only have to handle the decomposed form; the inliner
@@ -62,6 +63,8 @@ void buildStableHLOInputConversionPassPipelineImpl(
       ::mlir::stablehlo::createStablehloLegalizeQuantToMathPass());
   passManager.addNestedPass<func::FuncOp>(
       ::mlir::stablehlo::createChloLegalizeToStablehloPass());
+  // Expose shape-helper arithmetic before deriving assertion facts.
+  passManager.addPass(createInlineShapeAssertionHelpers());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
   passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());
@@ -108,6 +111,7 @@ void buildStableHLOInputConversionPassPipelineImpl(
   // Convert to Linalg. After this point, StableHLO will be eliminated.
   passManager.addNestedPass<func::FuncOp>(
       stablehlo::createLegalizeShapeComputations());
+  passManager.addPass(stablehlo::createLegalizeDynamicReduceWindow());
   passManager.addNestedPass<func::FuncOp>(
       stablehlo::createConvertStableHloToLinalgExt());
   passManager.addNestedPass<func::FuncOp>(

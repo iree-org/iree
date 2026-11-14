@@ -68,15 +68,20 @@ func.func @i4_dequant_unit_matmul_f16() attributes {
 //     CHECK-DAG: spirv.Constant dense<0> : vector<4xi32>
 //     CHECK-DAG: %[[CSTVEC2XI32_4:.+]] = spirv.Constant dense<4> : vector<2xi32>
 //     CHECK-DAG: %[[CSTVEC2XI32_15:.+]] = spirv.Constant dense<15> : vector<2xi32>
+//     CHECK-DAG: %[[CSTVEC2XI32_255:.+]] = spirv.Constant dense<255> : vector<2xi32>
 
 //         CHECK: spirv.mlir.loop
 
-// Load the quantized weight and get 8xi4 out of it.
+// Load the quantized weight and get 8xi4 out of it. Each i8 is emulated in a
+// 32-bit lane whose bits above the byte are unspecified, so the byte is
+// isolated before the shift moves those bits into the high nibble.
 //         CHECK:   %[[LOAD:.+]] = spirv.Load "StorageBuffer" %{{.+}} : vector<4xi32>
 //         CHECK:   %[[SHUF01:.+]] = spirv.VectorShuffle [0 : i32, 1 : i32] %[[LOAD]], %[[LOAD]] : vector<4xi32>, vector<4xi32> -> vector<2xi32>
 //         CHECK:   %[[MASKED:.+]] = spirv.BitwiseAnd %[[SHUF01]], %[[CSTVEC2XI32_15]] : vector<2xi32>
-//         CHECK:   %[[SHIFTED:.+]] = spirv.ShiftRightLogical %[[SHUF01]], %[[CSTVEC2XI32_4]] : vector<2xi32>, vector<2xi32>
-//         CHECK:   spirv.VectorShuffle [0 : i32, 2 : i32, 1 : i32, 3 : i32] %[[MASKED]], %[[SHIFTED]] : vector<2xi32>, vector<2xi32> -> vector<4xi32>
+//         CHECK:   %[[BYTE:.+]] = spirv.BitwiseAnd %[[SHUF01]], %[[CSTVEC2XI32_255]] : vector<2xi32>
+//         CHECK:   %[[SHIFTED:.+]] = spirv.ShiftRightLogical %[[BYTE]], %[[CSTVEC2XI32_4]] : vector<2xi32>, vector<2xi32>
+//         CHECK:   %[[HIGH:.+]] = spirv.BitwiseAnd %[[SHIFTED]], %[[CSTVEC2XI32_255]] : vector<2xi32>
+//         CHECK:   spirv.VectorShuffle [0 : i32, 2 : i32, 1 : i32, 3 : i32] %[[MASKED]], %[[HIGH]] : vector<2xi32>, vector<2xi32> -> vector<4xi32>
 //         CHECK:   spirv.ConvertUToF %{{.+}} : vector<4xi32> to vector<4xf16>
 
 //         CHECK:   spirv.VectorShuffle [2 : i32, 3 : i32] %[[LOAD:.+]], %[[LOAD:.+]] : vector<4xi32>, vector<4xi32> -> vector<2xi32>

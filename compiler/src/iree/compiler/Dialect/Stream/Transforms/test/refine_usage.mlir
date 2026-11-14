@@ -791,3 +791,43 @@ util.func public @asyncCastConcreteMismatchTransfers(%source: !stream.resource<c
   // CHECK: util.return %[[TRANSFER]] : !stream.resource<external>
   util.return %cast : !stream.resource<external>
 }
+
+// -----
+
+// A barrier must not hide a write when choosing a clone's lifetime.
+// CHECK-LABEL: @clone_constant_barrier_mutation
+// CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} !stream.resource<constant>{{.*}} -> !stream.resource<transient>
+// CHECK: %[[BARRIER:.+]] = util.optimization_barrier %[[CLONE]] : !stream.resource<transient>
+// CHECK: stream.async.fill {{.*}} %[[BARRIER]]
+util.func private @clone_constant_barrier_mutation(%constant: !stream.resource<constant>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1_i32 = arith.constant 1 : i32
+  %clone = stream.async.clone %constant : !stream.resource<constant>{%size} -> !stream.resource<*>{%size}
+  %barrier = util.optimization_barrier %clone : !stream.resource<*>
+  %result = stream.async.fill %c1_i32, %barrier[%c0 to %size for %size] : i32 -> %barrier as !stream.resource<*>{%size}
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// A read-only barrier still permits a clone to inherit constant storage.
+// CHECK-LABEL: @clone_constant_barrier_readonly
+// CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} !stream.resource<constant>{{.*}} -> !stream.resource<constant>
+// CHECK: util.optimization_barrier %[[CLONE]] : !stream.resource<constant>
+util.func private @clone_constant_barrier_readonly() -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %size = arith.constant 4 : index
+  %constant = stream.async.constant : !stream.resource<constant>{%size} = dense<0> : tensor<i32>
+  %clone = stream.async.clone %constant : !stream.resource<constant>{%size} -> !stream.resource<*>{%size}
+  %barrier = util.optimization_barrier %clone : !stream.resource<*>
+  %result = stream.async.dispatch @ex::@dispatch(%barrier[%c0 to %size for %size]) : (!stream.resource<*>{%size}) -> !stream.resource<*>{%size}
+  util.return %result : !stream.resource<*>
+}
+stream.executable private @ex {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%in: !stream.binding, %out: !stream.binding) {
+      return
+    }
+  }
+}

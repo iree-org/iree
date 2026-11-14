@@ -34,6 +34,16 @@ def SPIRVConvertGPUTargetPass : Pass<"iree-spirv-convert-gpu-target", "mlir::Mod
   let summary = "Convert #iree_gpu.target into #spirv.target_env";
 }
 
+def SPIRVEmulateF16StoragePass :
+    InterfacePass<"iree-spirv-emulate-f16-storage", "mlir::FunctionOpInterface"> {
+  let summary = "Emulate f16 arithmetic and storage when unsupported by the target";
+  let description = [{
+    Emulates unsupported half-precision values and narrow integer storage.
+    Preserves each half-precision rounding boundary and the original bits
+    observed by bitcasts. Leaves native representations unchanged.
+  }];
+}
+
 def SPIRVEmulateI64Pass :
     InterfacePass<"iree-spirv-emulate-i64", "mlir::FunctionOpInterface"> {
   let summary = "Emulate 64-bit integer ops with 32-bit integer ops";

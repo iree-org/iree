@@ -22,6 +22,12 @@ static llvm::cl::opt<bool> clAnnotateInputAffinities(
                    "the pipeline for debugging."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clBoundTransientAllocations(
+    "iree-stream-bound-transient-allocations",
+    llvm::cl::desc("Packs local transients whose sizes have a proven upper "
+                   "bound at that bound, so fully bounded slabs are static."),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clUnifyEncodingForGlobals(
     "iree-stream-experimental-unify-encoding-for-globals",
     llvm::cl::desc("Unifies multiple encodings of the same immutable global to "
@@ -332,7 +338,10 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
                                 const TransformOptions &transformOptions) {
   // Schedule fine-grained allocations and insert placeholders for larger/longer
   // lifetime allocations.
-  passManager.addPass(IREE::Stream::createScheduleAllocationPass());
+  IREE::Stream::ScheduleAllocationPassOptions scheduleAllocationOptions;
+  scheduleAllocationOptions.boundTransients = clBoundTransientAllocations;
+  passManager.addPass(
+      IREE::Stream::createScheduleAllocationPass(scheduleAllocationOptions));
 
   // Tries to emplace transient allocations in user-provided storage, if any.
   // This will find stream.resource.alloca (and matching dealloca) ops and try

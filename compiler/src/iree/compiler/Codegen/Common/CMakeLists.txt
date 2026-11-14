@@ -66,6 +66,7 @@ iree_cc_library(
     "TileInferenceUtils.h"
     "Transforms.h"
     "UserConfig.h"
+    "WidenNarrowIntegers.h"
   SRCS
     "AbsorbSwizzleHintToAlloc.cpp"
     "AddFastMathFlags.cpp"
@@ -180,6 +181,7 @@ iree_cc_library(
     "VectorizeMemrefCopy.cpp"
     "VerifyPipelineConstraints.cpp"
     "VerifyWorkgroupDistribution.cpp"
+    "WidenNarrowIntegers.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen

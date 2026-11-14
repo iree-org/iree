@@ -84,3 +84,27 @@ util.func public @zero_extent_reduction_dynamic(
 //  CHECK-NOT:   linalg.generic
 //  CHECK-NOT:   linalg.fill
 //      CHECK:   util.return %[[INIT]]
+
+// -----
+
+// A contraction over an empty dimension never writes its output.
+util.func public @zero_trip_matmul(%lhs: tensor<5x0xf32>, %rhs: tensor<0x7xf32>) -> tensor<5x7xf32> {
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<5x7xf32>
+  %fill = linalg.fill ins(%zero : f32) outs(%empty : tensor<5x7xf32>) -> tensor<5x7xf32>
+  %result = linalg.matmul ins(%lhs, %rhs : tensor<5x0xf32>, tensor<0x7xf32>) outs(%fill : tensor<5x7xf32>) -> tensor<5x7xf32>
+  util.return %result : tensor<5x7xf32>
+}
+// CHECK-LABEL: util.func public @zero_trip_matmul
+//   CHECK-NOT:   linalg.matmul
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//       CHECK:   util.return %[[FILL]]
+
+// -----
+
+util.func public @nonempty_matmul(%lhs: tensor<5x3xf32>, %rhs: tensor<3x7xf32>, %init: tensor<5x7xf32>) -> tensor<5x7xf32> {
+  %result = linalg.matmul ins(%lhs, %rhs : tensor<5x3xf32>, tensor<3x7xf32>) outs(%init : tensor<5x7xf32>) -> tensor<5x7xf32>
+  util.return %result : tensor<5x7xf32>
+}
+// CHECK-LABEL: util.func public @nonempty_matmul
+//       CHECK:   linalg.matmul

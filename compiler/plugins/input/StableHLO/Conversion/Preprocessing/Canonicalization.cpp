@@ -18,6 +18,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Dialect/CommonFolders.h"
+#include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
@@ -360,23 +361,7 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
     Value rhs = op.getRhs();
 
     if (lhs == rhs) {
-      switch (direction) {
-      case ComparisonDirection::EQ:
-      case ComparisonDirection::GE:
-      case ComparisonDirection::LE: {
-        rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
-            op, SplatElementsAttr::get(type, rewriter.getBoolAttr(true)));
-        return success();
-      }
-      case ComparisonDirection::GT:
-      case ComparisonDirection::LT:
-      case ComparisonDirection::NE: {
-        rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
-            op, rewriter.getZeroAttr(type));
-        return success();
-      }
-      }
-      llvm_unreachable("Unhandled case");
+      return foldSelfComparison(op, type, rewriter);
     }
 
     TypedAttr lhsAttr;
@@ -395,19 +380,62 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
     }
 
     if (lhsAttr && rhsAttr) {
-      if (Attribute res = constFoldBinaryOp<IntegerAttr, IntegerAttr,
-                                            IntegerAttr::ValueType,
-                                            IntegerAttr::ValueType, void>(
-              ArrayRef<Attribute>({lhsAttr, rhsAttr}), op.getType(),
-              [direction, kind = *compType](const APInt &a, const APInt &b) {
-                return calculateComp(kind, direction, a, b);
-              })) {
-        rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
-        return success();
-      }
+      return foldConstantComparison(op, type, *compType, lhsAttr, rhsAttr,
+                                    rewriter);
     }
-
     return failure();
+  }
+
+private:
+  // Replaces a comparison of a value with itself by its constant result. A
+  // dynamic result has no constant to replace it with.
+  static LogicalResult foldSelfComparison(mlir::stablehlo::CompareOp op,
+                                          RankedTensorType type,
+                                          PatternRewriter &rewriter) {
+    using mlir::stablehlo::ComparisonDirection;
+    if (!type.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op, "dynamic self comparison");
+    }
+    switch (op.getComparisonDirection()) {
+    case ComparisonDirection::EQ:
+    case ComparisonDirection::GE:
+    case ComparisonDirection::LE:
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
+          op, SplatElementsAttr::get(type, rewriter.getBoolAttr(true)));
+      return success();
+    case ComparisonDirection::GT:
+    case ComparisonDirection::LT:
+    case ComparisonDirection::NE:
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(
+          op, rewriter.getZeroAttr(type));
+      return success();
+    }
+    llvm_unreachable("Unhandled case");
+  }
+
+  // Replaces a comparison of two integer constants by its constant result.
+  static LogicalResult
+  foldConstantComparison(mlir::stablehlo::CompareOp op, RankedTensorType type,
+                         mlir::stablehlo::ComparisonType kind,
+                         TypedAttr lhsAttr, TypedAttr rhsAttr,
+                         PatternRewriter &rewriter) {
+    if (!type.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "requires a static constant result");
+    }
+    Attribute res =
+        constFoldBinaryOp<IntegerAttr, IntegerAttr, IntegerAttr::ValueType,
+                          IntegerAttr::ValueType, void>(
+            ArrayRef<Attribute>({lhsAttr, rhsAttr}), op.getType(),
+            [direction = op.getComparisonDirection(), kind](const APInt &a,
+                                                            const APInt &b) {
+              return calculateComp(kind, direction, a, b);
+            });
+    if (!res) {
+      return failure();
+    }
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ConstantOp>(op, res);
+    return success();
   }
 };
 
@@ -587,6 +615,36 @@ struct ConcatenateOpCanon final
   }
 };
 
+// concatenate(concatenate(x, y), z) on one dimension is concatenate(x, y, z).
+// Only a single-use inner concatenate is absorbed, so no tensor is duplicated.
+// Mirrors upstream ConcatenateOpFlatten, which StableHLO registers only with
+// its whole aggressive simplification set.
+struct ConcatenateOpFlatten final
+    : OpRewritePattern<mlir::stablehlo::ConcatenateOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ConcatenateOp op,
+                                PatternRewriter &rewriter) const override {
+    SmallVector<Value> operands;
+    bool flattened = false;
+    for (Value input : op.getInputs()) {
+      auto inner = input.getDefiningOp<mlir::stablehlo::ConcatenateOp>();
+      if (inner && inner->hasOneUse() &&
+          inner.getDimension() == op.getDimension()) {
+        llvm::append_range(operands, inner.getInputs());
+        flattened = true;
+        continue;
+      }
+      operands.push_back(input);
+    }
+    if (!flattened) {
+      return rewriter.notifyMatchFailure(op, "no same-axis single-use input");
+    }
+    rewriter.modifyOpInPlace(op, [&] { op->setOperands(operands); });
+    return success();
+  }
+};
+
 struct ConvertOpCanon final : OpRewritePattern<mlir::stablehlo::ConvertOp> {
   using Base::Base;
 
@@ -733,15 +791,167 @@ struct DynamicBroadcastInDimAllDimsNonExpanding final
   }
 };
 
-struct NoopReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
+// Returns whether `op` keeps every operand dimension in place.
+static bool
+hasIdentityBroadcastDims(mlir::stablehlo::DynamicBroadcastInDimOp op) {
+  auto operandType = dyn_cast<RankedTensorType>(op.getOperand().getType());
+  auto resultType = dyn_cast<RankedTensorType>(op.getType());
+  return operandType && resultType &&
+         operandType.getRank() == resultType.getRank() &&
+         llvm::equal(op.getBroadcastDimensions(),
+                     llvm::seq<int64_t>(0, resultType.getRank()));
+}
+
+// A broadcast to the operand's own shape is the operand.
+struct DynamicBroadcastInDimOfOwnShape final
+    : OpRewritePattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DynamicBroadcastInDimOp op,
+                                PatternRewriter &rewriter) const override {
+    auto shapeOf = op.getOutputDimensions().getDefiningOp<shape::ShapeOfOp>();
+    if (!shapeOf || shapeOf.getArg() != op.getOperand() ||
+        !hasIdentityBroadcastDims(op)) {
+      return rewriter.notifyMatchFailure(op, "not the operand's own shape");
+    }
+    rewriter.replaceOp(op, rewriter.createOrFold<tensor::CastOp>(
+                               op.getLoc(), op.getType(), op.getOperand()));
+    return success();
+  }
+};
+
+// A broadcast to the shape a dynamic_reshape just produced is that reshape.
+struct DynamicBroadcastInDimOfDynamicReshape final
+    : OpRewritePattern<mlir::stablehlo::DynamicBroadcastInDimOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DynamicBroadcastInDimOp op,
+                                PatternRewriter &rewriter) const override {
+    auto reshape =
+        op.getOperand().getDefiningOp<mlir::stablehlo::DynamicReshapeOp>();
+    if (!reshape || reshape.getOutputShape() != op.getOutputDimensions() ||
+        !hasIdentityBroadcastDims(op)) {
+      return rewriter.notifyMatchFailure(op, "not the reshape's own shape");
+    }
+    rewriter.replaceOp(op, rewriter.createOrFold<tensor::CastOp>(
+                               op.getLoc(), op.getType(), reshape));
+    return success();
+  }
+};
+
+// Ordinary convert handles integer, floating-point and complex element types.
+// Identical quantized element types need no numerical conversion.
+static bool canConvertReductionElementType(Type sourceType, Type targetType) {
+  return sourceType == targetType ||
+         (isa<IntegerType, FloatType, ComplexType>(sourceType) &&
+          isa<IntegerType, FloatType, ComplexType>(targetType));
+}
+
+// The reducer can promote both its input and initializer element types. Keep
+// those conversions explicit before scalarization remaps its block arguments
+// from the operand types, which would otherwise lose the required promotion.
+// For a reducer with i32 block arguments:
+//   %r = stablehlo.reduce(%x init: %init) ... :
+//       (tensor<?xi8>, tensor<i32>) -> tensor<i32>
+// becomes:
+//   %wide = stablehlo.convert %x : (tensor<?xi8>) -> tensor<?xi32>
+//   %r = stablehlo.reduce(%wide init: %init) ... :
+//       (tensor<?xi32>, tensor<i32>) -> tensor<i32>
+// The region, result types and attributes stay unchanged. Tensor conversions
+// remain available for fusion with the reduction.
+struct NormalizeReduceOperandTypes final
+    : OpRewritePattern<mlir::stablehlo::ReduceOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ReduceOp op,
                                 PatternRewriter &rewriter) const override {
-    // No dimensions to reduce.
+    int64_t inputCount = op.getInputs().size();
+    Block &body = op.getBody().front();
+    SmallVector<RankedTensorType> operandTypes;
+    bool needsConversion = false;
+    for (auto [index, operand] : llvm::enumerate(op.getOperands())) {
+      // Operands are (inputs, initializers); body arguments are (accumulators,
+      // inputs). Their counts agree by the ReduceOp verifier.
+      int64_t bodyArgumentIndex =
+          index < inputCount ? index + inputCount : index - inputCount;
+      auto sourceType = cast<RankedTensorType>(operand.getType());
+      Type targetElementType =
+          getElementTypeOrSelf(body.getArgument(bodyArgumentIndex).getType());
+      if (!canConvertReductionElementType(sourceType.getElementType(),
+                                          targetElementType)) {
+        return rewriter.notifyMatchFailure(op,
+                                           "requires non-quantized promotion");
+      }
+      auto targetType = RankedTensorType::get(
+          sourceType.getShape(), targetElementType, sourceType.getEncoding());
+      operandTypes.push_back(targetType);
+      needsConversion |= targetType != sourceType;
+    }
+    if (!needsConversion) {
+      return rewriter.notifyMatchFailure(op,
+                                         "operand types already normalized");
+    }
+
+    SmallVector<Value> operands;
+    for (auto [operand, type] :
+         llvm::zip_equal(op.getOperands(), operandTypes)) {
+      if (operand.getType() != type) {
+        operand = mlir::stablehlo::ConvertOp::create(rewriter, op.getLoc(),
+                                                     type, operand);
+      }
+      operands.push_back(operand);
+    }
+    rewriter.modifyOpInPlace(op,
+                             [op, &operands] { op->setOperands(operands); });
+    return success();
+  }
+};
+
+struct NoopReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
+  using Base::Base;
+
+  // Replaces a reduction over no dimensions by its inputs. They still need
+  // conversion to the declared result types, including any element promotion
+  // or shape cast.
+  static LogicalResult replaceWithConvertedInputs(mlir::stablehlo::ReduceOp op,
+                                                  PatternRewriter &rewriter) {
+    auto pairs = llvm::zip_equal(op.getInputs(), op.getResultTypes());
+    bool canConvertAll = llvm::all_of(pairs, [](auto pair) {
+      auto [input, resultType] = pair;
+      return canConvertReductionElementType(getElementTypeOrSelf(input),
+                                            getElementTypeOrSelf(resultType));
+    });
+    if (!canConvertAll) {
+      return rewriter.notifyMatchFailure(op,
+                                         "requires non-quantized conversion");
+    }
+    SmallVector<Value> results;
+    for (auto [input, resultType] : pairs) {
+      results.push_back(
+          convertToResultType(rewriter, op.getLoc(), input, resultType));
+    }
+    rewriter.replaceOp(op, results);
+    return success();
+  }
+
+  // Returns `input` converted to `resultType`: a convert for a different
+  // element type, a cast for a different shape, or `input` itself.
+  static Value convertToResultType(PatternRewriter &rewriter, Location loc,
+                                   Value input, Type resultType) {
+    if (getElementTypeOrSelf(input) != getElementTypeOrSelf(resultType)) {
+      return mlir::stablehlo::ConvertOp::create(rewriter, loc, resultType,
+                                                input);
+    }
+    if (input.getType() != resultType) {
+      return rewriter.createOrFold<tensor::CastOp>(loc, resultType, input);
+    }
+    return input;
+  }
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ReduceOp op,
+                                PatternRewriter &rewriter) const override {
     if (op.getDimensions().empty()) {
-      rewriter.replaceOp(op, op.getInputs());
-      return success();
+      return replaceWithConvertedInputs(op, rewriter);
     }
 
     // If all returned values in the ReduceOp region exists outside the
@@ -755,6 +965,12 @@ struct NoopReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
         return failure();
       }
 
+      // A captured scalar is not a replacement for a tensor-valued partial
+      // reduction; ordinary lowering broadcasts it over the remaining axes.
+      if (!llvm::equal(retOp.getOperandTypes(), op.getResultTypes())) {
+        return rewriter.notifyMatchFailure(
+            op, "captured results have different types");
+      }
       rewriter.replaceOp(op, retOp.getResults());
       return success();
     }
@@ -778,6 +994,16 @@ struct EmptyReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
 
     if (!llvm::is_contained(elemTy.getShape(), 0)) {
       return failure();
+    }
+
+    // NormalizeReduceOperandTypes establishes the initializer element type.
+    // Decline until it does, regardless of greedy pattern visitation order.
+    for (auto [init, resultType] :
+         llvm::zip_equal(op.getInitValues(), op.getResultTypes())) {
+      if (getElementTypeOrSelf(init) != getElementTypeOrSelf(resultType)) {
+        return rewriter.notifyMatchFailure(
+            op, "initializer type needs normalization");
+      }
     }
 
     Location loc = op.getLoc();
@@ -1221,7 +1447,8 @@ struct StableHLOCanonicalize final
 } // namespace
 void populateCanonicalizationPatterns(MLIRContext *context,
                                       RewritePatternSet *patterns,
-                                      PatternBenefit benefit) {
+                                      PatternBenefit benefit,
+                                      bool reorderElementwiseAndShape) {
   patterns->add<
       // Arithmetic ops.
       AddOpCanon, SubtractOpCanon, MulOpCanon, CompareOpCanon, SelectOpCanon,
@@ -1232,14 +1459,18 @@ void populateCanonicalizationPatterns(MLIRContext *context,
       // Broadcast ops.
       BroadcastInDimOpCanon, DynamicBroadcastInDimOpNotActuallyDynamic,
       ChainedDynamicBroadcastInDimCanonicalization,
-      DynamicBroadcastInDimAllDimsNonExpanding,
+      DynamicBroadcastInDimAllDimsNonExpanding, DynamicBroadcastInDimOfOwnShape,
+      DynamicBroadcastInDimOfDynamicReshape,
       // Reduce op.
-      NoopReduceOpCanon, EmptyReduceOpCanon,
+      NormalizeReduceOperandTypes, NoopReduceOpCanon, EmptyReduceOpCanon,
       // Shape manipulation(-ish) ops.
-      ConcatenateOpCanon, ConvertOpCanon, DynamicReshapeOpCanon, GatherOpCanon,
-      ReshapeOpCanon, MergeConsecutiveReshapes, TransposeIsReshape,
+      ConcatenateOpCanon, ConcatenateOpFlatten, ConvertOpCanon,
+      DynamicReshapeOpCanon, GatherOpCanon, ReshapeOpCanon,
+      MergeConsecutiveReshapes, TransposeIsReshape,
       // Types.
       ZeroExtentTensorCanon>(context, benefit);
-  patterns->add<ReorderElementwiseAndShapeOp>(context);
+  if (reorderElementwiseAndShape) {
+    patterns->add<ReorderElementwiseAndShapeOp>(context);
+  }
 }
 } // namespace mlir::iree_compiler::stablehlo

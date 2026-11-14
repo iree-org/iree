@@ -126,10 +126,15 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "convolution_dynamic_zero_extent.mlir"
+    "dynamic_cumsum_custom_call.mlir"
     "globals_ml_program.mlir"
   TOOLS
+    ${IREE_LLD_TARGET}
     FileCheck
+    iree-compile
     iree-run-mlir
+    iree-run-module
   LABELS
     "driver=local-task"
     "hostonly"

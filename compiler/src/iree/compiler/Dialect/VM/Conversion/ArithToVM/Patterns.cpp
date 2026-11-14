@@ -25,7 +25,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct ConstantOpConversion : OpConversionPattern<arith::ConstantOp> {
+struct ConstantOpConversion final : OpConversionPattern<arith::ConstantOp> {
   TypeConverter &typeConverter;
   ConstantOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
@@ -38,61 +38,88 @@ struct ConstantOpConversion : OpConversionPattern<arith::ConstantOp> {
                                << " (check -iree-vm-target-* options)";
     }
     if (isa<IntegerType>(targetType)) {
-      auto integerAttr = dyn_cast<IntegerAttr>(srcOp.getValue());
-      if (!integerAttr) {
-        return srcOp.emitRemark() << "unsupported const type for dialect";
-      }
-      switch (targetType.getIntOrFloatBitWidth()) {
-      case 1:
-      case 32:
-        if (integerAttr.getInt()) {
-          rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(
-              srcOp,
-              integerAttr.getType().isInteger(1) ? 1 : integerAttr.getInt());
-        } else {
-          rewriter.replaceOpWithNewOp<IREE::VM::ConstI32ZeroOp>(srcOp);
-        }
-        break;
-      case 64:
-        if (integerAttr.getInt()) {
-          rewriter.replaceOpWithNewOp<IREE::VM::ConstI64Op>(
-              srcOp, integerAttr.getInt());
-        } else {
-          rewriter.replaceOpWithNewOp<IREE::VM::ConstI64ZeroOp>(srcOp);
-        }
-        break;
-      default:
-        return srcOp.emitRemark()
-               << "unsupported const integer bit width for dialect";
-      }
-    } else if (isa<FloatType>(targetType)) {
-      auto floatAttr = dyn_cast<FloatAttr>(srcOp.getValue());
-      if (!floatAttr) {
-        return srcOp.emitRemark() << "unsupported const type for dialect";
-      }
-      switch (targetType.getIntOrFloatBitWidth()) {
-      case 32:
-        if (floatAttr.getValue().isZero()) {
-          rewriter.replaceOpWithNewOp<IREE::VM::ConstF32ZeroOp>(srcOp);
-        } else {
-          rewriter.replaceOpWithNewOp<IREE::VM::ConstF32Op>(srcOp, floatAttr);
-        }
-        break;
-      case 64:
-        if (floatAttr.getValue().isZero()) {
-          rewriter.replaceOpWithNewOp<IREE::VM::ConstF64ZeroOp>(srcOp);
-        } else {
-          rewriter.replaceOpWithNewOp<IREE::VM::ConstF64Op>(srcOp, floatAttr);
-        }
-        break;
-      default:
-        return srcOp.emitRemark()
-               << "unsupported const floating-point bit width for dialect";
-      }
-    } else {
-      return rewriter.notifyMatchFailure(srcOp, "unsupported type");
+      return replaceWithIntegerConstant(srcOp, targetType, rewriter);
     }
-    return success();
+    if (isa<FloatType>(targetType)) {
+      return replaceWithFloatConstant(srcOp, targetType, rewriter);
+    }
+    return rewriter.notifyMatchFailure(srcOp, "unsupported type");
+  }
+
+private:
+  // Returns the integer value of `value` in `targetType`: the integer itself,
+  // or the storage bits of a narrow float held in a VM integer register.
+  static IntegerAttr getIntegerConstantAttr(Attribute value, Type targetType,
+                                            Builder &builder) {
+    if (auto floatAttr = dyn_cast<FloatAttr>(value)) {
+      return builder.getIntegerAttr(
+          targetType, floatAttr.getValue().bitcastToAPInt().zextOrTrunc(
+                          targetType.getIntOrFloatBitWidth()));
+    }
+    return dyn_cast<IntegerAttr>(value);
+  }
+
+  static LogicalResult
+  replaceWithIntegerConstant(arith::ConstantOp srcOp, Type targetType,
+                             ConversionPatternRewriter &rewriter) {
+    IntegerAttr integerAttr =
+        getIntegerConstantAttr(srcOp.getValue(), targetType, rewriter);
+    if (!integerAttr) {
+      return srcOp.emitRemark() << "unsupported const type for dialect";
+    }
+    switch (targetType.getIntOrFloatBitWidth()) {
+    case 1:
+    case 32:
+      if (integerAttr.getInt()) {
+        rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(
+            srcOp,
+            integerAttr.getType().isInteger(1) ? 1 : integerAttr.getInt());
+      } else {
+        rewriter.replaceOpWithNewOp<IREE::VM::ConstI32ZeroOp>(srcOp);
+      }
+      return success();
+    case 64:
+      if (integerAttr.getInt()) {
+        rewriter.replaceOpWithNewOp<IREE::VM::ConstI64Op>(srcOp,
+                                                          integerAttr.getInt());
+      } else {
+        rewriter.replaceOpWithNewOp<IREE::VM::ConstI64ZeroOp>(srcOp);
+      }
+      return success();
+    default:
+      return srcOp.emitRemark()
+             << "unsupported const integer bit width for dialect";
+    }
+  }
+
+  static LogicalResult
+  replaceWithFloatConstant(arith::ConstantOp srcOp, Type targetType,
+                           ConversionPatternRewriter &rewriter) {
+    auto floatAttr = dyn_cast<FloatAttr>(srcOp.getValue());
+    if (!floatAttr) {
+      return srcOp.emitRemark() << "unsupported const type for dialect";
+    }
+    // The zero ops produce +0.0; -0.0 keeps its sign through a value
+    // constant.
+    switch (targetType.getIntOrFloatBitWidth()) {
+    case 32:
+      if (floatAttr.getValue().isPosZero()) {
+        rewriter.replaceOpWithNewOp<IREE::VM::ConstF32ZeroOp>(srcOp);
+      } else {
+        rewriter.replaceOpWithNewOp<IREE::VM::ConstF32Op>(srcOp, floatAttr);
+      }
+      return success();
+    case 64:
+      if (floatAttr.getValue().isPosZero()) {
+        rewriter.replaceOpWithNewOp<IREE::VM::ConstF64ZeroOp>(srcOp);
+      } else {
+        rewriter.replaceOpWithNewOp<IREE::VM::ConstF64Op>(srcOp, floatAttr);
+      }
+      return success();
+    default:
+      return srcOp.emitRemark()
+             << "unsupported const floating-point bit width for dialect";
+    }
   }
 };
 
@@ -391,11 +418,16 @@ struct CmpF64OpConversion : OpConversionPattern<arith::CmpFOp> {
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-struct UnaryArithmeticOpConversion : OpConversionPattern<SrcOpTy> {
+struct UnaryArithmeticOpConversion final : OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    if (!IREE::VM::isVMArithmeticType(srcOp.getType(),
+                                      adaptor.getOperand().getType())) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "unsupported scalar arithmetic type");
+    }
     switch (adaptor.getOperand().getType().getIntOrFloatBitWidth()) {
     case 32:
       rewriter.replaceOpWithNewOp<Dst32OpTy>(
@@ -413,11 +445,16 @@ struct UnaryArithmeticOpConversion : OpConversionPattern<SrcOpTy> {
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-struct BinaryArithmeticOpConversion : OpConversionPattern<SrcOpTy> {
+struct BinaryArithmeticOpConversion final : OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(SrcOpTy srcOp, typename SrcOpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    if (!IREE::VM::isVMArithmeticType(srcOp.getType(),
+                                      adaptor.getLhs().getType())) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "unsupported scalar arithmetic type");
+    }
     switch (adaptor.getLhs().getType().getIntOrFloatBitWidth()) {
     case 32:
       rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, adaptor.getLhs().getType(),
