@@ -8,7 +8,7 @@
 // (6x32 inner tile: MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32, intrinsics_m = 6),
 // compiled at 8, 4 and 1 runtime threads. Distribution tile sizes are counts
 // of inner tiles per workgroup, chosen by the cache-footprint cost model
-// ported from `getMmt4dLoweringConfig` (see `selectInnerTiledDistribution`);
+// `selectMatmulWorkgroupTile`, shared with `getMmt4dLoweringConfig`;
 // its thread-underutilization term is what makes the small shapes sweep
 // toward fewer, larger workgroup tiles as the thread count drops. The 1T
 // benchmark flow additionally passes --iree-llvmcpu-disable-distribution,
@@ -245,8 +245,9 @@ func.func @inner_tiled_rvv_f32_batched_8x64x64x64(%lhs: tensor<8x11x64x6x1x1xf32
 
 // Empty M extent: there is no work to distribute, and the model's baseline
 // cost divides the thread count by the workgroup count derived from the M and
-// N iteration bounds. It must bail out for a zero bound instead of dividing by
-// zero (a crash in the compiler, not just a bad tile).
+// N iteration bounds. `selectMatmulWorkgroupTile` must answer with its
+// one-tile baseline for a zero bound instead of dividing by zero (a crash in
+// the compiler, not just a bad tile).
 #executable_target_riscv64 = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+c,+v,+zvl256b", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 32 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
 func.func @inner_tiled_rvv_f32_empty_m(%lhs: tensor<0x64x6x1x1xf32>, %rhs: tensor<2x64x32x1xf32>, %acc: tensor<0x2x6x1x32xf32>) -> tensor<0x2x6x1x32xf32> attributes {hal.executable.target = #executable_target_riscv64} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <

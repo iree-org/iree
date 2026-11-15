@@ -599,12 +599,12 @@ func.func @pooling_nchw_max(%2: tensor<1x64x114x114xf32>) -> tensor<1x64x56x56xf
 // an SVE `1x4VLx1` kind keeps its VL-dependent extents dynamic in tensor form
 // (`vector<[4]x1xf32>` materializes as `1x?`), so its element footprint is not
 // statically known, while `getIntrinsicMNKShape` reports the base-VL shape
-// {1, 4, 1} whatever the VL is. `selectInnerTiledDistribution` budgets workgroup
-// tile bytes from those extents, which understates the real footprint by up to
-// vscale, so it has to fall back to one inner tile per workgroup. Without that
-// guard this shape picks [18, 17, 0]: 5 workgroups, each taking all 17 N tiles,
-// so every workgroup re-traverses the whole RHS. The RVV spelling of scalable is
-// already caught earlier (a
+// {1, 4, 1} whatever the VL is. `matmulTileFitsBudget` budgets workgroup tile
+// bytes from those extents, which understates the real footprint by up to
+// vscale, so `selectInnerTiledDistribution` has to fall back to one inner tile
+// per workgroup. Without that guard this shape picks [18, 17, 0]: 5
+// workgroups, each taking all 17 N tiles, so every workgroup re-traverses the
+// whole RHS. The RVV spelling of scalable is already caught earlier (a
 // concrete `vlen` is required to resolve an RVV intrinsic at all, see
 // select_riscv_inner_tiled_lowering_strategy.mlir); SVE intrinsic extents are
 // base-VL regardless of `vlen`, so they need the layout check.
