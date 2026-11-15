@@ -179,11 +179,13 @@ iree_status_t iree_hal_webgpu_builder_copy_buffer(
 // |pipeline_handle| and |bind_group_layout_handle| are baked from the
 // executable at recording time. |config| provides the workgroup count.
 // |bindings| lists all buffer bindings for the dispatch.
+// |constants| is copied into the instruction stream for its uniform binding.
 iree_status_t iree_hal_webgpu_builder_dispatch(
     iree_hal_webgpu_builder_t* builder,
     iree_hal_webgpu_handle_t pipeline_handle,
     iree_hal_webgpu_handle_t bind_group_layout_handle,
-    const uint32_t workgroup_count[3], iree_hal_buffer_ref_list_t bindings);
+    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+    iree_hal_buffer_ref_list_t bindings);
 
 // Emits a BARRIER instruction (no-op, reserved for future use).
 iree_status_t iree_hal_webgpu_builder_execution_barrier(

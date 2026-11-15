@@ -8,6 +8,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "push_constants.mlir"
     "smoketest.mlir"
   TOOLS
     FileCheck
