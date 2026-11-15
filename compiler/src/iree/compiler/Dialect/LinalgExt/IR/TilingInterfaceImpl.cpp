@@ -1799,8 +1799,8 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
     // True if N > K or N came before K
     Value indexCmpRes =
         arith::OrIOp::create(b, loc, forwardCmpRes, combinedCmpEqRes);
-    // Select results for K based on comparisons
-    Value resultKValue = arith::SelectOp::create(b, loc, forwardCmpRes,
+    // Keep values paired with their indices when breaking ties.
+    Value resultKValue = arith::SelectOp::create(b, loc, indexCmpRes,
                                                  loopCarryValues[0], kValue);
     Value resultKIndex = arith::SelectOp::create(b, loc, indexCmpRes,
                                                  loopCarryValues[1], kIndex);
@@ -1808,7 +1808,7 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
     memref::StoreOp::create(b, loc, resultKIndex, getOutputIndices(), indices);
     // Select loop carry, opposite of K results
     Value resultCarryValue = arith::SelectOp::create(
-        b, loc, forwardCmpRes, kValue, loopCarryValues[0]);
+        b, loc, indexCmpRes, kValue, loopCarryValues[0]);
     Value resultCarryIndex = arith::SelectOp::create(
         b, loc, indexCmpRes, kIndex, loopCarryValues[1]);
     scf::YieldOp::create(b, loc,
@@ -1995,14 +1995,7 @@ LogicalResult TopkV2Op::generateScalarImplementation(OpBuilder &b, Location loc,
         Value forwardCmpRes =
             bvmF.lookup(srcBlock.getTerminator()->getOperand(0));
 
-        Value resultKValue = arith::SelectOp::create(
-            b, loc, forwardCmpRes, loopCarryValues[0], kValue);
-        memref::StoreOp::create(b, loc, resultKValue, outputValues, indices);
-        Value resultCarryValue = arith::SelectOp::create(
-            b, loc, forwardCmpRes, kValue, loopCarryValues[0]);
-
-        SmallVector<Value> yieldValues = {resultCarryValue};
-
+        Value cmpRes = forwardCmpRes;
         // With output indices, also clone the reverse mapping f(y,x) for
         // strict weak ordering tie-breaking.
         if (outputIndices) {
@@ -2025,13 +2018,24 @@ LogicalResult TopkV2Op::generateScalarImplementation(OpBuilder &b, Location loc,
               b, loc, arith::CmpIPredicate::slt, loopCarryValues[1], kIndex);
           Value combinedCmpEqRes =
               arith::AndIOp::create(b, loc, cmpValuesEqual, cmpFirstIndex);
-          Value indexCmpRes =
+          cmpRes =
               arith::OrIOp::create(b, loc, forwardCmpRes, combinedCmpEqRes);
+        }
+
+        // Keep values paired with their indices when breaking ties.
+        Value resultKValue =
+            arith::SelectOp::create(b, loc, cmpRes, loopCarryValues[0], kValue);
+        memref::StoreOp::create(b, loc, resultKValue, outputValues, indices);
+        Value resultCarryValue =
+            arith::SelectOp::create(b, loc, cmpRes, kValue, loopCarryValues[0]);
+
+        SmallVector<Value> yieldValues = {resultCarryValue};
+        if (outputIndices) {
           Value resultKIndex = arith::SelectOp::create(
-              b, loc, indexCmpRes, loopCarryValues[1], kIndex);
+              b, loc, cmpRes, loopCarryValues[1], kIndex);
           memref::StoreOp::create(b, loc, resultKIndex, outputIndices, indices);
           Value resultCarryIndex = arith::SelectOp::create(
-              b, loc, indexCmpRes, kIndex, loopCarryValues[1]);
+              b, loc, cmpRes, kIndex, loopCarryValues[1]);
           yieldValues.push_back(resultCarryIndex);
         }
 
