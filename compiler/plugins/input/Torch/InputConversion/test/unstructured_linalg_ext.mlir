@@ -1,5 +1,8 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(torch-iree-torch-unstructured-to-linalg-ext))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(torch-iree-torch-unstructured-to-linalg-ext{topk-only}))" %s | FileCheck %s --check-prefix=EARLY
 
+// EARLY-LABEL: func.func @fft_rfft.with_transpose
+// EARLY: torch.aten.fft_rfft
 // CHECK-DAG:         #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d2)>
 // CHECK-DAG:         #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 func.func @fft_rfft.with_transpose(%arg0: !torch.vtensor<[3,8,16],f32>) -> !torch.vtensor<[3,5,16],complex<f32>> {
@@ -575,3 +578,206 @@ func.func @argmax_select_last_index_ui8(%arg0: !torch.vtensor<[3,4],ui8>) -> !to
 // CHECK:             iree_linalg_ext.yield
 // CHECK-NOT:       torch.aten.sub.Scalar
 // CHECK-NOT:       torch.aten.abs
+
+// -----
+
+// CHECK-LABEL: func.func @topk_single_row(
+// CHECK: tensor.extract_slice {{.*}}[0, 0] [1, 3] [1, 1]
+// CHECK: iree_linalg_ext.sort
+// CHECK: arith.cmpf ogt
+// CHECK: arith.cmpf uno
+// CHECK: arith.cmpf ord
+// CHECK: tensor.extract_slice {{.*}}[0, 3] [1, 5] [1, 1]
+// CHECK: iree_linalg_ext.topk
+// CHECK: arith.cmpf ogt
+// CHECK: arith.cmpf uno
+// CHECK: arith.cmpf ord
+// CHECK: arith.extsi {{.*}} : tensor<1x3xi32> to tensor<1x3xi64>
+// EARLY-LABEL: func.func @topk_single_row(
+// EARLY: iree_linalg_ext.sort
+// EARLY: iree_linalg_ext.topk
+func.func @topk_single_row(%input: !torch.vtensor<[1,8],f32>) -> (!torch.vtensor<[1,3],f32>, !torch.vtensor<[1,3],si64>) {
+  %k = torch.constant.int 3
+  %dim = torch.constant.int -1
+  %true = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %true, %true : !torch.vtensor<[1,8],f32>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[1,3],f32>, !torch.vtensor<[1,3],si64>
+  return %values, %indices : !torch.vtensor<[1,3],f32>, !torch.vtensor<[1,3],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @topk_batched_fallback(
+// CHECK: torch.aten.topk
+// EARLY-LABEL: func.func @topk_batched_fallback(
+// EARLY: torch.aten.topk
+func.func @topk_batched_fallback(%input: !torch.vtensor<[2,8],f32>) -> (!torch.vtensor<[2,3],f32>, !torch.vtensor<[2,3],si64>) {
+  %k = torch.constant.int 3
+  %dim = torch.constant.int 1
+  %true = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %true, %true : !torch.vtensor<[2,8],f32>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[2,3],f32>, !torch.vtensor<[2,3],si64>
+  return %values, %indices : !torch.vtensor<[2,3],f32>, !torch.vtensor<[2,3],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @topk_smallest_fallback(
+// CHECK: torch.aten.topk
+// EARLY-LABEL: func.func @topk_smallest_fallback(
+// EARLY: torch.aten.topk
+func.func @topk_smallest_fallback(%input: !torch.vtensor<[8],f32>) -> (!torch.vtensor<[3],f32>, !torch.vtensor<[3],si64>) {
+  %k = torch.constant.int 3
+  %dim = torch.constant.int 0
+  %false = torch.constant.bool false
+  %true = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %false, %true : !torch.vtensor<[8],f32>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[3],f32>, !torch.vtensor<[3],si64>
+  return %values, %indices : !torch.vtensor<[3],f32>, !torch.vtensor<[3],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @topk_one(
+// CHECK: torch.aten.topk
+// EARLY-LABEL: func.func @topk_one(
+// EARLY: torch.aten.topk
+func.func @topk_one(%input: !torch.vtensor<[1,8],f32>) -> (!torch.vtensor<[1,1],f32>, !torch.vtensor<[1,1],si64>) {
+  %k = torch.constant.int 1
+  %dim = torch.constant.int 1
+  %true = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %true, %true : !torch.vtensor<[1,8],f32>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[1,1],f32>, !torch.vtensor<[1,1],si64>
+  return %values, %indices : !torch.vtensor<[1,1],f32>, !torch.vtensor<[1,1],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @topk_zero_fallback(
+// CHECK: torch.aten.topk
+// EARLY-LABEL: func.func @topk_zero_fallback(
+// EARLY: torch.aten.topk
+func.func @topk_zero_fallback(%input: !torch.vtensor<[1,8],f32>) -> (!torch.vtensor<[1,0],f32>, !torch.vtensor<[1,0],si64>) {
+  %k = torch.constant.int 0
+  %dim = torch.constant.int -1
+  %largest = torch.constant.bool true
+  %sorted = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %largest, %sorted : !torch.vtensor<[1,8],f32>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[1,0],f32>, !torch.vtensor<[1,0],si64>
+  return %values, %indices : !torch.vtensor<[1,0],f32>, !torch.vtensor<[1,0],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @topk_all_fallback(
+// CHECK: torch.aten.topk
+// EARLY-LABEL: func.func @topk_all_fallback(
+// EARLY: torch.aten.topk
+func.func @topk_all_fallback(%input: !torch.vtensor<[1,8],f32>) -> (!torch.vtensor<[1,8],f32>, !torch.vtensor<[1,8],si64>) {
+  %k = torch.constant.int 8
+  %dim = torch.constant.int -1
+  %largest = torch.constant.bool true
+  %sorted = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %largest, %sorted : !torch.vtensor<[1,8],f32>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[1,8],f32>, !torch.vtensor<[1,8],si64>
+  return %values, %indices : !torch.vtensor<[1,8],f32>, !torch.vtensor<[1,8],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @topk_dynamic_fallback(
+// CHECK: torch.aten.topk
+// EARLY-LABEL: func.func @topk_dynamic_fallback(
+// EARLY: torch.aten.topk
+func.func @topk_dynamic_fallback(%input: !torch.vtensor<[1,?],f32>) -> (!torch.vtensor<[1,3],f32>, !torch.vtensor<[1,3],si64>) {
+  %k = torch.constant.int 3
+  %dim = torch.constant.int -1
+  %largest = torch.constant.bool true
+  %sorted = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %largest, %sorted : !torch.vtensor<[1,?],f32>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[1,3],f32>, !torch.vtensor<[1,3],si64>
+  return %values, %indices : !torch.vtensor<[1,3],f32>, !torch.vtensor<[1,3],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @topk_integer_fallback(
+// CHECK: torch.aten.topk
+// EARLY-LABEL: func.func @topk_integer_fallback(
+// EARLY: torch.aten.topk
+func.func @topk_integer_fallback(%input: !torch.vtensor<[1,8],si32>) -> (!torch.vtensor<[1,3],si32>, !torch.vtensor<[1,3],si64>) {
+  %k = torch.constant.int 3
+  %dim = torch.constant.int -1
+  %largest = torch.constant.bool true
+  %sorted = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %largest, %sorted : !torch.vtensor<[1,8],si32>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[1,3],si32>, !torch.vtensor<[1,3],si64>
+  return %values, %indices : !torch.vtensor<[1,3],si32>, !torch.vtensor<[1,3],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @topk_unsorted(
+// CHECK: iree_linalg_ext.topk
+// EARLY-LABEL: func.func @topk_unsorted(
+// EARLY: iree_linalg_ext.topk
+func.func @topk_unsorted(%input: !torch.vtensor<[1,8],f32>) -> (!torch.vtensor<[1,3],f32>, !torch.vtensor<[1,3],si64>) {
+  %k = torch.constant.int 3
+  %dim = torch.constant.int -1
+  %largest = torch.constant.bool true
+  %sorted = torch.constant.bool false
+  %values, %indices = torch.aten.topk %input, %k, %dim, %largest, %sorted : !torch.vtensor<[1,8],f32>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[1,3],f32>, !torch.vtensor<[1,3],si64>
+  return %values, %indices : !torch.vtensor<[1,3],f32>, !torch.vtensor<[1,3],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @topk_middle_dimension(
+// CHECK: iree_linalg_ext.topk
+// EARLY-LABEL: func.func @topk_middle_dimension(
+// EARLY: iree_linalg_ext.topk
+func.func @topk_middle_dimension(%input: !torch.vtensor<[1,8,1],f32>) -> (!torch.vtensor<[1,3,1],f32>, !torch.vtensor<[1,3,1],si64>) {
+  %k = torch.constant.int 3
+  %dim = torch.constant.int 1
+  %largest = torch.constant.bool true
+  %sorted = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %largest, %sorted : !torch.vtensor<[1,8,1],f32>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[1,3,1],f32>, !torch.vtensor<[1,3,1],si64>
+  return %values, %indices : !torch.vtensor<[1,3,1],f32>, !torch.vtensor<[1,3,1],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @topk_f16(
+// CHECK: iree_linalg_ext.topk
+// EARLY-LABEL: func.func @topk_f16(
+// EARLY: iree_linalg_ext.topk
+func.func @topk_f16(%input: !torch.vtensor<[1,8],f16>) -> (!torch.vtensor<[1,3],f16>, !torch.vtensor<[1,3],si64>) {
+  %k = torch.constant.int 3
+  %dim = torch.constant.int -1
+  %largest = torch.constant.bool true
+  %sorted = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %largest, %sorted : !torch.vtensor<[1,8],f16>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[1,3],f16>, !torch.vtensor<[1,3],si64>
+  return %values, %indices : !torch.vtensor<[1,3],f16>, !torch.vtensor<[1,3],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @topk_bf16(
+// CHECK: iree_linalg_ext.topk
+// EARLY-LABEL: func.func @topk_bf16(
+// EARLY: iree_linalg_ext.topk
+func.func @topk_bf16(%input: !torch.vtensor<[1,8],bf16>) -> (!torch.vtensor<[1,3],bf16>, !torch.vtensor<[1,3],si64>) {
+  %k = torch.constant.int 3
+  %dim = torch.constant.int -1
+  %largest = torch.constant.bool true
+  %sorted = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %largest, %sorted : !torch.vtensor<[1,8],bf16>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[1,3],bf16>, !torch.vtensor<[1,3],si64>
+  return %values, %indices : !torch.vtensor<[1,3],bf16>, !torch.vtensor<[1,3],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @topk_f64(
+// CHECK: iree_linalg_ext.topk
+// EARLY-LABEL: func.func @topk_f64(
+// EARLY: iree_linalg_ext.topk
+func.func @topk_f64(%input: !torch.vtensor<[1,8],f64>) -> (!torch.vtensor<[1,3],f64>, !torch.vtensor<[1,3],si64>) {
+  %k = torch.constant.int 3
+  %dim = torch.constant.int -1
+  %largest = torch.constant.bool true
+  %sorted = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %largest, %sorted : !torch.vtensor<[1,8],f64>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[1,3],f64>, !torch.vtensor<[1,3],si64>
+  return %values, %indices : !torch.vtensor<[1,3],f64>, !torch.vtensor<[1,3],si64>
+}
