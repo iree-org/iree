@@ -65,7 +65,7 @@ iree_status_t iree_hal_metal_executable_infer_format(iree_const_byte_span_t exec
   }
 
   // Write the format string.
-  iree_string_view_t format = IREE_SV("PTXE");
+  iree_string_view_t format = IREE_SV("MTLE");
   if (format.size >= executable_format_capacity) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "executable format buffer too small");
   }
