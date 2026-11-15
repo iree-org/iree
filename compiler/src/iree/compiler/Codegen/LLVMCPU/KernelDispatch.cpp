@@ -122,6 +122,12 @@ static llvm::cl::opt<float> clMatmulTileUndercountWholeMatrix(
         "allowed fitting all matrix operands in one tile each."),
     llvm::cl::init(0.5f));
 
+// When a matmul's M1/N1/K1 (or `inner_tiled` iteration) bound is dynamic, the
+// distribution cost model prices it as this many elements. Mirrors the shape
+// the bufferization/vectorization code generally assumes for unknown dims, so
+// the picked workgroup tile stays reasonable when the real extent is unknown.
+static constexpr int64_t kTypicalDynamicSize = 1024;
+
 static llvm::cl::opt<bool> clDisableVectorPeeling(
     "iree-llvmcpu-disable-vector-peeling",
     llvm::cl::desc("Disable peeling as a pre-processing step for "
@@ -2007,7 +2013,6 @@ getMmt4dLoweringConfig(Operation *op, Value lhs, Value rhs, Value acc,
   // `selectMatmulWorkgroupTile`.
   //
 
-  const int64_t kTypicalDynamicSize = 1024;
   if (ShapedType::isDynamic(m1)) {
     m1 = kTypicalDynamicSize / m0;
   }
@@ -3228,15 +3233,11 @@ struct InnerTiledDistribution {
 /// Returns nullopt to mean "keep exactly one inner tile per workgroup", which
 /// is the behavior this heuristic replaces. That fallback is taken whenever
 /// something the model needs is not statically known: no data-tiled MMA
-/// `kind`, a multi-input/output op, a scalable inner tile, or dynamic M/N/K
-/// iteration bounds. An empty M or N extent needs no special case here; the
-/// shared model answers with its one-tile baseline.
-///
-/// Dynamic bounds must not be tiled here: `UnrollInnerTiledPattern` bails when
-/// it cannot divide a shape statically, pattern failures are swallowed by the
-/// greedy driver in `LLVMCPUVirtualVectorLowering`, and an unlowered
-/// `iree_codegen.inner_tiled` is a hard failure at `ConvertToLLVM` rather than
-/// a graceful degradation.
+/// `kind`, a multi-input/output op, or a scalable inner tile. An empty M or N
+/// extent needs no special case here; the shared model answers with its
+/// one-tile baseline. Dynamic M/N/K *outer* bounds are not a fallback: they are
+/// priced as `kTypicalDynamicSize` elements, the same substitution mmt4d makes
+/// for dynamic M1/N1/K1.
 static std::optional<InnerTiledDistribution>
 selectInnerTiledDistribution(IREE::Codegen::InnerTiledOp op,
                              ArrayRef<utils::IteratorType> iteratorTypes,
@@ -3302,11 +3303,6 @@ selectInnerTiledDistribution(IREE::Codegen::InnerTiledOp op,
       iteratorTypes[kDim] != utils::IteratorType::reduction) {
     return std::nullopt;
   }
-  if (llvm::any_of(
-          SmallVector<unsigned, 3>{mDim, nDim, kDim},
-          [&](unsigned dim) { return ShapedType::isDynamic(bounds[dim]); })) {
-    return std::nullopt;
-  }
 
   // A scalable inner tile has no statically resolvable element extents: the
   // tensor form of a scalable MMA tile keeps its VL-dependent extents dynamic
@@ -3331,14 +3327,22 @@ selectInnerTiledDistribution(IREE::Codegen::InnerTiledOp op,
     Type elementType = cast<ShapedType>(operand.getType()).getElementType();
     return elementType.getIntOrFloatBitWidth();
   };
+  // Dynamic outer iteration bounds are priced like mmt4d prices dynamic
+  // M1/N1/K1: substitute a typical 1024 elements. The model wants tile counts
+  // along M and N, so divide that by the inner-tile extent; K is an element
+  // count, so use the substituted bound directly.
+  auto substituteBound = [&](int64_t bound, int64_t innerExtent) {
+    return ShapedType::isDynamic(bound) ? kTypicalDynamicSize / innerExtent
+                                        : bound;
+  };
   MatmulTileModel model;
-  model.numTilesM = bounds[mDim];
-  model.numTilesN = bounds[nDim];
+  model.numTilesM = substituteBound(bounds[mDim], m0);
+  model.numTilesN = substituteBound(bounds[nDim], n0);
   model.m0 = m0;
   model.n0 = n0;
   // K is never distributed, so a workgroup sees the whole reduction extent of
   // both operands.
-  model.kElements = bounds[kDim] * k0;
+  model.kElements = substituteBound(bounds[kDim], k0) * k0;
   model.lhsTypeBits = typeBits(op.getInputs()[0]);
   model.rhsTypeBits = typeBits(op.getInputs()[1]);
   model.accTypeBits = typeBits(op.getOutputs()[0]);

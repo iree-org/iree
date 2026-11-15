@@ -169,10 +169,11 @@ func.func @inner_tiled_rvv_f32_540x516x332(%lhs: tensor<90x332x6x1x1xf32>, %rhs:
 
 // -----
 
-// Dynamic outer extents: the cost model requires static M/N/K iteration
-// bounds (the vector lowering chain cannot statically unroll dynamic ones),
-// so distribution falls back to one inner tile per workgroup at every thread
-// count.
+// Dynamic outer extents: priced like mmt4d prices dynamic M1/N1/K1, by
+// substituting kTypicalDynamicSize = 1024 elements. With the 6x32 inner tile
+// that is numTilesM = 170, numTilesN = 32 and K = 1024 elements; the budget
+// then caps M at 5 inner tiles per workgroup (6 tiles = 147456 LHS bytes
+// alone, plus RHS + acc, overshoots 256 KiB) at every thread count.
 #executable_target_riscv64 = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+c,+v,+zvl256b", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 32 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
 func.func @inner_tiled_rvv_f32_dynamic(%lhs: tensor<?x?x6x1x1xf32>, %rhs: tensor<?x?x32x1xf32>, %acc: tensor<?x?x6x1x32xf32>) -> tensor<?x?x6x1x32xf32> attributes {hal.executable.target = #executable_target_riscv64} {
   %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
@@ -189,16 +190,119 @@ func.func @inner_tiled_rvv_f32_dynamic(%lhs: tensor<?x?x6x1x1xf32>, %rhs: tensor
   > : tensor<?x?x6x1x1xf32>, tensor<?x?x32x1xf32> into tensor<?x?x6x1x32xf32>
   return %0 : tensor<?x?x6x1x32xf32>
 }
-//    T8-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//    T8-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [5, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
 //        T8: func.func @inner_tiled_rvv_f32_dynamic(
 //        T8:   iree_codegen.inner_tiled
 //   T8-SAME:       lowering_config = #[[CONFIG]]
-//    T4-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//    T4-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [5, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
 //        T4: func.func @inner_tiled_rvv_f32_dynamic(
 //        T4:   iree_codegen.inner_tiled
 //   T4-SAME:       lowering_config = #[[CONFIG]]
-//    T1-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//    T1-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [5, 1, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
 //        T1: func.func @inner_tiled_rvv_f32_dynamic(
+//        T1:   iree_codegen.inner_tiled
+//   T1-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+// Only M is dynamic: M is priced as 170 inner tiles (1024 / 6), while N stays
+// at its static 2 and K stays 64 elements. The budget caps the workgroup tile
+// at 34 M tiles (34 x 2 = 68 inner tiles) at every thread count.
+#executable_target_riscv64 = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+c,+v,+zvl256b", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 32 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
+func.func @inner_tiled_rvv_f32_dynamic_m(%lhs: tensor<?x64x6x1x1xf32>, %rhs: tensor<2x64x32x1xf32>, %acc: tensor<?x2x6x1x32xf32>) -> tensor<?x2x6x1x32xf32> attributes {hal.executable.target = #executable_target_riscv64} {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ],
+    iterator_types = [#linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32, intrinsics_m = 6, vlen = 256>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : tensor<?x64x6x1x1xf32>, tensor<2x64x32x1xf32> into tensor<?x2x6x1x32xf32>
+  return %0 : tensor<?x2x6x1x32xf32>
+}
+//    T8-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [34, 2, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//        T8: func.func @inner_tiled_rvv_f32_dynamic_m(
+//        T8:   iree_codegen.inner_tiled
+//   T8-SAME:       lowering_config = #[[CONFIG]]
+//    T4-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [34, 2, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//        T4: func.func @inner_tiled_rvv_f32_dynamic_m(
+//        T4:   iree_codegen.inner_tiled
+//   T4-SAME:       lowering_config = #[[CONFIG]]
+//    T1-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [34, 2, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//        T1: func.func @inner_tiled_rvv_f32_dynamic_m(
+//        T1:   iree_codegen.inner_tiled
+//   T1-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+// Only N is dynamic: N is priced as 32 inner tiles (1024 / 32), M stays 11 and
+// K stays 64 elements. At 8 threads the model splits the 32 N tiles into 4 per
+// workgroup over 8 workgroups; at 4 and 1 threads it consolidates to 8 per
+// workgroup (4 workgroups).
+#executable_target_riscv64 = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+c,+v,+zvl256b", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 32 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
+func.func @inner_tiled_rvv_f32_dynamic_n(%lhs: tensor<11x64x6x1x1xf32>, %rhs: tensor<?x64x32x1xf32>, %acc: tensor<11x?x6x1x32xf32>) -> tensor<11x?x6x1x32xf32> attributes {hal.executable.target = #executable_target_riscv64} {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ],
+    iterator_types = [#linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32, intrinsics_m = 6, vlen = 256>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : tensor<11x64x6x1x1xf32>, tensor<?x64x32x1xf32> into tensor<11x?x6x1x32xf32>
+  return %0 : tensor<11x?x6x1x32xf32>
+}
+//    T8-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [11, 4, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//        T8: func.func @inner_tiled_rvv_f32_dynamic_n(
+//        T8:   iree_codegen.inner_tiled
+//   T8-SAME:       lowering_config = #[[CONFIG]]
+//    T4-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [11, 8, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//        T4: func.func @inner_tiled_rvv_f32_dynamic_n(
+//        T4:   iree_codegen.inner_tiled
+//   T4-SAME:       lowering_config = #[[CONFIG]]
+//    T1-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [11, 8, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//        T1: func.func @inner_tiled_rvv_f32_dynamic_n(
+//        T1:   iree_codegen.inner_tiled
+//   T1-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+// Only K is dynamic: K is priced as 1024 elements, so a workgroup tile spans
+// 1024 (not 64) reduction elements in both operands. That alone limits N to 2
+// tiles per workgroup; M stays at 1.
+#executable_target_riscv64 = #hal.executable.target<"llvm-cpu", "embedded-elf-riscv_64", {cpu_features = "+m,+a,+f,+d,+c,+v,+zvl256b", data_layout = "e-m:e-p:64:64-i64:64-i128:128-n32:64-S128", native_vector_size = 32 : index, target_triple = "riscv64-unknown-unknown-eabi-elf"}>
+func.func @inner_tiled_rvv_f32_dynamic_k(%lhs: tensor<11x?x6x1x1xf32>, %rhs: tensor<2x?x32x1xf32>, %acc: tensor<11x2x6x1x32xf32>) -> tensor<11x2x6x1x32xf32> attributes {hal.executable.target = #executable_target_riscv64} {
+  %0 = iree_codegen.inner_tiled ins(%lhs, %rhs) outs(%acc) <
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d2)>,
+      affine_map<(d0, d1, d2) -> (d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ],
+    iterator_types = [#linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<parallel>,
+                      #linalg.iterator_type<reduction>],
+    kind = #iree_cpu.data_tiled_mma_layout<intrinsic = MMA_RISCV_V_VFMACC_1x8VLsx1_F32_F32, intrinsics_m = 6, vlen = 256>,
+    semantics = #iree_cpu.mma_semantics<>
+  > : tensor<11x?x6x1x1xf32>, tensor<2x?x32x1xf32> into tensor<11x2x6x1x32xf32>
+  return %0 : tensor<11x2x6x1x32xf32>
+}
+//    T8-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 2, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//        T8: func.func @inner_tiled_rvv_f32_dynamic_k(
+//        T8:   iree_codegen.inner_tiled
+//   T8-SAME:       lowering_config = #[[CONFIG]]
+//    T4-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 2, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//        T4: func.func @inner_tiled_rvv_f32_dynamic_k(
+//        T4:   iree_codegen.inner_tiled
+//   T4-SAME:       lowering_config = #[[CONFIG]]
+//    T1-DAG: #[[CONFIG:.+]] = #iree_cpu.lowering_config<distribution = [1, 2, 0], vector_common_parallel = [1, 1, 0], vector_reduction = [0, 0, 1]>
+//        T1: func.func @inner_tiled_rvv_f32_dynamic_k(
 //        T1:   iree_codegen.inner_tiled
 //   T1-SAME:       lowering_config = #[[CONFIG]]
 
