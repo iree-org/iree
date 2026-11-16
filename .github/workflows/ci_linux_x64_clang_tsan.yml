@@ -12,6 +12,11 @@ on:
     - cron: "15 9 * * 1-5"
   workflow_dispatch:
   workflow_call:
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING:
+        required: false
+      DISCORD_WEBHOOK:
+        required: false
 
 permissions:
   contents: read
@@ -35,6 +40,7 @@ jobs:
       - name: "Checking out repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: true
       - name: Install Python requirements
         run: |

@@ -41,8 +41,10 @@ jobs:
           workflow: build_package.yml
           run_id: ${{ github.event.inputs.build_run_id }}
       - name: Extract and display downloaded files
+        env:
+          PACKAGE_VERSION: ${{ github.event.inputs.package_version }}
         run: |
-          tar -xf wheels-linux-x86_64-main-dist-linux/iree-dist-${{ github.event.inputs.package_version }}-linux-x86_64.tar.xz
+          tar -xf "wheels-linux-x86_64-main-dist-linux/iree-dist-${PACKAGE_VERSION}-linux-x86_64.tar.xz"
           pwd
           ls -R
       - name: Set up python
@@ -52,10 +54,14 @@ jobs:
           python-version: "3.10"
       - name: Install python packages
         id: install_python_packages
+        env:
+          COMPILER_PACKAGE_VERSION: ${{ github.event.inputs.compiler_package_version }}
+          RUNTIME_PACKAGE_VERSION: ${{ github.event.inputs.runtime_package_version }}
+          LEGACY_PACKAGE_VERSION: ${{ github.event.inputs.legacy_package_version }}
         run: |
-          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-compiler-pkg/ "iree-base-compiler[onnx]==${{ github.event.inputs.compiler_package_version }}"
-          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-runtime-pkg/ "iree-base-runtime==${{ github.event.inputs.runtime_package_version }}"
-          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-tf-compiler-tools-pkg/ "iree-tools-tflite==${{ github.event.inputs.legacy_package_version }}" "iree-tools-tf==${{ github.event.inputs.legacy_package_version }}"
+          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-compiler-pkg/ "iree-base-compiler[onnx]==${COMPILER_PACKAGE_VERSION}"
+          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-runtime-pkg/ "iree-base-runtime==${RUNTIME_PACKAGE_VERSION}"
+          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-tf-compiler-tools-pkg/ "iree-tools-tflite==${LEGACY_PACKAGE_VERSION}" "iree-tools-tf==${LEGACY_PACKAGE_VERSION}"
       - name: Validate IREE Compiler Package
         id: validate_compiler_package
         run: |
@@ -163,9 +169,11 @@ jobs:
           python-version: "3.10"
 
       - name: Check for patch release
+        env:
+          PACKAGE_VERSION: ${{ github.event.inputs.package_version }}
         run: |
           python -m pip install packaging
-          is_patch_release="$(python -c "from packaging.version import Version;print('true' if Version('${{ github.event.inputs.package_version }}').micro !=0 else 'false')")"
+          is_patch_release="$(python -c "import os;from packaging.version import Version;print('true' if Version(os.environ['PACKAGE_VERSION']).micro !=0 else 'false')")"
           echo "is_patch_release=${is_patch_release}" >> $GITHUB_ENV
 
       - name: Updating latest-snapshot branch
