@@ -137,7 +137,8 @@ static LogicalResult verifyMultiTilingExpertPassPipelineConfig(
 static LogicalResult verifyConvTileAndDecomposeExpertConfig(
     Operation *op, IREE::CPU::LoweringConfigAttr loweringConfig,
     Operation * /*rootOp*/) {
-  if (!isa<linalg::ConvolutionOpInterface>(op)) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp || !linalg::isaConvolutionOpInterface(linalgOp)) {
     return success();
   }
 
@@ -152,7 +153,6 @@ static LogicalResult verifyConvTileAndDecomposeExpertConfig(
       IREE::CPU::TilingLevel::DistributionTiles,
       IREE::CPU::TilingLevel::VectorCommonParallelTiles,
       IREE::CPU::TilingLevel::VectorReductionTiles};
-  linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
   SmallVector<int64_t> shapeAfterTiling = linalgOp.getStaticLoopRanges();
   for (IREE::CPU::TilingLevel level : requiredLevels) {
     if (!loweringConfig.hasTilingLevel(llvm::to_underlying(level))) {
@@ -190,40 +190,18 @@ static LogicalResult verifyConvTileAndDecomposeExpertConfig(
     }
   }
 
-  int64_t khSize, kwSize, ohSize, owSize;
-  auto isSizeExtracted =
-      TypeSwitch<Operation *, LogicalResult>(op)
-          .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
-                linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
-                linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
-                linalg::PoolingNhwcMinUnsignedOp>([&](auto) {
-            // shape: N, OH, OW, OC, KH, KW, (IC)
-            khSize = shapeAfterTiling[4];
-            kwSize = shapeAfterTiling[5];
-            ohSize = shapeAfterTiling[1];
-            owSize = shapeAfterTiling[2];
-            return success();
-          })
-          .Case([&](linalg::Conv2DNchwFchwOp) {
-            // shape: N, OC, OH, OW, (IC), KH, KW
-            khSize = shapeAfterTiling[5];
-            kwSize = shapeAfterTiling[6];
-            ohSize = shapeAfterTiling[2];
-            owSize = shapeAfterTiling[3];
-            return success();
-          })
-          .Case<linalg::PoolingNchwSumOp, linalg::PoolingNchwMaxOp>([&](auto) {
-            // shape: N, OC, OH, OW, KH, KW
-            khSize = shapeAfterTiling[4];
-            kwSize = shapeAfterTiling[5];
-            ohSize = shapeAfterTiling[2];
-            owSize = shapeAfterTiling[3];
-            return success();
-          })
-          .Default(failure());
-  if (failed(isSizeExtracted)) {
+  // The pipeline decomposes 2-D convolutions and poolings. Take the spatial
+  // loops from the indexing maps, so the layout and the op name do not matter.
+  FailureOr<linalg::ConvolutionDimensions> convDims =
+      linalg::inferConvolutionDims(linalgOp);
+  if (failed(convDims) || convDims->outputImage.size() != 2 ||
+      convDims->filterLoop.size() != 2) {
     return op->emitOpError("unsupported conv types");
   }
+  int64_t ohSize = shapeAfterTiling[convDims->outputImage[0]];
+  int64_t owSize = shapeAfterTiling[convDims->outputImage[1]];
+  int64_t khSize = shapeAfterTiling[convDims->filterLoop[0]];
+  int64_t kwSize = shapeAfterTiling[convDims->filterLoop[1]];
 
   bool removeH = (khSize == 1 && ohSize == 1);
   bool removeW = (kwSize == 1 && owSize == 1);

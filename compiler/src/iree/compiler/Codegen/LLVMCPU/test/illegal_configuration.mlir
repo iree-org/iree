@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-llvmcpu-select-lowering-strategy)' --verify-diagnostics --split-input-file %s
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(linalg-generalize-named-ops),iree-llvmcpu-select-lowering-strategy)' --verify-diagnostics --split-input-file %s
 
 #config = #iree_cpu.lowering_config<distribution = [64, 64], vector_common_parallel = [8, 32, 16], vector_reduction = [0, 0, 16]>
 #translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>>
@@ -103,5 +104,46 @@ func.func @illegal_conv_config_unsupported_conv(%0: memref<1x11x576xf32>, %1: me
 } {
   // expected-error @+1 {{unsupported conv types}}
   linalg.conv_1d_nwc_wcf {lowering_config = #config} ins(%0, %1 : memref<1x11x576xf32>, memref<5x576x576xf32>) outs(%2 : memref<1x7x576xf32>)
+  return
+}
+
+// -----
+
+// The spatial dims are taken from the indexing maps, so layouts other than
+// NHWC are verified as well. OH is tiled to 1, but KH is not.
+
+#config = #iree_cpu.lowering_config<distribution = [0, 64, 7, 7, 0, 0, 0], vector_common_parallel = [6, 32, 1, 7, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 4, 3, 3]>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
+func.func @illegal_conv_config_nchw(%0: memref<36x512x9x9xf32>, %1: memref<512x512x3x3xf32>, %2: memref<36x512x7x7xf32>) attributes {
+  translation_info = #translation
+} {
+  // expected-error @+1 {{can't decompose the conv op}}
+  linalg.conv_2d_nchw_fchw {lowering_config = #config} ins(%0, %1 : memref<36x512x9x9xf32>, memref<512x512x3x3xf32>) outs(%2 : memref<36x512x7x7xf32>)
+  return
+}
+
+// -----
+
+// OW and KW are tiled to 1, so the NCHW conv can be decomposed along W. No
+// error is expected.
+
+#config = #iree_cpu.lowering_config<distribution = [0, 64, 7, 7, 0, 0, 0], vector_common_parallel = [6, 32, 7, 1, 0, 0, 0], vector_reduction = [0, 0, 0, 0, 4, 3, 1]>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
+func.func @legal_conv_config_nchw(%0: memref<36x512x9x9xf32>, %1: memref<512x512x3x3xf32>, %2: memref<36x512x7x7xf32>) attributes {
+  translation_info = #translation
+} {
+  linalg.conv_2d_nchw_fchw {lowering_config = #config} ins(%0, %1 : memref<36x512x9x9xf32>, memref<512x512x3x3xf32>) outs(%2 : memref<36x512x7x7xf32>)
+  return
+}
+
+// -----
+
+#config = #iree_cpu.lowering_config<distribution = [0, 64, 7, 7, 0, 0], vector_common_parallel = [1, 32, 1, 7, 0, 0], vector_reduction = [0, 0, 0, 0, 3, 3]>
+#translation = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<ConvTileAndDecomposeExpert>>
+func.func @illegal_pooling_config_nchw(%0: memref<1x64x9x9xf32>, %1: memref<3x3xf32>, %2: memref<1x64x7x7xf32>) attributes {
+  translation_info = #translation
+} {
+  // expected-error @+1 {{can't decompose the conv op}}
+  linalg.pooling_nchw_max {lowering_config = #config} ins(%0, %1 : memref<1x64x9x9xf32>, memref<3x3xf32>) outs(%2 : memref<1x64x7x7xf32>)
   return
 }
