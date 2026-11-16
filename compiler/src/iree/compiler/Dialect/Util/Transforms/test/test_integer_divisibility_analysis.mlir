@@ -540,3 +540,26 @@ util.func @select_divisibility_with_constant_zero(%arg0 : index, %cond : i1) {
   %probe = "iree_unregistered.test_int_divisibility"(%1) : (index) -> index
   util.return
 }
+
+// -----
+
+// A constant wider than 64 bits keeps its largest power-of-two factor that
+// fits; 3 * 2^100 yields 2^63.
+// CHECK-LABEL: @constant_wider_than_64_bits
+util.func @constant_wider_than_64_bits() {
+  %c = arith.constant 3802951800684688204490109616128 : i128
+  // CHECK: divisibility = "udiv = 9223372036854775808, sdiv = 9223372036854775808"
+  %probe = "iree_unregistered.test_int_divisibility"(%c) : (i128) -> i128
+  util.return
+}
+
+// -----
+
+// The signed minimum has magnitude 2^63 under both interpretations.
+// CHECK-LABEL: @constant_signed_minimum
+util.func @constant_signed_minimum() {
+  %c = arith.constant -9223372036854775808 : i64
+  // CHECK: divisibility = "udiv = 9223372036854775808, sdiv = 9223372036854775808"
+  %probe = "iree_unregistered.test_int_divisibility"(%c) : (i64) -> i64
+  util.return
+}
