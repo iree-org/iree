@@ -320,8 +320,10 @@ static iree_status_t iree_hal_buffer_view_generate_buffer_on_host(
   iree_allocator_t host_allocator =
       iree_hal_allocator_host_allocator(allocator);
   void* host_ptr = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(host_allocator, content_size, &host_ptr));
+  if (content_size > 0) {
+    IREE_RETURN_IF_ERROR(
+        iree_allocator_malloc(host_allocator, content_size, &host_ptr));
+  }
   iree_hal_buffer_mapping_t mapping = {
       .contents = iree_make_byte_span(host_ptr, content_size),
   };
