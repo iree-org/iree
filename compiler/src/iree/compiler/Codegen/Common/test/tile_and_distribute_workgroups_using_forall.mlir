@@ -1498,3 +1498,112 @@ func.func @arg_compare_fold_broadcast(
 //   CHECK-NOT:     linalg.broadcast
 //       CHECK:     scf.forall {{.*}} shared_outs(%{{.*}} = %[[INIT_F16]], %{{.*}} = %[[INIT_I32]])
 //       CHECK:       iree_linalg_ext.arg_compare
+
+// -----
+
+// A 3x3-stride-2 conv on a 3-channel input, lowered to a same-padding
+// `tensor.pad` feeding an im2col patch-gather `linalg.generic`.
+// Contains a lowering config indicating to tile the 3-channel dim by 16.
+// Test that the over-tiled distribution loop is dropped,
+// rather than emitting a degenerate dynamic partial tile.
+// Each over-tiled config is paired with the config
+// that already clamps the tile to the extent, to show the two produce an
+// identical distribution.
+
+// Real model pad: innermost 3-channel dim tiled by the 16-lane subgroup.
+func.func @model_pad_overtiled(%in: tensor<256x256x3xi8>) -> tensor<257x257x3xi8> {
+  %c = arith.constant -128 : i8
+  %p = tensor.pad %in low[0, 0, 0] high[1, 1, 0] {
+  ^bb0(%a: index, %b: index, %d: index):
+    tensor.yield %c : i8
+  } {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 16], [1, 1, 1]]>} : tensor<256x256x3xi8> to tensor<257x257x3xi8>
+  return %p : tensor<257x257x3xi8>
+}
+// CHECK-LABEL: func @model_pad_overtiled(
+//       CHECK:   scf.forall (%{{[a-zA-Z0-9]+}}, %{{[a-zA-Z0-9]+}}) in (257, 257)
+//       CHECK:     tensor.pad
+//       CHECK:     tensor.parallel_insert_slice %{{.+}} into %{{.+}}[%{{.+}}, %{{.+}}, 0] [1, 1, 3] [1, 1, 1]
+//       CHECK:   mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+// Same pad with the tile already clamped to the extent -- identical result.
+func.func @model_pad_clamped_to_extent(%in: tensor<256x256x3xi8>) -> tensor<257x257x3xi8> {
+  %c = arith.constant -128 : i8
+  %p = tensor.pad %in low[0, 0, 0] high[1, 1, 0] {
+  ^bb0(%a: index, %b: index, %d: index):
+    tensor.yield %c : i8
+  } {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 3], [1, 1, 1]]>} : tensor<256x256x3xi8> to tensor<257x257x3xi8>
+  return %p : tensor<257x257x3xi8>
+}
+// CHECK-LABEL: func @model_pad_clamped_to_extent(
+//       CHECK:   scf.forall (%{{[a-zA-Z0-9]+}}, %{{[a-zA-Z0-9]+}}) in (257, 257)
+//       CHECK:     tensor.pad
+//       CHECK:     tensor.parallel_insert_slice %{{.+}} into %{{.+}}[%{{.+}}, %{{.+}}, 0] [1, 1, 3] [1, 1, 1]
+//       CHECK:   mapping = [#iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+// Real model im2col gather: workgroup tile [1, 1, 2, 4, 4] over 128x128x3x3x3.
+// The trailing 3x3 filter dims (tiled by 4 > 3) are dropped; the 3-wide dim
+// tiled by 2 (< 3) keeps its genuine partial tile.
+func.func @model_im2col_overtiled(%in: tensor<257x257x3xi8>) -> tensor<128x128x3x3x3xi8> {
+  %e = tensor.empty() : tensor<128x128x3x3x3xi8>
+  %0 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0 * 2 + d2, d1 * 2 + d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
+    ins(%in : tensor<257x257x3xi8>) outs(%e : tensor<128x128x3x3x3xi8>)
+    attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 2, 4, 4], [0, 0, 1, 1, 1]]>} {
+  ^bb0(%i: i8, %o: i8):
+    linalg.yield %i : i8
+  } -> tensor<128x128x3x3x3xi8>
+  return %0 : tensor<128x128x3x3x3xi8>
+}
+// CHECK-LABEL: func @model_im2col_overtiled(
+//       CHECK:   scf.forall (%{{[a-zA-Z0-9]+}}, %{{[a-zA-Z0-9]+}}, %{{[a-zA-Z0-9]+}}) = (0, 0, 0) to (128, 128, 3) step (1, 1, 2)
+//       CHECK:     tensor.parallel_insert_slice %{{.+}} into %{{.+}}[%{{.+}}, %{{.+}}, %{{.+}}, 0, 0] [1, 1, %{{.+}}, 3, 3] [1, 1, 1, 1, 1]
+//       CHECK:   mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+// Same gather with the filter dims already clamped to the extent -- identical.
+func.func @model_im2col_clamped_to_extent(%in: tensor<257x257x3xi8>) -> tensor<128x128x3x3x3xi8> {
+  %e = tensor.empty() : tensor<128x128x3x3x3xi8>
+  %0 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0 * 2 + d2, d1 * 2 + d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>],
+    iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
+    ins(%in : tensor<257x257x3xi8>) outs(%e : tensor<128x128x3x3x3xi8>)
+    attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 2, 3, 3], [0, 0, 1, 1, 1]]>} {
+  ^bb0(%i: i8, %o: i8):
+    linalg.yield %i : i8
+  } -> tensor<128x128x3x3x3xi8>
+  return %0 : tensor<128x128x3x3x3xi8>
+}
+// CHECK-LABEL: func @model_im2col_clamped_to_extent(
+//       CHECK:   scf.forall (%{{[a-zA-Z0-9]+}}, %{{[a-zA-Z0-9]+}}, %{{[a-zA-Z0-9]+}}) = (0, 0, 0) to (128, 128, 3) step (1, 1, 2)
+//       CHECK:     tensor.parallel_insert_slice %{{.+}} into %{{.+}}[%{{.+}}, %{{.+}}, %{{.+}}, 0, 0] [1, 1, %{{.+}}, 3, 3] [1, 1, 1, 1, 1]
+//       CHECK:   mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
+
+// -----
+
+// The clamp above is keyed on the *static* extent: a dynamic innermost
+// dimension is not assumed to be covered by the tile and must still be
+// distributed (with a genuine `affine.min` partial tile).
+func.func @dynamic_innermost_dim_still_distributed(%in: tensor<257x257x?xf32>, %d: index) -> tensor<257x257x?xf32> {
+  %e = tensor.empty(%d) : tensor<257x257x?xf32>
+  %0 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+    iterator_types = ["parallel", "parallel", "parallel"]}
+    ins(%in : tensor<257x257x?xf32>) outs(%e : tensor<257x257x?xf32>)
+    attrs = {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 16]]>} {
+  ^bb0(%a: f32, %b: f32):
+    linalg.yield %a : f32
+  } -> tensor<257x257x?xf32>
+  return %0 : tensor<257x257x?xf32>
+}
+// CHECK-LABEL: func @dynamic_innermost_dim_still_distributed(
+//       CHECK:   scf.forall (%{{[a-zA-Z0-9]+}}, %{{[a-zA-Z0-9]+}}, %{{[a-zA-Z0-9]+}}) = (0, 0, 0) to (257, 257, %{{.+}}) step (1, 1, 16)
+//       CHECK:   mapping = [#iree_codegen.workgroup_mapping<z>, #iree_codegen.workgroup_mapping<y>, #iree_codegen.workgroup_mapping<x>]
