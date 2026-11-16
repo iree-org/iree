@@ -28,6 +28,8 @@ if(_IREE_UKERNEL_BITCODE_BUILD_ARM_64)
 # All headers transitively included by code in this directory. Bazel-only.
 UKERNEL_ARM_64_INTERNAL_HEADERS = [
     "common_arm_64.h",
+    "conv_nchwc_arm_64_internal.h",
+    "conv_nchwc_arm_64_tiles.inl",
     "mmt4d_arm_64_internal.h",
     "mmt4d_arm_64_tiles.inl",
     "pack_arm_64_internal.h",
@@ -51,6 +53,7 @@ iree_bitcode_library(
 iree_bitcode_library(
     name = "ukernel_bitcode_arch_arm_64_base",
     srcs = [
+        "conv_nchwc_arm_64_base.c",
         "mmt4d_arm_64_base.c",
         "pack_arm_64_base.c",
         "unpack_arm_64_base.c",

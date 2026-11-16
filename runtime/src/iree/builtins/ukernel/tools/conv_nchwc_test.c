@@ -303,7 +303,10 @@ int main(int argc, char** argv) {
   // fallback even when arch-specific tiles are compiled in.
   iree_uk_test_conv_nchwc(IREE_UK_FLAG_CONV_NCHWC_TYPE_F32F32F32, 4, 4, "");
 
-#if defined(IREE_ARCH_X86_64)
+#if defined(IREE_ARCH_ARM_64)
+  // Baseline NEON tile; needs no CPU feature beyond plain aarch64.
+  iree_uk_test_conv_nchwc(IREE_UK_FLAG_CONV_NCHWC_TYPE_F32F32F32, 8, 8, "");
+#elif defined(IREE_ARCH_X86_64)
   iree_uk_test_conv_nchwc(IREE_UK_FLAG_CONV_NCHWC_TYPE_F32F32F32, 16, 16,
                           "avx512_base");
 #endif

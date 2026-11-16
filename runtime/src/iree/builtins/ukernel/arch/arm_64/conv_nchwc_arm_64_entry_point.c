@@ -4,14 +4,36 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-// No arm_64-specific conv_nchwc tile function yet. Falls back to generic.
-// TODO: implement arm_64 tile functions analogous to the +dotprod / +i8mm /
-// +bf16 dispatch in mmt4d_arm_64_entry_point.c.
-#include "iree/builtins/ukernel/conv_nchwc_internal.h"
+#include "iree/builtins/ukernel/arch/arm_64/common_arm_64.h"
+#include "iree/builtins/ukernel/arch/arm_64/conv_nchwc_arm_64_internal.h"
 
 iree_uk_conv_nchwc_tile_selection_t iree_uk_conv_nchwc_select_tile_func_arch(
     const iree_uk_conv_nchwc_params_t* params) {
-  (void)params;
+  IREE_UK_ATTRIBUTE_UNUSED iree_uk_conv_nchwc_type_t type =
+      iree_uk_conv_nchwc_type(params->flags);
   iree_uk_conv_nchwc_tile_selection_t selection = {0};
+
+#define IREE_UK_CONV_NCHWC_TILE_IMPL_arm_64(LHS, RHS, OUT, OW_TILE, K0_TILE,                          \
+                                            C0_TILE, SUFFIX)                                          \
+  if (type == iree_uk_conv_nchwc_type_##LHS##RHS##OUT &&                                              \
+      params->k0 == (K0_TILE) && params->c0 == (C0_TILE) &&                                           \
+      iree_uk_cpu_arm_64##SUFFIX(params->cpu_data)) {                                                 \
+    selection.tile_func =                                                                             \
+        iree_uk_conv_nchwc_tile_##LHS##RHS##OUT##_##OW_TILE##x##K0_TILE##x##C0_TILE##_arm_64##SUFFIX; \
+    selection.ow_tile = (OW_TILE);                                                                    \
+  }
+
+#define IREE_UK_CONV_NCHWC_TILE_arm_64(LHS, RHS, OUT, OW_TILE, K0_TILE, \
+                                       C0_TILE)                         \
+  IREE_UK_CONV_NCHWC_TILE_IMPL_arm_64(LHS, RHS, OUT, OW_TILE, K0_TILE,  \
+                                      C0_TILE, )
+
+#define IREE_UK_CONV_NCHWC_TILE(ARCH, LHS, RHS, OUT, OW_TILE, K0_TILE,    \
+                                C0_TILE, SUFFIX)                          \
+  IREE_UK_CONV_NCHWC_TILE_arm_64##SUFFIX(LHS, RHS, OUT, OW_TILE, K0_TILE, \
+                                         C0_TILE)
+
+#include "iree/builtins/ukernel/arch/arm_64/conv_nchwc_arm_64_tiles.inl"
+
   return selection;
 }
