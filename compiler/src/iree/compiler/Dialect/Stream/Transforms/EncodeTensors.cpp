@@ -198,9 +198,13 @@ static Value canonicalizeFillPattern(Value pattern, RankedTensorType resultType,
     return i8Val;
   }
 
-  // Zero-extend unpacked integers to their storage width.
+  // Zero-extend unpacked logical elements to their storage width. A pattern
+  // narrower than the logical element was narrowed by fill canonicalization
+  // and is byte-replicated, so it must pass through unchanged.
   Type storageType = legalizeStorageElementType(resultType);
   if (isa<IntegerType>(pattern.getType()) && isa<IntegerType>(storageType) &&
+      elementBitWidth ==
+          IREE::Util::getTypeBitWidth(resultType.getElementType()) &&
       storageType.getIntOrFloatBitWidth() > elementBitWidth) {
     return builder.createOrFold<arith::ExtUIOp>(loc, storageType, pattern);
   }
