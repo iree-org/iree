@@ -34,6 +34,22 @@ iree_lit_test_suite(
     "hostonly"
 )
 
+iree_lit_test_suite(
+  NAME
+    large_stack_lit
+  SRCS
+    "llvmcpu_large_stack_scatter.mlir"
+  TOOLS
+    ${IREE_LLD_TARGET}
+    FileCheck
+    iree-compile
+    iree-run-module
+  LABELS
+    "driver=local-sync"
+    "driver=local-task"
+    "hostonly"
+)
+
 iree_check_single_backend_test_suite(
   NAME
     check_fp_reassoc_regression_llvm-cpu

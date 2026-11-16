@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 
 namespace mlir::iree_compiler {
 
@@ -16,6 +17,17 @@ namespace mlir::iree_compiler {
 /// of `hal.executable.target` attribute used commonly in CPU codegen pipelines.
 std::optional<int64_t>
 getConfigMaxStackAllocationSize(DictionaryAttr targetConfig);
+
+/// Returns the maximum stack allocation size in bytes for `funcOp`, read from
+/// the `hal.executable.target` configuration (32KB if absent).
+unsigned getStackAllocationLimit(mlir::FunctionOpInterface funcOp);
+
+/// Returns the stack size in bytes of `allocaOp`, as accounted for by
+/// iree-llvmcpu-check-ir-before-llvm-conversion. Diagnostics are emitted on
+/// failure only when `emitDiagnostics` is true.
+FailureOr<int64_t> getStackAllocationSize(memref::AllocaOp allocaOp,
+                                          bool emitDiagnostics = true);
+
 std::optional<int64_t> getConfigNativeVectorSize(DictionaryAttr targetConfig);
 
 /// Methods to add attributes to the `config` list.

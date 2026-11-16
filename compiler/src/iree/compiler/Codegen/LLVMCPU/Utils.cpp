@@ -9,6 +9,8 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/MathExtras.h"
+#include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
 
 #define DEBUG_TYPE "iree-llvmcpu-utils"
 
@@ -16,6 +18,76 @@ constexpr char kMaxStackAllocationSizeAttrName[] = "max_stack_allocation_size";
 constexpr char kNativeVectorSizeAttrName[] = "native_vector_size";
 
 namespace mlir::iree_compiler {
+
+static llvm::cl::opt<unsigned> clAssumedVscaleValue(
+    "iree-llvmcpu-stack-allocation-assumed-vscale",
+    llvm::cl::desc(
+        "assumed value of vscale when checking (scalable) stack allocations"),
+    llvm::cl::init(1));
+
+unsigned getStackAllocationLimit(mlir::FunctionOpInterface funcOp) {
+  // In rare cases where the attribute is not present in the module, a value of
+  // 32KB will be taken.
+  unsigned maxAllocationSizeInBytes = 32 * 1024;
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+  if (targetAttr) {
+    std::optional<int64_t> nativeAllocationSize =
+        getConfigMaxStackAllocationSize(targetAttr.getConfiguration());
+    if (nativeAllocationSize) {
+      maxAllocationSizeInBytes = nativeAllocationSize.value();
+    }
+  }
+  return maxAllocationSizeInBytes;
+}
+
+FailureOr<int64_t> getStackAllocationSize(memref::AllocaOp allocaOp,
+                                          bool emitDiagnostics) {
+  auto emitOpError = [&](StringRef message) -> FailureOr<int64_t> {
+    if (emitDiagnostics) {
+      allocaOp.emitOpError(message);
+    }
+    return failure();
+  };
+  const unsigned assumedVscale = clAssumedVscaleValue;
+  auto allocaType = cast<ShapedType>(allocaOp.getType());
+  FailureOr<int64_t> staticSizeBits =
+      getStaticShapeSizeInBits(allocaType, [](Type elementType) -> int64_t {
+        return IREE::Util::getTypeBitWidth(elementType);
+      });
+  if (failed(staticSizeBits)) {
+    return emitOpError("stack allocation size overflows 64 bits");
+  }
+  int64_t allocaSize = *staticSizeBits;
+  for (auto operand : allocaOp.getDynamicSizes()) {
+    // Assume vscale is `clAssumedVscaleValue` for determining if the alloca
+    // is within the stack limit. This should always resolve to a constant
+    // bound. Note: This may be an underestimate if the runtime larger than
+    // `clAssumedVscaleValue`, but should still catch unreasonable allocatons
+    // (which will have large static factors).
+    auto ub = vector::ScalableValueBoundsConstraintSet::computeScalableBound(
+        operand, /*dim=*/std::nullopt,
+        /*vscaleMin=*/assumedVscale,
+        /*vscaleMax=*/assumedVscale, presburger::BoundType::UB);
+    if (succeeded(ub)) {
+      if (llvm::MulOverflow(allocaSize,
+                            static_cast<int64_t>(ub->getSize()->baseSize),
+                            allocaSize)) {
+        return emitOpError("stack allocation size overflows 64 bits");
+      }
+      continue;
+    }
+    return emitOpError("expected no unbounded stack allocations");
+  }
+  if (allocaOp.getAlignment()) {
+    int64_t alignmentInBits = *allocaOp.getAlignment() * 8;
+    int64_t alignedUnits = llvm::divideCeil(allocaSize, alignmentInBits);
+    if (llvm::MulOverflow(alignedUnits, alignmentInBits, allocaSize)) {
+      return emitOpError("stack allocation size overflows 64 bits");
+    }
+  }
+  int64_t allocaSizeBytes = llvm::divideCeil(allocaSize, 8);
+  return allocaSizeBytes;
+}
 
 static llvm::cl::opt<int32_t> clMaxAllowedNumberOfNativeVectors(
     "iree-llvmcpu-max-allowed-number-of-native-vectors",

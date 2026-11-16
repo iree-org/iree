@@ -53,6 +53,23 @@ iree_lit_test_suite(
     ],
 )
 
+iree_lit_test_suite(
+    name = "large_stack_lit",
+    srcs = ["llvmcpu_large_stack_scatter.mlir"],
+    cfg = "//tests:lit.cfg.py",
+    tags = [
+        "driver=local-sync",
+        "driver=local-task",
+        "hostonly",
+    ],
+    tools = [
+        "//tools:iree-compile",
+        "//tools:iree-run-module",
+        "@llvm-project//lld",
+        "@llvm-project//llvm:FileCheck",
+    ],
+)
+
 iree_check_single_backend_test_suite(
     name = "check_fp_reassoc_regression_llvm-cpu",
     srcs = [

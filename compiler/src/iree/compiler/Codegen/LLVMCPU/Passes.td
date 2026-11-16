@@ -69,6 +69,18 @@ def LLVMCPUAssignWorkgroupLocalMemoryPass :
   }];
 }
 
+def LLVMCPUPromoteLargeAllocasToWorkgroupLocalMemoryPass :
+    InterfacePass<"iree-llvmcpu-promote-large-allocas",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Moves static allocas exceeding the stack budget to HAL scratch.";
+  let description = [{
+    Promotes static entry-block allocas, largest first, until the cumulative
+    stack estimate fits the target stack-allocation limit. Promoted allocations
+    use #iree_codegen.workgroup_local.
+  }];
+  let dependentDialects = ["memref::MemRefDialect"];
+}
+
 def LLVMCPUCheckIRBeforeLLVMConversionPass :
     InterfacePass<"iree-llvmcpu-check-ir-before-llvm-conversion", "mlir::FunctionOpInterface"> {
   let summary = "Checks CPU backend specific IR constraints (like no allocas)";
