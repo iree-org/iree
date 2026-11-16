@@ -2,6 +2,8 @@
 
 // CHECK-DAG: vm.import private @hal.command_buffer.dispatch{{\(.+}}attributes {minimum_version = 7 : i32}
 // CHECK-DAG: vm.import private @hal.command_buffer.dispatch.indirect{{\(.+}}attributes {minimum_version = 7 : i32}
+// CHECK-DAG: vm.import private @hal.command_buffer.flush_buffer{{\(.+}}attributes {minimum_version = 8 : i32}
+// CHECK-DAG: vm.import private @hal.command_buffer.invalidate_buffer{{\(.+}}attributes {minimum_version = 8 : i32}
 // CHECK-DAG: vm.import private @hal.executable.lookup.function{{.*}}attributes {nosideeffects, minimum_version = 7 : i32}
 
 // CHECK-LABEL: @command_buffer_create

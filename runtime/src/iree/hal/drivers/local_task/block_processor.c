@@ -1222,24 +1222,33 @@ static iree_status_t iree_hal_cmd_execute_cache(
     if (length != 0) {
       // The queue mapped the submitted binding starting at its base offset.
       // Keep that mapping alive for the queue to unmap after execution.
-      IREE_RETURN_IF_ERROR(cmd->header.opcode == IREE_HAL_CMD_FLUSH
-                               ? iree_hal_buffer_mapping_flush_range(
-                                     entry->mapping, ref.offset, length)
-                               : iree_hal_buffer_mapping_invalidate_range(
-                                     entry->mapping, ref.offset, length));
+      iree_status_t status;
+      if (cmd->header.opcode == IREE_HAL_CMD_FLUSH) {
+        status = iree_hal_buffer_mapping_flush_range(entry->mapping,
+                                                     ref.offset, length);
+      } else {
+        status = iree_hal_buffer_mapping_invalidate_range(entry->mapping,
+                                                          ref.offset, length);
+      }
+      IREE_RETURN_IF_ERROR(status);
     }
   } else if (length != 0) {
     iree_hal_buffer_mapping_t mapping;
+    iree_hal_memory_access_t memory_access = IREE_HAL_MEMORY_ACCESS_READ;
+    if (cmd->header.opcode == IREE_HAL_CMD_FLUSH) {
+      memory_access = IREE_HAL_MEMORY_ACCESS_WRITE;
+    }
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        ref.buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-        cmd->header.opcode == IREE_HAL_CMD_FLUSH ? IREE_HAL_MEMORY_ACCESS_WRITE
-                                                 : IREE_HAL_MEMORY_ACCESS_READ,
-        ref.offset, length, &mapping));
-    iree_status_t status = cmd->header.opcode == IREE_HAL_CMD_FLUSH
-                               ? iree_hal_buffer_mapping_flush_range(
-                                     &mapping, 0, IREE_HAL_WHOLE_BUFFER)
-                               : iree_hal_buffer_mapping_invalidate_range(
-                                     &mapping, 0, IREE_HAL_WHOLE_BUFFER);
+        ref.buffer, IREE_HAL_MAPPING_MODE_SCOPED, memory_access, ref.offset,
+        length, &mapping));
+    iree_status_t status;
+    if (cmd->header.opcode == IREE_HAL_CMD_FLUSH) {
+      status = iree_hal_buffer_mapping_flush_range(&mapping, 0,
+                                                   IREE_HAL_WHOLE_BUFFER);
+    } else {
+      status = iree_hal_buffer_mapping_invalidate_range(
+          &mapping, 0, IREE_HAL_WHOLE_BUFFER);
+    }
     IREE_RETURN_IF_ERROR(
         iree_status_join(status, iree_hal_buffer_unmap_range(&mapping)));
   }

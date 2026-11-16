@@ -604,10 +604,11 @@ static iree_status_t iree_hal_hip_graph_command_buffer_advise_buffer(
 }
 
 static iree_status_t iree_hal_hip_graph_command_buffer_cache_maintenance(
-    iree_hal_buffer_ref_t target_ref, const char* operation) {
+    iree_hal_buffer_ref_t target_ref) {
   if (!target_ref.buffer) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "HIP graph %s buffer reference is NULL", operation);
+                            "HIP graph cache maintenance requires a direct "
+                            "buffer reference");
   }
   // Direct graph bindings are concrete at recording time. Coherent memory
   // needs no cache operation; graph and submission dependencies order accesses.
@@ -615,25 +616,21 @@ static iree_status_t iree_hal_hip_graph_command_buffer_cache_maintenance(
                         IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
     return iree_ok_status();
   }
-  return iree_make_status(
-      IREE_STATUS_UNIMPLEMENTED,
-      "HIP graph %s requires unsupported execution-time cache maintenance "
-      "for non-coherent memory",
-      operation);
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "HIP graph cache maintenance for non-coherent "
+                          "memory is unsupported");
 }
 
 static iree_status_t iree_hal_hip_graph_command_buffer_flush_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t target_ref) {
-  return iree_hal_hip_graph_command_buffer_cache_maintenance(target_ref,
-                                                             "flush_buffer");
+  return iree_hal_hip_graph_command_buffer_cache_maintenance(target_ref);
 }
 
 static iree_status_t iree_hal_hip_graph_command_buffer_invalidate_buffer(
     iree_hal_command_buffer_t* base_command_buffer,
     iree_hal_buffer_ref_t target_ref) {
-  return iree_hal_hip_graph_command_buffer_cache_maintenance(
-      target_ref, "invalidate_buffer");
+  return iree_hal_hip_graph_command_buffer_cache_maintenance(target_ref);
 }
 
 // Splats a pattern value of 1, 2, or 4 bytes out to a 4 byte value.

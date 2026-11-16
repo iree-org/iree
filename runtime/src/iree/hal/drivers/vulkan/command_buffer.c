@@ -1839,6 +1839,17 @@ static iree_status_t iree_hal_vulkan_command_buffer_record_execution_barrier_nat
   const bool has_memory_visibility =
       execution_barrier->memory_barrier_count != 0 ||
       execution_barrier->buffer_barrier_count != 0;
+  VkAccessFlags2 dst_access_mask = 0;
+  if (execution_barrier->cache_maintenance_kind ==
+      IREE_HAL_VULKAN_CACHE_MAINTENANCE_FLUSH) {
+    // The barrier makes preceding device writes available to a later host
+    // read. Queue completion orders that read but does not establish
+    // device-to-host memory visibility.
+    dst_access_mask = VK_ACCESS_2_HOST_READ_BIT;
+  } else if (has_memory_visibility) {
+    dst_access_mask =
+        VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+  }
   VkMemoryBarrier2 memory_barrier = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
       .srcStageMask =
@@ -1848,13 +1859,7 @@ static iree_status_t iree_hal_vulkan_command_buffer_record_execution_barrier_nat
       .dstStageMask =
           iree_hal_vulkan_pipeline_stage_mask_from_hal_execution_stage(
               execution_barrier->target_stage_mask, has_memory_visibility),
-      .dstAccessMask = execution_barrier->cache_maintenance_kind ==
-                               IREE_HAL_VULKAN_CACHE_MAINTENANCE_FLUSH
-                           ? VK_ACCESS_2_MEMORY_READ_BIT
-                           : (has_memory_visibility
-                                  ? VK_ACCESS_2_MEMORY_READ_BIT |
-                                        VK_ACCESS_2_MEMORY_WRITE_BIT
-                                  : 0),
+      .dstAccessMask = dst_access_mask,
   };
   VkDependencyInfo dependency_info = {
       .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
