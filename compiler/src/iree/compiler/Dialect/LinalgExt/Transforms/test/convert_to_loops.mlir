@@ -796,11 +796,11 @@ func.func @topk_memref(%input_values: memref<2x10xf32>, %input_indices: memref<2
 // CHECK:               %[[D8:.+]] = arith.cmpi slt, %[[ARG8]], %[[D4]] : i32
 // CHECK:               %[[D9:.+]] = arith.andi %[[D7]], %[[D8]] : i1
 // CHECK:               %[[D10:.+]] = arith.ori %[[D5]], %[[D9]] : i1
-// CHECK:               %[[D11:.+]] = arith.select %[[D5]], %[[ARG7]], %[[D3]] : f32
+// CHECK:               %[[D11:.+]] = arith.select %[[D10]], %[[ARG7]], %[[D3]] : f32
 // CHECK:               %[[D12:.+]] = arith.select %[[D10]], %[[ARG8]], %[[D4]] : i32
 // CHECK:               memref.store %[[D11]], %[[ARG2]][%[[ARG4]], %[[ARG6]]]
 // CHECK:               memref.store %[[D12]], %[[ARG3]][%[[ARG4]], %[[ARG6]]]
-// CHECK:               %[[D13:.+]] = arith.select %[[D5]], %[[D3]], %[[ARG7]] : f32
+// CHECK:               %[[D13:.+]] = arith.select %[[D10]], %[[D3]], %[[ARG7]] : f32
 // CHECK:               %[[D14:.+]] = arith.select %[[D10]], %[[D4]], %[[ARG8]] : i32
 // CHECK:               scf.yield %[[D13]], %[[D14]] : f32, i32
 
@@ -841,11 +841,11 @@ func.func @topk_memref_dynamic(%input_values: memref<?x?xf32>, %input_indices: m
 // CHECK:               %[[D10:.+]] = arith.cmpi slt, %[[ARG8]], %[[D6]] : i32
 // CHECK:               %[[D11:.+]] = arith.andi %[[D9]], %[[D10]] : i1
 // CHECK:               %[[D12:.+]] = arith.ori %[[D7]], %[[D11]] : i1
-// CHECK:               %[[D13:.+]] = arith.select %[[D7]], %[[ARG7]], %[[D5]] : f32
+// CHECK:               %[[D13:.+]] = arith.select %[[D12]], %[[ARG7]], %[[D5]] : f32
 // CHECK:               %[[D14:.+]] = arith.select %[[D12]], %[[ARG8]], %[[D6]] : i32
 // CHECK:               memref.store %[[D13]], %[[ARG2]][%[[ARG4]], %[[ARG6]]]
 // CHECK:               memref.store %[[D14]], %[[ARG3]][%[[ARG4]], %[[ARG6]]]
-// CHECK:               %[[D15:.+]] = arith.select %[[D7]], %[[D5]], %[[ARG7]] : f32
+// CHECK:               %[[D15:.+]] = arith.select %[[D12]], %[[D5]], %[[ARG7]] : f32
 // CHECK:               %[[D16:.+]] = arith.select %[[D12]], %[[D6]], %[[ARG8]] : i32
 // CHECK:               scf.yield %[[D15]], %[[D16]] : f32, i32
 
@@ -885,11 +885,11 @@ func.func @topk_memref_optional(%input_values: memref<2x10xf32>, %out_values: me
 // CHECK:               %[[D8:.+]] = arith.cmpi slt, %[[ARG7]], %[[D4]] : i32
 // CHECK:               %[[D9:.+]] = arith.andi %[[D7]], %[[D8]] : i1
 // CHECK:               %[[D10:.+]] = arith.ori %[[D5]], %[[D9]] : i1
-// CHECK:               %[[D11:.+]] = arith.select %[[D5]], %[[ARG6]], %[[D3]] : f32
+// CHECK:               %[[D11:.+]] = arith.select %[[D10]], %[[ARG6]], %[[D3]] : f32
 // CHECK:               %[[D12:.+]] = arith.select %[[D10]], %[[ARG7]], %[[D4]] : i32
 // CHECK:               memref.store %[[D11]], %[[ARG1]][%[[ARG3]], %[[ARG5]]]
 // CHECK:               memref.store %[[D12]], %[[ARG2]][%[[ARG3]], %[[ARG5]]]
-// CHECK:               %[[D13:.+]] = arith.select %[[D5]], %[[D3]], %[[ARG6]] : f32
+// CHECK:               %[[D13:.+]] = arith.select %[[D10]], %[[D3]], %[[ARG6]] : f32
 // CHECK:               %[[D14:.+]] = arith.select %[[D10]], %[[D4]], %[[ARG7]] : i32
 // CHECK:               scf.yield %[[D13]], %[[D14]] : f32, i32
 
@@ -925,14 +925,14 @@ func.func @topk_v2_memref(%input_values: memref<2x10xf32>, %input_indices: memre
 // CHECK:               %[[D3:.+]] = memref.load %[[ARG2]][%[[ARG4]], %[[ARG6]]]
 // CHECK:               %[[D4:.+]] = memref.load %[[ARG3]][%[[ARG4]], %[[ARG6]]]
 // CHECK:               %[[D5:.+]] = arith.cmpf ogt, %[[ARG7]], %[[D3]] : f32
-// CHECK:               %[[D6:.+]] = arith.select %[[D5]], %[[ARG7]], %[[D3]] : f32
-// CHECK:               memref.store %[[D6]], %[[ARG2]][%[[ARG4]], %[[ARG6]]]
-// CHECK:               %[[D7:.+]] = arith.select %[[D5]], %[[D3]], %[[ARG7]] : f32
 // CHECK:               %[[D8:.+]] = arith.cmpf ogt, %[[D3]], %[[ARG7]] : f32
 // CHECK:               %[[D9:.+]] = arith.cmpi eq, %[[D5]], %[[D8]] : i1
 // CHECK:               %[[D10:.+]] = arith.cmpi slt, %[[ARG8]], %[[D4]] : i32
 // CHECK:               %[[D11:.+]] = arith.andi %[[D9]], %[[D10]] : i1
 // CHECK:               %[[D12:.+]] = arith.ori %[[D5]], %[[D11]] : i1
+// CHECK:               %[[D6:.+]] = arith.select %[[D12]], %[[ARG7]], %[[D3]] : f32
+// CHECK:               memref.store %[[D6]], %[[ARG2]][%[[ARG4]], %[[ARG6]]]
+// CHECK:               %[[D7:.+]] = arith.select %[[D12]], %[[D3]], %[[ARG7]] : f32
 // CHECK:               %[[D13:.+]] = arith.select %[[D12]], %[[ARG8]], %[[D4]] : i32
 // CHECK:               memref.store %[[D13]], %[[ARG3]][%[[ARG4]], %[[ARG6]]]
 // CHECK:               %[[D14:.+]] = arith.select %[[D12]], %[[D4]], %[[ARG8]] : i32
@@ -1003,14 +1003,14 @@ func.func @topk_v2_memref_i64_indices(%input_values: memref<2x10xf32>, %input_in
 // CHECK:               %[[D3:.+]] = memref.load %[[ARG2]][%[[ARG4]], %[[ARG6]]]
 // CHECK:               %[[D4:.+]] = memref.load %[[ARG3]][%[[ARG4]], %[[ARG6]]]
 // CHECK:               %[[D5:.+]] = arith.cmpf ogt, %[[ARG7]], %[[D3]] : f32
-// CHECK:               %[[D6:.+]] = arith.select %[[D5]], %[[ARG7]], %[[D3]] : f32
-// CHECK:               memref.store %[[D6]], %[[ARG2]][%[[ARG4]], %[[ARG6]]]
-// CHECK:               %[[D7:.+]] = arith.select %[[D5]], %[[D3]], %[[ARG7]] : f32
 // CHECK:               %[[D8:.+]] = arith.cmpf ogt, %[[D3]], %[[ARG7]] : f32
 // CHECK:               %[[D9:.+]] = arith.cmpi eq, %[[D5]], %[[D8]] : i1
 // CHECK:               %[[D10:.+]] = arith.cmpi slt, %[[ARG8]], %[[D4]] : i64
 // CHECK:               %[[D11:.+]] = arith.andi %[[D9]], %[[D10]] : i1
 // CHECK:               %[[D12:.+]] = arith.ori %[[D5]], %[[D11]] : i1
+// CHECK:               %[[D6:.+]] = arith.select %[[D12]], %[[ARG7]], %[[D3]] : f32
+// CHECK:               memref.store %[[D6]], %[[ARG2]][%[[ARG4]], %[[ARG6]]]
+// CHECK:               %[[D7:.+]] = arith.select %[[D12]], %[[D3]], %[[ARG7]] : f32
 // CHECK:               %[[D13:.+]] = arith.select %[[D12]], %[[ARG8]], %[[D4]] : i64
 // CHECK:               memref.store %[[D13]], %[[ARG3]][%[[ARG4]], %[[ARG6]]]
 // CHECK:               %[[D14:.+]] = arith.select %[[D12]], %[[D4]], %[[ARG8]] : i64
