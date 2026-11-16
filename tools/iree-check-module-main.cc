@@ -49,7 +49,6 @@ class CheckModuleTest : public ::testing::Test {
         /*default_device_uri=*/iree_string_view_empty(),
         iree_vm_instance_allocator(instance_), &context_, &device_list_,
         /*out_device_allocator=*/NULL, &replay_recorder_));
-    device_ = device_list_ ? iree_hal_device_list_at(device_list_, 0) : nullptr;
   }
 
   void TearDown() override {
@@ -64,8 +63,10 @@ class CheckModuleTest : public ::testing::Test {
 
   void TestBody() override {
     iree_hal_profiling_session_t* profiling = nullptr;
-    IREE_ASSERT_OK(iree_hal_begin_profiling_from_flags(
-        device_, iree_vm_instance_allocator(instance_), &profiling));
+    IREE_ASSERT_OK(iree_hal_begin_device_list_profiling_from_flags(
+        device_list_ ? device_list_->count : 0,
+        device_list_ ? device_list_->devices : nullptr,
+        iree_vm_instance_allocator(instance_), &profiling));
     iree_status_t status =
         iree_vm_invoke(context_, function_, IREE_VM_INVOCATION_FLAG_NONE,
                        /*policy=*/nullptr,
@@ -85,7 +86,6 @@ class CheckModuleTest : public ::testing::Test {
 
   iree_vm_context_t* context_ = nullptr;
   iree_hal_device_list_t* device_list_ = nullptr;
-  iree_hal_device_t* device_ = nullptr;
   iree_hal_replay_recorder_t* replay_recorder_ = nullptr;
 };
 

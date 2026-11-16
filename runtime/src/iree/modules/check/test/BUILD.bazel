@@ -18,6 +18,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "failure.mlir",
+            "multi_device.mlir",
             "success.mlir",
             "unavailable.mlir",
         ],
