@@ -219,6 +219,27 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
       subviewSizes.push_back(dynamicSize);
     }
 
+    // Refuse to hoist when the bounded shape is implausibly large. An
+    // unconstrained `index` operand carries the trivial type-level upper bound
+    // (~2^53), so a single `affine.apply` can turn it into a multi-petabyte
+    // static dimension. Materializing that as a static alloca silently
+    // overflows the downstream stride/size computation (see #24483); leaving
+    // the allocation dynamic lets it be handled or diagnosed later instead.
+    constexpr int64_t kMaxHoistedAllocationElements = int64_t(1) << 32;
+    int64_t numElements = 1;
+    for (OpFoldResult allocSize : allocSizes) {
+      std::optional<int64_t> dim = getConstantIntValue(allocSize);
+      if (!dim) {
+        // A scalable bound (vscale >= 1) only grows the allocation, so the
+        // product of the constant bounds is still a valid lower bound.
+        continue;
+      }
+      if (*dim > 0 && numElements > kMaxHoistedAllocationElements / *dim) {
+        return std::nullopt;
+      }
+      numElements *= *dim;
+    }
+
     // FIXME: The `AllocLikeOp::build()` method for OpFoldResult drops the
     // layout, so we have to resolve the static/dynamic values here.
     SmallVector<int64_t> staticShape;
