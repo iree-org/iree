@@ -32,6 +32,7 @@ iree_lit_test_suite(
     "legalize_deprecated_ops.mlir"
     "legalize_deprecated_ops_invalid.mlir"
     "legalize_dynamic_reduce_window.mlir"
+    "legalize_dynamic_reduce_window_public_reducer.mlir"
     "legalize_shape_computations.mlir"
     "lower_bounds_pipeline.mlir"
     "lower_bounds_tuple.mlir"
@@ -44,6 +45,7 @@ iree_lit_test_suite(
     "stablehlo_to_linalg_ext.mlir"
     "stablehlo_to_linalg_ext_invalid.mlir"
     "unsupported_custom_call.mlir"
+    "unsupported_custom_call_shape_assertion.mlir"
     "verify_compiler_input_legality.mlir"
     "vhlo_stablehlo_mix_invalid.mlir"
   TOOLS
@@ -51,7 +53,6 @@ iree_lit_test_suite(
     FileCheck
     iree-compile
     iree-opt
-    split-file
 )
 
 iree_cc_test(
