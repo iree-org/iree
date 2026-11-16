@@ -109,6 +109,20 @@ util.func public @denseTensorSplatI64(%arg0: i64, %arg1: index, %arg2: index) ->
 
 // -----
 
+// Fill canonicalization narrows byte-uniform patterns such as -1 : i64 to
+// i8. The narrowed pattern is byte-replicated and must not be zero-extended.
+
+// CHECK-LABEL: @denseTensorSplatNarrowedPatternI64
+util.func public @denseTensorSplatNarrowedPatternI64(%arg0: i8, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  // CHECK-NOT: arith.extui
+  // CHECK: %[[RESULT:.+]] = stream.async.splat %arg0 : i8 -> !stream.resource<*>{%arg2}
+  %result = stream.tensor.splat %arg0 : i8 -> tensor<?x1x10xi64>{%arg1} in !stream.resource<*>{%arg2}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @denseTensorSplatConstantComplexF32
 util.func public @denseTensorSplatConstantComplexF32(%arg0: !stream.resource<*>) -> (!stream.resource<*>) {
   %cst = complex.constant [3.000000e+00 : f32, 1.000000e+01 : f32] : complex<f32>
@@ -188,6 +202,19 @@ util.func public @denseTensorFillI64(%arg0: i64, %arg1: !stream.resource<*>, %ar
   // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 40 : index
   // CHECK: %[[RESULT:.+]] = stream.async.fill %arg0, %arg1[%[[OFFSET]] to %[[LENGTH]] for %[[LENGTH]]] : i64 -> %arg1 as !stream.resource<*>{%arg3}
   %result = stream.tensor.fill %arg0, %arg1[%c0, %c0 for %c1, %c1] : i64 -> tensor<?x4xi64>{%arg2} in %arg1 as !stream.resource<*>{%arg3}
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @denseTensorFillNarrowedPatternI64
+util.func public @denseTensorFillNarrowedPatternI64(%arg0: i8, %arg1: !stream.resource<*>, %arg2: index, %arg3: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK-NOT: arith.extui
+  // CHECK: %[[RESULT:.+]] = stream.async.fill %arg0, %arg1[{{.+}}] : i8 -> %arg1 as !stream.resource<*>{%arg3}
+  %result = stream.tensor.fill %arg0, %arg1[%c0, %c0 for %c1, %c1] : i8 -> tensor<?x4xi64>{%arg2} in %arg1 as !stream.resource<*>{%arg3}
   // CHECK: util.return %[[RESULT]]
   util.return %result : !stream.resource<*>
 }
