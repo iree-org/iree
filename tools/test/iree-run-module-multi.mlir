@@ -39,8 +39,14 @@
 // RUN:      --print_device_statistics) 2>&1 | \
 // RUN: FileCheck %s --check-prefix=STATS
 
-// STATS-DAG: host_execute multi_device_mul_dispatch_0_
-// STATS-DAG: host_execute multi_device_mul_dispatch_1_
+// STATS: IREE HAL device statistics (device[0] local-task):
+// STATS-NOT: dispatch_1_
+// STATS: host_execute multi_device_mul_dispatch_0_
+// STATS-NOT: dispatch_1_
+// STATS: IREE HAL device statistics (device[1] local-task):
+// STATS-NOT: dispatch_0_
+// STATS: host_execute multi_device_mul_dispatch_1_
+// STATS-NOT: dispatch_0_
 func.func public @multi_device_mul(
   // Input argument is resident on device_a (tooling default to first device).
   %input_a: tensor<4xf32> {iree.abi.affinity = #hal.device.promise<@device_a>}

@@ -12,8 +12,14 @@
 // RUN:     --print_device_statistics 2>&1 | \
 // RUN: FileCheck %s
 
-// CHECK-DAG: host_execute _multi_device_mul_dispatch_0_
-// CHECK-DAG: host_execute _multi_device_mul_dispatch_1_
+// CHECK: IREE HAL device statistics (device[0] local-task):
+// CHECK-NOT: dispatch_1_
+// CHECK: host_execute _multi_device_mul_dispatch_0_
+// CHECK-NOT: dispatch_1_
+// CHECK: IREE HAL device statistics (device[1] local-task):
+// CHECK-NOT: dispatch_0_
+// CHECK: host_execute _multi_device_mul_dispatch_1_
+// CHECK-NOT: dispatch_0_
 
 func.func @multi_device_mul() {
   // Compute on device_a.
