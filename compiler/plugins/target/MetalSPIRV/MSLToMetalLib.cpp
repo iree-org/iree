@@ -39,9 +39,11 @@ static std::string getMetalCompileCommand(MetalTargetPlatform platform,
   // Metal shader offline compilation involves two steps:
   // 1. Compile the MSL source code into an Apple IR (AIR) file,
   // 2. Compile the AIR file into a Metal library.
+  // Match runtime source compilation: preserve signed zeros and NaNs instead
+  // of applying the Metal compiler's default unsafe arithmetic optimisations.
   return llvm::Twine("xcrun -sdk ")
       .concat(sdk)
-      .concat(" metal -c ")
+      .concat(" metal -fno-fast-math -c ")
       .concat(mslFile)
       .concat(" -o - | xcrun -sdk ")
       .concat(sdk)

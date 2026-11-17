@@ -404,6 +404,41 @@ _RPATH_LINKOPTS = select({
 })
 
 cc_binary(
+    name = "_mlir.so",
+    srcs = [
+        "@llvm-project//mlir:MLIRBindingsPythonSourceFiles",
+        "@llvm-project//mlir:lib/Bindings/Python/MainModule.cpp",
+    ],
+    copts = _PYTHON_COPTS,
+    features = _PYTHON_FEATURES,
+    linkopts = _RPATH_LINKOPTS + select({
+        # CPython frame APIs used by MLIR's traceback-to-location adapter are
+        # absent from nanobind's Darwin import list. Resolve them at import.
+        "@platforms//os:osx": [
+            "-Wl,-U,_PyCode_Addr2Location",
+            "-Wl,-U,_PyFrame_GetLasti",
+        ],
+        "//conditions:default": [],
+    }),
+    linkshared = True,
+    linkstatic = False,
+    deps = [
+        "//compiler/src/iree/compiler/API:SharedImpl",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:CAPIAsyncHeaders",
+        "@llvm-project//mlir:CAPIDebugHeaders",
+        "@llvm-project//mlir:CAPIIRHeaders",
+        "@llvm-project//mlir:CAPITransformsHeaders",
+        "@llvm-project//mlir:MLIRBindingsPythonLibHeaders",
+        "@llvm-project//mlir:MLIRBindingsPythonNanobindHeaders",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:config",
+        "@nanobind",
+        "@rules_python//python/cc:current_py_cc_headers",
+    ],
+)
+
+cc_binary(
     name = "_site_initialize_0.so",
     srcs = ["IREECompilerRegistration.cpp"],
     copts = _PYTHON_COPTS,

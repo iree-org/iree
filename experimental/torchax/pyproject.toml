@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iree-torchax"
+version = "0.1.0.dev0"
+description = "Experimental Torchax export integration for IREE"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0 WITH LLVM-exception"
+dependencies = [
+  "iree-base-compiler",
+  "numpy",
+  "torch==2.14.1",
+  "torchax==0.0.14.dev20261007",
+  "jax==0.12.0.dev20261016",
+  "jaxlib==0.12.0.dev20261016",
+]
+
+[tool.setuptools.packages.find]
+include = ["iree_torchax*"]

@@ -83,3 +83,5 @@
 /runtime/src/iree/hal/drivers/hip/ @AWoloszyn @krzysz00
 /runtime/src/iree/hal/drivers/metal/ @antiagainst @devtbi
 /runtime/src/iree/hal/drivers/vulkan/ @AGindinson @benvanik @devtbi
+
+/experimental/torchax/ @jschuhmacher

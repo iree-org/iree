@@ -66,3 +66,12 @@ func.func @dot() {
   check.expect_almost_eq_const(%res, dense<512.0> : tensor<f32>) : tensor<f32>
   return
 }
+
+// Partial f16 sums round away both ones before cancellation.
+func.func @f16_accumulates_f32() {
+  %lhs = util.unfoldable_constant dense<[[2048.0, 1.0, 1.0, -2048.0]]> : tensor<1x4xf16>
+  %rhs = util.unfoldable_constant dense<1.0> : tensor<4x1xf16>
+  %res = stablehlo.dot %lhs, %rhs, precision = [HIGHEST, HIGHEST] : (tensor<1x4xf16>, tensor<4x1xf16>) -> tensor<1x1xf16>
+  check.expect_eq_const(%res, dense<2.0> : tensor<1x1xf16>) : tensor<1x1xf16>
+  return
+}
