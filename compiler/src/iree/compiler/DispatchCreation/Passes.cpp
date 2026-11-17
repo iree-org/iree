@@ -163,7 +163,8 @@ static void addDispatchRegionCreationPreprocessingPasses(
     return IREE::LinalgExt::createDecomposeAggregatedOpPass(
         IREE::LinalgExt::DecomposeAggregatedOpPassOptions{
             /*filterOps=*/"iree_linalg_ext.quantize_affine,"
-                          "iree_linalg_ext.dequantize_affine"});
+                          "iree_linalg_ext.dequantize_affine,"
+                          "iree_linalg_ext.choose_qparams_affine"});
   });
 
   // 1. Do some simple elementwise op fusion. This could be skipped,

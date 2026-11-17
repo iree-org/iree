@@ -2747,3 +2747,235 @@ func.func @group_mmt4d_short_row_stride(
       outs(%output : tensor<2x1x4x1xf32>) -> tensor<2x1x4x1xf32>
   return %result : tensor<2x1x4x1xf32>
 }
+
+// -----
+
+func.func @choose_qparams_affine_mismatched_maps(%input: tensor<4x8xf32>,
+    %scale: tensor<4xf32>, %zp: tensor<8xi8>) -> (tensor<4xf32>, tensor<8xi8>) {
+  // expected-error @+1 {{expected scale and zero_point to have the same indexing map}}
+  %0:2 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d1)>],
+       mapping = asymmetric, quant_min = -128, quant_max = 127, eps = 1.0e-08>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale, %zp : tensor<4xf32>, tensor<8xi8>) -> tensor<4xf32>, tensor<8xi8>
+  return %0#0, %0#1 : tensor<4xf32>, tensor<8xi8>
+}
+
+// -----
+
+func.func @choose_qparams_affine_scale_size(%input: tensor<4x8xf32>,
+    %scale: tensor<8xf32>) -> tensor<8xf32> {
+  // expected-error @+1 {{expected scale dimension 0 to have size 4 to match dimension 0 of the input, got 8}}
+  %0 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = symmetric, quant_min = -128, quant_max = 127, eps = 1.0e-08>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale : tensor<8xf32>) -> tensor<8xf32>
+  return %0 : tensor<8xf32>
+}
+
+// -----
+
+func.func @choose_qparams_affine_integer_input(%input: tensor<4x8xi8>,
+    %scale: tensor<f32>) -> tensor<f32> {
+  // expected-error @+1 {{expected input to have a floating point element type, got 'i8'}}
+  %0 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>],
+       mapping = symmetric, quant_min = -128, quant_max = 127, eps = 1.0e-08>
+      ins(%input : tensor<4x8xi8>)
+      outs(%scale : tensor<f32>) -> tensor<f32>
+  return %0 : tensor<f32>
+}
+
+// -----
+
+func.func @choose_qparams_affine_unrepresentable_zp(%input: tensor<4x8xf32>,
+    %scale: tensor<f32>, %zp: tensor<i8>) -> (tensor<f32>, tensor<i8>) {
+  // expected-error @+1 {{quantization range [0, 255] is not representable in signed 'i8'}}
+  %0:2 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> ()>],
+       mapping = asymmetric, quant_min = 0, quant_max = 255, eps = 1.0e-08>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale, %zp : tensor<f32>, tensor<i8>) -> tensor<f32>, tensor<i8>
+  return %0#0, %0#1 : tensor<f32>, tensor<i8>
+}
+
+// -----
+
+func.func @choose_qparams_affine_range_without_zero(%input: tensor<4x8xf32>,
+    %scale: tensor<f32>) -> tensor<f32> {
+  // expected-error @+1 {{expected a non-empty quantization range that includes 0, got [1, 127]}}
+  %0 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>],
+       mapping = symmetric, quant_min = 1, quant_max = 127, eps = 1.0e-08>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale : tensor<f32>) -> tensor<f32>
+  return %0 : tensor<f32>
+}
+
+// -----
+
+// symmetric_qmax divides by quant_max, so it must be positive.
+func.func @choose_qparams_affine_symmetric_qmax_nonpositive_qmax(
+    %input: tensor<4x8xf32>, %scale: tensor<4xf32>) -> tensor<4xf32> {
+  // expected-error @+1 {{expected a positive quant_max for the symmetric_qmax mapping}}
+  %0 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = symmetric_qmax, quant_min = -128, quant_max = 0, eps = 1.0e-05>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale : tensor<4xf32>) -> tensor<4xf32>
+  return %0 : tensor<4xf32>
+}
+
+// -----
+
+func.func @choose_qparams_affine_asymmetric_min_error_negative_eps(
+    %input: tensor<4x8xf32>, %scale: tensor<4xf32>, %zp: tensor<4xi8>)
+    -> (tensor<4xf32>, tensor<4xi8>) {
+  // expected-error @+1 {{expected a non-negative eps, got -1.000000e+00}}
+  %0:2 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = asymmetric_min_error, quant_min = -128, quant_max = 127, eps = -1.0>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale, %zp : tensor<4xf32>, tensor<4xi8>) -> tensor<4xf32>, tensor<4xi8>
+  return %0#0, %0#1 : tensor<4xf32>, tensor<4xi8>
+}
+
+// -----
+
+func.func @choose_qparams_affine_zp_without_map(%input: tensor<4x8xf32>, %scale: tensor<4xf32>, %zp: tensor<4xi8>)
+    -> (tensor<4xf32>, tensor<4xi8>) {
+  // expected-error @+1 {{expected 3 indexing maps, one per operand, got 2}}
+  %0:2 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = asymmetric, quant_min = -128, quant_max = 127, eps = 1.0e-08>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale, %zp : tensor<4xf32>, tensor<4xi8>) -> tensor<4xf32>, tensor<4xi8>
+  return %0#0, %0#1 : tensor<4xf32>, tensor<4xi8>
+}
+
+// -----
+
+func.func @choose_qparams_affine_extra_map(%input: tensor<4x8xf32>, %scale: tensor<4xf32>)
+    -> tensor<4xf32> {
+  // expected-error @+1 {{expected 2 indexing maps, one per operand, got 3}}
+  %0 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = asymmetric, quant_min = -128, quant_max = 127, eps = 1.0e-08>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale : tensor<4xf32>) -> tensor<4xf32>
+  return %0 : tensor<4xf32>
+}
+
+// -----
+
+func.func @choose_qparams_affine_projected_input_map(%input: tensor<4x8xf32>, %scale: tensor<4xf32>)
+    -> tensor<4xf32> {
+  // expected-error @+1 {{expected the input indexing map to be a permutation with 2 results}}
+  %0 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = asymmetric, quant_min = -128, quant_max = 127, eps = 1.0e-08>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale : tensor<4xf32>) -> tensor<4xf32>
+  return %0 : tensor<4xf32>
+}
+
+// -----
+
+func.func @choose_qparams_affine_map_rank(%input: tensor<4x8xf32>, %scale: tensor<4xf32>)
+    -> tensor<4xf32> {
+  // expected-error @+1 {{expected indexing map 1 to have 2 dimensions to match the rank of the input, got 3}}
+  %0 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1, d2) -> (d0)>],
+       mapping = asymmetric, quant_min = -128, quant_max = 127, eps = 1.0e-08>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale : tensor<4xf32>) -> tensor<4xf32>
+  return %0 : tensor<4xf32>
+}
+
+// -----
+
+func.func @choose_qparams_affine_integer_scale(%input: tensor<4x8xf32>, %scale: tensor<4xi32>)
+    -> tensor<4xi32> {
+  // expected-error @+1 {{expected scale to have a floating point element type, got 'i32'}}
+  %0 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = asymmetric, quant_min = -128, quant_max = 127, eps = 1.0e-08>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale : tensor<4xi32>) -> tensor<4xi32>
+  return %0 : tensor<4xi32>
+}
+
+// -----
+
+func.func @choose_qparams_affine_signed_zp(%input: tensor<4x8xf32>, %scale: tensor<4xf32>, %zp: tensor<4xsi8>)
+    -> (tensor<4xf32>, tensor<4xsi8>) {
+  // expected-error @+1 {{expected zero_point to have a signless integer element type, got 'si8'}}
+  %0:2 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = asymmetric, quant_min = -128, quant_max = 127, eps = 1.0e-08>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale, %zp : tensor<4xf32>, tensor<4xsi8>) -> tensor<4xf32>, tensor<4xsi8>
+  return %0#0, %0#1 : tensor<4xf32>, tensor<4xsi8>
+}
+
+// -----
+
+func.func @choose_qparams_affine_zp_unsigned_without_zp(%input: tensor<4x8xf32>, %scale: tensor<4xf32>)
+    -> tensor<4xf32> {
+  // expected-error @+1 {{zp_unsigned is only allowed when a zero_point operand is present}}
+  %0 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = symmetric, quant_min = 0, quant_max = 255, eps = 1.0e-08,
+       zp_unsigned>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale : tensor<4xf32>) -> tensor<4xf32>
+  return %0 : tensor<4xf32>
+}
+
+// -----
+
+func.func @choose_qparams_affine_empty_range(%input: tensor<4x8xf32>, %scale: tensor<4xf32>)
+    -> tensor<4xf32> {
+  // expected-error @+1 {{expected a non-empty quantization range that includes 0, got [0, 0]}}
+  %0 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = symmetric, quant_min = 0, quant_max = 0, eps = 1.0e-08>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale : tensor<4xf32>) -> tensor<4xf32>
+  return %0 : tensor<4xf32>
+}
+
+// -----
+
+func.func @choose_qparams_affine_nan_eps(%input: tensor<4x8xf32>, %scale: tensor<4xf32>)
+    -> tensor<4xf32> {
+  // expected-error @+1 {{expected a non-negative eps, got nan}}
+  %0 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = symmetric, quant_min = -128, quant_max = 127, eps = 0x7FF8000000000000>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale : tensor<4xf32>) -> tensor<4xf32>
+  return %0 : tensor<4xf32>
+}

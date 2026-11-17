@@ -2031,6 +2031,151 @@ def IREELinalgExt_DequantizeAffineOp
   }];
 }
 
+def IREELinalgExt_ChooseQParamsAffineOp
+    : IREELinalgExt_Op<"choose_qparams_affine", [
+        DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface,
+          ["reifyResultShapes"]>,
+        DeclareOpInterfaceMethods<AggregatedOpInterface,
+          ["decomposeOperation"]>]> {
+  let summary = [{Computes affine quantization parameters from real values.}];
+  let description = [{
+    Computes the `scale` and optional `zero_point` with which
+    `iree_linalg_ext.quantize_affine` maps `input` onto the quantized range
+    `[quant_min, quant_max]`.
+
+    `indexing_maps` holds one map per operand: input, scale, then zero point
+    when present. As in `quantize_affine`, the input map is a permutation and
+    the parameter maps are projected permutations, which have to be equal.
+    Every iteration dimension that the parameter maps do not index is reduced,
+    so each parameter element describes one block of input elements:
+
+    - per-tensor: `affine_map<(d0, d1) -> ()>`
+    - per-token:  `affine_map<(d0, d1, d2) -> (d0, d1)>`
+    - per-block:  `affine_map<(d0, d1, d2) -> (d0, d1)>` over an input whose
+                  blocked dimension has been expanded.
+
+    With `min_neg = min(min(block), 0)`, `max_pos = max(max(block), 0)` and
+    `qrange = quant_max - quant_min`, `mapping` selects:
+
+    - `symmetric`:
+      ```
+      scale = max(max(-min_neg, max_pos) / (qrange / 2), eps)
+      zero_point = (quant_min + quant_max + 1) floordiv 2
+      ```
+    - `asymmetric`:
+      ```
+      scale = max((max_pos - min_neg) / qrange, eps)
+      zero_point = clamp(quant_min - round(min_neg / scale),
+                         quant_min, quant_max)
+      ```
+    - `asymmetric_min_error`, which takes the zero point of the bound whose
+      error is smaller:
+      ```
+      scale = max((max_pos - min_neg) / qrange, eps)
+      zero_point = round(clamp(
+          quant_min + min_neg / scale + quant_max + max_pos / scale > 0
+            ? quant_min - min_neg / scale : quant_max - max_pos / scale,
+          quant_min, quant_max))
+      ```
+    - `symmetric_qmax`, which divides by `quant_max`:
+      ```
+      scale = max(max(-min_neg, max_pos), eps) / quant_max
+      zero_point = 0
+      ```
+
+    `round` breaks ties to even. The arithmetic is performed in the element
+    type of `input`; the results are then converted to the element types of
+    `scale` and `zero_point`. A block without elements has `scale = 1` and
+    `zero_point = 0`. A NaN input propagates into the scale of its block.
+
+    `zero_point` is optional, since the symmetric mappings may not need it.
+    `zp_unsigned` declares that its signless elements are unsigned.
+
+    Example:
+
+    ```mlir
+    %scale, %zp = iree_linalg_ext.choose_qparams_affine
+        <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                          affine_map<(d0, d1) -> (d0)>,
+                          affine_map<(d0, d1) -> (d0)>],
+         mapping = asymmetric,
+         quant_min = -128, quant_max = 127, eps = 1.1920928955078125e-07>
+        ins(%x : tensor<128x64xf32>)
+        outs(%s, %z : tensor<128xf32>, tensor<128xi64>)
+        -> tensor<128xf32>, tensor<128xi64>
+    ```
+  }];
+
+  let arguments = (ins
+      AnyRankedTensor:$input,
+      AnyRankedTensor:$scale,
+      Optional<AnyRankedTensor>:$zero_point,
+      AffineMapArrayAttr:$indexing_maps,
+      IREELinalgExt_QuantizationMappingAttr:$mapping,
+      IREELinalgExt_QuantizationBoundAttr:$quant_min,
+      IREELinalgExt_QuantizationBoundAttr:$quant_max,
+      F64Attr:$eps,
+      UnitAttr:$zp_unsigned
+  );
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+
+  let assemblyFormat = [{
+    prop-dict attr-dict
+    `ins` `(` $input `:` type($input) `)`
+    `outs` `(` $scale (`,` $zero_point^)? `:`
+               type($scale) (`,` type($zero_point)^)? `)`
+    (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    SmallVector<AffineMap> getIndexingMapsArray();
+
+    // The maps are stored in operand order: input, scale, then zero point
+    // when present.
+    AffineMap getInputMap() { return getIndexingMapsArray().front(); }
+    AffineMap getScaleMap() { return getIndexingMapsArray()[1]; }
+    AffineMap getZeroPointMap() {
+      assert(getZeroPoint() && "expected a zero_point operand");
+      return getIndexingMapsArray()[2];
+    }
+
+    ShapedType getInputType() {
+      return cast<ShapedType>(getInput().getType());
+    }
+    ShapedType getScaleType() {
+      return cast<ShapedType>(getScale().getType());
+    }
+    Type getScaleElementType() {
+      return getElementTypeOrSelf(getScale().getType());
+    }
+    int64_t getRank() {
+      return getInputType().getRank();
+    }
+
+    // The input dimensions that the scale map does not index are reduced.
+    SmallVector<utils::IteratorType> getLoopIteratorTypes();
+
+    // Returns whether `[quantMin, quantMax]` is a non-empty range that
+    // includes 0, as every mapping requires.
+    static bool isValidQuantizationRange(int64_t quantMin, int64_t quantMax) {
+      return quantMin < quantMax && quantMin <= 0 && quantMax >= 0;
+    }
+
+    // Returns the zero point of the `symmetric` mapping, the middle of
+    // `[quantMin, quantMax]`.
+    static int64_t getSymmetricZeroPoint(int64_t quantMin, int64_t quantMax) {
+      return llvm::divideFloorSigned(quantMin + quantMax + 1, 2);
+    }
+
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      return MutableOperandRange(*this, /*start=*/1,
+                                 /*length=*/getZeroPoint() ? 2 : 1);
+    }
+  }];
+}
+
 } // OpGroupAffineQuantizationOps
 
 
