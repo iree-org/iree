@@ -54,6 +54,16 @@ declare_mlir_python_sources(IREEPythonSources.Dialects
   ADD_TO_PARENT IREEPythonSources
 )
 
+# The Torch input plugin registers the native dialects. These Python modules
+# provide their namespace registrations without requiring Torch-MLIR OpViews.
+declare_mlir_python_sources(IREEPythonSources.Dialects.Torch
+  ADD_TO_PARENT IREEPythonSources.Dialects
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  SOURCES
+    dialects/torch.py
+    dialects/torch_c.py
+)
+
 declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
