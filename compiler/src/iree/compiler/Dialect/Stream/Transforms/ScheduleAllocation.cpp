@@ -16,6 +16,9 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
+#include "mlir/Analysis/DataFlow/IntegerRangeAnalysis.h"
+#include "mlir/Analysis/DataFlowFramework.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/AsmState.h"
@@ -1090,12 +1093,117 @@ struct TransientAllocation {
   BlockArgument capturedArg = nullptr;
 };
 
+// Upper bounds of transient sizes from integer range analysis.
+class TransientSizeBounds {
+public:
+  // Records the bound of every resource in an execution region before
+  // allocation rewrites the IR; the solver's states are keyed by values that
+  // the rewrites erase and reuse.
+  explicit TransientSizeBounds(Operation *rootOp) {
+    DataFlowSolver solver;
+    solver.load<mlir::dataflow::DeadCodeAnalysis>();
+    solver.load<mlir::dataflow::IntegerRangeAnalysis>();
+    bool analyzed = succeeded(solver.initializeAndRun(rootOp));
+    rootOp->walk([&](IREE::Stream::AsyncExecuteOp executeOp) {
+      executeOp.getBody().walk([&](Operation *op) {
+        for (Value result : op->getResults()) {
+          if (!isa<IREE::Stream::ResourceType>(result.getType())) {
+            continue;
+          }
+          Value size = IREE::Util::SizeAwareTypeInterface::findSizeValue(
+              result, executeOp->getBlock(), Block::iterator(executeOp));
+          if (std::optional<uint64_t> bound =
+                  getUpperBound(solver, analyzed, size)) {
+            bounds[result] = *bound;
+          }
+        }
+      });
+    });
+  }
+
+  // Returns the largest size |resource| can take, or nullopt when no finite
+  // bound below the full index range is known.
+  std::optional<uint64_t> getUpperBound(Value resource) const {
+    auto it = bounds.find(resource);
+    if (it == bounds.end()) {
+      return std::nullopt;
+    }
+    return it->second;
+  }
+
+private:
+  static std::optional<uint64_t> getUpperBound(const DataFlowSolver &solver,
+                                               bool analyzed, Value size) {
+    if (!size) {
+      return std::nullopt;
+    }
+    APInt constant;
+    if (matchPattern(size, m_ConstantInt(&constant))) {
+      return constant.getZExtValue();
+    }
+    if (!analyzed) {
+      return std::nullopt;
+    }
+    auto *state =
+        solver.lookupState<mlir::dataflow::IntegerValueRangeLattice>(size);
+    if (!state || state->getValue().isUninitialized()) {
+      return std::nullopt;
+    }
+    APInt umax = state->getValue().getValue().umax();
+    if (umax.getActiveBits() > 62) {
+      return std::nullopt;
+    }
+    return umax.getZExtValue();
+  }
+
+  DenseMap<Value, uint64_t> bounds;
+};
+
+// Returns the pack slice size for each transient: its proven upper bound,
+// aligned as the slab layout aligns it, or its exact size. All slices keep
+// their exact sizes when the bounded ones together exceed the largest
+// allocation.
+static SmallVector<Value> getTransientSliceSizes(
+    IREE::Stream::AsyncExecuteOp executeOp, ArrayRef<Value> transientValues,
+    ArrayRef<Value> exactSizes, const TransientSizeBounds *bounds,
+    OpBuilder &externalBuilder) {
+  SmallVector<Value> sliceSizes(exactSizes);
+  if (!bounds) {
+    return sliceSizes;
+  }
+  auto resourceConfig = IREE::Stream::ResourceConfigAttr::lookup(executeOp);
+  uint64_t alignment = resourceConfig.getMinBufferRangeAlignment();
+  uint64_t limit = resourceConfig.getMaxAllocationSize();
+  SmallVector<std::optional<uint64_t>> capacities;
+  uint64_t total = 0;
+  for (Value transient : transientValues) {
+    std::optional<uint64_t> bound = bounds->getUpperBound(transient);
+    std::optional<uint64_t> capacity;
+    if (bound && *bound <= limit) {
+      capacity = llvm::alignTo(*bound, alignment);
+      if (*capacity > limit - total) {
+        return sliceSizes;
+      }
+      total += *capacity;
+    }
+    capacities.push_back(capacity);
+  }
+  for (auto [sliceSize, capacity] : llvm::zip_equal(sliceSizes, capacities)) {
+    if (capacity && !matchPattern(sliceSize, m_Constant())) {
+      sliceSize = arith::ConstantIndexOp::create(externalBuilder,
+                                                 sliceSize.getLoc(), *capacity);
+    }
+  }
+  return sliceSizes;
+}
+
 // Performs allocation for all local transients in the execution region (those
 // !stream.resource<transient> values that don't escape). A new allocation op
 // will be inserted using |externalBuilder| and mappings added to |scope|.
 static std::optional<TransientAllocation>
 allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
-                        AllocationScope &scope, OpBuilder &externalBuilder) {
+                        AllocationScope &scope, OpBuilder &externalBuilder,
+                        const TransientSizeBounds *bounds) {
   // Track which values we've already reserved. This makes it easier to early-
   // exit on aliased values.
   SmallPtrSet<Value, 16> coveredValues;
@@ -1104,7 +1212,7 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
   SmallVector<Location> locs;
   SmallVector<Value> transientValues;
   SmallVector<int64_t> lifetimeIntervals;
-  SmallVector<Value> dynamicSliceSizes;
+  SmallVector<Value> exactSizes;
   auto livenessIntervals = computeExecutionRegionLivenessIntervals(
       executeOp, scope.getValueAliases());
   for (auto valueInterval : livenessIntervals) {
@@ -1134,7 +1242,7 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
     auto allocationSize = IREE::Util::SizeAwareTypeInterface::findSizeValue(
         value, executeOp->getBlock(), Block::iterator(executeOp));
     assert(allocationSize && "must have computable size");
-    dynamicSliceSizes.push_back(allocationSize);
+    exactSizes.push_back(allocationSize);
 
     // Mark as covered so we don't allocate it again.
     scope.forEachResourceAlias(
@@ -1149,6 +1257,8 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
   // the transient allocation required.
   auto fusedLoc = externalBuilder.getFusedLoc(locs);
   auto indexType = externalBuilder.getIndexType();
+  SmallVector<Value> dynamicSliceSizes = getTransientSliceSizes(
+      executeOp, transientValues, exactSizes, bounds, externalBuilder);
   llvm::Repeated<Type> packedOffsetTypes(dynamicSliceSizes.size(), indexType);
   auto packOp = IREE::Stream::ResourcePackOp::create(
       externalBuilder, fusedLoc, indexType, packedOffsetTypes,
@@ -1176,7 +1286,8 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
   for (size_t i = 0; i < transientValues.size(); ++i) {
     auto value = transientValues[i];
     auto offset = packOp.getPackedOffsets()[i];
-    auto length = packOp.getDynamicSliceSizes()[i];
+    // A slice may be larger than its value; the range keeps the exact size.
+    auto length = exactSizes[i];
     auto resourceRange = ResourceRange(
         allocation.capturedArg, allocation.reservationSize, offset, length);
     scope.mapResourceRange(value, resourceRange, asmState.get());
@@ -1683,7 +1794,8 @@ static bool isExecutedOnce(Operation *op) {
 // |executeOp| region. IR will be inserted around the op in its parent block.
 static LogicalResult
 allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
-                        AffinityAnalysis &affinityAnalysis) {
+                        AffinityAnalysis &affinityAnalysis,
+                        const TransientSizeBounds *bounds) {
   LLVM_DEBUG(llvm::dbgs() << "[[ Allocating execution region ]]\n");
 
   AllocationScope scope(executeOp);
@@ -1969,7 +2081,7 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
   // All locals are packed into a single slab and reserved as one.
   // Note that not all regions need transients.
   auto transientAllocation =
-      allocateLocalTransients(executeOp, scope, externalBuilder);
+      allocateLocalTransients(executeOp, scope, externalBuilder, bounds);
   if (transientAllocation.has_value()) {
     auto awaitTimepoint = transientAllocation->awaitTimepoint;
     auto reservation = transientAllocation->reservation;
@@ -2228,8 +2340,10 @@ convertAsyncParameterScatterOp(IREE::Stream::AsyncParameterScatterOp asyncOp) {
 // --iree-stream-schedule-allocation
 //===----------------------------------------------------------------------===//
 
-struct ScheduleAllocationPass
+struct ScheduleAllocationPass final
     : IREE::Stream::impl::ScheduleAllocationPassBase<ScheduleAllocationPass> {
+  using Base::Base;
+
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
 
@@ -2238,6 +2352,11 @@ struct ScheduleAllocationPass
       llvm::errs() << "affinity analysis failed to converge; the input IR may "
                       "not be correct\n";
       return signalPassFailure();
+    }
+
+    std::optional<TransientSizeBounds> bounds;
+    if (boundTransients) {
+      bounds.emplace(moduleOp);
     }
 
     for (auto &parentOp : llvm::make_early_inc_range(moduleOp.getOps())) {
@@ -2257,7 +2376,8 @@ struct ScheduleAllocationPass
       for (auto op : operations) {
         if (failed(TypeSwitch<Operation *, LogicalResult>(op)
                        .Case([&](IREE::Stream::AsyncExecuteOp op) {
-                         return allocateExecutionRegion(op, affinityAnalysis);
+                         return allocateExecutionRegion(
+                             op, affinityAnalysis, bounds ? &*bounds : nullptr);
                        })
                        .Case([&](IREE::Stream::AsyncLoadOp op) {
                          return convertAsyncLoadOp(op);

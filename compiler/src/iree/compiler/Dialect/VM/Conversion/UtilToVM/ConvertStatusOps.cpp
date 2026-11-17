@@ -6,11 +6,12 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
 
-class StatusCheckOkOpConversion
+class StatusCheckOkOpConversion final
     : public OpConversionPattern<IREE::Util::StatusCheckOkOp> {
 public:
   StatusCheckOkOpConversion(MLIRContext *context, TypeConverter &typeConverter)
@@ -19,6 +20,11 @@ public:
   LogicalResult
   matchAndRewrite(IREE::Util::StatusCheckOkOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    // A constant OK status needs no check.
+    if (matchPattern(adaptor.getStatus(), m_Zero())) {
+      rewriter.eraseOp(op);
+      return success();
+    }
     // If status value is non-zero, fail.
     rewriter.replaceOpWithNewOp<IREE::VM::CondFailOp>(
         op, adaptor.getStatus(), op.getMessage().value_or(""));

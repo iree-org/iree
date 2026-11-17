@@ -1031,6 +1031,14 @@ hasUnfusableUseInDispatch(Value v, Operation *dispatchOp,
         insertSlice && use.get() == insertSlice.getDest()) {
       return true;
     }
+
+    // A computed tensor read through tensor.extract is materialized whole in
+    // the dispatch, which no bounded allocation holds if its shape is dynamic.
+    if (isa<tensor::ExtractOp>(user) &&
+        isa_and_nonnull<linalg::LinalgOp>(v.getDefiningOp()) &&
+        !cast<RankedTensorType>(v.getType()).hasStaticShape()) {
+      return true;
+    }
   }
   return false;
 }

@@ -29,6 +29,8 @@ CPU_SPECIFIC_TESTS = [
 ]
 
 NON_CHECK_TESTS = [
+    "convolution_dynamic_zero_extent.mlir",
+    "dynamic_cumsum_custom_call.mlir",
     "globals_ml_program.mlir",
 ]
 
@@ -125,7 +127,10 @@ iree_lit_test_suite(
         "hostonly",
     ],
     tools = [
+        "//tools:iree-compile",
         "//tools:iree-run-mlir",
+        "//tools:iree-run-module",
+        "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],
 )

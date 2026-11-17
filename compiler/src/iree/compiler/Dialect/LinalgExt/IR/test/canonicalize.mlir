@@ -819,3 +819,104 @@ func.func @dequantize_affine_keep_nonzero_resource_zero_point(%q: tensor<4x2xi8>
     }
   }
 #-}
+
+// -----
+
+// CHECK-LABEL: @general_scatter_preserve_effect
+// CHECK: iree_linalg_ext.general_scatter
+// CHECK: memref.store
+// CHECK: return
+func.func @general_scatter_preserve_effect(%updates: tensor<2xi32>, %indices: tensor<2x1xi64>, %original: tensor<4xi32>, %buffer: memref<1xi32>) {
+  %c0 = arith.constant 0 : index
+  %result = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [], inserted_window_dims = [0], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates : tensor<2xi32>) indices(%indices : tensor<2x1xi64>)
+    outs(%original : tensor<4xi32>) {
+  ^bb0(%current: i32, %update: i32):
+    memref.store %update, %buffer[%c0] : memref<1xi32>
+    iree_linalg_ext.yield %update : i32
+  } -> tensor<4xi32>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @general_scatter_drop_unused_pure
+// CHECK-NOT: iree_linalg_ext.general_scatter
+// CHECK: return
+func.func @general_scatter_drop_unused_pure(%updates: tensor<2xi32>, %indices: tensor<2x1xi64>, %original: tensor<4xi32>, %buffer: memref<1xi32>) {
+  %c0 = arith.constant 0 : index
+  %result = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [], inserted_window_dims = [0], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates : tensor<2xi32>) indices(%indices : tensor<2x1xi64>)
+    outs(%original : tensor<4xi32>) {
+  ^bb0(%current: i32, %update: i32):
+    iree_linalg_ext.yield %update : i32
+  } -> tensor<4xi32>
+  return
+}
+
+// -----
+
+// With no update elements nothing is scattered.
+
+// CHECK-LABEL: func.func @scatter_no_updates(
+// CHECK-SAME:    %[[UPDATES:[a-zA-Z0-9]+]]: tensor<0x3xf32>, %[[INDICES:[a-zA-Z0-9]+]]: tensor<0x1xi32>, %[[ORIGINAL:[a-zA-Z0-9]+]]: tensor<5x3xf32>
+// CHECK-NOT:     iree_linalg_ext.scatter
+// CHECK:         return %[[ORIGINAL]]
+func.func @scatter_no_updates(%updates: tensor<0x3xf32>, %indices: tensor<0x1xi32>, %original: tensor<5x3xf32>) -> tensor<5x3xf32> {
+  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%updates, %indices : tensor<0x3xf32>, tensor<0x1xi32>)
+    outs(%original : tensor<5x3xf32>) {
+    ^bb0(%arg0: f32, %arg1: f32):
+      %1 = arith.addf %arg0, %arg1 : f32
+      iree_linalg_ext.yield %1 : f32
+    } -> tensor<5x3xf32>
+  return %0 : tensor<5x3xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @scatter_with_updates(
+// CHECK:         iree_linalg_ext.scatter
+func.func @scatter_with_updates(%updates: tensor<2x3xf32>, %indices: tensor<2x1xi32>, %original: tensor<5x3xf32>) -> tensor<5x3xf32> {
+  %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
+    ins(%updates, %indices : tensor<2x3xf32>, tensor<2x1xi32>)
+    outs(%original : tensor<5x3xf32>) {
+    ^bb0(%arg0: f32, %arg1: f32):
+      %1 = arith.addf %arg0, %arg1 : f32
+      iree_linalg_ext.yield %1 : f32
+    } -> tensor<5x3xf32>
+  return %0 : tensor<5x3xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @general_scatter_no_updates(
+// CHECK-SAME:    %[[ORIGINAL0:[a-zA-Z0-9]+]]: tensor<6x4xi32>, %[[ORIGINAL1:[a-zA-Z0-9]+]]: tensor<6x4xi32>
+// CHECK-NOT:     iree_linalg_ext.general_scatter
+// CHECK:         return %[[ORIGINAL0]], %[[ORIGINAL1]]
+func.func @general_scatter_no_updates(%updates0: tensor<3x0xi32>, %updates1: tensor<3x0xi32>, %indices: tensor<3x1xi64>, %original0: tensor<6x4xi32>, %original1: tensor<6x4xi32>) -> (tensor<6x4xi32>, tensor<6x4xi32>) {
+  %result:2 = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [1], inserted_window_dims = [0], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates0, %updates1 : tensor<3x0xi32>, tensor<3x0xi32>)
+    indices(%indices : tensor<3x1xi64>)
+    outs(%original0, %original1 : tensor<6x4xi32>, tensor<6x4xi32>) {
+  ^bb0(%current0: i32, %current1: i32, %update0: i32, %update1: i32):
+    iree_linalg_ext.yield %update0, %update1 : i32, i32
+  } -> tensor<6x4xi32>, tensor<6x4xi32>
+  return %result#0, %result#1 : tensor<6x4xi32>, tensor<6x4xi32>
+}
+
+// -----
+
+// An effect in the reducer keeps an unused general_scatter alive.
+// CHECK-LABEL: func.func @unused_effectful_general_scatter(
+//       CHECK:   iree_linalg_ext.general_scatter
+//       CHECK:     util.status.check_ok
+func.func @unused_effectful_general_scatter(%updates: tensor<3x4xi32>, %indices: tensor<3x1xi32>, %original: tensor<5x4xi32>, %status: i32) {
+  %0 = iree_linalg_ext.general_scatter <update_window_dims = [1], inserted_window_dims = [0], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0], index_vector_dim = 1>
+      ins(%updates : tensor<3x4xi32>) indices(%indices : tensor<3x1xi32>) outs(%original : tensor<5x4xi32>) {
+  ^bb0(%current: i32, %update: i32):
+    util.status.check_ok %status, "reducer check"
+    iree_linalg_ext.yield %update : i32
+  } -> tensor<5x4xi32>
+  return
+}

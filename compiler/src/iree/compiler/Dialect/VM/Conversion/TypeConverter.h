@@ -22,6 +22,12 @@ private:
   TargetOptions targetOptions_;
 };
 
+// Returns whether an arithmetic op producing `sourceType` can lower to VM
+// arithmetic on operands of the converted type `convertedType`. VM arithmetic
+// runs on integers and floats, and a float op must not run on the storage bits
+// of a narrow float that the VM holds in an integer register.
+bool isVMArithmeticType(Type sourceType, Type convertedType);
+
 } // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_CONVERSION_TYPECONVERTER_H_

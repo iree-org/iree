@@ -62,6 +62,7 @@ iree_lit_test_suite(
     "refine_usage.mlir"
     "reuse_allocations.mlir"
     "schedule_allocation.mlir"
+    "schedule_allocation_bounded.mlir"
     "schedule_allocation_parameters.mlir"
     "schedule_allocation_subviews_constant.mlir"
     "schedule_allocation_subviews_nested.mlir"

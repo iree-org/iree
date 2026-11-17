@@ -36,10 +36,25 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    PaddingUtils
+  HDRS
+    "StableHLOPaddingUtils.h"
+  SRCS
+    "StableHLOPaddingUtils.cpp"
+  DEPS
+    MLIRArithDialect
+    MLIRIR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     StableHLOLegalization
   SRCS
     "CheckVHLOStableHloMixUsage.cpp"
     "ConvertCollectives.cpp"
+    "DynamicShapeOps.cpp"
+    "InlineShapeAssertionHelpers.cpp"
     "LegalizeControlFlow.cpp"
     "LegalizeShapeComputations.cpp"
     "LegalizeToLinalgUtils.cpp"
@@ -50,11 +65,13 @@ iree_cc_library(
     "StableHLOToLinalgExt.cpp"
     "VerifyCompilerInputLegality.cpp"
   DEPS
+    ::PaddingUtils
     ::PassHeaders
     ChloOps
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
+    MLIRAnalysis
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRComplexDialect
@@ -62,6 +79,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRInferIntRangeCommon
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRLinalgUtils
@@ -69,14 +87,17 @@ iree_cc_library(
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRSCFDialect
+    MLIRSCFTransforms
     MLIRShapeDialect
     MLIRShapeOpsTransforms
+    MLIRSideEffectInterfaces
     MLIRSparseTensorDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
     MLIRTransformUtils
     MLIRTransforms
+    MLIRValueBoundsOpInterface
     MLIRVectorDialect
     StablehloBroadcastUtils
     StablehloLinalgTransforms

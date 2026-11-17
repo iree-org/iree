@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <tuple>
 
+#include "iree/compiler/Codegen/Common/WidenNarrowIntegers.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
@@ -38,9 +39,11 @@
 #include "mlir/Conversion/TensorToSPIRV/TensorToSPIRV.h"
 #include "mlir/Conversion/UBToSPIRV/UBToSPIRV.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
@@ -70,6 +73,53 @@ namespace mlir::iree_compiler {
 #include "iree/compiler/Codegen/SPIRV/Passes.h.inc"
 
 namespace {
+
+// Packed subword stores require word atomics on physical buffer pointers.
+// UniformMemory covers physical storage buffers as well as descriptor buffers.
+struct ConvertPhysicalWordAtomic final
+    : OpConversionPattern<memref::AtomicRMWOp> {
+  using Base::Base;
+
+  LogicalResult
+  matchAndRewrite(memref::AtomicRMWOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto memrefType = op.getMemRefType();
+    auto storage = dyn_cast_if_present<spirv::StorageClassAttr>(
+        memrefType.getMemorySpace());
+    if (!storage ||
+        storage.getValue() != spirv::StorageClass::PhysicalStorageBuffer ||
+        !memrefType.getElementType().isInteger(32) ||
+        (op.getKind() != arith::AtomicRMWKind::andi &&
+         op.getKind() != arith::AtomicRMWKind::ori)) {
+      return rewriter.notifyMatchFailure(
+          op, "requires a physical i32 bitwise atomic");
+    }
+    auto &converter = *getTypeConverter<SPIRVTypeConverter>();
+    Type resultType = converter.convertType(op.getType());
+    if (!resultType || resultType != adaptor.getValue().getType()) {
+      return rewriter.notifyMatchFailure(op,
+                                         "requires unchanged word arithmetic");
+    }
+    Value pointer =
+        spirv::getElementPtr(converter, memrefType, adaptor.getMemref(),
+                             adaptor.getIndices(), op.getLoc(), rewriter);
+    if (!pointer) {
+      return failure();
+    }
+    auto semantics = spirv::MemorySemantics::AcquireRelease |
+                     spirv::MemorySemantics::UniformMemory;
+    if (op.getKind() == arith::AtomicRMWKind::andi) {
+      rewriter.replaceOpWithNewOp<spirv::AtomicAndOp>(
+          op, resultType, pointer, spirv::Scope::Device, semantics,
+          adaptor.getValue());
+    } else {
+      rewriter.replaceOpWithNewOp<spirv::AtomicOrOp>(
+          op, resultType, pointer, spirv::Scope::Device, semantics,
+          adaptor.getValue());
+    }
+    return success();
+  }
+};
 
 //===----------------------------------------------------------------------===//
 // Resource utilities
@@ -698,7 +748,8 @@ public:
   explicit ConvertToSPIRVPass(unsigned indexBits) : indexBits(indexBits) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<spirv::SPIRVDialect>();
+    registry.insert<arith::ArithDialect, math::MathDialect,
+                    vector::VectorDialect, spirv::SPIRVDialect>();
   }
 
   LogicalResult initializeOptions(
@@ -719,6 +770,62 @@ private:
 };
 } // namespace
 
+// Sets the SPIR-V entry point ABI of each function with a dispatch config
+// from its workgroup and subgroup sizes. Functions with an ABI keep it. Fails
+// when a config has no workgroup size.
+static LogicalResult setEntryPointABIs(ModuleOp moduleOp) {
+  MLIRContext *context = moduleOp.getContext();
+  DenseMap<StringRef, IREE::Codegen::DispatchConfigOp> configMap;
+  for (auto configOp : moduleOp.getOps<IREE::Codegen::DispatchConfigOp>()) {
+    configMap[configOp.getFunctionRef()] = configOp;
+  }
+  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
+    IREE::Codegen::DispatchConfigOp configOp =
+        configMap.lookup(funcOp.getName());
+    if (!configOp || funcOp->hasAttr(spirv::getEntryPointABIAttrName())) {
+      continue;
+    }
+    std::optional<ArrayRef<int64_t>> wgSize = configOp.getWorkgroupSize();
+    if (!wgSize || wgSize->empty()) {
+      return funcOp->emitOpError(
+          "expected workgroup_size to be set for SPIR-V lowering");
+    }
+    SmallVector<int> workgroupSize =
+        llvm::map_to_vector(*wgSize, [](int64_t v) -> int { return v; });
+    std::optional<int> subgroupSize;
+    if (std::optional<uint64_t> sg = configOp.getSubgroupSize()) {
+      subgroupSize = sg.value();
+    }
+    funcOp->setAttr(
+        spirv::getEntryPointABIAttrName(),
+        spirv::getEntryPointABIAttr(context, workgroupSize, subgroupSize));
+  }
+  return success();
+}
+
+// Packed loads preserve only the logical low bits of integers that the type
+// converter emulates in 32-bit words. Extends their operands and computes at
+// 32 bits every operation whose result depends on the logical integer width.
+// Ceil and floor divisions are expanded first: the widening patterns handle
+// the divisions, remainders and comparisons the expansion produces, but not
+// the ceil and floor division ops themselves.
+static LogicalResult
+widenEmulatedNarrowIntegerOps(ModuleOp moduleOp,
+                              const SPIRVTypeConverter &typeConverter) {
+  auto isEmulated = [&typeConverter](Type type) {
+    auto integer = dyn_cast<IntegerType>(getElementTypeOrSelf(type));
+    if (!integer || integer.getWidth() == 1 || integer.getWidth() >= 32) {
+      return false;
+    }
+    Type converted = typeConverter.convertType(integer);
+    return converted && converted != integer;
+  };
+  RewritePatternSet narrowPatterns(moduleOp.getContext());
+  arith::populateCeilFloorDivExpandOpsPatterns(narrowPatterns);
+  populateWidenNarrowIntegerHighBitOpPatterns(narrowPatterns, 32, isEmulated);
+  return applyPatternsGreedily(moduleOp, std::move(narrowPatterns));
+}
+
 void ConvertToSPIRVPass::runOnOperation() {
   MLIRContext *context = &getContext();
   ModuleOp moduleOp = getOperation();
@@ -730,38 +837,8 @@ void ConvertToSPIRVPass::runOnOperation() {
   bool useIndirectBindings = usesIndirectBindingsAttr(moduleOp);
   bool useBdaRootBindings = usesBdaRootDispatchAbiAttr(moduleOp);
 
-  // Build a map from function name to dispatch_config for workgroup_size
-  // and subgroup_size lookup.
-  DenseMap<StringRef, IREE::Codegen::DispatchConfigOp> configMap;
-  for (auto configOp : moduleOp.getOps<IREE::Codegen::DispatchConfigOp>()) {
-    configMap[configOp.getFunctionRef()] = configOp;
-  }
-
-  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    if (!configMap.contains(funcOp.getName())) {
-      continue;
-    }
-    IREE::Codegen::DispatchConfigOp configOp = configMap[funcOp.getName()];
-    if (funcOp->hasAttr(spirv::getEntryPointABIAttrName())) {
-      continue;
-    }
-    SmallVector<int> workgroupSize;
-    if (std::optional<ArrayRef<int64_t>> wgSize = configOp.getWorkgroupSize()) {
-      workgroupSize = llvm::map_to_vector(wgSize.value(),
-                                          [](int64_t v) -> int { return v; });
-    }
-    if (workgroupSize.empty()) {
-      funcOp->emitOpError(
-          "expected workgroup_size to be set for SPIR-V lowering");
-      return signalPassFailure();
-    }
-    std::optional<int> subgroupSize;
-    if (std::optional<uint64_t> sg = configOp.getSubgroupSize()) {
-      subgroupSize = sg.value();
-    }
-    funcOp->setAttr(
-        spirv::getEntryPointABIAttrName(),
-        spirv::getEntryPointABIAttr(context, workgroupSize, subgroupSize));
+  if (failed(setEntryPointABIs(moduleOp))) {
+    return signalPassFailure();
   }
 
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
@@ -846,6 +923,11 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   SPIRVTypeConverter typeConverter(targetAttr, options);
 
+  if (failed(widenEmulatedNarrowIntegerOps(moduleOp, typeConverter))) {
+    moduleOp.emitOpError() << "failed widening emulated narrow integer ops";
+    return signalPassFailure();
+  }
+
   // Additionally pull in conversion rules for GPU subgroup MMA ops.
   populateMMAToSPIRVCoopMatrixTypeConversion(typeConverter);
   RewritePatternSet patterns(&getContext());
@@ -861,6 +943,7 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   // Pull in MemRef patterns to convert load/store ops.
   populateMemRefToSPIRVPatterns(typeConverter, patterns);
+  patterns.add<ConvertPhysicalWordAtomic>(typeConverter, context);
 
   // Pull in standard/math patterns to convert arithmetic ops and others.
   arith::populateCeilFloorDivExpandOpsPatterns(patterns);

@@ -24,3 +24,22 @@ func.func @concatenate_cst() {
   check.expect_eq_const(%0, dense<[[1, 2, 0, 0, 0], [3, 4, 0, 0, 0]]> : tensor<2x5xi32>) : tensor<2x5xi32>
   return
 }
+
+// A dynamic concatenate reads a sign-extended operand element by element.
+func.func @concatenate_dynamic_extended() {
+  %wide = flow.tensor.dynamic_constant dense<[
+      [[0, 1, 2, 3], [10, 11, 12, 13], [20, 21, 22, 23]],
+      [[100, 101, 102, 103], [110, 111, 112, 113], [120, 121, 122, 123]]]>
+      : tensor<2x3x4xi32> -> tensor<2x?x4xi32>
+  %narrow = flow.tensor.dynamic_constant dense<[[[-1], [-2], [-3]], [[4], [5], [-128]]]>
+      : tensor<2x3x1xi8> -> tensor<2x?x1xi8>
+  %extended = stablehlo.convert %narrow : (tensor<2x?x1xi8>) -> tensor<2x?x1xi32>
+  %result = "stablehlo.concatenate"(%wide, %extended) {dimension = 2} : (tensor<2x?x4xi32>, tensor<2x?x1xi32>) -> tensor<2x?x5xi32>
+  %expected = arith.constant dense<[
+      [[0, 1, 2, 3, -1], [10, 11, 12, 13, -2], [20, 21, 22, 23, -3]],
+      [[100, 101, 102, 103, 4], [110, 111, 112, 113, 5], [120, 121, 122, 123, -128]]]>
+      : tensor<2x3x5xi32>
+  %expected_dynamic = tensor.cast %expected : tensor<2x3x5xi32> to tensor<2x?x5xi32>
+  check.expect_eq(%result, %expected_dynamic) : tensor<2x?x5xi32>
+  return
+}

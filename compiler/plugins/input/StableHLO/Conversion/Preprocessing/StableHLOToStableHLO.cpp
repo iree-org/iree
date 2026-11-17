@@ -6,22 +6,37 @@
 
 // Implements StableHLO-to-StableHLO IREE-specific preprocessing.
 
+#include <limits>
 #include <numeric>
 #include <random>
+#include <variant>
 
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
+#include "compiler/plugins/input/StableHLO/Conversion/StableHLOPaddingUtils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/CheckedArithmetic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo/dialect/Base.h"
 #include "stablehlo/dialect/ChloOps.h"
@@ -459,6 +474,226 @@ struct TransposeReshapeGenericDotGeneral final
   }
 };
 
+// Materialize reversal before StableHLO-to-LinalgExt runs. A reverse created
+// during the final convolution conversion instead takes the upstream affine
+// lowering, whose negative indexing coefficient is unsupported by CPU tiling.
+struct ConvolutionReversal final
+    : OpRewritePattern<mlir::stablehlo::ConvolutionOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(mlir::stablehlo::ConvolutionOp op,
+                                PatternRewriter &rewriter) const override {
+    auto reversal = op.getWindowReversal();
+    if (!reversal) {
+      return failure();
+    }
+    SmallVector<int64_t> dimensions;
+    for (auto [i, reversed] : llvm::enumerate(*reversal)) {
+      if (reversed) {
+        dimensions.push_back(
+            op.getDimensionNumbers().getKernelSpatialDimensions()[i]);
+      }
+    }
+    if (dimensions.empty()) {
+      return failure();
+    }
+    Value filter = mlir::stablehlo::ReverseOp::create(
+        rewriter, op.getLoc(), op.getRhs(),
+        rewriter.getDenseI64ArrayAttr(dimensions));
+    rewriter.modifyOpInPlace(op, [&] {
+      op.getRhsMutable().assign(filter);
+      op.setWindowReversalAttr(rewriter.getDenseBoolArrayAttr(
+          SmallVector<bool>(reversal->size(), false)));
+    });
+    return success();
+  }
+};
+
+// Extract one padding coordinate into signless shape storage without changing
+// its numeric value. The input is trusted: an unsigned 64-bit value must fit
+// the signed dimension range, and no runtime check enforces it.
+static Value buildConvolutionPaddingElement(PatternRewriter &rewriter,
+                                            Location loc, Value padding,
+                                            Value row, Value column,
+                                            IntegerType originalElementType) {
+  Value element = tensor::ExtractOp::create(rewriter, loc, padding,
+                                            ValueRange{row, column});
+  if (originalElementType.getWidth() < 64) {
+    if (originalElementType.isUnsigned()) {
+      return arith::ExtUIOp::create(rewriter, loc, rewriter.getI64Type(),
+                                    element);
+    }
+    return arith::ExtSIOp::create(rewriter, loc, rewriter.getI64Type(),
+                                  element);
+  }
+  return element;
+}
+
+// The upstream static-padding matcher sign-extends APInt values. Normalise
+// unsigned constants first; report unrepresentable values before mutation.
+static LogicalResult normalizeUnsignedConvolutionPadding(
+    mlir::stablehlo::DynamicConvOp op, DenseIntElementsAttr constantPadding,
+    bool &hasInvalidPadding, PatternRewriter &rewriter) {
+  SmallVector<int64_t> values;
+  for (const APInt &value : constantPadding.getValues<APInt>()) {
+    if (value.getActiveBits() > 63) {
+      if (!hasInvalidPadding) {
+        op.emitOpError("padding exceeds the signed 64-bit dimension range");
+      }
+      hasInvalidPadding = true;
+      return failure();
+    }
+    values.push_back(value.getZExtValue());
+  }
+  auto type = constantPadding.getType().clone(rewriter.getI64Type());
+  Value padding = mlir::stablehlo::ConstantOp::create(
+      rewriter, op.getLoc(), DenseIntElementsAttr::get(type, values));
+  rewriter.modifyOpInPlace(op, [&] { op.getPaddingMutable().assign(padding); });
+  return success();
+}
+
+// Padding is the only operand dynamic_conv adds to convolution. Move it into
+// a dynamic_pad and lower the rest as a convolution.
+struct DynamicConvToPaddedConv final
+    : OpRewritePattern<mlir::stablehlo::DynamicConvOp> {
+  DynamicConvToPaddedConv(MLIRContext *context, bool &hasInvalidPadding)
+      : OpRewritePattern(context), hasInvalidPadding(hasInvalidPadding) {}
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DynamicConvOp op,
+                                PatternRewriter &rewriter) const override {
+    DenseIntElementsAttr constantPadding;
+    if (matchPattern(op.getPadding(), m_Constant(&constantPadding))) {
+      if (!constantPadding.getElementType().isUnsignedInteger()) {
+        return rewriter.notifyMatchFailure(op, "constant signed padding");
+      }
+      return normalizeUnsignedConvolutionPadding(op, constantPadding,
+                                                 hasInvalidPadding, rewriter);
+    }
+    Location loc = op.getLoc();
+    auto lhsType = dyn_cast<RankedTensorType>(op.getLhs().getType());
+    auto paddingType = dyn_cast<RankedTensorType>(op.getPadding().getType());
+    if (!lhsType || !paddingType || !paddingType.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op, "unranked lhs or padding");
+    }
+    auto dims = op.getDimensionNumbers();
+    ArrayRef<int64_t> spatialDims = dims.getInputSpatialDimensions();
+    int64_t rank = lhsType.getRank();
+    int64_t numSpatial = spatialDims.size();
+    auto originalElementType = cast<IntegerType>(paddingType.getElementType());
+    Value padding = op.getPadding();
+    if (originalElementType.isUnsigned()) {
+      // This changes storage signedness only. The tensor conversion removes
+      // the resulting identity operation after normalising the input type.
+      padding = mlir::stablehlo::ConvertOp::create(
+          rewriter, loc,
+          paddingType.clone(
+              rewriter.getIntegerType(originalElementType.getWidth())),
+          padding);
+    }
+    // Dilation can exceed the source padding width.
+    Type paddingElementType = rewriter.getI64Type();
+
+    Value zeroIndex = arith::ConstantIndexOp::create(rewriter, loc, 0);
+    Value oneIndex = arith::ConstantIndexOp::create(rewriter, loc, 1);
+    Value zeroPaddingElement = arith::ConstantOp::create(
+        rewriter, loc, rewriter.getIntegerAttr(paddingElementType, 0));
+    ArrayRef<int64_t> lhsDilation =
+        op.getLhsDilation().value_or(ArrayRef<int64_t>{});
+    SmallVector<APInt> interiorValues(rank, APInt(64, 0));
+    SmallVector<Value> lows(rank, zeroPaddingElement);
+    SmallVector<Value> highs(rank, zeroPaddingElement);
+    SmallVector<Value> paddedSizes;
+    for (int64_t d = 0; d < rank; ++d) {
+      paddedSizes.push_back(
+          rewriter.createOrFold<tensor::DimOp>(loc, op.getLhs(), d));
+    }
+    for (auto [s, d] : llvm::enumerate(spatialDims)) {
+      Value row = arith::ConstantIndexOp::create(rewriter, loc, s);
+      Value lowElement = buildConvolutionPaddingElement(
+          rewriter, loc, padding, row, zeroIndex, originalElementType);
+      Value highElement = buildConvolutionPaddingElement(
+          rewriter, loc, padding, row, oneIndex, originalElementType);
+      lows[d] = lowElement;
+
+      // Base dilation is applied by the pad, so the convolution must not
+      // apply it again.
+      int64_t interior = lhsDilation.empty() ? 0 : lhsDilation[s] - 1;
+      interiorValues[d] = APInt(64, interior);
+      highs[d] = highElement;
+      Value interiorSize =
+          arith::ConstantIntOp::create(rewriter, loc, interior, 64);
+      paddedSizes[d] =
+          buildPaddedDimension(rewriter, loc, paddedSizes[d], lowElement,
+                               highElement, interiorSize,
+                               /*isUnsignedPadding=*/false)
+              .size;
+    }
+    Value low = tensor::FromElementsOp::create(rewriter, loc, lows);
+    Value high = tensor::FromElementsOp::create(rewriter, loc, highs);
+
+    Value interior = mlir::stablehlo::ConstantOp::create(
+        rewriter, loc,
+        DenseIntElementsAttr::get(
+            RankedTensorType::get({rank}, paddingElementType), interiorValues));
+    Value zero = mlir::stablehlo::ConstantOp::create(
+        rewriter, loc,
+        rewriter.getZeroAttr(
+            RankedTensorType::get({}, lhsType.getElementType())));
+
+    // Padded spatial dims are dynamic; the rest keep the lhs sizes.
+    SmallVector<int64_t> paddedShape(lhsType.getShape());
+    for (int64_t d : spatialDims) {
+      paddedShape[d] = ShapedType::kDynamic;
+    }
+    auto paddedType =
+        RankedTensorType::get(paddedShape, lhsType.getElementType());
+    SmallVector<Value> dynamicSizes;
+    Value nonempty = rewriter.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
+    for (int64_t d = 0; d < rank; ++d) {
+      if (paddedType.isDynamicDim(d)) {
+        dynamicSizes.push_back(paddedSizes[d]);
+      }
+      Value positive = rewriter.createOrFold<arith::CmpIOp>(
+          loc, arith::CmpIPredicate::sgt, paddedSizes[d], zeroIndex);
+      nonempty = rewriter.createOrFold<arith::AndIOp>(loc, nonempty, positive);
+    }
+    // A fully cropped convolution is empty, while dynamic_pad requires
+    // nonnegative extents. Preserve the original padding on the nonempty path.
+    auto ifOp =
+        scf::IfOp::create(rewriter, loc, TypeRange{paddedType}, nonempty, true);
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToStart(&ifOp.getThenRegion().front());
+      Value padded = mlir::stablehlo::DynamicPadOp::create(
+          rewriter, loc, paddedType, op.getLhs(), zero, low, high, interior);
+      scf::YieldOp::create(rewriter, loc, padded);
+      rewriter.setInsertionPointToStart(&ifOp.getElseRegion().front());
+      Value empty =
+          tensor::EmptyOp::create(rewriter, loc, paddedType, dynamicSizes);
+      scf::YieldOp::create(rewriter, loc, empty);
+    }
+    Value padded = IREE::Flow::TensorTieShapeOp::create(
+        rewriter, loc, paddedType, ifOp.getResult(0), dynamicSizes);
+
+    auto zeroPadding = DenseIntElementsAttr::get(
+        RankedTensorType::get({numSpatial, 2}, rewriter.getI64Type()),
+        int64_t{0});
+    auto onesLhsDilation =
+        rewriter.getDenseI64ArrayAttr(SmallVector<int64_t>(numSpatial, 1));
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ConvolutionOp>(
+        op, op.getType(), padded, op.getRhs(), op.getWindowStridesAttr(),
+        zeroPadding, onesLhsDilation, op.getRhsDilationAttr(),
+        op.getWindowReversalAttr(), dims, op.getFeatureGroupCount(),
+        op.getBatchGroupCount(), op.getPrecisionConfigAttr());
+    return success();
+  }
+
+private:
+  // The greedy driver has no fatal-match result. Keep the failure local to this
+  // pass invocation and report it after rewriting, including constants exposed
+  // by other patterns during the same invocation.
+  bool &hasInvalidPadding;
+};
+
 // The following helpers and the ScatterBatchingDimsExpander pattern below are
 // ported from upstream StableHLO's `ScatterWithBatchingDimsExpander` and its
 // supporting helpers in
@@ -489,16 +724,17 @@ bool fitsInIntegralType(int64_t size, IntegerType type) {
 
 // If `type` is an integer type in which `size` doesn't fit, promote it to i32
 // or i64 (depending on `size`).
-Type promoteTypeForSize(Type type, int64_t size, OpBuilder &builder) {
+Type promoteTypeForSize(Type type, int64_t size) {
   // Gather/Scatter should have an integer type, but we check just in case.
   auto intType = dyn_cast<IntegerType>(type);
   if (!intType || fitsInIntegralType(size, intType)) {
     return type;
   }
-  if (fitsInIntegralType(size, builder.getI32Type())) {
-    return builder.getI32Type();
+  auto i32Type = IntegerType::get(type.getContext(), 32);
+  if (fitsInIntegralType(size, i32Type)) {
+    return i32Type;
   }
-  return builder.getI64Type();
+  return IntegerType::get(type.getContext(), 64);
 }
 
 // If `indicesBatchingDims` and `updatedIndexMap` are both sorted, then the
@@ -511,53 +747,329 @@ bool getUpdatedIndicesAreSorted(bool indicesAreSorted,
          llvm::is_sorted(updatedIndexMap);
 }
 
-// Returns an updated indices tensor such that an `IotaOp` is prepended for each
-// dim in `indicesBatchingDims` with a `ConcatenateOp`.
-//
-// If `indexVectorDim` is equal to the rank of `indices`, it is reshaped to have
-// a trailing dimension of size 1 so it can be concatenated with the `IotaOp`s.
-Value createConcatIndices(Value indices, int64_t indexVectorDim,
-                          ArrayRef<int64_t> indicesBatchingDims,
-                          PatternRewriter &rewriter) {
-  Location loc = indices.getLoc();
-  auto indicesType = cast<RankedTensorType>(indices.getType());
-  Type elementType = indicesType.getElementType();
+// Planning borrows existing indices but creates no IR. Static construction
+// keeps StableHLO's promotion/encoding behavior; dynamic generation uses
+// signless storage internally and restores the planned public integer
+// signedness.
+struct BatchedIndexSource {
+  Value indices;
+  IntegerType elementType;
+};
 
-  // The batching dim sizes might not fit in the existing element type, in which
-  // case we need to promote it.
-  for (int64_t batchingDim : indicesBatchingDims) {
-    elementType = promoteTypeForSize(
-        elementType, indicesType.getDimSize(batchingDim), rewriter);
+BatchedIndexSource selectDynamicIndexSource(Value indices) {
+  auto elementType = cast<IntegerType>(getElementTypeOrSelf(indices.getType()));
+  if (auto convert = indices.getDefiningOp<mlir::stablehlo::ConvertOp>()) {
+    auto sourceType = dyn_cast<IntegerType>(
+        getElementTypeOrSelf(convert.getOperand().getType()));
+    if (sourceType && !elementType.isUnsigned() &&
+        sourceType.getWidth() < elementType.getWidth()) {
+      return {convert.getOperand(), sourceType};
+    }
   }
-  if (elementType != indicesType.getElementType()) {
-    indicesType = RankedTensorType::get(indicesType.getShape(), elementType);
-    indices =
-        mlir::stablehlo::ConvertOp::create(rewriter, loc, indicesType, indices);
-  }
+  return {indices, elementType};
+}
 
-  bool indexVectorDimOnLastDim = indexVectorDim == indicesType.getRank();
-  SmallVector<int64_t> iotaShape(indicesType.getShape());
-  if (indexVectorDimOnLastDim) {
+struct StaticBatchedIndexPlan {
+  Value indices;
+  RankedTensorType convertedSourceType;
+  RankedTensorType iotaType;
+  int64_t vectorDimension;
+  bool implicitVectorDimension;
+  SmallVector<int64_t> batchingDimensions;
+};
+
+struct DynamicBatchedIndexPlan {
+  struct Extent {
+    int64_t sourceDimension;
+    bool addBatchingColumns;
+  };
+  Location location;
+  BatchedIndexSource source;
+  RankedTensorType generatorSourceType;
+  RankedTensorType generatedType;
+  RankedTensorType publicResultType;
+  int64_t vectorDimension;
+  bool implicitVectorDimension;
+  SmallVector<int64_t> batchingDimensions;
+  SmallVector<Extent> dynamicExtents;
+};
+
+using BatchedIndexPlan =
+    std::variant<StaticBatchedIndexPlan, DynamicBatchedIndexPlan>;
+
+// The vector axis gains one iota column per batching dimension. Bounds on that
+// axis no longer describe the result; preserve bounds on the other axes.
+Attribute planBatchedIndexEncoding(RankedTensorType sourceType,
+                                   int64_t vectorDimension,
+                                   bool implicitVectorDimension,
+                                   bool preserveUnboundedEncoding) {
+  ArrayRef<int64_t> bounds =
+      mlir::hlo::encodingToBounds(sourceType.getEncoding());
+  if (bounds.empty()) {
+    return preserveUnboundedEncoding ? sourceType.getEncoding() : Attribute{};
+  }
+  SmallVector<int64_t> resultBounds(bounds);
+  if (implicitVectorDimension) {
+    resultBounds.push_back(ShapedType::kDynamic);
+  } else {
+    resultBounds[vectorDimension] = ShapedType::kDynamic;
+  }
+  return mlir::hlo::boundsToEncoding(sourceType.getEncoding(), resultBounds);
+}
+
+// Returns the element type of the batched indices: wide enough for every
+// batching dimension's iota. Dynamic batching dimensions need 64 bits. With a
+// dynamic shape the original signedness is kept even when the width grows;
+// static StableHLO promotion does not keep it.
+Type getBatchedIndexElementType(RankedTensorType originalType,
+                                ArrayRef<int64_t> batchingDimensions) {
+  auto originalElementType = cast<IntegerType>(originalType.getElementType());
+  MLIRContext *context = originalType.getContext();
+  Type publicElementType = originalElementType;
+  for (int64_t dimension : batchingDimensions) {
+    if (originalType.isDynamicDim(dimension)) {
+      publicElementType =
+          IntegerType::get(context, 64, originalElementType.getSignedness());
+      continue;
+    }
+    publicElementType = promoteTypeForSize(publicElementType,
+                                           originalType.getDimSize(dimension));
+    if (!originalType.hasStaticShape()) {
+      publicElementType = IntegerType::get(
+          context, cast<IntegerType>(publicElementType).getWidth(),
+          originalElementType.getSignedness());
+    }
+  }
+  return publicElementType;
+}
+
+// Plans concatenating static indices with one iota column per batching
+// dimension.
+StaticBatchedIndexPlan
+planStaticBatchedIndices(Value indices, int64_t vectorDimension,
+                         ArrayRef<int64_t> batchingDimensions,
+                         Type publicElementType) {
+  auto originalType = cast<RankedTensorType>(indices.getType());
+  bool implicitVectorDimension = vectorDimension == originalType.getRank();
+  auto convertedType = RankedTensorType::get(
+      originalType.getShape(), publicElementType, originalType.getEncoding());
+  SmallVector<int64_t> iotaShape(originalType.getShape());
+  if (implicitVectorDimension) {
     iotaShape.push_back(1);
   } else {
-    iotaShape[indexVectorDim] = 1;
+    iotaShape[vectorDimension] = 1;
   }
-  auto iotaType = RankedTensorType::get(iotaShape, elementType);
+  auto iotaType = RankedTensorType::get(
+      iotaShape, publicElementType,
+      planBatchedIndexEncoding(originalType, vectorDimension,
+                               implicitVectorDimension, false));
+  return StaticBatchedIndexPlan{indices,
+                                convertedType,
+                                iotaType,
+                                vectorDimension,
+                                implicitVectorDimension,
+                                llvm::to_vector(batchingDimensions)};
+}
 
-  if (indexVectorDimOnLastDim) {
-    indices =
-        mlir::stablehlo::ReshapeOp::create(rewriter, loc, iotaType, indices);
+// Plans generating dynamic indices together with their batching iotas in one
+// output generator.
+DynamicBatchedIndexPlan
+planDynamicBatchedIndices(Value indices, int64_t vectorDimension,
+                          ArrayRef<int64_t> batchingDimensions,
+                          Type publicElementType) {
+  MLIRContext *context = indices.getContext();
+  bool implicitVectorDimension =
+      vectorDimension == cast<RankedTensorType>(indices.getType()).getRank();
+  BatchedIndexSource source = selectDynamicIndexSource(indices);
+  auto sourceType = cast<RankedTensorType>(source.indices.getType());
+  auto generatorElementType =
+      IntegerType::get(context, source.elementType.getWidth());
+  auto generatedElementType = IntegerType::get(
+      context, cast<IntegerType>(publicElementType).getWidth());
+  SmallVector<int64_t> resultShape(sourceType.getShape());
+  if (implicitVectorDimension) {
+    resultShape.push_back(1 + batchingDimensions.size());
+  } else if (!ShapedType::isDynamic(resultShape[vectorDimension])) {
+    resultShape[vectorDimension] += batchingDimensions.size();
   }
+  Attribute encoding = planBatchedIndexEncoding(sourceType, vectorDimension,
+                                                implicitVectorDimension, true);
+  DynamicBatchedIndexPlan plan{
+      indices.getLoc(),
+      source,
+      RankedTensorType::get(sourceType.getShape(), generatorElementType,
+                            sourceType.getEncoding()),
+      RankedTensorType::get(resultShape, generatedElementType, encoding),
+      RankedTensorType::get(resultShape, publicElementType, encoding),
+      vectorDimension,
+      implicitVectorDimension,
+      llvm::to_vector(batchingDimensions),
+      {}};
+  for (auto [dimension, size] : llvm::enumerate(resultShape)) {
+    if (ShapedType::isDynamic(size)) {
+      plan.dynamicExtents.push_back(
+          {static_cast<int64_t>(dimension),
+           !implicitVectorDimension && dimension == vectorDimension});
+    }
+  }
+  return plan;
+}
 
-  SmallVector<Value> indicesToConcat;
-  indicesToConcat.reserve(indicesBatchingDims.size() + 1);
-  for (int64_t batchingDim : indicesBatchingDims) {
-    indicesToConcat.push_back(
-        mlir::stablehlo::IotaOp::create(rewriter, loc, iotaType, batchingDim));
+BatchedIndexPlan planBatchedIndices(Value indices, int64_t vectorDimension,
+                                    ArrayRef<int64_t> batchingDimensions) {
+  auto originalType = cast<RankedTensorType>(indices.getType());
+  Type publicElementType =
+      getBatchedIndexElementType(originalType, batchingDimensions);
+  if (originalType.hasStaticShape()) {
+    return planStaticBatchedIndices(indices, vectorDimension,
+                                    batchingDimensions, publicElementType);
   }
-  indicesToConcat.push_back(indices);
-  return mlir::stablehlo::ConcatenateOp::create(rewriter, loc, indicesToConcat,
-                                                indexVectorDim);
+  return planDynamicBatchedIndices(indices, vectorDimension, batchingDimensions,
+                                   publicElementType);
+}
+
+Value buildStaticConcatIndices(const StaticBatchedIndexPlan &plan,
+                               PatternRewriter &rewriter) {
+  Value indices = plan.indices;
+  Location loc = indices.getLoc();
+  if (indices.getType() != plan.convertedSourceType) {
+    indices = mlir::stablehlo::ConvertOp::create(
+        rewriter, loc, plan.convertedSourceType, indices);
+  }
+  if (plan.implicitVectorDimension) {
+    indices = mlir::stablehlo::ReshapeOp::create(rewriter, loc, plan.iotaType,
+                                                 indices);
+  }
+  SmallVector<Value> columns;
+  columns.reserve(plan.batchingDimensions.size() + 1);
+  for (int64_t dimension : plan.batchingDimensions) {
+    columns.push_back(mlir::stablehlo::IotaOp::create(
+        rewriter, loc, plan.iotaType, dimension));
+  }
+  columns.push_back(indices);
+  // Keep concatenate's inferred result type and original column order.
+  return mlir::stablehlo::ConcatenateOp::create(rewriter, loc, columns,
+                                                plan.vectorDimension);
+}
+
+// Return one generated scalar. Extract source indices only inside the source
+// branch: batching columns may otherwise address outside the source tensor.
+Value buildGeneratedIndexElement(const DynamicBatchedIndexPlan &plan,
+                                 Value source, ValueRange coordinates,
+                                 OpBuilder &builder, Location loc) {
+  Type elementType = plan.generatedType.getElementType();
+  Value vectorIndex = coordinates[plan.vectorDimension];
+  Value batchCount = arith::ConstantIndexOp::create(
+      builder, loc, plan.batchingDimensions.size());
+  Value inSourceVector = arith::CmpIOp::create(
+      builder, loc, arith::CmpIPredicate::sge, vectorIndex, batchCount);
+  auto ifOp = scf::IfOp::create(builder, loc, TypeRange{elementType},
+                                inSourceVector, /*withElseRegion=*/true);
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(&ifOp.getThenRegion().front());
+  SmallVector<Value> sourceCoordinates;
+  for (int64_t dimension = 0; dimension < plan.generatorSourceType.getRank();
+       ++dimension) {
+    if (!plan.implicitVectorDimension && dimension == plan.vectorDimension) {
+      sourceCoordinates.push_back(
+          arith::SubIOp::create(builder, loc, vectorIndex, batchCount));
+    } else {
+      sourceCoordinates.push_back(coordinates[dimension]);
+    }
+  }
+  Value sourceValue =
+      tensor::ExtractOp::create(builder, loc, source, sourceCoordinates);
+  if (plan.source.elementType.getWidth() <
+      cast<IntegerType>(elementType).getWidth()) {
+    // StableHLO Boolean conversion maps true to one, including when a widening
+    // convert was bypassed while selecting the source tensor.
+    if (plan.source.elementType.isUnsigned() ||
+        plan.source.elementType.getWidth() == 1) {
+      sourceValue =
+          arith::ExtUIOp::create(builder, loc, elementType, sourceValue);
+    } else {
+      sourceValue =
+          arith::ExtSIOp::create(builder, loc, elementType, sourceValue);
+    }
+  }
+  scf::YieldOp::create(builder, loc, sourceValue);
+
+  builder.setInsertionPointToStart(&ifOp.getElseRegion().front());
+  Value batchCoordinate =
+      arith::ConstantIntOp::create(builder, loc, elementType, 0);
+  for (auto [ordinal, dimension] : llvm::enumerate(plan.batchingDimensions)) {
+    Value ordinalValue = arith::ConstantIndexOp::create(builder, loc, ordinal);
+    Value matches = arith::CmpIOp::create(
+        builder, loc, arith::CmpIPredicate::eq, vectorIndex, ordinalValue);
+    Value coordinate = arith::IndexCastOp::create(builder, loc, elementType,
+                                                  coordinates[dimension]);
+    batchCoordinate = arith::SelectOp::create(builder, loc, matches, coordinate,
+                                              batchCoordinate);
+  }
+  scf::YieldOp::create(builder, loc, batchCoordinate);
+  return ifOp.getResult(0);
+}
+
+Value buildDynamicConcatIndices(const DynamicBatchedIndexPlan &plan,
+                                PatternRewriter &rewriter) {
+  Location loc = plan.location;
+  Value source = plan.source.indices;
+  if (source.getType() != plan.generatorSourceType) {
+    source = mlir::stablehlo::ConvertOp::create(
+        rewriter, loc, plan.generatorSourceType, source);
+  }
+  SmallVector<Value> dynamicExtents;
+  for (const auto &extentPlan : plan.dynamicExtents) {
+    Value extent = tensor::DimOp::create(rewriter, loc, source,
+                                         extentPlan.sourceDimension);
+    if (extentPlan.addBatchingColumns) {
+      Value batchCount = arith::ConstantIndexOp::create(
+          rewriter, loc, plan.batchingDimensions.size());
+      extent = arith::AddIOp::create(rewriter, loc, extent, batchCount);
+    }
+    dynamicExtents.push_back(extent);
+  }
+  Value empty = tensor::EmptyOp::create(rewriter, loc, plan.generatedType,
+                                        dynamicExtents);
+  SmallVector<utils::IteratorType> iterators(plan.generatedType.getRank(),
+                                             utils::IteratorType::parallel);
+  auto generic = linalg::GenericOp::create(
+      rewriter, loc, TypeRange{plan.generatedType}, ValueRange{},
+      ValueRange{empty},
+      SmallVector<AffineMap>{
+          rewriter.getMultiDimIdentityMap(plan.generatedType.getRank())},
+      iterators,
+      [&](OpBuilder &builder, Location bodyLoc, ValueRange) {
+        SmallVector<Value> coordinates;
+        for (int64_t dimension = 0; dimension < plan.generatedType.getRank();
+             ++dimension) {
+          coordinates.push_back(
+              linalg::IndexOp::create(builder, bodyLoc, dimension));
+        }
+        Value element = buildGeneratedIndexElement(plan, source, coordinates,
+                                                   builder, bodyLoc);
+        linalg::YieldOp::create(builder, bodyLoc, element);
+      },
+      ArrayRef<NamedAttribute>{});
+  if (plan.generatedType == plan.publicResultType) {
+    return generic.getResult(0);
+  }
+  return mlir::stablehlo::ConvertOp::create(
+      rewriter, loc, plan.publicResultType, generic.getResult(0));
+}
+
+// Add one batching-coordinate column per dimension, followed by the original
+// indices. An implicit trailing vector axis becomes explicit in either builder.
+Value buildConcatIndices(Value indices, int64_t vectorDimension,
+                         ArrayRef<int64_t> batchingDimensions,
+                         PatternRewriter &rewriter) {
+  BatchedIndexPlan plan =
+      planBatchedIndices(indices, vectorDimension, batchingDimensions);
+  if (auto *staticPlan = std::get_if<StaticBatchedIndexPlan>(&plan)) {
+    return buildStaticConcatIndices(*staticPlan, rewriter);
+  }
+  return buildDynamicConcatIndices(std::get<DynamicBatchedIndexPlan>(plan),
+                                   rewriter);
 }
 
 // Converts a `stablehlo.scatter` with batching dims to one without batching
@@ -580,9 +1092,8 @@ struct ScatterBatchingDimsExpander final
       return rewriter.notifyMatchFailure(op, "scatter op has no batching dims");
     }
 
-    if (!cast<ShapedType>(op.getScatterIndices().getType()).hasStaticShape()) {
-      return rewriter.notifyMatchFailure(
-          op, "scatter indices have dynamic shape, can't expand");
+    if (!isa<RankedTensorType>(op.getScatterIndices().getType())) {
+      return rewriter.notifyMatchFailure(op, "unranked scatter indices");
     }
 
     SmallVector<int64_t> newInsertedWindowDims =
@@ -590,9 +1101,9 @@ struct ScatterBatchingDimsExpander final
     SmallVector<int64_t> newScatterDimsToOperandDims =
         llvm::to_vector(llvm::concat<const int64_t>(
             inputBatchingDims, dimNumbers.getScatterDimsToOperandDims()));
-    Value newIndices = createConcatIndices(
-        op.getScatterIndices(), dimNumbers.getIndexVectorDim(),
-        scatterIndicesBatchingDims, rewriter);
+    Value newIndices = buildConcatIndices(op.getScatterIndices(),
+                                          dimNumbers.getIndexVectorDim(),
+                                          scatterIndicesBatchingDims, rewriter);
 
     auto newDimNumbers = mlir::stablehlo::ScatterDimensionNumbersAttr::get(
         op.getContext(), dimNumbers.getUpdateWindowDims(),
@@ -628,99 +1139,522 @@ static LogicalResult failIfScatterHasBatchingDims(mlir::stablehlo::ScatterOp op,
   return success();
 }
 
+// Returns `indices`, unsigned integers of at most 64 bits, as signed i64
+// values. Extents and nonnegative offsets fit signed i64, so unsigned 64-bit
+// starts above INT64_MAX are always out of bounds; they saturate to that
+// out-of-bounds sentinel instead of wrapping to negative values.
+static Value convertUnsignedIndicesToI64(ImplicitLocOpBuilder &b,
+                                         Value indices) {
+  auto indicesType = cast<RankedTensorType>(indices.getType());
+  auto indexElementType = cast<IntegerType>(indicesType.getElementType());
+  if (indexElementType.getWidth() == 64) {
+    auto scalarType = RankedTensorType::get({}, indexElementType);
+    Value limit = mlir::stablehlo::ConstantOp::create(
+        b, DenseElementsAttr::get(scalarType, APInt::getSignedMaxValue(64)));
+    if (indicesType.hasStaticShape()) {
+      limit = mlir::stablehlo::BroadcastInDimOp::create(
+          b, indicesType, limit, b.getDenseI64ArrayAttr({}));
+    } else {
+      Value shapeCarrier = mlir::stablehlo::ConvertOp::create(
+          b, indicesType.clone(b.getI64Type()), indices);
+      Value shape = shape::ShapeOfOp::create(
+          b, RankedTensorType::get({indicesType.getRank()}, b.getIndexType()),
+          shapeCarrier);
+      limit = mlir::stablehlo::DynamicBroadcastInDimOp::create(
+          b, indicesType, limit, shape, b.getDenseI64ArrayAttr({}));
+    }
+    indices = mlir::stablehlo::MinOp::create(b, indicesType, indices, limit);
+  }
+  return mlir::stablehlo::ConvertOp::create(
+      b, indicesType.clone(b.getI64Type()), indices);
+}
+
+// Match storage elements to the reducer and preserve unsigned index values.
+struct ScatterNormalizeTypes final
+    : OpRewritePattern<mlir::stablehlo::ScatterOp> {
+  using Base::Base;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    bool promoteElements = llvm::any_of(
+        llvm::zip_equal(op.getInputs(), op.getResultTypes()), [](auto pair) {
+          return getElementTypeOrSelf(std::get<0>(pair).getType()) !=
+                 getElementTypeOrSelf(std::get<1>(pair));
+        });
+    auto indexElementType =
+        cast<IntegerType>(op.getScatterIndices().getType().getElementType());
+    bool normalizeUnsignedIndices = indexElementType.isUnsigned();
+    if (!promoteElements && !normalizeUnsignedIndices) {
+      return rewriter.notifyMatchFailure(op, "scatter types are normalized");
+    }
+    if (normalizeUnsignedIndices && indexElementType.getWidth() > 64) {
+      return rewriter.notifyMatchFailure(op, "indices exceed 64 bits");
+    }
+
+    ImplicitLocOpBuilder b(op.getLoc(), rewriter);
+    SmallVector<Value> inputs, updates;
+    for (auto [input, update, resultType] : llvm::zip_equal(
+             op.getInputs(), op.getUpdates(), op.getResultTypes())) {
+      Type elementType = getElementTypeOrSelf(resultType);
+      inputs.push_back(convertElementType(b, input, elementType));
+      updates.push_back(convertElementType(b, update, elementType));
+    }
+    Value indices = op.getScatterIndices();
+    if (normalizeUnsignedIndices) {
+      indices = convertUnsignedIndicesToI64(b, indices);
+    }
+    // Saturation can collapse distinct vectors and change tie ordering.
+    bool mayCollapseIndices =
+        normalizeUnsignedIndices && indexElementType.getWidth() == 64;
+    rewriter.modifyOpInPlace(op, [&] {
+      op.getInputsMutable().assign(inputs);
+      op.getUpdatesMutable().assign(updates);
+      op.getScatterIndicesMutable().set(indices);
+      if (mayCollapseIndices) {
+        op.setUniqueIndices(false);
+        op.setIndicesAreSorted(false);
+      }
+    });
+    return success();
+  }
+
+private:
+  // Returns `value` converted to `elementType` when its element type differs.
+  static Value convertElementType(ImplicitLocOpBuilder &b, Value value,
+                                  Type elementType) {
+    auto type = cast<RankedTensorType>(value.getType());
+    if (type.getElementType() == elementType) {
+      return value;
+    }
+    return mlir::stablehlo::ConvertOp::create(b, type.clone(elementType),
+                                              value);
+  }
+};
+
+// An inclusive integer range.
+struct IntRange {
+  int64_t min;
+  int64_t max;
+};
+
+// Returns whether conversion through `type` preserves every value in `range`.
+static bool fitsIn(IntRange range, IntegerType type) {
+  unsigned width = type.getWidth();
+  // StableHLO i1 is boolean; only 0 and 1 keep their value through conversion.
+  if (width == 1) {
+    return range.min >= 0 && range.max <= 1;
+  }
+  if (width >= 64) {
+    return !type.isUnsigned() || range.min >= 0;
+  }
+  if (type.isUnsigned()) {
+    return range.min >= 0 && range.max <= (int64_t{1} << width) - 1;
+  }
+  return range.min >= -(int64_t{1} << (width - 1)) &&
+         range.max <= (int64_t{1} << (width - 1)) - 1;
+}
+
+// Returns the smallest range containing both `lhs` and `rhs`.
+static IntRange joinRanges(std::optional<IntRange> lhs, IntRange rhs) {
+  if (!lhs) {
+    return rhs;
+  }
+  return IntRange{std::min(lhs->min, rhs.min), std::max(lhs->max, rhs.max)};
+}
+
+// Returns `range` when conversion through `type` preserves all its values.
+static std::optional<IntRange> ifFitsIn(std::optional<IntRange> range,
+                                        IntegerType type) {
+  return range && fitsIn(*range, type) ? range : std::nullopt;
+}
+
+// Returns the range of a constant integer tensor's elements.
+static std::optional<IntRange> getConstantRange(DenseIntElementsAttr constant,
+                                                IntegerType elementType) {
+  // Boolean true converts to integer 1 rather than signed i1's -1.
+  bool isUnsignedOrBool =
+      elementType.isUnsigned() || elementType.getWidth() == 1;
+  std::optional<IntRange> range;
+  for (const APInt &element : constant.getValues<APInt>()) {
+    if (isUnsignedOrBool && element.getActiveBits() > 63) {
+      return std::nullopt;
+    }
+    int64_t v =
+        isUnsignedOrBool ? element.getZExtValue() : element.getSExtValue();
+    range = joinRanges(range, IntRange{v, v});
+  }
+  return range;
+}
+
+// Returns the operand passed for `argument` when it belongs to the entry block
+// of a private function with exactly one call site.
+static Value getSingleCallOperand(BlockArgument argument) {
+  auto function = dyn_cast<func::FuncOp>(argument.getOwner()->getParentOp());
+  if (!function || !function.isPrivate() ||
+      argument.getOwner() != &function.getBody().front()) {
+    return {};
+  }
+  auto module = function->getParentOfType<ModuleOp>();
+  std::optional<SymbolTable::UseRange> uses =
+      module ? SymbolTable::getSymbolUses(function, module) : std::nullopt;
+  if (!uses || !llvm::hasSingleElement(*uses)) {
+    return {};
+  }
+  auto call = dyn_cast<func::CallOp>(uses->begin()->getUser());
+  if (!call || call.getCallee() != function.getName()) {
+    return {};
+  }
+  return call.getOperand(argument.getArgNumber());
+}
+
+// Returns the range of a vector of scalars that each carry unsigned
+// `util.assume.int` bounds.
+static std::optional<IntRange>
+getAssumedElementsRange(tensor::FromElementsOp fromElements) {
+  std::optional<IntRange> range;
+  for (Value element : fromElements.getElements()) {
+    auto assume = element.getDefiningOp<IREE::Util::AssumeIntOp>();
+    if (!assume) {
+      return std::nullopt;
+    }
+    unsigned index = cast<OpResult>(element).getResultNumber();
+    auto [umin, umax] = assume.getUnionedUnsignedRange(index);
+    if (!umin || !umax || *umax > uint64_t(INT64_MAX)) {
+      return std::nullopt;
+    }
+    range = joinRanges(range, IntRange{int64_t(*umin), int64_t(*umax)});
+  }
+  return range;
+}
+
+// Returns the range of a sum or difference, or nullopt if an endpoint
+// overflows.
+static std::optional<IntRange> getSumRange(bool isSubtraction, IntRange lhs,
+                                           IntRange rhs) {
+  std::optional<int64_t> min = isSubtraction
+                                   ? llvm::checkedSub(lhs.min, rhs.max)
+                                   : llvm::checkedAdd(lhs.min, rhs.min);
+  std::optional<int64_t> max = isSubtraction
+                                   ? llvm::checkedSub(lhs.max, rhs.min)
+                                   : llvm::checkedAdd(lhs.max, rhs.max);
+  if (!min || !max) {
+    return std::nullopt;
+  }
+  return IntRange{*min, *max};
+}
+
+// Returns the range of every element of the integer tensor `value`, from
+// constants, `util.assume.int` bounds and steps that cannot wrap. An argument
+// of a private function with one call site takes the caller's operand.
+static std::optional<IntRange> getElementRange(Value value, int depth = 0) {
+  if (depth > 16) {
+    return std::nullopt;
+  }
+  auto type = dyn_cast<RankedTensorType>(value.getType());
+  auto elementType =
+      type ? dyn_cast<IntegerType>(type.getElementType()) : nullptr;
+  if (!elementType || elementType.getWidth() > 64) {
+    return std::nullopt;
+  }
+  DenseIntElementsAttr constant;
+  if (matchPattern(value, m_Constant(&constant))) {
+    return getConstantRange(constant, elementType);
+  }
+  if (auto argument = dyn_cast<BlockArgument>(value)) {
+    Value operand = getSingleCallOperand(argument);
+    return operand ? getElementRange(operand, depth + 1) : std::nullopt;
+  }
+  auto operandRange = [&](Operation *op, unsigned i) {
+    return getElementRange(op->getOperand(i), depth + 1);
+  };
+  return llvm::TypeSwitch<Operation *, std::optional<IntRange>>(
+             value.getDefiningOp())
+      .Case([&](tensor::FromElementsOp fromElements) {
+        return ifFitsIn(getAssumedElementsRange(fromElements), elementType);
+      })
+      .Case<mlir::stablehlo::ReshapeOp, mlir::stablehlo::BroadcastInDimOp>(
+          [&](Operation *op) { return operandRange(op, 0); })
+      .Case([&](mlir::stablehlo::ConvertOp op) {
+        return ifFitsIn(operandRange(op, 0), elementType);
+      })
+      .Case<mlir::stablehlo::AddOp, mlir::stablehlo::SubtractOp>(
+          [&](Operation *op) -> std::optional<IntRange> {
+            std::optional<IntRange> lhs = operandRange(op, 0);
+            std::optional<IntRange> rhs = operandRange(op, 1);
+            if (!lhs || !rhs) {
+              return std::nullopt;
+            }
+            return ifFitsIn(
+                getSumRange(isa<mlir::stablehlo::SubtractOp>(op), *lhs, *rhs),
+                elementType);
+          })
+      .Default([](Operation *) { return std::nullopt; });
+}
+
+// Returns whether `region` only returns its second argument, the update.
+// Replacing the scatter removes its region, so any other operation could lose
+// effects even when the terminator returns the update unchanged.
+static bool isPlainOverwrite(Region &region) {
+  if (!region.hasOneBlock() || region.front().getNumArguments() != 2 ||
+      !llvm::hasSingleElement(region.front())) {
+    return false;
+  }
+  Block &block = region.front();
+  auto returnOp = dyn_cast<mlir::stablehlo::ReturnOp>(block.getTerminator());
+  return returnOp && returnOp.getNumOperands() == 1 &&
+         returnOp.getOperand(0) == block.getArgument(1);
+}
+
+// Returns whether every constant start places the window wholly inside the
+// operand. DUS clamps starts while scatter drops each out-of-bounds update
+// element; they agree only for an in-bounds window.
+static bool areConstantStartsInBounds(DenseElementsAttr constantIndices,
+                                      ArrayRef<int64_t> scatterDims,
+                                      RankedTensorType operandTy,
+                                      RankedTensorType updateTy) {
+  bool isUnsigned = constantIndices.getElementType().isUnsignedInteger();
+  for (auto [operandDim, value] :
+       llvm::zip_equal(scatterDims, constantIndices.getValues<APInt>())) {
+    if (isUnsigned && value.getActiveBits() > 63) {
+      return false;
+    }
+    int64_t start = isUnsigned ? value.getZExtValue() : value.getSExtValue();
+    int64_t maxStart =
+        operandTy.getDimSize(operandDim) - updateTy.getDimSize(operandDim);
+    if (start < 0 || start > maxStart) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// The shapes of the out-of-bounds fallback: each indexed dimension is padded by
+// its window extent on both sides, so a clamped start's window lies wholly in
+// the padding, which the final slice drops.
+struct GuardedWindowShape {
+  SmallVector<int64_t> padding;
+  SmallVector<int64_t> paddedShape;
+  // Slice limits that restore the operand from the padded tensor.
+  SmallVector<int64_t> limits;
+};
+
+// Returns the fallback shapes, or failure when a padded size does not fit the
+// shape representation.
+static FailureOr<GuardedWindowShape>
+getGuardedWindowShape(RankedTensorType operandTy, RankedTensorType updateTy,
+                      ArrayRef<int64_t> scatterDims) {
+  GuardedWindowShape shape;
+  shape.padding.assign(operandTy.getRank(), 0);
+  shape.paddedShape.assign(operandTy.getShape().begin(),
+                           operandTy.getShape().end());
+  shape.limits = shape.paddedShape;
+  for (int64_t dim : scatterDims) {
+    int64_t extent = updateTy.getDimSize(dim);
+    std::optional<int64_t> sliceLimit =
+        llvm::checkedAdd(operandTy.getDimSize(dim), extent);
+    std::optional<int64_t> paddedSize =
+        sliceLimit ? llvm::checkedAdd(*sliceLimit, extent) : std::nullopt;
+    if (!paddedSize) {
+      return failure();
+    }
+    shape.padding[dim] = extent;
+    shape.paddedShape[dim] = *paddedSize;
+    shape.limits[dim] = *sliceLimit;
+  }
+  return shape;
+}
+
 // Converts a `stablehlo.scatter` that writes a single, full-rank contiguous
 // slice with an overwrite computation into a `stablehlo.dynamic_update_slice`.
 //
 // Such scatters (a scalar index selecting an offset into an operand dim that is
-// *not* collapsed, i.e. a partial slice) are dynamic-update-slice semantics and
-// cannot be represented as an `iree_linalg_ext.scatter`, which requires the
-// index depth to map to fully-inserted leading operand dims.
+// *not* collapsed, i.e. a partial slice) cannot be represented as an
+// `iree_linalg_ext.scatter`, which requires the index depth to map to
+// fully-inserted leading operand dims. DUS agrees with scatter overwrite only
+// for a wholly in-bounds window. Constant starts must be in bounds, and so must
+// runtime starts whose range is known. Other runtime starts select between the
+// DUS and an out-of-bounds fallback with an scf.if: the fallback pads the
+// operand, updates the padded tensor and slices the operand back out, so
+// out-of-bounds update elements land in the discarded padding.
 struct ScatterToDynamicUpdateSlice final
     : OpRewritePattern<mlir::stablehlo::ScatterOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
+    if (failed(matchSingleSliceOverwrite(op, rewriter))) {
+      return failure();
+    }
+    auto operandTy = cast<RankedTensorType>(op.getInputs().front().getType());
+    auto updateTy = cast<RankedTensorType>(op.getUpdates().front().getType());
+    FailureOr<bool> runtimeStarts = classifyScatterStarts(op, rewriter);
+    if (failed(runtimeStarts)) {
+      return failure();
+    }
+    ArrayRef<int64_t> scatterDims =
+        op.getScatterDimensionNumbers().getScatterDimsToOperandDims();
+    // Prove the fallback shapes representable before creating any IR.
+    FailureOr<GuardedWindowShape> guardedShape;
+    if (*runtimeStarts) {
+      guardedShape = getGuardedWindowShape(operandTy, updateTy, scatterDims);
+      if (failed(guardedShape)) {
+        return rewriter.notifyMatchFailure(
+            op, "padded scatter window exceeds the shape representation");
+      }
+    }
+
+    ImplicitLocOpBuilder b(op.getLoc(), rewriter);
+    SmallVector<Value> startIndices = createStartIndices(b, op);
+    Value operand = op.getInputs().front();
+    Value update = op.getUpdates().front();
+    if (!*runtimeStarts) {
+      rewriter.replaceOpWithNewOp<mlir::stablehlo::DynamicUpdateSliceOp>(
+          op, operandTy, operand, update, startIndices);
+      return success();
+    }
+    rewriter.replaceOp(op, createGuardedUpdateSlice(b, operand, update,
+                                                    startIndices, scatterDims,
+                                                    *guardedShape));
+    return success();
+  }
+
+private:
+  // Succeeds if `op` overwrites one static, full-rank window selected by a
+  // single index vector without promoting element types.
+  static LogicalResult matchSingleSliceOverwrite(mlir::stablehlo::ScatterOp op,
+                                                 PatternRewriter &rewriter) {
+    if (!isMemoryEffectFree(op)) {
+      return rewriter.notifyMatchFailure(op, "update computation has effects");
+    }
     if (op.getInputs().size() != 1 || op.getUpdates().size() != 1) {
       return rewriter.notifyMatchFailure(op, "variadic scatter");
+    }
+    // The DUS keeps the operand element type. ScatterNormalizeTypes rewrites
+    // promoted scatters into this form; do not depend on it running first.
+    Type resultElementTy = getElementTypeOrSelf(op.getResult(0).getType());
+    if (getElementTypeOrSelf(op.getInputs().front().getType()) !=
+            resultElementTy ||
+        getElementTypeOrSelf(op.getUpdates().front().getType()) !=
+            resultElementTy) {
+      return rewriter.notifyMatchFailure(op, "promoted element type");
     }
     if (failed(failIfScatterHasBatchingDims(op, rewriter))) {
       return failure();
     }
-    auto dimNumbers = op.getScatterDimensionNumbers();
-    if (!dimNumbers.getInsertedWindowDims().empty()) {
+    if (!op.getScatterDimensionNumbers().getInsertedWindowDims().empty()) {
       return rewriter.notifyMatchFailure(op, "has inserted dims");
     }
+    if (failed(matchFullRankStaticWindow(op, rewriter))) {
+      return failure();
+    }
+    if (!isPlainOverwrite(op.getUpdateComputation())) {
+      return rewriter.notifyMatchFailure(op, "not an overwrite computation");
+    }
+    return success();
+  }
 
-    Value operand = op.getInputs().front();
-    Value update = op.getUpdates().front();
-    Value indices = op.getScatterIndices();
-    auto operandTy = dyn_cast<RankedTensorType>(operand.getType());
-    auto updateTy = dyn_cast<RankedTensorType>(update.getType());
-    auto indicesTy = dyn_cast<RankedTensorType>(indices.getType());
+  // Succeeds if one static index vector selects one static window spanning
+  // every operand dimension in order.
+  static LogicalResult matchFullRankStaticWindow(mlir::stablehlo::ScatterOp op,
+                                                 PatternRewriter &rewriter) {
+    auto dimNumbers = op.getScatterDimensionNumbers();
+    auto operandTy =
+        dyn_cast<RankedTensorType>(op.getInputs().front().getType());
+    auto updateTy =
+        dyn_cast<RankedTensorType>(op.getUpdates().front().getType());
+    auto indicesTy =
+        dyn_cast<RankedTensorType>(op.getScatterIndices().getType());
     if (!operandTy || !updateTy || !indicesTy || !operandTy.hasStaticShape() ||
         !updateTy.hasStaticShape() || !indicesTy.hasStaticShape()) {
       return rewriter.notifyMatchFailure(op, "dynamic/unranked shapes");
     }
-
-    int64_t rank = operandTy.getRank();
-
     // The update must be a single full-rank contiguous slice: no batch dims and
     // an identity window mapping over all operand dims.
     ArrayRef<int64_t> updateWindowDims = dimNumbers.getUpdateWindowDims();
+    int64_t rank = operandTy.getRank();
     if (updateTy.getRank() != rank ||
         static_cast<int64_t>(updateWindowDims.size()) != rank) {
       return rewriter.notifyMatchFailure(op, "update is not a full-rank slice");
     }
-    for (auto [idx, dim] : llvm::enumerate(updateWindowDims)) {
-      if (static_cast<int64_t>(idx) != dim) {
-        return rewriter.notifyMatchFailure(op, "non-identity window dims");
-      }
+    if (!llvm::equal(updateWindowDims, llvm::seq<int64_t>(rank))) {
+      return rewriter.notifyMatchFailure(op, "non-identity window dims");
     }
-
-    // There must be exactly one scatter index vector.
     int64_t indexVectorDim = dimNumbers.getIndexVectorDim();
-    int64_t numUpdates = 1;
-    for (int64_t d = 0, s = indicesTy.getRank(); d < s; ++d) {
-      if (d != indexVectorDim) {
-        numUpdates *= indicesTy.getDimSize(d);
+    for (int64_t dim = 0; dim < indicesTy.getRank(); ++dim) {
+      if (dim != indexVectorDim && indicesTy.getDimSize(dim) != 1) {
+        return rewriter.notifyMatchFailure(op, "not exactly one scatter index");
       }
     }
-    if (numUpdates != 1) {
-      return rewriter.notifyMatchFailure(op, "more than one scatter index");
-    }
+    return success();
+  }
 
-    // The update computation must be a plain overwrite: return the update value
-    // (block argument #1) unchanged.
-    Region &region = op.getUpdateComputation();
-    if (!region.hasOneBlock() || region.front().getNumArguments() != 2) {
-      return rewriter.notifyMatchFailure(op, "unexpected update computation");
+  // Returns whether the starts are only known at runtime and need the
+  // in-bounds guard. Constant starts and starts with a known range must place
+  // the window in bounds. Fails for starts the guard cannot handle.
+  static FailureOr<bool> classifyScatterStarts(mlir::stablehlo::ScatterOp op,
+                                               PatternRewriter &rewriter) {
+    ArrayRef<int64_t> scatterDims =
+        op.getScatterDimensionNumbers().getScatterDimsToOperandDims();
+    if (scatterDims.empty()) {
+      return false;
     }
-    Block &block = region.front();
-    auto retOp = dyn_cast<mlir::stablehlo::ReturnOp>(block.getTerminator());
-    if (!retOp || retOp.getNumOperands() != 1 ||
-        retOp.getOperand(0) != block.getArgument(1)) {
-      return rewriter.notifyMatchFailure(op, "not an overwrite computation");
+    auto operandTy = cast<RankedTensorType>(op.getInputs().front().getType());
+    auto updateTy = cast<RankedTensorType>(op.getUpdates().front().getType());
+    Value indices = op.getScatterIndices();
+    auto integerType = cast<IntegerType>(getElementTypeOrSelf(indices));
+    if (integerType.getWidth() > 64) {
+      return rewriter.notifyMatchFailure(op, "scatter starts exceed 64 bits");
     }
+    DenseElementsAttr constantIndices;
+    if (matchPattern(indices, m_Constant(&constantIndices))) {
+      if (!areConstantStartsInBounds(constantIndices, scatterDims, operandTy,
+                                     updateTy)) {
+        return rewriter.notifyMatchFailure(op,
+                                           "scatter window is out of bounds");
+      }
+      return false;
+    }
+    std::optional<IntRange> range = getElementRange(indices);
+    bool isRangeInBounds =
+        range && range->min >= 0 &&
+        llvm::all_of(scatterDims, [&](int64_t operandDim) {
+          return range->max <= operandTy.getDimSize(operandDim) -
+                                   updateTy.getDimSize(operandDim);
+        });
+    if (isRangeInBounds) {
+      return false;
+    }
+    // The check compares starts as i64.
+    if (integerType.isUnsigned() && integerType.getWidth() == 64) {
+      return rewriter.notifyMatchFailure(
+          op, "unsigned 64-bit runtime scatter starts");
+    }
+    if (!isa<FloatType, IntegerType>(operandTy.getElementType())) {
+      return rewriter.notifyMatchFailure(
+          op, "no padding value for the out-of-bounds window");
+    }
+    return true;
+  }
 
-    ArrayRef<int64_t> scatterDims = dimNumbers.getScatterDimsToOperandDims();
+  // Returns a scalar start per operand dimension: the index vector component
+  // for an indexed dimension, otherwise zero.
+  static SmallVector<Value> createStartIndices(ImplicitLocOpBuilder &b,
+                                               mlir::stablehlo::ScatterOp op) {
+    ArrayRef<int64_t> scatterDims =
+        op.getScatterDimensionNumbers().getScatterDimsToOperandDims();
     int64_t indexDepth = scatterDims.size();
-
-    ImplicitLocOpBuilder b(op.getLoc(), rewriter);
-    Type indexElemTy = indicesTy.getElementType();
+    Value indices = op.getScatterIndices();
+    Type indexElemTy = getElementTypeOrSelf(indices);
     auto scalarTy = RankedTensorType::get({}, indexElemTy);
-
-    // Flatten indices to `indexDepth` scalar components (numUpdates == 1).
+    // Flatten indices to `indexDepth` scalar components (one index vector).
     auto flatTy = RankedTensorType::get({indexDepth}, indexElemTy);
     Value flatIndices = mlir::stablehlo::ReshapeOp::create(b, flatTy, indices);
-
     Value zero =
         mlir::stablehlo::ConstantOp::create(b, b.getZeroAttr(indexElemTy));
-
-    // Map each operand dim to a start offset: the scatter index component if
-    // the dim is indexed, otherwise zero. dynamic_update_slice clamps offsets.
     auto sliceTy = RankedTensorType::get({1}, indexElemTy);
-    llvm::SmallVector<Value> startIndices(rank, zero);
+    int64_t rank =
+        cast<RankedTensorType>(op.getInputs().front().getType()).getRank();
+    SmallVector<Value> startIndices(rank, zero);
     for (auto [j, operandDim] : llvm::enumerate(scatterDims)) {
       Value comp = mlir::stablehlo::SliceOp::create(
           b, sliceTy, flatIndices,
@@ -730,10 +1664,80 @@ struct ScatterToDynamicUpdateSlice final
       startIndices[operandDim] =
           mlir::stablehlo::ReshapeOp::create(b, scalarTy, comp);
     }
+    return startIndices;
+  }
 
-    rewriter.replaceOpWithNewOp<mlir::stablehlo::DynamicUpdateSliceOp>(
-        op, operandTy, operand, update, startIndices);
-    return success();
+  // Returns the update applied in place when every runtime start keeps the
+  // window in bounds, and through the padded fallback otherwise.
+  static Value createGuardedUpdateSlice(ImplicitLocOpBuilder &b, Value operand,
+                                        Value update,
+                                        ArrayRef<Value> startIndices,
+                                        ArrayRef<int64_t> scatterDims,
+                                        const GuardedWindowShape &shape) {
+    auto operandTy = cast<RankedTensorType>(operand.getType());
+    auto updateTy = cast<RankedTensorType>(update.getType());
+    int64_t rank = operandTy.getRank();
+    auto i64ScalarTy = RankedTensorType::get({}, b.getI64Type());
+    auto i64Constant = [&](int64_t value) -> Value {
+      return mlir::stablehlo::ConstantOp::create(
+          b, DenseElementsAttr::get(i64ScalarTy, ArrayRef<int64_t>{value}));
+    };
+    Value zero64 = i64Constant(0);
+    SmallVector<Value> starts(rank, zero64);
+    SmallVector<Value> extents(rank, zero64);
+    Value inBounds;
+    for (int64_t operandDim : scatterDims) {
+      Value start = mlir::stablehlo::ConvertOp::create(
+          b, i64ScalarTy, startIndices[operandDim]);
+      starts[operandDim] = start;
+      int64_t extent = updateTy.getDimSize(operandDim);
+      Value notLow = mlir::stablehlo::CompareOp::create(
+          b, start, zero64, mlir::stablehlo::ComparisonDirection::GE,
+          mlir::stablehlo::ComparisonType::SIGNED);
+      Value notHigh = mlir::stablehlo::CompareOp::create(
+          b, start, i64Constant(operandTy.getDimSize(operandDim) - extent),
+          mlir::stablehlo::ComparisonDirection::LE,
+          mlir::stablehlo::ComparisonType::SIGNED);
+      Value dimInBounds = mlir::stablehlo::AndOp::create(b, notLow, notHigh);
+      inBounds = inBounds
+                     ? mlir::stablehlo::AndOp::create(b, inBounds, dimInBounds)
+                     : dimInBounds;
+      extents[operandDim] = i64Constant(extent);
+    }
+
+    Type elementTy = operandTy.getElementType();
+    Value padValue = mlir::stablehlo::ConstantOp::create(
+        b, cast<ElementsAttr>(
+               b.getZeroAttr(RankedTensorType::get({}, elementTy))));
+    // Control flow is already legalised, so the guard is an scf.if.
+    Value condition = tensor::ExtractOp::create(b, inBounds, ValueRange{});
+    auto ifOp = scf::IfOp::create(b, TypeRange{operandTy}, condition,
+                                  /*withElseRegion=*/true);
+    OpBuilder::InsertionGuard guard(b);
+    b.setInsertionPointToStart(ifOp.thenBlock());
+    Value inPlace = mlir::stablehlo::DynamicUpdateSliceOp::create(
+        b, operandTy, operand, update, starts);
+    scf::YieldOp::create(b, inPlace);
+
+    b.setInsertionPointToStart(ifOp.elseBlock());
+    auto paddedTy = RankedTensorType::get(shape.paddedShape, elementTy);
+    Value padded = mlir::stablehlo::PadOp::create(
+        b, paddedTy, operand, padValue, b.getDenseI64ArrayAttr(shape.padding),
+        b.getDenseI64ArrayAttr(shape.padding),
+        b.getDenseI64ArrayAttr(SmallVector<int64_t>(rank, 0)));
+    SmallVector<Value> shiftedStarts(starts);
+    for (int64_t operandDim : scatterDims) {
+      shiftedStarts[operandDim] = mlir::stablehlo::AddOp::create(
+          b, starts[operandDim], extents[operandDim]);
+    }
+    Value written = mlir::stablehlo::DynamicUpdateSliceOp::create(
+        b, paddedTy, padded, update, shiftedStarts);
+    Value restored = mlir::stablehlo::SliceOp::create(
+        b, operandTy, written, b.getDenseI64ArrayAttr(shape.padding),
+        b.getDenseI64ArrayAttr(shape.limits),
+        b.getDenseI64ArrayAttr(SmallVector<int64_t>(rank, 1)));
+    scf::YieldOp::create(b, restored);
+    return ifOp.getResult(0);
   }
 };
 
@@ -741,28 +1745,77 @@ struct ScatterInt64Indices final
     : OpRewritePattern<mlir::stablehlo::ScatterOp> {
   using Base::Base;
 
+  // Returns whether wide indices must be clamped to the i32 range before
+  // conversion: constant indices must all fit, while runtime indices are
+  // clamped, which keeps them out of bounds only while every indexed operand
+  // dimension is at most INT32_MAX. Fails when neither applies.
+  static FailureOr<bool> needsSaturationToI32(mlir::stablehlo::ScatterOp op,
+                                              PatternRewriter &rewriter) {
+    Value indices = op.getScatterIndices();
+    auto integerTy = cast<IntegerType>(getElementTypeOrSelf(indices));
+    DenseElementsAttr constant;
+    if (matchPattern(indices, m_Constant(&constant))) {
+      bool allFit =
+          llvm::all_of(constant.getValues<APInt>(), [&](const APInt &value) {
+            return integerTy.isUnsigned() ? value.getActiveBits() <= 31
+                                          : value.isSignedIntN(32);
+          });
+      if (!allFit) {
+        return rewriter.notifyMatchFailure(op, "index value does not fit i32");
+      }
+      return false;
+    }
+    auto operandTy = cast<ShapedType>(op.getInputs().front().getType());
+    for (int64_t dim :
+         op.getScatterDimensionNumbers().getScatterDimsToOperandDims()) {
+      if (operandTy.isDynamicDim(dim) ||
+          operandTy.getDimSize(dim) > std::numeric_limits<int32_t>::max()) {
+        return rewriter.notifyMatchFailure(op, "wide index values are unknown");
+      }
+    }
+    return true;
+  }
+
+  // Clamps wide integer `indices` to the i32 range in their own type. Only
+  // out-of-bounds indices collide after saturation, and scatter drops their
+  // updates, so unique_indices still holds.
+  static Value clampToI32Range(PatternRewriter &rewriter, Location loc,
+                               Value indices) {
+    auto integerTy = cast<IntegerType>(getElementTypeOrSelf(indices));
+    unsigned width = integerTy.getWidth();
+    auto scalarTy = RankedTensorType::get({}, integerTy);
+    APInt low = integerTy.isUnsigned()
+                    ? APInt::getZero(width)
+                    : APInt::getSignedMinValue(32).sext(width);
+    APInt high = APInt::getSignedMaxValue(32).zext(width);
+    Value min = mlir::stablehlo::ConstantOp::create(
+        rewriter, loc, DenseElementsAttr::get(scalarTy, low));
+    Value max = mlir::stablehlo::ConstantOp::create(
+        rewriter, loc, DenseElementsAttr::get(scalarTy, high));
+    return mlir::stablehlo::ClampOp::create(rewriter, loc, min, indices, max);
+  }
+
   LogicalResult matchAndRewrite(mlir::stablehlo::ScatterOp op,
                                 PatternRewriter &rewriter) const override {
     if (failed(failIfScatterHasBatchingDims(op, rewriter))) {
       return failure();
     }
-    auto indices = op.getScatterIndices();
-    auto indicesTy = indices.getType();
+    Value indices = op.getScatterIndices();
+    auto indicesTy = op.getScatterIndices().getType();
     auto indicesETy = indicesTy.getElementType();
     if (indicesETy.isInteger(32)) {
       return rewriter.notifyMatchFailure(op, "already has i32 index type");
     }
 
-    if (!indicesTy.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(op, "cannot validate legal size");
-    }
-
-    uint64_t maxSize = std::numeric_limits<int32_t>::max();
+    // Tensor shape says nothing about the values stored in its index tensor.
+    // Narrow wide indices only when their actual values are known to fit.
     if (indicesETy.getIntOrFloatBitWidth() > 32) {
-      for (int i = 0, s = indicesTy.getRank(); i < s; ++i) {
-        if (indicesTy.getDimSize(i) > maxSize) {
-          return rewriter.notifyMatchFailure(op, "index may exceed i32 max");
-        }
+      FailureOr<bool> saturate = needsSaturationToI32(op, rewriter);
+      if (failed(saturate)) {
+        return failure();
+      }
+      if (*saturate) {
+        indices = clampToI32Range(rewriter, op.getLoc(), indices);
       }
     }
 
@@ -1143,6 +2196,14 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
 // to the form expected by downstream IREE scatter lowering.
 //
 // This rewrite only permutes operand, update and result dimensions.
+// Returns whether sorted indices stay sorted once the indexed operand
+// dimensions are moved first in `scatterDimsToOperandDims` order. That holds
+// only when the mapping already lists them in increasing order.
+static bool keepsIndicesSorted(mlir::stablehlo::ScatterOp op,
+                               ArrayRef<int64_t> scatterDimsToOperandDims) {
+  return op.getIndicesAreSorted() && llvm::is_sorted(scatterDimsToOperandDims);
+}
+
 struct ScatterIndexedDimsFirst final
     : OpRewritePattern<mlir::stablehlo::ScatterOp> {
   using Base::Base;
@@ -1317,7 +2378,8 @@ struct ScatterIndexedDimsFirst final
     auto newScatter = mlir::stablehlo::ScatterOp::create(
         rewriter, loc, transposedResultTypes, transposedInputs,
         op.getScatterIndices(), transposedUpdates, newDimNumbers,
-        op.getIndicesAreSorted(), op.getUniqueIndices());
+        keepsIndicesSorted(op, scatterDimsToOperandDims),
+        op.getUniqueIndices());
     Region &region = newScatter.getUpdateComputation();
     rewriter.cloneRegionBefore(op.getUpdateComputation(), region, region.end());
 
@@ -1964,18 +3026,33 @@ struct ZeroConcat final : OpRewritePattern<mlir::stablehlo::ConcatenateOp> {
 struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
   using Base::Base;
 
-  LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
-                                PatternRewriter &rewriter) const override {
-    auto lhs = cast<Value>(op.getLhs());
-    auto rhs = cast<Value>(op.getRhs());
-    auto lhsTy = dyn_cast<RankedTensorType>(lhs.getType());
-    auto rhsTy = dyn_cast<RankedTensorType>(rhs.getType());
-    auto resultTy = dyn_cast<RankedTensorType>(op.getType());
-    ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
-
-    if (!lhsTy || !rhsTy || !resultTy) {
+  // Succeeds if `op` has ranked operands and result and no explicit algorithm,
+  // which stablehlo.multiply cannot represent.
+  static LogicalResult matchRankedPlainDot(mlir::stablehlo::DotGeneralOp op,
+                                           PatternRewriter &rewriter) {
+    if (op.getAlgorithm()) {
+      return rewriter.notifyMatchFailure(
+          op, "dot algorithm cannot be represented by stablehlo.multiply");
+    }
+    if (!isa<RankedTensorType>(op.getLhs().getType()) ||
+        !isa<RankedTensorType>(op.getRhs().getType()) ||
+        !isa<RankedTensorType>(op.getType())) {
       return failure();
     }
+    return success();
+  }
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
+                                PatternRewriter &rewriter) const override {
+    if (failed(matchRankedPlainDot(op, rewriter))) {
+      return failure();
+    }
+    auto lhs = cast<Value>(op.getLhs());
+    auto rhs = cast<Value>(op.getRhs());
+    auto lhsTy = cast<RankedTensorType>(lhs.getType());
+    auto rhsTy = cast<RankedTensorType>(rhs.getType());
+    auto resultTy = cast<RankedTensorType>(op.getType());
+    ImplicitLocOpBuilder builder(op.getLoc(), rewriter);
 
     auto dNums = op.getDotDimensionNumbers();
     auto batchDimsL = dNums.getLhsBatchingDimensions();
@@ -2128,14 +3205,28 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
 };
 
 // TODO(suderman): Move this to solve code.
+// Succeeds if `op` calls `target` and declares no output-operand aliases,
+// which a value-semantics replacement could not honour.
+static LogicalResult matchUnaliasedCustomCall(mlir::stablehlo::CustomCallOp op,
+                                              StringRef target,
+                                              PatternRewriter &rewriter) {
+  if (op.getCallTargetName() != target) {
+    return rewriter.notifyMatchFailure(op, "not a " + target + " custom call");
+  }
+  if (!op.getOutputOperandAliases().empty()) {
+    return rewriter.notifyMatchFailure(op, "aliases need an aliasing lowering");
+  }
+  return success();
+}
+
 struct CustomCallIsTopK final
     : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
   using Base::Base;
 
   LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.getCallTargetName() != "TopK") {
-      return rewriter.notifyMatchFailure(op, "not a TopK custom call");
+    if (failed(matchUnaliasedCustomCall(op, "TopK", rewriter))) {
+      return failure();
     }
 
     if (op.getNumOperands() != 1 ||
@@ -2355,8 +3446,8 @@ struct ApproxTopK final : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
 
   LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.getCallTargetName() != "ApproxTopK") {
-      return rewriter.notifyMatchFailure(op, "not ApproxTopK operation.");
+    if (failed(matchUnaliasedCustomCall(op, "ApproxTopK", rewriter))) {
+      return failure();
     }
 
     auto computationName =
@@ -2440,7 +3531,9 @@ struct StableHLOToStableHLOPreprocessing final
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<shape::ShapeDialect, mlir::stablehlo::StablehloDialect,
-                    chlo::ChloDialect, tensor::TensorDialect>();
+                    chlo::ChloDialect, tensor::TensorDialect,
+                    arith::ArithDialect, linalg::LinalgDialect, scf::SCFDialect,
+                    IREE::Util::UtilDialect, IREE::Flow::FlowDialect>();
   }
 
   void runOnOperation() override {
@@ -2457,6 +3550,7 @@ struct StableHLOToStableHLOPreprocessing final
       return signalPassFailure();
     }
 
+    bool hasInvalidConvolutionPadding = false;
     RewritePatternSet patterns(context);
     // General StableHLO canonicalization patterns. Run these with a high
     // benefit to enable more rewrites and avoid needless expansions that could
@@ -2475,12 +3569,18 @@ struct StableHLOToStableHLOPreprocessing final
     // rng float conversion pattern
     patterns.insert<RngBitcastFloat>(context);
 
-    // scatter canonicalization patterns
+    // scatter canonicalization patterns. Normalising element and index types
+    // first lets the DUS pattern see the form it accepts sooner; it does not
+    // rely on this order for correctness.
+    patterns.insert<ScatterNormalizeTypes>(context, /*benefit=*/3);
     patterns.insert<ScatterToDynamicUpdateSlice>(context, /*benefit=*/2);
     patterns.insert<ScatterBatchingDimsExpander, ScatterInt64Indices,
                     ScatterImplicitIndex, ScatterImplicitBatch,
                     ScatterMaterializeInsertedDim, ScatterCollapseBatch,
                     ScatterBatchFirst, ScatterIndexedDimsFirst>(context);
+    patterns.insert<ConvolutionReversal>(context);
+    patterns.insert<DynamicConvToPaddedConv>(context,
+                                             hasInvalidConvolutionPadding);
 
     // dot_general canonicalization patterns.
     populatePreprocessingDotGeneralToDotPatterns(context, &patterns);
@@ -2562,7 +3662,8 @@ struct StableHLOToStableHLOPreprocessing final
       patterns.insert<ReorderConvOpKernelDimensions>(context);
       patterns.insert<ReorderConvOpOutputDimensions>(context);
     }
-    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
+    if (failed(applyPatternsGreedily(getOperation(), std::move(patterns))) ||
+        hasInvalidConvolutionPadding) {
       return signalPassFailure();
     }
   }

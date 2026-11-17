@@ -36,21 +36,19 @@ func.func @sort_mismatch_rank(%arg0: tensor<?x?xi32>, %arg1: tensor<?xf32>)
 
 // -----
 
-func.func @sort_mismatch_shape(%arg0: tensor<?xi32>, %arg1: tensor<42xf32>)
-    -> (tensor<?xi32>, tensor<42xf32>) {
-  %c0 = arith.constant 0 : index
-  %d0 = tensor.dim %arg0, %c0 : tensor<?xi32>
-  %empty0 = tensor.empty(%d0) : tensor<?xi32>
-  %empty1 = tensor.empty() : tensor<42xf32>
+func.func @sort_mismatch_shape(%arg0: tensor<5x41xi32>, %arg1: tensor<5x42xf32>)
+    -> (tensor<5x41xi32>, tensor<5x42xf32>) {
+  %empty0 = tensor.empty() : tensor<5x41xi32>
+  %empty1 = tensor.empty() : tensor<5x42xf32>
   // expected-error @+1 {{expected operand 1 to have same shape as other operands}}
-  %0:2 = iree_linalg_ext.sort dimension(0)
-      ins(%arg0, %arg1 : tensor<?xi32>, tensor<42xf32>)
-      outs(%empty0, %empty1 : tensor<?xi32>, tensor<42xf32>) {
+  %0:2 = iree_linalg_ext.sort dimension(1)
+      ins(%arg0, %arg1 : tensor<5x41xi32>, tensor<5x42xf32>)
+      outs(%empty0, %empty1 : tensor<5x41xi32>, tensor<5x42xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):
         %1 = arith.cmpf ogt, %arg4, %arg5 : f32
         iree_linalg_ext.yield %1 : i1
-      } -> tensor<?xi32>, tensor<42xf32>
-  return %0#0, %0#1 : tensor<?xi32>, tensor<42xf32>
+      } -> tensor<5x41xi32>, tensor<5x42xf32>
+  return %0#0, %0#1 : tensor<5x41xi32>, tensor<5x42xf32>
 }
 
 // -----
@@ -155,11 +153,11 @@ func.func @scatter_output_type_mismatch(
 // -----
 
 func.func @scatter_dim_mismatch(
-    %update : tensor<?x?xf32>, %indices : tensor<48x1xi32>,
+    %update : tensor<47x?xf32>, %indices : tensor<48x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @below {{'iree_linalg_ext.scatter' op mismatch in shape of indices and update value at dim#0}}
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
-    ins(%update, %indices : tensor<?x?xf32>, tensor<48x1xi32>)
+    ins(%update, %indices : tensor<47x?xf32>, tensor<48x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = arith.addf %arg1, %arg2 : f32
@@ -171,11 +169,11 @@ func.func @scatter_dim_mismatch(
 // -----
 
 func.func @scatter_dim_mismatch(
-    %update : tensor<48x?x?xf32>, %indices : tensor<48x10x1xi32>,
+    %update : tensor<48x9x?xf32>, %indices : tensor<48x10x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error @below {{'iree_linalg_ext.scatter' op mismatch in shape of indices and update value at dim#1}}
   %0 = iree_linalg_ext.scatter dimension_map = [0] unique_indices(true)
-    ins(%update, %indices : tensor<48x?x?xf32>, tensor<48x10x1xi32>)
+    ins(%update, %indices : tensor<48x9x?xf32>, tensor<48x10x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = arith.addf %arg1, %arg2 : f32
@@ -2746,4 +2744,56 @@ func.func @group_mmt4d_short_row_stride(
           tensor<2x1x4x1xf32>, tensor<2x1x1x1x1xf32>, tensor<2xi64>, index, index)
       outs(%output : tensor<2x1x4x1xf32>) -> tensor<2x1x4x1xf32>
   return %result : tensor<2x1x4x1xf32>
+}
+
+// -----
+
+func.func @general_scatter_unsigned_indices(%updates: tensor<2xi32>, %indices: tensor<2x1xui64>, %original: tensor<4xi32>) -> tensor<4xi32> {
+  // expected-error @+1 {{expects signless integer indices of at most 64 bits}}
+  %result = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [], inserted_window_dims = [0], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates : tensor<2xi32>) indices(%indices : tensor<2x1xui64>)
+    outs(%original : tensor<4xi32>) {
+  ^bb0(%current: i32, %update: i32):
+    iree_linalg_ext.yield %update : i32
+  } -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}
+
+// -----
+
+func.func @general_scatter_signed_indices(%updates: tensor<2xi32>, %indices: tensor<2x1xsi32>, %original: tensor<4xi32>) -> tensor<4xi32> {
+  // expected-error @+1 {{expects signless integer indices of at most 64 bits}}
+  %result = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [], inserted_window_dims = [0], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates : tensor<2xi32>) indices(%indices : tensor<2x1xsi32>)
+    outs(%original : tensor<4xi32>) {
+  ^bb0(%current: i32, %update: i32):
+    iree_linalg_ext.yield %update : i32
+  } -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}
+
+// -----
+
+func.func @general_scatter_wide_indices(%updates: tensor<2xi32>, %indices: tensor<2x1xi128>, %original: tensor<4xi32>) -> tensor<4xi32> {
+  // expected-error @+1 {{expects signless integer indices of at most 64 bits}}
+  %result = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [], inserted_window_dims = [0], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates : tensor<2xi32>) indices(%indices : tensor<2x1xi128>)
+    outs(%original : tensor<4xi32>) {
+  ^bb0(%current: i32, %update: i32):
+    iree_linalg_ext.yield %update : i32
+  } -> tensor<4xi32>
+  return %result : tensor<4xi32>
+}
+
+// -----
+
+func.func @general_scatter_float_indices(%updates: tensor<2xi32>, %indices: tensor<2x1xf32>, %original: tensor<4xi32>) -> tensor<4xi32> {
+  // expected-error @+1 {{expects signless integer indices of at most 64 bits}}
+  %result = iree_linalg_ext.general_scatter <index_vector_dim = 1, update_window_dims = [], inserted_window_dims = [0], input_batching_dims = [], scatter_indices_batching_dims = [], scatter_dims_to_operand_dims = [0]>
+    ins(%updates : tensor<2xi32>) indices(%indices : tensor<2x1xf32>)
+    outs(%original : tensor<4xi32>) {
+  ^bb0(%current: i32, %update: i32):
+    iree_linalg_ext.yield %update : i32
+  } -> tensor<4xi32>
+  return %result : tensor<4xi32>
 }
