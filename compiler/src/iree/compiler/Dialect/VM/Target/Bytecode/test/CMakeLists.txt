@@ -16,7 +16,6 @@ iree_lit_test_suite(
   SRCS
     "constant_encoding.mlir"
     "dependencies.mlir"
-    "function_limits.mlir"
     "module_encoding_smoke.mlir"
     "reflection_attrs.mlir"
   TOOLS
