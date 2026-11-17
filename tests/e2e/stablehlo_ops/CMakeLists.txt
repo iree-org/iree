@@ -82,6 +82,7 @@ iree_check_single_backend_test_suite(
     "subtract.mlir"
     "tanh.mlir"
     "three_fry.mlir"
+    "torch_attention_composites.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
     "unsigned_start_indices.mlir"
@@ -165,6 +166,7 @@ iree_check_single_backend_test_suite(
     "subtract.mlir"
     "tanh.mlir"
     "three_fry.mlir"
+    "torch_attention_composites.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
     "unsigned_start_indices.mlir"
@@ -247,6 +249,7 @@ iree_check_single_backend_test_suite(
     "subtract.mlir"
     "tanh.mlir"
     "three_fry.mlir"
+    "torch_attention_composites.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
     "unsigned_start_indices.mlir"
@@ -258,6 +261,19 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_local-task_attention_ukernels
+  SRCS
+    "torch_attention_composites.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
 )
 
 iree_check_single_backend_test_suite(
@@ -367,6 +383,7 @@ iree_check_single_backend_test_suite(
     "subtract.mlir"
     "tanh.mlir"
     "three_fry.mlir"
+    "torch_attention_composites.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
     "unsigned_start_indices.mlir"
@@ -468,6 +485,7 @@ iree_check_single_backend_test_suite(
     "subtract.mlir"
     "tanh.mlir"
     "three_fry.mlir"
+    "torch_attention_composites.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
     "unsigned_start_indices.mlir"
@@ -557,6 +575,7 @@ iree_check_single_backend_test_suite(
     "subtract.mlir"
     "tanh.mlir"
     "three_fry.mlir"
+    "torch_attention_composites.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
     "unsigned_start_indices.mlir"
@@ -645,6 +664,7 @@ iree_check_single_backend_test_suite(
     "subtract.mlir"
     "tanh.mlir"
     "three_fry.mlir"
+    "torch_attention_composites.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
     "unsigned_start_indices.mlir"
@@ -724,6 +744,7 @@ iree_check_single_backend_test_suite(
     "subtract.mlir"
     "tanh.mlir"
     "three_fry.mlir"
+    "torch_attention_composites.mlir"
     "torch_index_select.mlir"
     "transpose.mlir"
     "unsigned_start_indices.mlir"

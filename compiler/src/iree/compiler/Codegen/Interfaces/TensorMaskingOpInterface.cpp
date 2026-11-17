@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/Interfaces/TensorMaskingOpInterface.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "llvm/ADT/STLExtras.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -13,6 +15,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/UB/IR/UBOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler {
 
@@ -61,9 +64,14 @@ static bool isPaddingNeeded(OpBuilder &b, TilingInterface op,
 
 static FailureOr<linalg::PadTilingInterfaceResult>
 maskTilingInterfaceOp(OpBuilder &b, Operation *op,
-                      ArrayRef<OpFoldResult> padMultiples) {
-  auto poison = ub::PoisonAttr::get(b.getContext());
-  SmallVector<Attribute> padValues(op->getNumOperands(), poison);
+                      ArrayRef<OpFoldResult> padMultiples,
+                      ArrayRef<Attribute> paddingValues = {}) {
+  SmallVector<Attribute> padValues(paddingValues);
+  if (padValues.empty()) {
+    padValues.assign(op->getNumOperands(), ub::PoisonAttr::get(b.getContext()));
+  }
+  assert(padValues.size() == op->getNumOperands() &&
+         "expected one padding value per operand");
   TilingInterface tilingInterfaceOp = cast<TilingInterface>(op);
   // Set options.
   linalg::PadTilingInterfaceOptions options =
@@ -243,6 +251,80 @@ private:
   }
 };
 
+// Padding is copied through tensor.pad into host buffer-fill commands, where
+// poison has no VM representation. Use defined values even though later masks
+// hide the padding. Parallel result padding is discarded, so zero suffices for
+// its initial values too.
+static SmallVector<Attribute>
+createAttentionPaddingValues(OpBuilder &builder,
+                             IREE::LinalgExt::OnlineAttentionOp op) {
+  SmallVector<Attribute> values;
+  for (Value operand : op->getOperands()) {
+    values.push_back(
+        builder.getZeroAttr(getElementTypeOrSelf(operand.getType())));
+  }
+  if (op.getMask()) {
+    Type maskType = getElementTypeOrSelf(op.getMask().getType());
+    if (isa<FloatType>(maskType)) {
+      values[op.getMaskMutable()[0].getOperandNumber()] =
+          arith::getIdentityValueAttr(arith::AtomicRMWKind::maximumf, maskType,
+                                      builder, op.getLoc(),
+                                      /*useOnlyFiniteValue=*/false);
+    }
+  }
+  return values;
+}
+
+// Padding positions must be excluded even when their zero-filled keys produce
+// NaN with a non-finite query. Mask only the synthetic key positions in the
+// score region, after the original region.
+static void maskPaddedAttentionScores(OpBuilder &builder,
+                                      IREE::LinalgExt::OnlineAttentionOp op,
+                                      ArrayRef<OpFoldResult> bounds) {
+  auto opInfo = IREE::LinalgExt::AttentionOpDetail::get(
+      op.getQueryMap(), op.getKeyMap(), op.getValueMap(), op.getOutputMap());
+  assert(succeeded(opInfo) && "expected verified attention indexing maps");
+  AffineMap scoreMap = opInfo->getSMap();
+  SmallVector<OpFoldResult> scoreBounds;
+  for (AffineExpr expr : scoreMap.getResults()) {
+    int64_t loop = cast<AffineDimExpr>(expr).getPosition();
+    scoreBounds.push_back(llvm::is_contained(opInfo->getK2Dims(), loop)
+                              ? bounds[loop]
+                              : OpFoldResult());
+  }
+  if (llvm::none_of(scoreBounds,
+                    [](OpFoldResult bound) { return bool(bound); })) {
+    return;
+  }
+
+  OpBuilder::InsertionGuard guard(builder);
+  auto yield = cast<IREE::LinalgExt::YieldOp>(op.getBody()->getTerminator());
+  builder.setInsertionPoint(yield);
+  Location loc = yield.getLoc();
+  OpFoldResult inBounds = builder.getBoolAttr(true);
+  for (auto [position, bound] : llvm::enumerate(scoreBounds)) {
+    if (!bound) {
+      continue;
+    }
+    Value index = IREE::LinalgExt::IndexOp::create(builder, loc, position);
+    Value included = arith::CmpIOp::create(
+        builder, loc, arith::CmpIPredicate::ult, index,
+        getValueOrCreateConstantIndexOp(builder, loc, bound));
+    inBounds = builder.createOrFold<arith::AndIOp>(
+        loc, getValueOrCreateConstantIntOp(builder, loc, inBounds), included);
+  }
+  Value score = yield->getOperand(0);
+  Value negativeInfinity = arith::getIdentityValue(
+      arith::AtomicRMWKind::maximumf, score.getType(), builder, loc,
+      /*useOnlyFiniteValue=*/false);
+  Value masked = arith::SelectOp::create(
+      builder, loc, getValueOrCreateConstantIntOp(builder, loc, inBounds),
+      score, negativeInfinity);
+  IRRewriter rewriter(builder);
+  rewriter.modifyOpInPlace(yield,
+                           [yield, masked] { yield->setOperand(0, masked); });
+}
+
 struct OnlineAttentionOpInterface final
     : TensorMaskingOpInterface::ExternalModel<
           OnlineAttentionOpInterface, IREE::LinalgExt::OnlineAttentionOp> {
@@ -252,20 +334,28 @@ struct OnlineAttentionOpInterface final
                           ArrayRef<OpFoldResult> padMultiples) const {
     auto onlineAttentionOp = cast<IREE::LinalgExt::OnlineAttentionOp>(op);
 
+    // FP8 regions precede scaling, so they cannot exclude padding for all
+    // scales (in particular zero). This optional padding must leave them
+    // intact.
+    bool needsScoreMask =
+        onlineAttentionOp.getAdditiveMask() || !onlineAttentionOp.getMask();
+    auto queryElementType = dyn_cast<FloatType>(
+        getElementTypeOrSelf(onlineAttentionOp.getQuery().getType()));
+    if (needsScoreMask &&
+        (!queryElementType || queryElementType.getWidth() <= 8)) {
+      return failure();
+    }
+
     // Check if padding is actually needed. If all dimensions are already
     // aligned to the pad multiples, we can skip padding entirely.
     auto tilingOp = cast<TilingInterface>(op);
-    bool needsPadding = isPaddingNeeded(builder, tilingOp, padMultiples);
-    if (needsPadding && !onlineAttentionOp.getMask()) {
-      op->emitError(
-          "Padding OnlineAttention without existing mask is not yet supported");
+    if (!isPaddingNeeded(builder, tilingOp, padMultiples)) {
       return failure();
     }
-    if (!needsPadding) {
-      return failure();
-    }
+    SmallVector<Attribute> paddingValues =
+        createAttentionPaddingValues(builder, onlineAttentionOp);
     FailureOr<linalg::PadTilingInterfaceResult> result =
-        maskTilingInterfaceOp(builder, op, padMultiples);
+        maskTilingInterfaceOp(builder, op, padMultiples, paddingValues);
     if (failed(result)) {
       op->emitError("failed to pad op");
       return failure();
@@ -294,6 +384,9 @@ struct OnlineAttentionOpInterface final
       selectNeutralElementForReducedDims(builder, paddedOp.getMaskMutable()[0],
                                          maskNeutralKind, bounds,
                                          *paddedOp.getMaskMap());
+    }
+    if (needsScoreMask) {
+      maskPaddedAttentionScores(builder, paddedOp, bounds);
     }
     return result->replacements;
   }

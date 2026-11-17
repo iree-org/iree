@@ -555,7 +555,7 @@ util.func public @collapse_attention(%arg0: tensor<20x4096x16xf16>, %arg1: tenso
     %expanded_1 = tensor.expand_shape %arg2 [[0, 1], [2], [3]] output_shape [2, 10, 1024, 64] : tensor<20x1024x64xf16> into tensor<2x10x1024x64xf16>
   %0 = flow.dispatch.region -> (tensor<2x10x4096x64xf16>) {
     %0 = tensor.empty() : tensor<2x10x4096x64xf16>
-    %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>], decomposition_config = {use_exp2 = true}> {test.discardable} ins(%expanded, %expanded_0, %expanded_1, %arg3 : tensor<2x10x4096x16xf16>, tensor<2x10x1024x16xf16>, tensor<2x10x1024x64xf16>, f16) outs(%0 : tensor<2x10x4096x64xf16>) {
+    %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> ()>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>], decomposition_config = {use_exp2 = true}, safe_softmax> {test.discardable} ins(%expanded, %expanded_0, %expanded_1, %arg3 : tensor<2x10x4096x16xf16>, tensor<2x10x1024x16xf16>, tensor<2x10x1024x64xf16>, f16) outs(%0 : tensor<2x10x4096x64xf16>) {
     ^bb0(%arg4: f16):
       iree_linalg_ext.yield %arg4 : f16
     } -> tensor<2x10x4096x64xf16>
@@ -566,7 +566,7 @@ util.func public @collapse_attention(%arg0: tensor<20x4096x16xf16>, %arg1: tenso
 
 // CHECK-LABEL: util.func public @collapse_attention
 //       CHECK:   %[[ATTN:.*]] = iree_linalg_ext.attention
-//  CHECK-SAME:      decomposition_config = {use_exp2 = true}> {test.discardable}
+//  CHECK-SAME:      decomposition_config = {use_exp2 = true}, safe_softmax> {test.discardable}
 //  CHECK-SAME:      tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16
 //  CHECK-SAME:      tensor<20x4096x64xf16>
 //       CHECK:   flow.return %[[ATTN]] : tensor<20x4096x64xf16>
@@ -585,7 +585,7 @@ util.func public @collapse_online_attention(%arg0: tensor<20x4096x16xf16>, %arg1
     %acc = linalg.fill ins(%cst0 : f32) outs(%acc_e : tensor<2x10x4096x64xf32>) -> tensor<2x10x4096x64xf32>
     %max = linalg.fill ins(%cst_neg : f32) outs(%ms_e : tensor<2x10x4096xf32>) -> tensor<2x10x4096xf32>
     %sum = linalg.fill ins(%cst0 : f32) outs(%ms_e : tensor<2x10x4096xf32>) -> tensor<2x10x4096xf32>
-    %r:3 = iree_linalg_ext.online_attention <indexing_maps = [
+    %r:3 = iree_linalg_ext.online_attention <additive_mask, indexing_maps = [
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
@@ -605,7 +605,7 @@ util.func public @collapse_online_attention(%arg0: tensor<20x4096x16xf16>, %arg1
 
 // CHECK-LABEL: util.func public @collapse_online_attention
 //       CHECK:   %[[ATTN:.*]]:3 = iree_linalg_ext.online_attention
-//  CHECK-SAME:      decomposition_config = {use_exp2 = true}> {test.discardable}
+//  CHECK-SAME:      decomposition_config = {use_exp2 = true}, additive_mask> {test.discardable}
 //  CHECK-SAME:      tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16
 //  CHECK-SAME:      tensor<20x4096x64xf32>, tensor<20x4096xf32>, tensor<20x4096xf32>
 //       CHECK:   flow.return %[[ATTN]]#0, %[[ATTN]]#1, %[[ATTN]]#2
@@ -1153,6 +1153,46 @@ util.func public @collapse_reverse_generic(%src: tensor<2x2x2xf32>) -> tensor<2x
 // CHECK-SAME:      iterator_types = ["parallel"]
 // CHECK:         tensor.extract
 // CHECK:         tensor.expand_shape
+
+// -----
+
+// Collapsing the batch dims delinearises the head index; the query and key
+// indices move down one.
+util.func public @collapse_attention_score_indices(%q: tensor<6x5x4xf32>, %k: tensor<6x7x4xf32>, %v: tensor<6x7x8xf32>, %scale: f32) -> tensor<2x3x5x8xf32> {
+  %eq = tensor.expand_shape %q [[0, 1], [2], [3]] output_shape [2, 3, 5, 4] : tensor<6x5x4xf32> into tensor<2x3x5x4xf32>
+  %ek = tensor.expand_shape %k [[0, 1], [2], [3]] output_shape [2, 3, 7, 4] : tensor<6x7x4xf32> into tensor<2x3x7x4xf32>
+  %ev = tensor.expand_shape %v [[0, 1], [2], [3]] output_shape [2, 3, 7, 8] : tensor<6x7x8xf32> into tensor<2x3x7x8xf32>
+  %0 = flow.dispatch.region -> (tensor<2x3x5x8xf32>) {
+    %init = tensor.empty() : tensor<2x3x5x8xf32>
+    %1 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> ()>,
+      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>]>
+      ins(%eq, %ek, %ev, %scale : tensor<2x3x5x4xf32>, tensor<2x3x7x4xf32>, tensor<2x3x7x8xf32>, f32) outs(%init : tensor<2x3x5x8xf32>) {
+    ^bb0(%score: f32):
+      %h = iree_linalg_ext.index 1 : index
+      %qi = iree_linalg_ext.index 2 : index
+      %ki = iree_linalg_ext.index 3 : index
+      %limit = arith.addi %qi, %h : index
+      %hidden = arith.cmpi ugt, %ki, %limit : index
+      %ninf = arith.constant 0xFF800000 : f32
+      %masked = arith.select %hidden, %ninf, %score : f32
+      iree_linalg_ext.yield %masked : f32
+    } -> tensor<2x3x5x8xf32>
+    flow.return %1 : tensor<2x3x5x8xf32>
+  }
+  util.return %0 : tensor<2x3x5x8xf32>
+}
+// CHECK-LABEL: util.func public @collapse_attention_score_indices
+//       CHECK:   iree_linalg_ext.attention
+//  CHECK-SAME:     tensor<6x5x4xf32>
+//       CHECK:     %[[B:.+]] = iree_linalg_ext.index 0 : index
+//       CHECK:     %[[BH:.+]]:2 = affine.delinearize_index %[[B]] into (2, 3) : index, index
+//       CHECK:     %[[Q:.+]] = iree_linalg_ext.index 1 : index
+//       CHECK:     %[[K:.+]] = iree_linalg_ext.index 2 : index
+//       CHECK:     %[[LIMIT:.+]] = arith.addi %[[Q]], %[[BH]]#1 : index
+//       CHECK:     arith.cmpi ugt, %[[K]], %[[LIMIT]] : index
 
 // -----
 

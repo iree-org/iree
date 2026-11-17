@@ -120,6 +120,9 @@ def DecomposeAttentionPass :
     Option<"useExp2", "use-exp2", "bool", /*default=*/"true",
         "Use exp2 for computations; Tunable to allow for accuracte computations"
         "in case of accuracy losses due to fp-reassociation.">,
+    Option<"skipMaskedTiles", "skip-masked-tiles", "bool", /*default=*/"false",
+        "Skip online attention whose mask hides every position, keeping the "
+        "incoming output, max and sum.">,
   ];
 }
 

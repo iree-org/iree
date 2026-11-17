@@ -8,7 +8,7 @@
 
 util.func public @attention_static(%arg0: tensor<20x4096x16xf16>, %arg1: tensor<20x1024x16xf16>, %arg2: tensor<20x1024x64xf16>, %arg3: f16) -> tensor<2x10x4096x64xf16> {
   %0 = tensor.empty() : tensor<20x4096x64xf16>
-  %1 = iree_linalg_ext.attention <indexing_maps = [#map, #map1, #map2, #map3, #map4]> ins(%arg0, %arg1, %arg2, %arg3 : tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16) outs(%0 : tensor<20x4096x64xf16>) {
+  %1 = iree_linalg_ext.attention <indexing_maps = [#map, #map1, #map2, #map3, #map4], safe_softmax> ins(%arg0, %arg1, %arg2, %arg3 : tensor<20x4096x16xf16>, tensor<20x1024x16xf16>, tensor<20x1024x64xf16>, f16) outs(%0 : tensor<20x4096x64xf16>) {
     ^bb0(%score: f16):
       iree_linalg_ext.yield %score: f16
   } -> tensor<20x4096x64xf16>
@@ -31,6 +31,7 @@ util.func public @attention_static(%arg0: tensor<20x4096x16xf16>, %arg1: tensor<
 // CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d3)>
 // CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d4, d5)>
 // CHECK-SAME:       affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d5)>
+// CHECK-SAME:       safe_softmax
 // CHECK-SAME:       ins(%[[QUERY]], %[[KEY]], %[[CACHE]], %[[ARG3]] :
 // CHECK-SAME:       outs(%[[EMPTY]] :
 //      CHECK:   util.return %[[ATTENTION]]
@@ -953,3 +954,41 @@ util.func public @quantize_scalar_collapse_input(%x: tensor<1x1xf32>, %s: tensor
 //  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] : tensor<1x1xf32>, tensor<f32>)
 //  CHECK-SAME:       -> tensor<1x1xi8>
 //       CHECK:   tensor.collapse_shape %[[Q]] [] : tensor<1x1xi8> into tensor<i8>
+
+// -----
+
+// Expanding the batch dim linearises the batch index from the two new batch
+// indices; the query and key indices move up one.
+util.func public @attention_expand_score_indices(%q: tensor<2x3x5x4xf32>, %k: tensor<2x3x7x4xf32>, %v: tensor<2x3x7x8xf32>, %scale: f32) -> tensor<6x5x8xf32> {
+  %cq = tensor.collapse_shape %q [[0, 1], [2], [3]] : tensor<2x3x5x4xf32> into tensor<6x5x4xf32>
+  %ck = tensor.collapse_shape %k [[0, 1], [2], [3]] : tensor<2x3x7x4xf32> into tensor<6x7x4xf32>
+  %cv = tensor.collapse_shape %v [[0, 1], [2], [3]] : tensor<2x3x7x8xf32> into tensor<6x7x8xf32>
+  %init = tensor.empty() : tensor<6x5x8xf32>
+  %0 = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+      affine_map<(d0, d1, d2, d3, d4) -> ()>,
+      affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
+    ins(%cq, %ck, %cv, %scale : tensor<6x5x4xf32>, tensor<6x7x4xf32>, tensor<6x7x8xf32>, f32) outs(%init : tensor<6x5x8xf32>) {
+    ^bb0(%score: f32):
+      %b = iree_linalg_ext.index 0 : index
+      %qi = iree_linalg_ext.index 1 : index
+      %ki = iree_linalg_ext.index 2 : index
+      %limit = arith.addi %qi, %b : index
+      %hidden = arith.cmpi ugt, %ki, %limit : index
+      %ninf = arith.constant 0xFF800000 : f32
+      %masked = arith.select %hidden, %ninf, %score : f32
+      iree_linalg_ext.yield %masked : f32
+  } -> tensor<6x5x8xf32>
+  util.return %0 : tensor<6x5x8xf32>
+}
+// CHECK-LABEL: util.func public @attention_expand_score_indices
+//       CHECK:   iree_linalg_ext.attention
+//  CHECK-SAME:     tensor<2x3x5x4xf32>
+//       CHECK:     %[[B0:.+]] = iree_linalg_ext.index 0 : index
+//       CHECK:     %[[B1:.+]] = iree_linalg_ext.index 1 : index
+//       CHECK:     %[[B:.+]] = affine.linearize_index disjoint [%[[B0]], %[[B1]]] by (2, 3) : index
+//       CHECK:     %[[Q:.+]] = iree_linalg_ext.index 2 : index
+//       CHECK:     %[[K:.+]] = iree_linalg_ext.index 3 : index
+//       CHECK:     %[[LIMIT:.+]] = arith.addi %[[Q]], %[[B]] : index
+//       CHECK:     arith.cmpi ugt, %[[K]], %[[LIMIT]] : index

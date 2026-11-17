@@ -18,6 +18,9 @@ ALL_SRCS = enforce_glob(
         "arg_compare.mlir",
         "attention.mlir",
         "attention_i1_mask.mlir",
+        "attention_large_head.mlir",
+        "attention_masked_tiles.mlir",
+        "attention_masked_values.mlir",
         "dynamic_attention.mlir",
         "gather.mlir",
         "map_load.mlir",
@@ -66,6 +69,8 @@ VMVX_SRCS = enforce_glob(
     [
         "arg_compare.mlir",
         "attention.mlir",
+        "attention_masked_tiles.mlir",
+        "attention_masked_values.mlir",
         "dynamic_attention.mlir",
         "gather.mlir",
         "map_load.mlir",
@@ -82,6 +87,7 @@ VMVX_SRCS = enforce_glob(
     exclude = [
         "grouped_matmul.mlir",
         "attention_i1_mask.mlir",
+        "attention_large_head.mlir",
         "scan_configured.mlir",
     ],
 )
@@ -97,6 +103,8 @@ LLVM_GPU_SRCS = enforce_glob(
     # keep sorted
     [
         "arg_compare.mlir",
+        "attention_masked_tiles.mlir",
+        "attention_masked_values.mlir",
         "gather.mlir",
         "scan.mlir",
         "scan_configured.mlir",
@@ -112,6 +120,7 @@ LLVM_GPU_SRCS = enforce_glob(
         "grouped_matmul.mlir",
         "attention.mlir",
         "attention_i1_mask.mlir",
+        "attention_large_head.mlir",
         "dynamic_attention.mlir",
         "map_load.mlir",
         "map_store.mlir",
@@ -139,6 +148,8 @@ ROCM_HIP_SRCS = enforce_glob(
     [
         "arg_compare.mlir",
         "attention.mlir",
+        "attention_masked_tiles.mlir",
+        "attention_masked_values.mlir",
         "gather.mlir",
         "map_load.mlir",
         "map_store.mlir",
@@ -153,6 +164,7 @@ ROCM_HIP_SRCS = enforce_glob(
         "grouped_matmul.mlir",
         "top-k.mlir",
         "attention_i1_mask.mlir",
+        "attention_large_head.mlir",
         "dynamic_attention.mlir",
         "scan_configured.mlir",
         # The Distribute pipeline skips TopK v2 thread distribution, causing
@@ -182,6 +194,8 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "arg_compare.mlir",
+            "attention_masked_tiles.mlir",
+            "attention_masked_values.mlir",
             "gather.mlir",
             "scan.mlir",
             "scatter.mlir",
@@ -195,6 +209,7 @@ iree_check_single_backend_test_suite(
             "grouped_matmul.mlir",
             "attention.mlir",
             "attention_i1_mask.mlir",
+            "attention_large_head.mlir",
             "dynamic_attention.mlir",
             "map_load.mlir",
             "map_store.mlir",
@@ -212,6 +227,8 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "arg_compare.mlir",
+            "attention_masked_tiles.mlir",
+            "attention_masked_values.mlir",
             "gather.mlir",
             "map_load.mlir",
             "map_store.mlir",
@@ -228,6 +245,7 @@ iree_check_single_backend_test_suite(
             "grouped_matmul.mlir",
             "attention.mlir",
             "attention_i1_mask.mlir",
+            "attention_large_head.mlir",
             "dynamic_attention.mlir",
             "scan_configured.mlir",
         ],

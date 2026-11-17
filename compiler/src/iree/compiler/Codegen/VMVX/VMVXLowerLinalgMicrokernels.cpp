@@ -150,20 +150,15 @@ private:
   friend class StridedBufferAnalysis;
   MemRefType memRefType;
 };
-/// Holds the results of an analysis which indicates whether a given memref
-/// can be decomposed into fully known static or dynamic base, strides, offset
-/// and sizes. If this holds, then a StridedBufferDescriptor is guaranteed to
-/// be producible (this is an IR mutation so must be separated).
-///
-/// Analyzing the buffer involves tracking up through the stack of composed
-/// SubviewOps to some memref with an identity layout (i.e. not offsets/strides
-/// applied).
+/// Checks whether a value can supply a late-bound VMVX buffer descriptor.
+/// Later lowering resolves the base buffer, offset, sizes and strides through
+/// any views. Descriptor construction mutates IR after matching succeeds.
 class StridedBufferAnalysis {
 public:
   StridedBufferAnalysis(Value buffer) : buffer(buffer) {}
 
   // Whether analysis was successful.
-  bool isValid() { return true; }
+  bool isValid() { return isa<MemRefType>(buffer.getType()); }
 
   // Gets the type of the buffer being analyzed.
   MemRefType getType() { return cast<MemRefType>(buffer.getType()); }
@@ -435,6 +430,12 @@ struct UnaryEmitter {
   }
 };
 
+static bool supportsCopyElementType(Type type) {
+  return type.isSignlessInteger(8) || type.isSignlessInteger(16) ||
+         type.isSignlessInteger(32) || type.isSignlessInteger(64) ||
+         type.isF32() || type.isF64();
+}
+
 /// Emits a vmvx.copy op from/to a buffer/indexingMap pair.
 /// Only projected permutations are supported.
 struct CopyEmitter {
@@ -481,6 +482,11 @@ struct CopyEmitter {
           !copy.second.bufferAnal.isValid()) {
         return rewriter.notifyMatchFailure(
             loc, "could not compute buffer descriptor");
+      }
+      if (!supportsCopyElementType(
+              copy.first.bufferAnal.getType().getElementType())) {
+        return rewriter.notifyMatchFailure(loc,
+                                           "unsupported copy element type");
       }
     }
 
@@ -840,7 +846,8 @@ struct LinalgUnaryGenericConversion : OpRewritePattern<linalg::GenericOp> {
 
 /// Matches a "trivial" generic which only yields, emitting as copy
 /// operation(s).
-struct LinalgTrivialGenericConversion : OpRewritePattern<linalg::GenericOp> {
+struct LinalgTrivialGenericConversion final
+    : OpRewritePattern<linalg::GenericOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
@@ -860,6 +867,11 @@ struct LinalgTrivialGenericConversion : OpRewritePattern<linalg::GenericOp> {
     for (auto [outputIndex, yieldOperand] :
          llvm::enumerate(yieldOp.getOperands())) {
       if (auto blockArg = dyn_cast<BlockArgument>(yieldOperand)) {
+        if (blockArg.getOwner() != op.getBody() ||
+            blockArg.getArgNumber() >= op.getNumDpsInputs()) {
+          return rewriter.notifyMatchFailure(
+              op, "yielded argument is not an input");
+        }
         unsigned inputIndex = blockArg.getArgNumber();
         OpOperand *input = op.getDpsInputOperand(inputIndex);
         OpOperand *output = op.getDpsInitOperand(outputIndex);

@@ -340,3 +340,117 @@ func.func @rsqrt(%arg0 : memref<64x64xf32>, %arg1 : memref<64xf32>) {
   }
   func.return
 }
+
+// An output argument is not an input operand. Preserve this generic for loop
+// lowering rather than indexing beyond its empty input operand range.
+// CHECK-LABEL: @yield_output_argument
+func.func @yield_output_argument(%output: memref<4xf32>) {
+  // CHECK-NOT: vmvx.copy
+  // CHECK: linalg.generic
+  // CHECK: ^bb0(%[[OUTPUT:.*]]: f32):
+  // CHECK: linalg.yield %[[OUTPUT]] : f32
+  // CHECK-NOT: vmvx.copy
+  // CHECK: return
+  linalg.generic {
+    indexing_maps = [affine_map<(d0) -> (d0)>],
+    iterator_types = ["parallel"]
+  } outs(%output : memref<4xf32>) {
+  ^bb0(%element: f32):
+    linalg.yield %element : f32
+  }
+  return
+}
+
+// A captured block argument can have the same argument number as an input,
+// but still supplies a different scalar value.
+// CHECK-LABEL: @yield_captured_argument
+// CHECK-SAME: %[[VALUE:.*]]: f32
+func.func @yield_captured_argument(%value: f32, %input: memref<4xf32>, %output: memref<4xf32>) {
+  // CHECK-NOT: vmvx.copy
+  // CHECK: linalg.generic
+  // CHECK: linalg.yield %[[VALUE]] : f32
+  // CHECK-NOT: vmvx.copy
+  // CHECK: return
+  linalg.generic {
+    indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+    iterator_types = ["parallel"]
+  } ins(%input : memref<4xf32>) outs(%output : memref<4xf32>) {
+  ^bb0(%unused_input: f32, %unused_output: f32):
+    linalg.yield %value : f32
+  }
+  return
+}
+
+// A scalar input is broadcast by linalg, but has no VMVX buffer descriptor.
+// CHECK-LABEL: @scalar_operands
+func.func @scalar_operands(%value: f32, %unary: memref<4xf32>, %binary: memref<4xf32>, %copy: memref<4xf32>) {
+  // CHECK-NOT: vmvx.get_buffer_descriptor
+  // CHECK: linalg.generic
+  // CHECK: arith.negf
+  linalg.generic {
+    indexing_maps = [affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>],
+    iterator_types = ["parallel"]
+  } ins(%value : f32) outs(%unary : memref<4xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %negative = arith.negf %in : f32
+    linalg.yield %negative : f32
+  }
+  // CHECK-NOT: vmvx.get_buffer_descriptor
+  // CHECK: linalg.generic
+  // CHECK: arith.addf
+  linalg.generic {
+    indexing_maps = [affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>],
+    iterator_types = ["parallel"]
+  } ins(%value : f32) outs(%binary : memref<4xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    %sum = arith.addf %in, %out : f32
+    linalg.yield %sum : f32
+  }
+  // CHECK-NOT: vmvx.get_buffer_descriptor
+  // CHECK: linalg.generic
+  // CHECK: linalg.yield
+  linalg.generic {
+    indexing_maps = [affine_map<(d0) -> ()>, affine_map<(d0) -> (d0)>],
+    iterator_types = ["parallel"]
+  } ins(%value : f32) outs(%copy : memref<4xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  }
+  // CHECK-NOT: vmvx.get_buffer_descriptor
+  // CHECK: return
+  return
+}
+
+// CHECK-LABEL: @copy_f16
+func.func @copy_f16(%input: memref<4xf16>, %output: memref<4xf16>) {
+  // CHECK-NOT: vmvx.copy
+  // CHECK: linalg.generic
+  // CHECK: linalg.yield
+  // CHECK-NOT: vmvx.copy
+  // CHECK: return
+  linalg.generic {
+    indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+    iterator_types = ["parallel"]
+  } ins(%input : memref<4xf16>) outs(%output : memref<4xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    linalg.yield %in : f16
+  }
+  return
+}
+
+// CHECK-LABEL: @copy_bf16
+func.func @copy_bf16(%input: memref<4xbf16>, %output: memref<4xbf16>) {
+  // CHECK-NOT: vmvx.copy
+  // CHECK: linalg.generic
+  // CHECK: linalg.yield
+  // CHECK-NOT: vmvx.copy
+  // CHECK: return
+  linalg.generic {
+    indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+    iterator_types = ["parallel"]
+  } ins(%input : memref<4xbf16>) outs(%output : memref<4xbf16>) {
+  ^bb0(%in: bf16, %out: bf16):
+    linalg.yield %in : bf16
+  }
+  return
+}

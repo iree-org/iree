@@ -638,6 +638,9 @@ static void buildSPIRVCodegenConfigurationPassPipelineImpl(
     FunctionLikeNest funcPassManager(modulePassManager);
     funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
     addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+    // SPIR-V configures the constituent contractions and reductions. Online
+    // attention has no buffer form, so decompose it before configuration.
+    funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass);
     addEncodingToNopPasses(funcPassManager);
   }
   modulePassManager.addPass(createMaterializeUserConfigsPass());
