@@ -1016,7 +1016,7 @@ std::vector<std::string> HalDriver::Query() {
     }
   };
   DriverInfosGuard guard{allocator, driver_infos};
-    
+
   std::vector<std::string> driver_names(driver_info_count);
   for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
     driver_names[i] = std::string(driver_infos[i].driver_name.data,
