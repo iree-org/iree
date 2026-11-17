@@ -53,11 +53,8 @@ import yaml
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 
-# We don't get StrEnum till Python 3.11
 @enum.unique
-class Trailer(str, enum.Enum):
-    __str__ = str.__str__
-
+class Trailer(enum.StrEnum):
     SKIP_CI = "skip-ci"
     SKIP_JOBS = "ci-skip"
     EXTRA_JOBS = "ci-extra"
