@@ -3629,6 +3629,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-global-opt-split-large-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-global-opt-split-large-constants
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-global-opt-warn-on-uninitialized-values" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6712,6 +6723,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#-iree-global-opt-split-large-constants" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        -iree-global-opt-split-large-constants
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#-iree-global-opt-warn-on-uninitialized-values" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6931,6 +6953,29 @@ where it could shift values off byte boundaries.</p>
 <p><em>Removes tensors that have 0-extents.</em></p>
 <h3 id="-iree-global-opt-simplify-pack-unpack"><code>-iree-global-opt-simplify-pack-unpack</code><a class="headerlink" href="#-iree-global-opt-simplify-pack-unpack" title="Permanent link">link</a></h3>
 <p><em>Simplifies tensor pack and unpack ops.</em></p>
+<h3 id="-iree-global-opt-split-large-constants"><code>-iree-global-opt-split-large-constants</code><a class="headerlink" href="#-iree-global-opt-split-large-constants" title="Permanent link">link</a></h3>
+<p><em>Splits constants larger than the max allocation size into shards.</em></p>
+<p>A constant global whose storage exceeds the max allocation size of its
+resource config (<code>--iree-stream-resource-max-allocation-size</code> unless the
+target sets one) cannot be packed into a resource within that limit. This
+pass splits such a private, immutable global with an inline dense value or
+a named parameter into shards along its outermost non-unit dimension, so
+each shard is a contiguous byte range of the original that fits into one
+allocation. A shard of a named parameter refers to its range of the same
+parameter through the <code>offset</code> and <code>length</code> config entries. The pass then
+rewrites the uses of the global's loads to use the shards:</p>
+<ul>
+<li>an input of a structured op whose split dimension is indexed by a
+    single loop: the op is split along that loop, one op per shard. The
+    results of a parallel loop are inserted into the destination, the ops
+    of a reduction loop accumulate into the result of the previous one.
+    This covers e.g. matmuls with a large weight such as a tied LM head.</li>
+<li>a value read with <code>tensor.extract</code> in the body of an elementwise
+    <code>linalg.generic</code>, e.g. an embedding lookup: one op per shard reads its
+    shard at the rebased, clamped index and keeps the previous op's
+    element unless the index lies in its shard.</li>
+</ul>
+<p>A constant with any other use is left unchanged with a warning.</p>
 <h3 id="-iree-global-opt-warn-on-uninitialized-values"><code>-iree-global-opt-warn-on-uninitialized-values</code><a class="headerlink" href="#-iree-global-opt-warn-on-uninitialized-values" title="Permanent link">link</a></h3>
 <p><em>Catch some uses of uninitialized values</em></p>
 
