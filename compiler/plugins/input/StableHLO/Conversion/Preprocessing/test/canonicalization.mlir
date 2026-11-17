@@ -205,6 +205,29 @@ func.func @compare_folds()
 
 // -----
 
+// CHECK-LABEL: func.func @compare_dynamic_integer_self
+// CHECK: %[[RESULT:.+]] = stablehlo.compare EQ, %arg0, %arg0, SIGNED
+// CHECK: return %[[RESULT]] : tensor<?xi1>
+func.func @compare_dynamic_integer_self(%x: tensor<?xi32>) -> tensor<?xi1> {
+  %r = stablehlo.compare EQ, %x, %x, SIGNED : (tensor<?xi32>, tensor<?xi32>) -> tensor<?xi1>
+  return %r : tensor<?xi1>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @compare_dynamic_integer_constants
+// CHECK: %[[RESULT:.+]] = stablehlo.compare LT
+// CHECK-SAME: -> tensor<?xi1>
+// CHECK: return %[[RESULT]] : tensor<?xi1>
+func.func @compare_dynamic_integer_constants() -> tensor<?xi1> {
+  %a = stablehlo.constant dense<[0, 1]> : tensor<2xi32>
+  %b = stablehlo.constant dense<[1, 0]> : tensor<2xi32>
+  %r = stablehlo.compare LT, %a, %b, SIGNED : (tensor<2xi32>, tensor<2xi32>) -> tensor<?xi1>
+  return %r : tensor<?xi1>
+}
+
+// -----
+
 // CHECK-LABEL: func.func @select
 // CHECK-SAME:   ([[ARG0:%.+]]: tensor<2xi32>, [[ARG1:%.+]]: tensor<2xi32>, [[ARGC:%.+]]: tensor<2xi1>)
 func.func @select(%arg0: tensor<2xi32>, %arg1: tensor<2xi32>, %argC: tensor<2xi1>)
@@ -478,6 +501,66 @@ func.func @dynamic_broadcast_in_dim_op_not_actually_dynamic_constant_requires_ca
   // CHECK: return %[[RESULT]] : tensor<?x?xf32>
   func.return %1 : tensor<?x?xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_to_own_shape
+// CHECK-SAME: %[[ARG:.+]]: tensor<?x5xf32>
+func.func @dynamic_broadcast_in_dim_to_own_shape(%arg0: tensor<?x5xf32>) -> tensor<?x5xf32> {
+  %0 = shape.shape_of %arg0 : tensor<?x5xf32> -> tensor<2xindex>
+  %1 = stablehlo.dynamic_broadcast_in_dim %arg0, %0, dims = [0, 1] : (tensor<?x5xf32>, tensor<2xindex>) -> tensor<?x5xf32>
+  // CHECK-NOT: stablehlo.dynamic_broadcast_in_dim
+  // CHECK: return %[[ARG]] : tensor<?x5xf32>
+  func.return %1 : tensor<?x5xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_to_own_shape_requires_cast
+// CHECK-SAME: %[[ARG:.+]]: tensor<?x5xf32>
+func.func @dynamic_broadcast_in_dim_to_own_shape_requires_cast(%arg0: tensor<?x5xf32>) -> tensor<?x?xf32> {
+  %0 = shape.shape_of %arg0 : tensor<?x5xf32> -> tensor<2xindex>
+  %1 = stablehlo.dynamic_broadcast_in_dim %arg0, %0, dims = [0, 1] : (tensor<?x5xf32>, tensor<2xindex>) -> tensor<?x?xf32>
+  // CHECK: %[[CAST:.+]] = tensor.cast %[[ARG]] : tensor<?x5xf32> to tensor<?x?xf32>
+  // CHECK: return %[[CAST]]
+  func.return %1 : tensor<?x?xf32>
+}
+
+// -----
+
+// A transposing broadcast to the operand's own shape is no identity.
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_to_own_shape_transposed
+func.func @dynamic_broadcast_in_dim_to_own_shape_transposed(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = shape.shape_of %arg0 : tensor<?x?xf32> -> tensor<2xindex>
+  // CHECK: stablehlo.dynamic_broadcast_in_dim %arg0, %{{.+}}, dims = [1, 0]
+  %1 = stablehlo.dynamic_broadcast_in_dim %arg0, %0, dims = [1, 0] : (tensor<?x?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
+  func.return %1 : tensor<?x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_of_dynamic_reshape
+// CHECK-SAME: %[[ARG:.+]]: tensor<?xf32>, %[[SHAPE:.+]]: tensor<2xi64>
+func.func @dynamic_broadcast_in_dim_of_dynamic_reshape(%arg0: tensor<?xf32>, %arg1: tensor<2xi64>) -> tensor<?x?xf32> {
+  %0 = stablehlo.dynamic_reshape %arg0, %arg1 : (tensor<?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  %1 = stablehlo.dynamic_broadcast_in_dim %0, %arg1, dims = [0, 1] : (tensor<?x?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  // CHECK: %[[RESHAPE:.+]] = stablehlo.dynamic_reshape %[[ARG]], %[[SHAPE]]
+  // CHECK-NOT: stablehlo.dynamic_broadcast_in_dim
+  // CHECK: return %[[RESHAPE]]
+  func.return %1 : tensor<?x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: func @dynamic_broadcast_in_dim_of_dynamic_reshape_other_shape
+func.func @dynamic_broadcast_in_dim_of_dynamic_reshape_other_shape(%arg0: tensor<?xf32>, %arg1: tensor<2xi64>, %arg2: tensor<2xi64>) -> tensor<?x?xf32> {
+  %0 = stablehlo.dynamic_reshape %arg0, %arg1 : (tensor<?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  // CHECK: stablehlo.dynamic_broadcast_in_dim %{{.+}}, %arg2, dims = [0, 1]
+  %1 = stablehlo.dynamic_broadcast_in_dim %0, %arg2, dims = [0, 1] : (tensor<?x?xf32>, tensor<2xi64>) -> tensor<?x?xf32>
+  func.return %1 : tensor<?x?xf32>
+}
+
+// -----
 
 // CHECK-LABEL: func @dynamic_broadcast_in_dim_op_almost_not_actually_dynamic
 func.func @dynamic_broadcast_in_dim_op_almost_not_actually_dynamic(%arg0: tensor<?xf32>, %arg1: tensor<2xi64>) -> tensor<5x4xf32> {
@@ -795,3 +878,55 @@ func.func @generic_op(%arg0: tensor<2xf32>, %arg1: tensor<2xf32>) -> tensor<2xf3
 // CHECK-LABEL: func.func @generic_op
 // CHECK-NEXT:    "test_dialect.op"
 // CHECK-NEXT:    return
+
+// -----
+
+// A single-use inner concatenate on the same axis is absorbed.
+// CHECK-LABEL: func.func @concatenate_flatten
+// CHECK-SAME:    (%[[X:.+]]: tensor<2x5xf32>, %[[Y:.+]]: tensor<3x5xf32>, %[[Z:.+]]: tensor<4x5xf32>)
+// CHECK:         %[[R:.+]] = stablehlo.concatenate %[[X]], %[[Y]], %[[Z]], dim = 0 : (tensor<2x5xf32>, tensor<3x5xf32>, tensor<4x5xf32>) -> tensor<9x5xf32>
+// CHECK:         return %[[R]]
+func.func @concatenate_flatten(%x: tensor<2x5xf32>, %y: tensor<3x5xf32>, %z: tensor<4x5xf32>) -> tensor<9x5xf32> {
+  %0 = stablehlo.concatenate %x, %y, dim = 0 : (tensor<2x5xf32>, tensor<3x5xf32>) -> tensor<5x5xf32>
+  %1 = stablehlo.concatenate %0, %z, dim = 0 : (tensor<5x5xf32>, tensor<4x5xf32>) -> tensor<9x5xf32>
+  return %1 : tensor<9x5xf32>
+}
+
+
+// -----
+
+// CHECK-LABEL: func.func @concatenate_flatten_dynamic
+// CHECK-SAME:    (%[[X:.+]]: tensor<3x?xi32>, %[[Y:.+]]: tensor<3x2xi32>, %[[Z:.+]]: tensor<3x7xi32>)
+// CHECK:         stablehlo.concatenate %[[Z]], %[[X]], %[[Y]], dim = 1 : (tensor<3x7xi32>, tensor<3x?xi32>, tensor<3x2xi32>) -> tensor<3x?xi32>
+func.func @concatenate_flatten_dynamic(%x: tensor<3x?xi32>, %y: tensor<3x2xi32>, %z: tensor<3x7xi32>) -> tensor<3x?xi32> {
+  %0 = stablehlo.concatenate %x, %y, dim = 1 : (tensor<3x?xi32>, tensor<3x2xi32>) -> tensor<3x?xi32>
+  %1 = stablehlo.concatenate %z, %0, dim = 1 : (tensor<3x7xi32>, tensor<3x?xi32>) -> tensor<3x?xi32>
+  return %1 : tensor<3x?xi32>
+}
+
+
+// -----
+
+// An inner concatenate on another axis stays.
+// CHECK-LABEL: func.func @concatenate_flatten_other_axis
+// CHECK:         %[[INNER:.+]] = stablehlo.concatenate %{{.+}}, %{{.+}}, dim = 1
+// CHECK:         stablehlo.concatenate %[[INNER]], %{{.+}}, dim = 0
+func.func @concatenate_flatten_other_axis(%x: tensor<2x3xf32>, %y: tensor<2x4xf32>, %z: tensor<5x7xf32>) -> tensor<7x7xf32> {
+  %0 = stablehlo.concatenate %x, %y, dim = 1 : (tensor<2x3xf32>, tensor<2x4xf32>) -> tensor<2x7xf32>
+  %1 = stablehlo.concatenate %0, %z, dim = 0 : (tensor<2x7xf32>, tensor<5x7xf32>) -> tensor<7x7xf32>
+  return %1 : tensor<7x7xf32>
+}
+
+
+// -----
+
+// A shared inner concatenate stays, so its tensor is not built twice.
+// CHECK-LABEL: func.func @concatenate_flatten_shared
+// CHECK:         %[[INNER:.+]] = stablehlo.concatenate %{{.+}}, %{{.+}}, dim = 0
+// CHECK:         %[[OUTER:.+]] = stablehlo.concatenate %[[INNER]], %{{.+}}, dim = 0
+// CHECK:         return %[[INNER]], %[[OUTER]]
+func.func @concatenate_flatten_shared(%x: tensor<2x5xf32>, %y: tensor<3x5xf32>, %z: tensor<4x5xf32>) -> (tensor<5x5xf32>, tensor<9x5xf32>) {
+  %0 = stablehlo.concatenate %x, %y, dim = 0 : (tensor<2x5xf32>, tensor<3x5xf32>) -> tensor<5x5xf32>
+  %1 = stablehlo.concatenate %0, %z, dim = 0 : (tensor<5x5xf32>, tensor<4x5xf32>) -> tensor<9x5xf32>
+  return %0, %1 : tensor<5x5xf32>, tensor<9x5xf32>
+}

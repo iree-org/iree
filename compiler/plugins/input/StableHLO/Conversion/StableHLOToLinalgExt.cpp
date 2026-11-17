@@ -26,15 +26,21 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/Repeated.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
@@ -42,6 +48,7 @@
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DEF_CONVERTSTABLEHLOTOLINALGEXT
+#define GEN_PASS_DEF_LEGALIZEDYNAMICREDUCEWINDOW
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h.inc"
 
 namespace {
@@ -75,7 +82,12 @@ Value materializeCast(OpBuilder &builder, Type toType, ValueRange inputs,
   Value fromValue = inputs[0];
   auto fromType = dyn_cast<RankedTensorType>(fromValue.getType());
   if (!fromType) {
-    return Value();
+    auto toTensorType = dyn_cast<RankedTensorType>(toType);
+    if (!toTensorType || toTensorType.getRank() != 0) {
+      return Value();
+    }
+    fromType = toTensorType.clone(fromValue.getType());
+    fromValue = tensor::FromElementsOp::create(builder, loc, fromType, inputs);
   }
 
   if (auto intFromType = dyn_cast<IntegerType>(fromType.getElementType())) {
@@ -91,7 +103,7 @@ Value materializeCast(OpBuilder &builder, Type toType, ValueRange inputs,
     }
   }
 
-  if (fromType.getRank() != 0) {
+  if (fromType.getRank() != 0 || isa<ShapedType>(toType)) {
     return fromValue;
   }
 
@@ -118,11 +130,21 @@ struct StableHloToStdTypeConverter final : TypeConverter {
 // Utils
 //===----------------------------------------------------------------------===//
 
-bool isInBodyOfLinalgExtOps(Operation *op) {
+static bool isInBodyOfLinalgExtOps(Operation *op) {
   auto parent_op = op->getParentRegion()->getParentOp();
   return parent_op->getDialect() ==
          parent_op->getContext()
              ->getLoadedDialect<IREE::LinalgExt::IREELinalgExtDialect>();
+}
+
+static bool isNestedInLinalgExtOp(Operation *op) {
+  for (Operation *parent = op->getParentOp(); parent;
+       parent = parent->getParentOp()) {
+    if (isa<IREE::LinalgExt::IREELinalgExtDialect>(parent->getDialect())) {
+      return true;
+    }
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
@@ -135,12 +157,12 @@ struct LinalgExtRegionHLOOpConversion final : OpConversionPattern<OpTy> {
   LogicalResult
   matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (!isInBodyOfLinalgExtOps(op)) {
+    if (!isNestedInLinalgExtOp(op)) {
       return failure();
     }
-    TensorType origRetType = dyn_cast<TensorType>(op.getType());
-    if (!origRetType) {
-      return failure();
+    auto origRetType = dyn_cast<RankedTensorType>(op.getType());
+    if (!origRetType || origRetType.getRank() != 0) {
+      return rewriter.notifyMatchFailure(op, "expected a scalar tensor result");
     }
     SmallVector<Value> scalarArgs;
     Type newRetType = getElementTypeOrSelf(
@@ -221,89 +243,118 @@ struct ScatterOpConversion final
     : OpConversionPattern<mlir::stablehlo::ScatterOp> {
   using Base::Base;
 
-  /// Returns true if the `dimensionNumbers` from the stablehlo.scatter op
-  /// follows a canonical form:
-  ///
-  /// * The rank of indices is greater than or equal to two.
-  /// * The index_vector_dim is the last dim of indices.
-  /// * Scatter dims to operand dims order: (0, ... , n)
-  /// * Inserted window dims order: (0, ... , d)
-  /// * Update window dims order: (d + 1, ... , m)
-  static bool hasCanonicalDimensionNumbers(mlir::stablehlo::ScatterOp op) {
-    auto dimNumbers = op.getScatterDimensionNumbers();
-    auto indicesType = cast<ShapedType>(op.getScatterIndices().getType());
-    auto indicesRank = indicesType.getRank();
-    auto indexVectorDim = dimNumbers.getIndexVectorDim();
-    auto indexDepth = indicesType.getShape().back();
-    auto scatterDimsToOperandDims = dimNumbers.getScatterDimsToOperandDims();
-
-    if (indicesRank != 2) {
-      return false;
-    }
-    if (indexVectorDim != indicesRank - 1) {
-      return false;
-    }
-    if (scatterDimsToOperandDims.size() != indexDepth) {
-      return false;
-    }
-    for (auto [idx, dim] : llvm::enumerate(scatterDimsToOperandDims)) {
-      if (idx != dim) {
-        return false;
-      }
-    }
-
-    auto insertedWindowDims = dimNumbers.getInsertedWindowDims();
-    for (auto [idx, dim] : llvm::enumerate(insertedWindowDims)) {
-      if (idx != dim) {
-        return false;
-      }
-    }
-
-    // Check that there is only one batch dimension in the updates.
-    for (auto [idx, dim] : llvm::enumerate(dimNumbers.getUpdateWindowDims())) {
-      if (idx + 1 != dim) {
-        return false;
-      }
-    }
-
-    return true;
+  /// Returns whether `dims` is 0, 1, ..., n - 1 shifted by `start`.
+  static bool isConsecutiveFrom(ArrayRef<int64_t> dims, int64_t start) {
+    return llvm::equal(dims, llvm::seq<int64_t>(start, start + dims.size()));
   }
 
-  LogicalResult
-  matchAndRewrite(mlir::stablehlo::ScatterOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    if (!hasCanonicalDimensionNumbers(op)) {
-      return failure();
+  /// Returns whether the indices are one batch axis of index vectors that
+  /// address, in order, the leading operand dimensions, which the update
+  /// inserts:
+  ///
+  /// * The original has rank at least one; the local type converter scalarizes
+  ///   rank-zero originals.
+  /// * The indices have rank two, with index_vector_dim last.
+  /// * There are no batching dimensions.
+  /// * scatter_dims_to_operand_dims and inserted_window_dims are both
+  ///   (0, ..., d - 1) for index depth d.
+  static bool hasCanonicalIndexing(mlir::stablehlo::ScatterOp op) {
+    auto dimNumbers = op.getScatterDimensionNumbers();
+    auto indicesType = cast<ShapedType>(op.getScatterIndices().getType());
+    if (cast<ShapedType>(op.getInputs().front().getType()).getRank() == 0 ||
+        indicesType.getRank() != 2 ||
+        dimNumbers.getIndexVectorDim() != indicesType.getRank() - 1 ||
+        !dimNumbers.getInputBatchingDims().empty() ||
+        !dimNumbers.getScatterIndicesBatchingDims().empty()) {
+      return false;
     }
-    if (llvm::size(op.getInputs()) != 1) {
-      return op.emitError("NYI variadic operands scatter");
+    int64_t indexDepth = indicesType.getDimSize(1);
+    ArrayRef<int64_t> scatterDims = dimNumbers.getScatterDimsToOperandDims();
+    ArrayRef<int64_t> insertedDims = dimNumbers.getInsertedWindowDims();
+    return static_cast<int64_t>(scatterDims.size()) == indexDepth &&
+           static_cast<int64_t>(insertedDims.size()) == indexDepth &&
+           isConsecutiveFrom(scatterDims, 0) &&
+           isConsecutiveFrom(insertedDims, 0);
+  }
+
+  /// Returns whether each update is one batch axis followed by whole windows
+  /// over the unindexed operand dimensions:
+  ///
+  /// * update_window_dims is (1, ..., w) and the update has rank w + 1.
+  /// * The original has rank d + w.
+  /// * No static window extent differs from its static operand extent;
+  ///   LinalgExt scatter writes whole windows, and narrower ones take the
+  ///   general lowering.
+  static bool hasWholeWindowUpdates(mlir::stablehlo::ScatterOp op) {
+    auto dimNumbers = op.getScatterDimensionNumbers();
+    int64_t indexDepth = dimNumbers.getScatterDimsToOperandDims().size();
+    auto updateType = cast<ShapedType>(op.getUpdates().front().getType());
+    auto originalType = cast<ShapedType>(op.getInputs().front().getType());
+    ArrayRef<int64_t> windowDims = dimNumbers.getUpdateWindowDims();
+    int64_t windowRank = windowDims.size();
+    if (updateType.getRank() != windowRank + 1 ||
+        originalType.getRank() != indexDepth + windowRank ||
+        !isConsecutiveFrom(windowDims, 1)) {
+      return false;
     }
-    if (llvm::size(op.getUpdates()) != 1) {
-      return op.emitError("NYI variadic updates scatter");
+    return llvm::all_of(llvm::seq<int64_t>(windowRank), [&](int64_t dim) {
+      int64_t updateSize = updateType.getDimSize(dim + 1);
+      int64_t originalSize = originalType.getDimSize(indexDepth + dim);
+      return ShapedType::isDynamic(updateSize) ||
+             ShapedType::isDynamic(originalSize) || updateSize == originalSize;
+    });
+  }
+
+  /// Returns true if the scatter has the canonical form that
+  /// iree_linalg_ext.scatter represents directly: canonical indexing (see
+  /// hasCanonicalIndexing) and whole-window updates (see
+  /// hasWholeWindowUpdates).
+  static bool hasCanonicalDimensionNumbers(mlir::stablehlo::ScatterOp op) {
+    return hasCanonicalIndexing(op) && hasWholeWindowUpdates(op);
+  }
+
+  /// Returns the window axes, as (update dim, operand dim), whose extents may
+  /// differ at runtime.
+  static SmallVector<std::pair<int64_t, int64_t>>
+  getUnprovenWindowDims(mlir::stablehlo::ScatterOp op, Value original,
+                        Value updates) {
+    auto indicesType = cast<ShapedType>(op.getScatterIndices().getType());
+    int64_t indexDepth = indicesType.getShape().back();
+    auto originalType = cast<ShapedType>(original.getType());
+    auto updateType = cast<ShapedType>(updates.getType());
+    SmallVector<std::pair<int64_t, int64_t>> dims;
+    for (int64_t updateDim = 1; updateDim < updateType.getRank(); ++updateDim) {
+      int64_t originalDim = indexDepth + updateDim - 1;
+      if (updateType.isStaticDim(updateDim) &&
+          originalType.isStaticDim(originalDim)) {
+        continue;
+      }
+      FailureOr<bool> equal = ValueBoundsConstraintSet::areEqual(
+          {updates, updateDim}, {original, originalDim});
+      if (failed(equal) || !*equal) {
+        dims.push_back({updateDim, originalDim});
+      }
     }
+    return dims;
+  }
 
-    ImplicitLocOpBuilder b(op.getLoc(), rewriter);
-
-    Value original = adaptor.getInputs().front();
-    Value indices = adaptor.getScatterIndices();
-    Value updates = adaptor.getUpdates().front();
-
-    auto originalType = dyn_cast<ShapedType>(original.getType());
-
-    llvm::SmallVector<int64_t> scatterDimMap;
-    for (auto dim :
-         op.getScatterDimensionNumbers().getScatterDimsToOperandDims()) {
-      scatterDimMap.push_back(dim);
-    }
-
+  Value createWindowScatter(mlir::stablehlo::ScatterOp op, Value original,
+                            Value indices, Value updates, bool cloneReducer,
+                            ConversionPatternRewriter &rewriter) const {
+    SmallVector<int64_t> scatterDimMap(
+        op.getScatterDimensionNumbers().getScatterDimsToOperandDims());
     auto scatterOp = IREE::LinalgExt::ScatterOp::create(
-        rewriter, op.getLoc(), originalType, updates, indices,
+        rewriter, op.getLoc(), original.getType(), updates, indices,
         /*mask=*/Value(), original, scatterDimMap, op.getUniqueIndices());
 
-    rewriter.inlineRegionBefore(op.getUpdateComputation(),
-                                scatterOp.getRegion(),
-                                scatterOp.getRegion().begin());
     Region &region = scatterOp.getRegion();
+    if (cloneReducer) {
+      rewriter.cloneRegionBefore(op.getUpdateComputation(), region,
+                                 region.begin());
+    } else {
+      rewriter.inlineRegionBefore(op.getUpdateComputation(), region,
+                                  region.begin());
+    }
     TypeConverter::SignatureConversion signatureConverter(2);
     Type argType = getElementTypeOrSelf(original.getType());
     // stablehlo.scatter op takes:
@@ -311,9 +362,142 @@ struct ScatterOpConversion final
     // where output[O] maps to block args #1 in linalg_ext.scatter ops.
     signatureConverter.addInputs(1, argType);
     signatureConverter.addInputs(0, argType);
-    rewriter.applySignatureConversion(&region.front(), signatureConverter);
+    rewriter.applySignatureConversion(&region.front(), signatureConverter,
+                                      getTypeConverter());
+    return scatterOp->getResult(0);
+  }
 
-    rewriter.replaceOp(op, scatterOp->getResults());
+  /// Returns true if `op` lowers to the whole-window LinalgExt scatter.
+  static bool takesWholeWindowPath(mlir::stablehlo::ScatterOp op) {
+    return isMemoryEffectFree(op) && hasCanonicalDimensionNumbers(op) &&
+           llvm::size(op.getInputs()) == 1 && llvm::size(op.getUpdates()) == 1;
+  }
+
+  /// Returns why the general lowering cannot take `op`, or nullptr.
+  static const char *getGeneralScatterBlocker(mlir::stablehlo::ScatterOp op) {
+    auto indexElementType =
+        getElementTypeOrSelf(op.getScatterIndices().getType());
+    auto integerType = dyn_cast<IntegerType>(indexElementType);
+    if (!integerType || integerType.getWidth() > 64) {
+      return "general scatter lowering supports indices up to 64 bits";
+    }
+    if (integerType.isUnsigned()) {
+      return "general scatter lowering requires unsigned index normalization";
+    }
+    for (auto [input, update, result] :
+         llvm::zip(op.getInputs(), op.getUpdates(), op.getResultTypes())) {
+      Type inputElementType = getElementTypeOrSelf(input.getType());
+      if (inputElementType != getElementTypeOrSelf(update.getType()) ||
+          inputElementType != getElementTypeOrSelf(result)) {
+        return "general scatter lowering requires element promotion "
+               "before conversion";
+      }
+    }
+    return nullptr;
+  }
+
+  SmallVector<Value>
+  createGeneralScatter(mlir::stablehlo::ScatterOp op, OpAdaptor adaptor,
+                       ConversionPatternRewriter &rewriter) const {
+    auto asRankedTensor = [&](Value value) -> Value {
+      if (isa<RankedTensorType>(value.getType())) {
+        return value;
+      }
+      auto tensorType = RankedTensorType::get({}, value.getType());
+      return tensor::FromElementsOp::create(rewriter, op.getLoc(), tensorType,
+                                            ValueRange{value});
+    };
+    Value indices = asRankedTensor(adaptor.getScatterIndices());
+    SmallVector<Value> originals =
+        llvm::map_to_vector(adaptor.getInputs(), asRankedTensor);
+    SmallVector<Value> updates =
+        llvm::map_to_vector(adaptor.getUpdates(), asRankedTensor);
+    SmallVector<Type> resultTypes(ValueRange(originals).getTypes());
+    auto generalScatter = IREE::LinalgExt::GeneralScatterOp::create(
+        rewriter, op.getLoc(), resultTypes, updates, indices, originals,
+        op.getScatterDimensionNumbers().getUpdateWindowDims(),
+        op.getScatterDimensionNumbers().getInsertedWindowDims(),
+        op.getScatterDimensionNumbers().getInputBatchingDims(),
+        op.getScatterDimensionNumbers().getScatterIndicesBatchingDims(),
+        op.getScatterDimensionNumbers().getScatterDimsToOperandDims(),
+        op.getScatterDimensionNumbers().getIndexVectorDim());
+    rewriter.inlineRegionBefore(op.getUpdateComputation(),
+                                generalScatter.getRegion(),
+                                generalScatter.getRegion().begin());
+    Region &region = generalScatter.getRegion();
+    TypeConverter::SignatureConversion signatureConverter(
+        2 * adaptor.getInputs().size());
+    for (auto [i, argument] : llvm::enumerate(region.front().getArguments())) {
+      signatureConverter.addInputs(
+          i, getTypeConverter()->convertType(argument.getType()));
+    }
+    rewriter.applySignatureConversion(&region.front(), signatureConverter,
+                                      getTypeConverter());
+    SmallVector<Value> results;
+    for (auto [result, sourceType] :
+         llvm::zip(generalScatter.getResults(), op.getResultTypes())) {
+      if (cast<RankedTensorType>(sourceType).getRank() == 0) {
+        results.push_back(
+            tensor::ExtractOp::create(rewriter, op.getLoc(), result));
+      } else {
+        results.push_back(result);
+      }
+    }
+    return results;
+  }
+
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::ScatterOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    const char *generalBlocker = getGeneralScatterBlocker(op);
+
+    if (takesWholeWindowPath(op)) {
+      Value original = adaptor.getInputs().front();
+      Value indices = adaptor.getScatterIndices();
+      Value updates = adaptor.getUpdates().front();
+      SmallVector<std::pair<int64_t, int64_t>> unproven =
+          getUnprovenWindowDims(op, original, updates);
+      // The whole-window path accepts index types unsupported by the general
+      // fallback.
+      if (unproven.empty() || generalBlocker) {
+        rewriter.replaceOp(
+            op, createWindowScatter(op, original, indices, updates,
+                                    /*cloneReducer=*/false, rewriter));
+        return success();
+      }
+
+      Location loc = op.getLoc();
+      Value whole;
+      for (auto [updateDim, originalDim] : unproven) {
+        Value updateSize =
+            tensor::DimOp::create(rewriter, loc, updates, updateDim);
+        Value originalSize =
+            tensor::DimOp::create(rewriter, loc, original, originalDim);
+        Value equal = arith::CmpIOp::create(
+            rewriter, loc, arith::CmpIPredicate::eq, updateSize, originalSize);
+        whole =
+            whole ? arith::AndIOp::create(rewriter, loc, whole, equal) : equal;
+      }
+      auto ifOp = scf::IfOp::create(rewriter, loc, original.getType(), whole,
+                                    /*addThenBlock=*/true,
+                                    /*addElseBlock=*/true);
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPointToStart(ifOp.thenBlock());
+      scf::YieldOp::create(rewriter, loc,
+                           createWindowScatter(op, original, indices, updates,
+                                               /*cloneReducer=*/true,
+                                               rewriter));
+      rewriter.setInsertionPointToStart(ifOp.elseBlock());
+      scf::YieldOp::create(rewriter, loc,
+                           createGeneralScatter(op, adaptor, rewriter));
+      rewriter.replaceOp(op, ifOp.getResults());
+      return success();
+    }
+
+    if (generalBlocker) {
+      return op.emitError(generalBlocker);
+    }
+    rewriter.replaceOp(op, createGeneralScatter(op, adaptor, rewriter));
     return success();
   }
 };
@@ -451,6 +635,231 @@ static bool checkUnary(const ArrayRef<int64_t> &values) {
   return true;
 }
 
+enum class ScanInitHandling { Unsupported, Identity, SeedFirstElement };
+
+// Returns the single binary operation of `body` that combines two distinct
+// block arguments and is returned, or null.
+static Operation *getSingleArgumentCombiner(Block &body) {
+  Operation *reduceOp = body.getTerminator()->getOperand(0).getDefiningOp();
+  if (!reduceOp || !llvm::hasSingleElement(body.without_terminator()) ||
+      reduceOp->getBlock() != &body || &body.front() != reduceOp ||
+      reduceOp->getNumOperands() != 2) {
+    return nullptr;
+  }
+  Value lhs = reduceOp->getOperand(0);
+  Value rhs = reduceOp->getOperand(1);
+  bool combinesArguments = llvm::is_contained(body.getArguments(), lhs) &&
+                           llvm::is_contained(body.getArguments(), rhs) &&
+                           lhs != rhs;
+  return combinesArguments ? reduceOp : nullptr;
+}
+
+// Classifies a floating-point initial value of `reduceOp`.
+static ScanInitHandling classifyFloatInit(Operation *reduceOp,
+                                          const APFloat &x) {
+  if (isa<mlir::stablehlo::AddOp>(reduceOp) && x.isPosZero()) {
+    return ScanInitHandling::SeedFirstElement;
+  }
+  bool isIdentity =
+      TypeSwitch<Operation *, bool>(reduceOp)
+          .Case([&](mlir::stablehlo::AddOp) { return x.isZero(); })
+          .Case([&](mlir::stablehlo::MulOp) { return x.isExactlyValue(1.0); })
+          .Case([&](mlir::stablehlo::MaxOp) {
+            return x.isInfinity() && x.isNegative();
+          })
+          .Case([&](mlir::stablehlo::MinOp) {
+            return x.isInfinity() && !x.isNegative();
+          })
+          .Default(false);
+  return isIdentity ? ScanInitHandling::Identity
+                    : ScanInitHandling::Unsupported;
+}
+
+// Classifies an integer initial value of `reduceOp`.
+static ScanInitHandling classifyIntegerInit(Operation *reduceOp, const APInt &x,
+                                            bool isUnsigned) {
+  bool isIdentity =
+      TypeSwitch<Operation *, bool>(reduceOp)
+          .Case<mlir::stablehlo::AddOp, mlir::stablehlo::OrOp,
+                mlir::stablehlo::XorOp>([&](auto) { return x.isZero(); })
+          .Case([&](mlir::stablehlo::MulOp) { return x.isOne(); })
+          .Case([&](mlir::stablehlo::AndOp) { return x.isAllOnes(); })
+          .Case([&](mlir::stablehlo::MaxOp) {
+            return isUnsigned ? x.isZero() : x.isMinSignedValue();
+          })
+          .Case([&](mlir::stablehlo::MinOp) {
+            return isUnsigned ? x.isAllOnes() : x.isMaxSignedValue();
+          })
+          .Default(false);
+  return isIdentity ? ScanInitHandling::Identity
+                    : ScanInitHandling::Unsupported;
+}
+
+// Classifies the initial value of a supported scalar reducer. Inclusive scans
+// skip their initial value, so +0 must be combined with the first element:
+// unlike -0, it is not an identity for addition of a negative zero.
+static ScanInitHandling getScanInitHandling(Block &body, Value init) {
+  auto initType = cast<RankedTensorType>(init.getType());
+  if (initType.getRank() != 0 || body.getArgument(0).getType() != initType ||
+      body.getArgument(1).getType() != initType) {
+    return ScanInitHandling::Unsupported;
+  }
+  Operation *reduceOp = getSingleArgumentCombiner(body);
+  DenseElementsAttr value;
+  if (!reduceOp || !matchPattern(init, m_Constant(&value)) ||
+      !value.isSplat()) {
+    return ScanInitHandling::Unsupported;
+  }
+  Type elementType = value.getElementType();
+  if (isa<FloatType>(elementType)) {
+    return classifyFloatInit(reduceOp, value.getSplatValue<APFloat>());
+  }
+  if (!elementType.isIntOrIndex()) {
+    return ScanInitHandling::Unsupported;
+  }
+  return classifyIntegerInit(reduceOp, value.getSplatValue<APInt>(),
+                             elementType.isUnsignedInteger());
+}
+
+// Combines a +0 initializer with the first slice along the scan axis. Limiting
+// the slice extent to at most one also preserves empty axes. Tensor insertion
+// leaves the original input immutable and avoids interpreting a conditional
+// for every element on VMVX. Seeding after reversal also handles suffix scans.
+static Value createSeededScanInput(ConversionPatternRewriter &rewriter,
+                                   Location loc, Value input, Value init,
+                                   int64_t axis) {
+  auto inputType = cast<RankedTensorType>(input.getType());
+  int64_t rank = inputType.getRank();
+  SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
+  SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
+  SmallVector<OpFoldResult> sizes = tensor::getMixedSizes(rewriter, loc, input);
+  if (std::optional<int64_t> size = getConstantIntValue(sizes[axis])) {
+    sizes[axis] = rewriter.getIndexAttr(std::min(*size, int64_t{1}));
+  } else {
+    Value one = arith::ConstantIndexOp::create(rewriter, loc, 1);
+    sizes[axis] = rewriter.createOrFold<arith::MinUIOp>(
+        loc, cast<Value>(sizes[axis]), one);
+  }
+  Value first = tensor::ExtractSliceOp::create(rewriter, loc, input, offsets,
+                                               sizes, strides);
+  auto firstType = cast<RankedTensorType>(first.getType());
+  Value empty =
+      tensor::EmptyOp::create(rewriter, loc, sizes, inputType.getElementType());
+  SmallVector<AffineMap> maps{
+      rewriter.getMultiDimIdentityMap(rank),
+      AffineMap::get(rank, 0, {}, rewriter.getContext()),
+      rewriter.getMultiDimIdentityMap(rank)};
+  SmallVector<utils::IteratorType> iterators(rank,
+                                             utils::IteratorType::parallel);
+  Value seeded =
+      linalg::GenericOp::create(
+          rewriter, loc, firstType, ValueRange{first, init}, ValueRange{empty},
+          maps, iterators,
+          [](OpBuilder &builder, Location loc, ValueRange args) {
+            Value sum = arith::AddFOp::create(builder, loc, args[1], args[0]);
+            linalg::YieldOp::create(builder, loc, sum);
+          })
+          .getResult(0);
+  return tensor::InsertSliceOp::create(rewriter, loc, seeded, input, offsets,
+                                       sizes, strides);
+}
+
+// Builds an inclusive scan of `input` along `reduceAxis` seeded with `init`;
+// a suffix scan reverses around it. `fillReducer` moves or clones the reducer
+// into the scan region: a block of two 0-d tensors ending in stablehlo.return.
+static Value
+createReduceWindowScan(ConversionPatternRewriter &rewriter, Location loc,
+                       Value input, Value init, int64_t reduceAxis,
+                       bool isPostfix, ScanInitHandling initHandling,
+                       llvm::function_ref<void(Region &)> fillReducer) {
+  auto inputTy = cast<ShapedType>(input.getType());
+  auto initTy = cast<ShapedType>(init.getType());
+  llvm::SmallVector<Value> outputs;
+  llvm::SmallVector<Value> outputDynDims;
+  for (int i = 0; i < inputTy.getRank(); ++i) {
+    if (inputTy.isDynamicDim(i)) {
+      outputDynDims.push_back(
+          rewriter.createOrFold<tensor::DimOp>(loc, input, i));
+    }
+  }
+
+  llvm::SmallVector<int64_t> initDims;
+  llvm::SmallVector<Value> initDynDims;
+  for (int i = 0; i < inputTy.getRank(); ++i) {
+    if (i == reduceAxis) {
+      continue;
+    }
+    initDims.push_back(inputTy.getDimSize(i));
+    if (ShapedType::isDynamic(initDims.back())) {
+      initDynDims.push_back(
+          rewriter.createOrFold<tensor::DimOp>(loc, input, i));
+    }
+  }
+
+  outputs.push_back(tensor::EmptyOp::create(rewriter, loc, inputTy.getShape(),
+                                            inputTy.getElementType(),
+                                            outputDynDims));
+
+  Value newInit = tensor::EmptyOp::create(rewriter, loc, initDims,
+                                          initTy.getElementType(), initDynDims);
+
+  SmallVector<AffineMap> indexingMaps{
+      AffineMap::get(initDims.size(), /*symbolCount=*/0, {},
+                     rewriter.getContext()),
+      rewriter.getMultiDimIdentityMap(initDims.size())};
+  SmallVector<utils::IteratorType> iterators(initDims.size(),
+                                             utils::IteratorType::parallel);
+
+  newInit = linalg::GenericOp::create(
+                rewriter, loc, initTy.clone(initDims), ValueRange{init},
+                ValueRange{newInit}, indexingMaps, iterators,
+                [&](OpBuilder &b, Location loc, ValueRange args) {
+                  linalg::YieldOp::create(b, loc, args[0]);
+                })
+                .getResult(0);
+  outputs.push_back(newInit);
+
+  llvm::SmallVector<Type> outputTys;
+  for (auto output : outputs) {
+    outputTys.push_back(output.getType());
+  }
+
+  // IREE::LinalgExt::ScanOp only supports purely inclusive (prefix) scans.
+  // To support suffix (postfix) scans, we can reverse the input, perform a
+  // prefix scan, and then reverse the output.
+  auto createReverse = [&](Value val, int64_t axis) -> Value {
+    auto valTy = llvm::cast<mlir::RankedTensorType>(val.getType());
+    SmallVector<int64_t> dimensions;
+    dimensions.push_back(axis);
+    return mlir::stablehlo::ReverseOp::create(
+        rewriter, loc, valTy, val, rewriter.getDenseI64ArrayAttr(dimensions));
+  };
+  Value scanInput = isPostfix ? createReverse(input, reduceAxis) : input;
+  if (initHandling == ScanInitHandling::SeedFirstElement) {
+    scanInput =
+        createSeededScanInput(rewriter, loc, scanInput, init, reduceAxis);
+  }
+
+  auto scanOp = IREE::LinalgExt::ScanOp::create(
+      rewriter, loc, outputTys, scanInput, outputs[0], outputs[1],
+      rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(true));
+
+  fillReducer(scanOp.getRegion());
+
+  // Handle the tensor<*> to * conversion:
+  TypeConverter::SignatureConversion signatureConverter(2);
+  signatureConverter.addInputs(0, inputTy.getElementType());
+  signatureConverter.addInputs(1, initTy.getElementType());
+  rewriter.applySignatureConversion(&scanOp.getRegion().front(),
+                                    signatureConverter);
+
+  Value result = scanOp.getResult(0);
+  if (isPostfix) {
+    result = createReverse(result, reduceAxis);
+  }
+  return result;
+}
+
 struct ScanOpConversion final
     : OpConversionPattern<mlir::stablehlo::ReduceWindowOp> {
   using Base::Base;
@@ -477,7 +886,18 @@ struct ScanOpConversion final
     auto input0 = inputs.front();
     auto input0Ty = cast<ShapedType>(input0.getType());
     auto init0 = op.getInitValues().front();
-    auto init0Ty = cast<ShapedType>(init0.getType());
+    Type elementType = input0Ty.getElementType();
+    if (getElementTypeOrSelf(init0.getType()) != elementType ||
+        getElementTypeOrSelf(op.getResult(0).getType()) != elementType) {
+      return rewriter.notifyMatchFailure(
+          op, "scan requires matching element types");
+    }
+    ScanInitHandling initHandling =
+        getScanInitHandling(op.getBody().front(), init0);
+    if (initHandling == ScanInitHandling::Unsupported) {
+      return rewriter.notifyMatchFailure(op,
+                                         "unsupported scan reducer or init");
+    }
 
     auto window = llvm::to_vector(op.getWindowDimensions());
     llvm::SmallVector<int64_t, 4> reduceAxes;
@@ -521,105 +941,348 @@ struct ScanOpConversion final
     }
 
     bool isPrefix =
-        padding[reduceAxis * 2] == (input0Ty.getDimSize(reduceAxis) - 1);
+        padding[reduceAxis * 2] == (input0Ty.getDimSize(reduceAxis) - 1) &&
+        padding[reduceAxis * 2 + 1] == 0;
     bool isPostfix =
+        padding[reduceAxis * 2] == 0 &&
         padding[reduceAxis * 2 + 1] == (input0Ty.getDimSize(reduceAxis) - 1);
 
     if (isPrefix == isPostfix) {
       return rewriter.notifyMatchFailure(op, "is not purely prefix or postfix");
     }
 
-    llvm::SmallVector<Value> outputs;
-    llvm::SmallVector<Value> outputDynDims;
-    for (int i = 0; i < input0Ty.getRank(); ++i) {
-      if (input0Ty.isDynamic(i)) {
-        outputDynDims.push_back(
-            rewriter.createOrFold<tensor::DimOp>(op.getLoc(), input0, i));
+    Value result = createReduceWindowScan(
+        rewriter, op.getLoc(), input0, init0, reduceAxis, isPostfix,
+        initHandling, [&](Region &region) {
+          rewriter.inlineRegionBefore(op.getRegion(), region, region.begin());
+        });
+    // The result can have less or more static shape information than the
+    // input, even though a pure scan preserves its runtime extents.
+    result = rewriter.createOrFold<tensor::CastOp>(
+        op.getLoc(), op.getResult(0).getType(), result);
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// stablehlo.dynamic_reduce_window
+//===----------------------------------------------------------------------===//
+
+// An element of a shape operand: a constant, or the scalar holding it.
+struct ShapeElement {
+  std::optional<int64_t> constant;
+  Value value;
+};
+
+// Returns element `linear` of `tensor` if a constant or from_elements builds
+// it, or nullopt for any other producer.
+static std::optional<ShapeElement> readLeafShapeElement(Value tensor,
+                                                        int64_t linear) {
+  DenseIntElementsAttr constant;
+  if (matchPattern(tensor, m_Constant(&constant))) {
+    return ShapeElement{constant.getValues<APInt>()[linear].getSExtValue(), {}};
+  }
+  auto fromElements = tensor.getDefiningOp<tensor::FromElementsOp>();
+  if (!fromElements) {
+    return std::nullopt;
+  }
+  Value scalar = fromElements.getElements()[linear];
+  APInt value;
+  if (matchPattern(scalar, m_ConstantInt(&value))) {
+    return ShapeElement{value.getSExtValue(), {}};
+  }
+  return ShapeElement{std::nullopt, scalar};
+}
+
+// Moves `tensor` and `index` to the same element in the operand of a
+// concatenate or reshape producer. Returns false for any other producer or a
+// dynamic operand shape.
+static bool stepToShapeSource(Value &tensor, SmallVectorImpl<int64_t> &index,
+                              int64_t linear) {
+  if (auto concat = tensor.getDefiningOp<mlir::stablehlo::ConcatenateOp>()) {
+    int64_t dim = concat.getDimension();
+    for (Value input : concat.getInputs()) {
+      int64_t size = cast<ShapedType>(input.getType()).getDimSize(dim);
+      if (ShapedType::isDynamic(size)) {
+        return false;
       }
+      if (index[dim] < size) {
+        tensor = input;
+        return true;
+      }
+      index[dim] -= size;
     }
+    return false;
+  }
+  auto reshape = tensor.getDefiningOp<mlir::stablehlo::ReshapeOp>();
+  if (!reshape) {
+    return false;
+  }
+  tensor = reshape.getOperand();
+  auto operandType = cast<RankedTensorType>(tensor.getType());
+  if (!operandType.hasStaticShape()) {
+    return false;
+  }
+  index.assign(delinearize(linear, computeStrides(operandType.getShape())));
+  return true;
+}
 
-    llvm::SmallVector<Value> init;
-    llvm::SmallVector<int64_t> initDims;
-    llvm::SmallVector<Value> initDynDims;
-    for (int i = 0; i < input0Ty.getRank(); ++i) {
-      if (i == reduceAxis) {
-        continue;
-      }
-      initDims.push_back(input0Ty.getDimSize(i));
-      if (ShapedType::isDynamic(initDims.back())) {
-        initDynDims.push_back(
-            rewriter.createOrFold<tensor::DimOp>(op.getLoc(), input0, i));
-      }
+// Returns element `index` of the integer tensor `tensor` when only constants
+// and data movement build it. Follow the producer chain iteratively because
+// its length is independent of the IR's region nesting depth.
+static std::optional<ShapeElement> getShapeElement(Value tensor,
+                                                   ArrayRef<int64_t> indices) {
+  SmallVector<int64_t> index(indices);
+  while (true) {
+    auto type = dyn_cast<RankedTensorType>(tensor.getType());
+    if (!type || !type.hasStaticShape()) {
+      return std::nullopt;
     }
-
-    outputs.push_back(
-        tensor::EmptyOp::create(rewriter, op.getLoc(), input0Ty.getShape(),
-                                input0Ty.getElementType(), outputDynDims));
-
-    Value newInit = tensor::EmptyOp::create(
-        rewriter, op.getLoc(), initDims, init0Ty.getElementType(), initDynDims);
-
-    SmallVector<AffineMap> indexingMaps{
-        AffineMap::get(initDims.size(), /*symbolCount=*/0, {},
-                       rewriter.getContext()),
-        rewriter.getMultiDimIdentityMap(initDims.size())};
-    SmallVector<utils::IteratorType> iterators(initDims.size(),
-                                               utils::IteratorType::parallel);
-
-    newInit =
-        linalg::GenericOp::create(
-            rewriter, op.getLoc(), init0Ty.clone(initDims), ValueRange{init0},
-            ValueRange{newInit}, indexingMaps, iterators,
-            [&](OpBuilder &b, Location loc, ValueRange args) {
-              linalg::YieldOp::create(b, loc, args[0]);
-            })
-            .getResult(0);
-    outputs.push_back(newInit);
-
-    llvm::SmallVector<Type> outputTys;
-    for (auto output : outputs) {
-      outputTys.push_back(output.getType());
+    int64_t linear = linearize(index, computeStrides(type.getShape()));
+    if (std::optional<ShapeElement> element =
+            readLeafShapeElement(tensor, linear)) {
+      return element;
     }
+    if (!stepToShapeSource(tensor, index, linear)) {
+      return std::nullopt;
+    }
+  }
+}
 
-    // IREE::LinalgExt::ScanOp only supports purely inclusive (prefix) scans.
-    // To support suffix (postfix) scans, we can reverse the input, perform a
-    // prefix scan, and then reverse the output.
-    auto createReverse = [&](Value val, int64_t axis) -> Value {
-      auto valTy = llvm::cast<mlir::RankedTensorType>(val.getType());
-      SmallVector<int64_t> dimensions;
-      dimensions.push_back(axis);
-      return mlir::stablehlo::ReverseOp::create(
-          rewriter, op.getLoc(), valTy, val,
-          rewriter.getDenseI64ArrayAttr(dimensions));
-    };
-    llvm::SmallVector<Value> scanInputs;
-    if (isPostfix) {
-      for (auto input : inputs) {
-        scanInputs.push_back(createReverse(input, reduceAxis));
-      }
+// Strips casts and assumptions under which an i32 dimension size is exact.
+static Value stripExactSizeCasts(Value value) {
+  auto isWide = [](Type type) {
+    return type.isIndex() || type.getIntOrFloatBitWidth() >= 32;
+  };
+  while (Operation *op = value.getDefiningOp()) {
+    if (isa<arith::ExtSIOp, arith::ExtUIOp>(op) ||
+        (isa<arith::IndexCastOp, arith::IndexCastUIOp, arith::TruncIOp>(op) &&
+         isWide(op->getResult(0).getType()))) {
+      value = op->getOperand(0);
+    } else if (auto assume = dyn_cast<IREE::Util::AssumeIntOp>(op)) {
+      value = assume.getOperand(cast<OpResult>(value).getResultNumber());
     } else {
-      scanInputs = inputs;
+      break;
     }
+  }
+  return value;
+}
 
-    auto scanOp = IREE::LinalgExt::ScanOp::create(
-        rewriter, op.getLoc(), outputTys, scanInputs[0], outputs[0], outputs[1],
-        rewriter.getI64IntegerAttr(reduceAxis), rewriter.getBoolAttr(true));
-
-    rewriter.inlineRegionBefore(op.getRegion(), scanOp.getRegion(),
-                                scanOp.getRegion().begin());
-
-    // Handle the tensor<*> to * conversion:
-    TypeConverter::SignatureConversion signatureConverter(2);
-    signatureConverter.addInputs(0, input0Ty.getElementType());
-    signatureConverter.addInputs(1, init0Ty.getElementType());
-    rewriter.applySignatureConversion(&scanOp.getRegion().front(),
-                                      signatureConverter);
-
-    Value result = scanOp.getResult(0);
-    if (isPostfix) {
-      result = createReverse(result, reduceAxis);
+// Returns true when `element` is the extent of dimension `dim` of `tensor`.
+static bool isDimSize(const ShapeElement &element, Value tensor, int64_t dim) {
+  auto type = cast<RankedTensorType>(tensor.getType());
+  if (element.constant) {
+    return type.getDimSize(dim) == *element.constant;
+  }
+  auto stripTieShape = [](Value value) {
+    while (auto tie = value.getDefiningOp<IREE::Flow::TensorTieShapeOp>()) {
+      value = tie.getOperand();
     }
+    return value;
+  };
+  Value size = stripExactSizeCasts(element.value);
+  if (auto dimOp = size.getDefiningOp<tensor::DimOp>()) {
+    return dimOp.getConstantIndex() == dim &&
+           stripTieShape(dimOp.getSource()) == stripTieShape(tensor);
+  }
+  auto tie = tensor.getDefiningOp<IREE::Flow::TensorTieShapeOp>();
+  return tie && type.isDynamicDim(dim) &&
+         stripExactSizeCasts(
+             tie.getDynamicDims()[type.getDynamicDimIndex(dim)]) == size;
+}
 
+// Returns true when `element` is one less than the extent of dimension `dim`.
+static bool isDimSizeMinusOne(const ShapeElement &element, Value tensor,
+                              int64_t dim) {
+  if (element.constant) {
+    int64_t size = cast<RankedTensorType>(tensor.getType()).getDimSize(dim);
+    return ShapedType::isStatic(size) && size - 1 == *element.constant;
+  }
+  auto isConstant = [](Value value, int64_t expected) {
+    APInt constant;
+    return matchPattern(value, m_ConstantInt(&constant)) &&
+           constant.trySExtValue() == expected;
+  };
+  Value value = stripExactSizeCasts(element.value);
+  if (auto add = value.getDefiningOp<arith::AddIOp>()) {
+    for (auto [size, offset] : {std::pair(add.getLhs(), add.getRhs()),
+                                std::pair(add.getRhs(), add.getLhs())}) {
+      if (isConstant(offset, -1) &&
+          isDimSize({std::nullopt, size}, tensor, dim)) {
+        return true;
+      }
+    }
+  }
+  auto sub = value.getDefiningOp<arith::SubIOp>();
+  return sub && isConstant(sub.getRhs(), 1) &&
+         isDimSize({std::nullopt, sub.getLhs()}, tensor, dim);
+}
+
+// The scan JAX emits as stablehlo.dynamic_reduce_window for a cumulative
+// reduction over a symbolic axis.
+struct DynamicReduceWindowScan {
+  int64_t axis;
+  bool isPostfix;
+  func::FuncOp reducer;
+  ScanInitHandling initHandling;
+};
+
+// Returns whether `element` is the constant `value`.
+static bool isConstantShapeElement(std::optional<ShapeElement> element,
+                                   int64_t value) {
+  return element && element->constant == value;
+}
+
+// Returns the scalar reducer `op` calls when it combines two values of
+// `initType` in one block.
+static func::FuncOp getScalarReducer(mlir::stablehlo::CustomCallOp op,
+                                     RankedTensorType initType) {
+  auto reducer = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+      op, cast<FlatSymbolRefAttr>(op.getCalledComputations()[0]));
+  if (!reducer || reducer.isExternal() || !reducer.getBody().hasOneBlock() ||
+      reducer.getFunctionType() != FunctionType::get(op.getContext(),
+                                                     {initType, initType},
+                                                     {initType})) {
+    return {};
+  }
+  return reducer;
+}
+
+// Returns whether the window dimension, stride and dilation operands are
+// signless integer vectors of `rank` elements and the padding a `rank`x2
+// matrix of them.
+static bool hasWindowOperandShapes(mlir::stablehlo::CustomCallOp op,
+                                   int64_t rank) {
+  auto hasShape = [](Value value, ArrayRef<int64_t> shape) {
+    auto type = dyn_cast<RankedTensorType>(value.getType());
+    return type && type.getShape() == shape &&
+           type.getElementType().isSignlessInteger();
+  };
+  return llvm::all_of(op->getOperands().slice(2, 4),
+                      [&](Value value) { return hasShape(value, {rank}); }) &&
+         hasShape(op.getOperand(6), {rank, 2});
+}
+
+// Returns whether every element of the `rank`-element vector `shape` is 1.
+static bool isAllOnesShape(Value shape, int64_t rank) {
+  return llvm::all_of(llvm::seq<int64_t>(rank), [&](int64_t i) {
+    return isConstantShapeElement(getShapeElement(shape, {i}), 1);
+  });
+}
+
+// Returns the only axis whose window is not 1, if that window spans the whole
+// extent of `input` along it.
+static std::optional<int64_t> getFullWindowAxis(Value window, Value input) {
+  std::optional<int64_t> axis;
+  for (int64_t i = 0, rank = cast<RankedTensorType>(input.getType()).getRank();
+       i < rank; ++i) {
+    std::optional<ShapeElement> size = getShapeElement(window, {i});
+    if (isConstantShapeElement(size, 1)) {
+      continue;
+    }
+    if (axis || !size || !isDimSize(*size, input, i)) {
+      return std::nullopt;
+    }
+    axis = i;
+  }
+  return axis;
+}
+
+// Returns whether `padding` is zero on both sides of every axis except
+// `axis`.
+static bool isUnpaddedOutside(Value padding, int64_t axis, int64_t rank) {
+  return llvm::all_of(llvm::seq<int64_t>(rank), [&](int64_t i) {
+    return i == axis ||
+           (isConstantShapeElement(getShapeElement(padding, {i, 0}), 0) &&
+            isConstantShapeElement(getShapeElement(padding, {i, 1}), 0));
+  });
+}
+
+// Returns whether the scan along `axis` runs from the end, given `size - 1`
+// padding on exactly one side: low padding makes a prefix scan, high padding
+// a postfix scan.
+static std::optional<bool> matchScanDirection(Value padding, Value input,
+                                              int64_t axis) {
+  std::optional<ShapeElement> low = getShapeElement(padding, {axis, 0});
+  std::optional<ShapeElement> high = getShapeElement(padding, {axis, 1});
+  if (!low || !high) {
+    return std::nullopt;
+  }
+  if (isDimSizeMinusOne(*low, input, axis) && isConstantShapeElement(high, 0)) {
+    return false;
+  }
+  if (isConstantShapeElement(low, 0) && isDimSizeMinusOne(*high, input, axis)) {
+    return true;
+  }
+  return std::nullopt;
+}
+
+// Matches one input with unit strides and dilations, a window spanning one
+// axis and of size one elsewhere, and `size - 1` padding on one side of that
+// axis only.
+static std::optional<DynamicReduceWindowScan>
+matchDynamicReduceWindowScan(mlir::stablehlo::CustomCallOp op) {
+  if (op.getCallTargetName() != "stablehlo.dynamic_reduce_window" ||
+      op.getNumOperands() != 7 || op.getNumResults() != 1 ||
+      op.getCalledComputations().size() != 1) {
+    return std::nullopt;
+  }
+  Value input = op.getOperand(0);
+  auto inputType = dyn_cast<RankedTensorType>(input.getType());
+  auto initType = dyn_cast<RankedTensorType>(op.getOperand(1).getType());
+  if (!inputType || !initType || initType.getRank() != 0 ||
+      initType.getElementType() != inputType.getElementType() ||
+      op.getResult(0).getType() != inputType) {
+    return std::nullopt;
+  }
+  func::FuncOp reducer = getScalarReducer(op, initType);
+  if (!reducer) {
+    return std::nullopt;
+  }
+  int64_t rank = inputType.getRank();
+  ScanInitHandling initHandling =
+      getScanInitHandling(reducer.getBody().front(), op.getOperand(1));
+  if (initHandling == ScanInitHandling::Unsupported ||
+      !hasWindowOperandShapes(op, rank) ||
+      !llvm::all_of(op->getOperands().slice(3, 3),
+                    [&](Value shape) { return isAllOnesShape(shape, rank); })) {
+    return std::nullopt;
+  }
+  std::optional<int64_t> axis = getFullWindowAxis(op.getOperand(2), input);
+  if (!axis || !isUnpaddedOutside(op.getOperand(6), *axis, rank)) {
+    return std::nullopt;
+  }
+  std::optional<bool> isPostfix =
+      matchScanDirection(op.getOperand(6), input, *axis);
+  if (!isPostfix) {
+    return std::nullopt;
+  }
+  return DynamicReduceWindowScan{*axis, *isPostfix, reducer, initHandling};
+}
+
+struct DynamicReduceWindowScanConversion final
+    : OpConversionPattern<mlir::stablehlo::CustomCallOp> {
+  using Base::Base;
+  LogicalResult
+  matchAndRewrite(mlir::stablehlo::CustomCallOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    std::optional<DynamicReduceWindowScan> scan =
+        matchDynamicReduceWindowScan(op);
+    if (!scan) {
+      return rewriter.notifyMatchFailure(op, "not a scan window");
+    }
+    Value result = createReduceWindowScan(
+        rewriter, op.getLoc(), op.getOperand(0), op.getOperand(1), scan->axis,
+        scan->isPostfix, scan->initHandling, [&](Region &region) {
+          OpBuilder::InsertionGuard guard(rewriter);
+          rewriter.cloneRegionBefore(scan->reducer.getBody(), region,
+                                     region.end());
+          Operation *terminator = region.front().getTerminator();
+          rewriter.setInsertionPoint(terminator);
+          rewriter.replaceOpWithNewOp<mlir::stablehlo::ReturnOp>(
+              terminator, terminator->getOperands());
+        });
     rewriter.replaceOp(op, result);
     return success();
   }
@@ -721,67 +1384,10 @@ struct TopkOpConversion final : OpConversionPattern<chlo::TopKOp> {
   }
 };
 
-//===----------------------------------------------------------------------===//
-// Pass
-//===----------------------------------------------------------------------===//
-struct ConvertStableHloToLinalgExt final
-    : impl::ConvertStableHloToLinalgExtBase<ConvertStableHloToLinalgExt> {
-  using ConvertStableHloToLinalgExtBase::ConvertStableHloToLinalgExtBase;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
-                IREE::Flow::FlowDialect, mlir::cf::ControlFlowDialect,
-                mlir::math::MathDialect, mlir::arith::ArithDialect,
-                complex::ComplexDialect, tensor::TensorDialect>();
-  }
-
-  void runOnOperation() override {
-    MLIRContext *context = &getContext();
-    RewritePatternSet patterns(context);
-
-    StableHloToStdTypeConverter typeConverter;
-    populateStableHloToLinalgExtConversionPatterns(context, typeConverter,
-                                                   &patterns);
-
-    ConversionTarget target(getContext());
-    target.addLegalDialect<IREE::LinalgExt::IREELinalgExtDialect,
-                           linalg::LinalgDialect, IREE::Flow::FlowDialect,
-                           mlir::cf::ControlFlowDialect,
-                           mlir::math::MathDialect, mlir::arith::ArithDialect,
-                           tensor::TensorDialect, complex::ComplexDialect>();
-    // TODO: Scatter is not marked as illegal to allow falling back to the
-    // generic LinAlg lowering, the generic lowering is not always performant
-    // and even though only used in fallback here, may hide performance
-    // issues and we'd rather know when the optimized lowering fails.
-    target.addIllegalOp<mlir::stablehlo::SortOp, mlir::stablehlo::FftOp,
-                        mlir::stablehlo::ReverseOp>();
-    // FFT conversion creates complex ops which will be converted by the normal
-    // StableHlo lowering, but these should still be converted if present inside
-    // other linalg_ext op regions.
-    target.addDynamicallyLegalOp<mlir::stablehlo::ComplexOp>(
-        [](mlir::stablehlo::ComplexOp complexOp) {
-          return !isInBodyOfLinalgExtOps(complexOp);
-        });
-    // We deliberately allow unrealized casts to persist. These should fall away
-    // when the rest of StableHlo is converted.
-    target.addLegalOp<UnrealizedConversionCastOp>();
-
-    if (failed(applyPartialConversion(getOperation(), target,
-                                      std::move(patterns)))) {
-      signalPassFailure();
-    }
-  }
-};
-} // namespace
-
-void populateStableHloToLinalgExtConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    RewritePatternSet *patterns) {
-  patterns->add<ScanOpConversion, SortOpConversion, ScatterOpConversion,
-                FftOpConversion, ReverseOpConversion, TopkOpConversion>(
-      typeConverter, context);
-
+// Converts StableHLO ops on 0-d tensors inside LinalgExt op regions.
+static void populateLinalgExtRegionPatterns(MLIRContext *context,
+                                            TypeConverter &typeConverter,
+                                            RewritePatternSet *patterns) {
   // FIXME: It shouldn't be necessary to list every matching StableHlo op
   // here, especially since they're already listed in
   // populateStableHloToLinalgConversionPattern and in
@@ -829,6 +1435,164 @@ void populateStableHloToLinalgExtConversionPatterns(
       LinalgExtRegionHLOOpConversion<mlir::stablehlo::TanhOp>,
       LinalgExtRegionHLOOpConversion<mlir::stablehlo::XorOp>,
       LinalgExtRegionReturnOpConversion>(typeConverter, context);
+}
+
+//===----------------------------------------------------------------------===//
+// Pass
+//===----------------------------------------------------------------------===//
+struct ConvertStableHloToLinalgExt final
+    : impl::ConvertStableHloToLinalgExtBase<ConvertStableHloToLinalgExt> {
+  using ConvertStableHloToLinalgExtBase::ConvertStableHloToLinalgExtBase;
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::LinalgExt::IREELinalgExtDialect,
+                    linalg::LinalgDialect, IREE::Flow::FlowDialect,
+                    mlir::cf::ControlFlowDialect, mlir::math::MathDialect,
+                    mlir::arith::ArithDialect, complex::ComplexDialect,
+                    scf::SCFDialect, tensor::TensorDialect>();
+  }
+
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    // A scatter is not illegal, so a declined general lowering must fail here
+    // rather than leave the scatter behind after its diagnostic.
+    WalkResult unsupportedScatter =
+        getOperation().walk([](mlir::stablehlo::ScatterOp op) {
+          if (ScatterOpConversion::takesWholeWindowPath(op)) {
+            return WalkResult::advance();
+          }
+          if (const char *blocker =
+                  ScatterOpConversion::getGeneralScatterBlocker(op)) {
+            op.emitError(blocker);
+            return WalkResult::interrupt();
+          }
+          return WalkResult::advance();
+        });
+    if (unsupportedScatter.wasInterrupted()) {
+      return signalPassFailure();
+    }
+
+    RewritePatternSet patterns(context);
+
+    StableHloToStdTypeConverter typeConverter;
+    populateStableHloToLinalgExtConversionPatterns(context, typeConverter,
+                                                   &patterns);
+
+    ConversionTarget target(getContext());
+    target.addLegalDialect<
+        IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
+        IREE::Flow::FlowDialect, mlir::cf::ControlFlowDialect,
+        mlir::math::MathDialect, mlir::arith::ArithDialect, scf::SCFDialect,
+        tensor::TensorDialect, complex::ComplexDialect>();
+    // Reducer control flow must carry scalars too. Leaving tensor-valued guards
+    // here would introduce rank-zero buffers with incompatible branch layouts.
+    // Keep structural operations outside LinalgExt regions at tensor level.
+    scf::populateSCFStructuralTypeConversions(typeConverter, patterns);
+    target.addDynamicallyLegalOp<scf::ForOp, scf::IfOp, scf::WhileOp,
+                                 scf::ConditionOp, scf::IndexSwitchOp,
+                                 scf::ExecuteRegionOp>(
+        [&typeConverter](Operation *op) {
+          return !isNestedInLinalgExtOp(op) || typeConverter.isLegal(op);
+        });
+    target.addDynamicallyLegalOp<scf::YieldOp>(
+        [&typeConverter](scf::YieldOp op) {
+          if (!isNestedInLinalgExtOp(op) ||
+              !isa<scf::ForOp, scf::IfOp, scf::WhileOp, scf::IndexSwitchOp,
+                   scf::ExecuteRegionOp>(op->getParentOp())) {
+            return true;
+          }
+          return typeConverter.isLegal(op.getOperands());
+        });
+    // Scatter is not marked illegal: ScatterOpConversion converts every
+    // scatter, and the walk above fails the pass for those it must reject.
+    // Other supported operations must use their dedicated lowering.
+    target.addIllegalOp<mlir::stablehlo::SortOp, mlir::stablehlo::FftOp,
+                        mlir::stablehlo::ReverseOp>();
+    // FFT conversion creates complex ops which will be converted by the normal
+    // StableHlo lowering, but these should still be converted if present inside
+    // other linalg_ext op regions.
+    target.addDynamicallyLegalOp<mlir::stablehlo::ComplexOp>(
+        [](mlir::stablehlo::ComplexOp complexOp) {
+          return !isNestedInLinalgExtOp(complexOp);
+        });
+    // We deliberately allow unrealized casts to persist. These should fall away
+    // when the rest of StableHlo is converted.
+    target.addLegalOp<UnrealizedConversionCastOp>();
+
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
+      signalPassFailure();
+    }
+  }
+};
+// A module pass: the custom call names its reducer by symbol, so lowering it
+// reads a sibling function.
+struct LegalizeDynamicReduceWindow final
+    : impl::LegalizeDynamicReduceWindowBase<LegalizeDynamicReduceWindow> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry
+        .insert<IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
+                mlir::math::MathDialect, mlir::arith::ArithDialect,
+                complex::ComplexDialect, tensor::TensorDialect>();
+  }
+
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    StableHloToStdTypeConverter typeConverter;
+    RewritePatternSet patterns(context);
+    patterns.add<DynamicReduceWindowScanConversion>(typeConverter, context);
+    populateLinalgExtRegionPatterns(context, typeConverter, &patterns);
+
+    // Bodies of LinalgExt ops created earlier are left to the general
+    // lowering, which handles ops the scan's body patterns do not.
+    llvm::DenseSet<Operation *> earlierOps;
+    getOperation().walk([&](Operation *op) {
+      if (isa<IREE::LinalgExt::IREELinalgExtDialect>(op->getDialect())) {
+        earlierOps.insert(op);
+      }
+    });
+    ConversionTarget target(*context);
+    target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
+    target.addDynamicallyLegalDialect<mlir::stablehlo::StablehloDialect>(
+        [&](Operation *op) {
+          return !isInBodyOfLinalgExtOps(op) ||
+                 earlierOps.contains(op->getParentRegion()->getParentOp());
+        });
+    target.addDynamicallyLegalOp<mlir::stablehlo::CustomCallOp>(
+        [](mlir::stablehlo::CustomCallOp op) {
+          return !matchDynamicReduceWindowScan(op);
+        });
+    target.addLegalOp<UnrealizedConversionCastOp>();
+    // Track reducer candidates before conversion removes their call sites.
+    llvm::SetVector<func::FuncOp> reducers;
+    getOperation().walk([&](mlir::stablehlo::CustomCallOp op) {
+      if (std::optional<DynamicReduceWindowScan> scan =
+              matchDynamicReduceWindowScan(op)) {
+        reducers.insert(scan->reducer);
+      }
+    });
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns)))) {
+      return signalPassFailure();
+    }
+    for (func::FuncOp reducer : reducers) {
+      if (reducer.isPrivate() &&
+          SymbolTable::symbolKnownUseEmpty(reducer, getOperation())) {
+        reducer.erase();
+      }
+    }
+  }
+};
+} // namespace
+
+void populateStableHloToLinalgExtConversionPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    RewritePatternSet *patterns) {
+  patterns->add<ScanOpConversion, SortOpConversion, ScatterOpConversion,
+                FftOpConversion, ReverseOpConversion, TopkOpConversion>(
+      typeConverter, context);
+
+  populateLinalgExtRegionPatterns(context, typeConverter, patterns);
 }
 
 } // namespace mlir::iree_compiler::stablehlo

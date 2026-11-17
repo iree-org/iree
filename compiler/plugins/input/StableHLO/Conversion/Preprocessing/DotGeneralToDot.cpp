@@ -222,15 +222,27 @@ struct GeneralDotConvert final
   // replaced with the standard Dot operator.
   //
   // Note: This requires an empty list of batch dimensions.
-  LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
-                                PatternRewriter &rewriter) const override {
-    Location loc = op.getLoc();
-
+  static LogicalResult matchUnbatchedPlainDot(mlir::stablehlo::DotGeneralOp op,
+                                              PatternRewriter &rewriter) {
+    if (op.getAlgorithm()) {
+      return rewriter.notifyMatchFailure(
+          op, "dot algorithm cannot be represented by stablehlo.dot");
+    }
     auto dotNumbers = op.getDotDimensionNumbers();
     if (!dotNumbers.getLhsBatchingDimensions().empty() ||
         !dotNumbers.getRhsBatchingDimensions().empty()) {
+      return rewriter.notifyMatchFailure(op, "has batching dimensions");
+    }
+    return success();
+  }
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::DotGeneralOp op,
+                                PatternRewriter &rewriter) const override {
+    if (failed(matchUnbatchedPlainDot(op, rewriter))) {
       return failure();
     }
+    Location loc = op.getLoc();
+    auto dotNumbers = op.getDotDimensionNumbers();
 
     ArrayAttr precisionConfig;
     auto opPrecisionConfig = op.getPrecisionConfig();
@@ -400,15 +412,25 @@ struct DotVectorOptimization final : OpRewritePattern<mlir::stablehlo::DotOp> {
     ShapedType rhsTy = cast<ShapedType>(rhs.getType());
     ShapedType resultTy = cast<ShapedType>(op.getType());
 
+    bool reshapeLhs = lhsTy.getRank() == 2 && lhsTy.getDimSize(0) == 1;
+    bool reshapeRhs = rhsTy.getRank() == 2 && rhsTy.getDimSize(1) == 1;
+    // ReshapeOp cannot form a dynamic result. Leave the dot unchanged when
+    // the vector rewrite would need to reshape a dynamic dimension.
+    if ((reshapeLhs && ShapedType::isDynamic(lhsTy.getDimSize(1))) ||
+        (reshapeRhs && ShapedType::isDynamic(rhsTy.getDimSize(0))) ||
+        ((reshapeLhs || reshapeRhs) && !resultTy.hasStaticShape())) {
+      return rewriter.notifyMatchFailure(op, "dynamic reshape unsupported");
+    }
+
     llvm::SmallVector<int64_t> dotShape;
-    if (lhsTy.getRank() == 2 && lhsTy.getDimSize(0) == 1) {
+    if (reshapeLhs) {
       lhs = mlir::stablehlo::ReshapeOp::create(
           b, lhsTy.clone({lhsTy.getDimSize(1)}), lhs);
     } else if (lhsTy.getRank() == 2) {
       dotShape.push_back(lhsTy.getDimSize(0));
     }
 
-    if (rhsTy.getRank() == 2 && rhsTy.getDimSize(1) == 1) {
+    if (reshapeRhs) {
       rhs = mlir::stablehlo::ReshapeOp::create(
           b, rhsTy.clone({rhsTy.getDimSize(0)}), rhs);
     } else if (rhsTy.getRank() == 2) {

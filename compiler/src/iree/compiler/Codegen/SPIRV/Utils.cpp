@@ -18,6 +18,17 @@
 
 namespace mlir::iree_compiler {
 
+bool supportsNativeSPIRVF16(IREE::GPU::TargetAttr target) {
+  if (!target) {
+    return false;
+  }
+  auto wgp = target.getWgp();
+  return IREE::GPU::bitEnumContainsAll(wgp.getCompute().getValue(),
+                                       IREE::GPU::ComputeBitwidths::FP16) &&
+         IREE::GPU::bitEnumContainsAll(wgp.getStorage().getValue(),
+                                       IREE::GPU::StorageBitwidths::B16);
+}
+
 bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp) {
   if (variantOp.getObjects().has_value()) {
     // Variants containing external executables do not go through CodeGen.

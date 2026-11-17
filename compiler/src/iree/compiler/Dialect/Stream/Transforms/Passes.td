@@ -436,6 +436,11 @@ def ScheduleAllocationPass :
     `stream.resource.alloca` (and the matching `stream.resource.dealloca`) and
     sequenced in the device timeline by `!stream.timepoint` values.
   }];
+  let options = [
+    Option<"boundTransients", "bound-transients", "bool", /*default=*/"false",
+           "Packs local transients whose sizes have a proven upper bound at "
+           "that bound; ranges keep their exact sizes.">,
+  ];
   let dependentDialects = [
     "mlir::arith::ArithDialect",
     "IREE::Stream::StreamDialect",

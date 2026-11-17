@@ -23,7 +23,7 @@ namespace mlir::iree_compiler {
 namespace {
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+class UnaryArithmeticOpConversion final : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
   LogicalResult
@@ -34,6 +34,11 @@ class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
       return failure();
     }
 
+    if (!IREE::VM::isVMArithmeticType(srcOp.getType(),
+                                      adaptor.getOperand().getType())) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "unsupported scalar arithmetic type");
+    }
     switch (adaptor.getOperand().getType().getIntOrFloatBitWidth()) {
     case 32:
       rewriter.replaceOpWithNewOp<Dst32OpTy>(
@@ -44,14 +49,14 @@ class UnaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
           srcOp, adaptor.getOperand().getType(), adaptor.getOperand());
       break;
     default:
-      assert(false && "invalid target type");
+      return rewriter.notifyMatchFailure(srcOp, "unsupported bit width");
     }
     return success();
   }
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+class BinaryArithmeticOpConversion final : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
   LogicalResult
@@ -62,6 +67,11 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
       return failure();
     }
 
+    if (!IREE::VM::isVMArithmeticType(srcOp.getType(),
+                                      adaptor.getLhs().getType())) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "unsupported scalar arithmetic type");
+    }
     switch (adaptor.getLhs().getType().getIntOrFloatBitWidth()) {
     case 32:
       rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, adaptor.getLhs().getType(),
@@ -74,14 +84,15 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
                                              adaptor.getRhs());
       break;
     default:
-      assert(false && "invalid target type");
+      return rewriter.notifyMatchFailure(srcOp, "unsupported bit width");
     }
     return success();
   }
 };
 
 template <typename SrcOpTy, typename Dst32OpTy, typename Dst64OpTy>
-class TernaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
+class TernaryArithmeticOpConversion final
+    : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
   LogicalResult
@@ -92,6 +103,11 @@ class TernaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
     }
 
     Type type = adaptor.getA().getType();
+    if (!IREE::VM::isVMArithmeticType(srcOp.getType(),
+                                      adaptor.getA().getType())) {
+      return rewriter.notifyMatchFailure(srcOp,
+                                         "unsupported scalar arithmetic type");
+    }
     switch (type.getIntOrFloatBitWidth()) {
     case 32:
       rewriter.replaceOpWithNewOp<Dst32OpTy>(srcOp, type, adaptor.getA(),

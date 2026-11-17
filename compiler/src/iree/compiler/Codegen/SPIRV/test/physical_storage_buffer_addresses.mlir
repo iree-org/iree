@@ -75,3 +75,37 @@ hal.executable private @interface_binding {
 //  CHECK-NEXT:   spirv.Load "PhysicalStorageBuffer" %[[loc1]]
 //       CHECK:   %[[loc2:.+]] = spirv.AccessChain %[[ptr2]]
 //  CHECK-NEXT:   spirv.Load "PhysicalStorageBuffer" %[[loc2]]
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+hal.executable private @physical_word_atomics {
+  hal.executable.variant @vulkan target(<"vulkan-spirv", "vulkan-spirv-bda-v1">) {
+    hal.executable.export public @physical_word_atomics layout(#pipeline_layout) <
+      workgroup_size = [32: index, 1: index, 1: index]
+    >
+    builtin.module attributes {
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.5,
+        [Int64, Shader, PhysicalStorageBufferAddresses],
+        [SPV_KHR_physical_storage_buffer]>, #spirv.resource_limits<>>
+    } {
+      func.func @physical_word_atomics(%mask: i32, %value: i32) -> i32 {
+        %index = arith.constant 1 : index
+        %buffer = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<2xi32, #spirv.storage_class<PhysicalStorageBuffer>>
+        %old = memref.atomic_rmw andi %mask, %buffer[%index] : (i32, memref<2xi32, #spirv.storage_class<PhysicalStorageBuffer>>) -> i32
+        %bits = memref.atomic_rmw ori %value, %buffer[%index] : (i32, memref<2xi32, #spirv.storage_class<PhysicalStorageBuffer>>) -> i32
+        return %bits : i32
+      }
+    }
+  }
+}
+// CHECK-LABEL: spirv.func @physical_word_atomics
+// CHECK: %[[POINTER:.+]] = spirv.AccessChain {{.+}} -> !spirv.ptr<i32, PhysicalStorageBuffer>
+// CHECK: spirv.AtomicAnd <Device> <AcquireRelease|UniformMemory> %[[POINTER]],
+// CHECK: %[[POINTER:.+]] = spirv.AccessChain {{.+}} -> !spirv.ptr<i32, PhysicalStorageBuffer>
+// CHECK: %[[OLD:.+]] = spirv.AtomicOr <Device> <AcquireRelease|UniformMemory> %[[POINTER]],
+// CHECK: spirv.ReturnValue %[[OLD]] : i32

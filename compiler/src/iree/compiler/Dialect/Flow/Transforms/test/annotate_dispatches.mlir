@@ -1066,3 +1066,25 @@ flow.executable private @ex {
     }
   }
 }
+
+// -----
+
+// Empty update and index tensors must have zero cost without dividing by zero.
+flow.executable private @empty_scatter {
+  // CHECK: flow.executable.export public @dispatch_scatter_4xi32
+  flow.executable.export public @dispatch
+  builtin.module {
+    // CHECK: func.func @dispatch_scatter_4xi32
+    func.func @dispatch(%input: tensor<4xi32>, %indices: tensor<0x1xi32>,
+        %updates: tensor<0xi32>) -> tensor<4xi32> {
+      %result = iree_linalg_ext.scatter dimension_map = [0] unique_indices(false)
+          ins(%updates, %indices : tensor<0xi32>, tensor<0x1xi32>)
+          outs(%input : tensor<4xi32>) {
+        ^bb0(%update: i32, %current: i32):
+          %sum = arith.addi %update, %current : i32
+          iree_linalg_ext.yield %sum : i32
+      } -> tensor<4xi32>
+      return %result : tensor<4xi32>
+    }
+  }
+}

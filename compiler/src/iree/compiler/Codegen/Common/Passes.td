@@ -125,6 +125,8 @@ def ConvertUnsupportedFloatToIntBuffersPass :
            "Convert F8E4M3FNUZ buffers to i8">,
     Option<"includeF8E8M0FNU", "include-f8e8m0fnu", "bool", /*default=*/"true",
            "Convert F8E8M0FNU (MX scale) buffers to i8">,
+    Option<"includeF16", "include-f16", "bool", /*default=*/"false",
+           "Convert F16 buffers to i16 after arithmetic emulation">,
   ];
 }
 
@@ -146,15 +148,27 @@ def ConvertUnsupportedFloatArithPass
     IEEE 754 round-to-nearest-even semantics and proper handling of denormals,
     NaN, Inf, and special encodings (FNUZ types).
 
+    F16, BF16 and math operations are opt-in. Each emulated arithmetic result
+    retains its original rounding boundary. Narrow math.fma is rejected because
+    wider evaluation can double-round its result. Narrow math.copysign requires
+    a static shape and preserves the sign and payload bits of signed-zero
+    formats.
+
     Note: arith.scaling_extf/truncf operations (used for MX/microscaling) are
     preserved and handled by separate expansion patterns in later passes.
   }];
   let options = [
     Option<"enableExtTruncEmulation", "enable-ext-trunc-emulation",
            "bool", /*default=*/"true",
-           "Enable software emulation for extf/truncf of fp4/fp8 types "
-           "without hardware support. When disabled, types requiring emulation "
-           "will be left unconverted and may cause errors in later passes.">
+           "Enable software emulation for conversions of selected float types, "
+           "including the bf16 expansion when include-bf16 is set. When "
+           "disabled, conversion operations remain for later passes.">,
+    Option<"includeF16", "include-f16", "bool", /*default=*/"false",
+           "Emulate f16 arithmetic and conversions in f32">,
+    Option<"includeBf16", "include-bf16", "bool", /*default=*/"false",
+           "Emulate bf16 arithmetic and conversions in f32">,
+    Option<"includeMath", "include-math", "bool", /*default=*/"false",
+           "Emulate math operations on selected float types in f32">
   ];
 }
 
@@ -538,7 +552,9 @@ def EmulateNarrowTypePass :
            "bool", /*default=*/"false",
            "Indicates that atomic ops are not allowed in the emulation. It can "
            "be enabled if the target can guarantee no concurrent accesses to "
-           "the same memory location.">
+           "the same memory location.">,
+    Option<"loadStoreBitwidth", "load-store-bitwidth", "int64_t", /*default=*/"8",
+           "Storage unit width for narrow load/store emulation (8 or 32 bits)">
   ];
 }
 

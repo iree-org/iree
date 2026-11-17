@@ -32,6 +32,29 @@ def ConvertStableHloToLinalgExt :
 // General passes
 //===----------------------------------------------------------------------===//
 
+def LegalizeDeprecatedOpsPass :
+    Pass<"iree-stablehlo-legalize-deprecated-ops", "ModuleOp"> {
+  let summary = "Normalizes deprecated StableHLO operations";
+  let description = [{
+    Replaces deprecated operation spellings in module functions with their
+    supported equivalents.
+    Leaves map and rng operations unchanged. Rejects quantized unary einsums.
+  }];
+  let dependentDialects = ["mlir::stablehlo::StablehloDialect"];
+}
+
+def LegalizeDynamicReduceWindow :
+    Pass<"iree-stablehlo-legalize-dynamic-reduce-window", "ModuleOp"> {
+  let summary =
+      "Lowers stablehlo.dynamic_reduce_window custom calls that compute scans";
+  let description = [{
+    Converts recognized dynamic prefix and suffix windows to LinalgExt scans.
+    After a
+    successful conversion, removes only private reducers proven unused in the
+    containing symbol scope. Externally visible reducers remain callable.
+  }];
+}
+
 def LegalizeControlFlow :
     InterfacePass<"iree-stablehlo-legalize-control-flow", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes from StableHLO control flow to SCF control flow";
@@ -40,11 +63,26 @@ def LegalizeControlFlow :
 def LegalizeStableHLOCustomCalls :
     InterfacePass<"iree-stablehlo-legalize-custom-calls", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes specialized custom calls to decomposed implementations";
+  let description = [{
+    Lowers supported custom calls to their IREE implementations. Shape assertions
+    describe the export's supported input domain and are dropped after extracting
+    supported dimension equalities, affine ties, bounds and divisibility facts.
+    Facts are analyzed without modifying IR, then materialized after the
+    assertions establishing them. Only dominated original uses are rewritten.
+    Unsupported or overflowing proofs add no facts. Callers must satisfy the
+    exported shape constraints; this pass does not add runtime validation.
+  }];
 }
 
 def LegalizeShapeComputations :
     InterfacePass<"iree-stablehlo-legalize-shape-computations", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes StableHLO shape operations to core-mlir operations";
+  let description = [{
+    Recognizes scalar and vector shape computations and expands elementwise
+    operations with statically shaped results into scalar arithmetic. Dynamic
+    results and integer operations with explicit signedness remain available
+    for ordinary tensor lowering.
+  }];
 }
 
 def VerifyCompilerStableHloInputLegality :
@@ -59,5 +97,21 @@ def CheckVHLOStableHloMixUsage :
       "Check and report an error when VHLO and StableHLO are used in the same module";
 }
 
+def InlineShapeAssertionHelpers :
+    Pass<"iree-stablehlo-inline-shape-assertion-helpers", "ModuleOp"> {
+  let summary =
+      "Inlines the private scalar helpers computing shape_assertion operands";
+  let description = [{
+    Analyzes private, pure, single-block scalar-integer helper closures without
+    changing IR. Rejects recursive dependencies and preserves no-inline and
+    affinity boundaries on functions and calls. Applies eligible calls in
+    dependency order with a pass-wide cloning allowance of eight times the
+    original module operation count plus 4096 operations. Expanded-body
+    estimates saturate and count each call occurrence, including nested-region
+    operations. Over-budget or failed inlining leaves valid calls and runtime
+    assertions intact; the allowance limits this optimization, not input size.
+  }];
+  let dependentDialects = ["mlir::func::FuncDialect"];
+}
 
 #endif // IREE_COMPILER_PLUGINS_INPUT_STABLEHLO_CONVERSION_PASSES
