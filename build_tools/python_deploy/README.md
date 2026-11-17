@@ -86,7 +86,7 @@ Here is the procedure:
 [host ~/iree]$ docker run --interactive --tty --rm -v $(pwd):/work/iree gcr.io/iree-oss/manylinux2014_x86_64-release:prod
 [root@c8f6d0041d79 /]# export PATH=/opt/python/cp311-cp311/bin:$PATH
 [root@c8f6d0041d79 /]# python --version
-Python 3.11.0
+Python 3.11.x
 
 
 # Two paths for further work.
