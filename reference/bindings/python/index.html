@@ -6346,16 +6346,15 @@ respectively.</p>
 </details>
 <h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
 <p>To use IREE's Python bindings, you will first need to install
-<a href="https://www.python.org/downloads/">Python 3</a> and
+<a href="https://www.python.org/downloads/">Python 3.11 or newer</a> and
 <a href="https://pip.pypa.io/en/stable/installing/">pip</a>, as needed.</p>
 <details class="info" open="open">
 <summary>Note - Python version compatibility</summary>
 <p>IREE's release wheels use the
 <a href="https://docs.python.org/3/c-api/stable.html">Python Stable ABI (abi3)</a>.
 The <code>cp312-abi3</code> wheels are compatible with any standard (with GIL)
-Python 3.12+ version. Separate <code>cp310</code> and <code>cp311</code> wheels are provided
-for older supported versions. A free-threaded (<code>cp313t</code>) wheel is also
-available for Python 3.13t (no GIL).</p>
+Python 3.12+ version. Separate <code>cp311</code> wheels are provided for Python 3.11.
+A free-threaded (<code>cp313t</code>) wheel is also available for Python 3.13t (no GIL).</p>
 </details>
 <details class="tip" open="open">
 <summary>Tip - Virtual environments</summary>
