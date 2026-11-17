@@ -56,7 +56,7 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &modulePassManager) {
       .addPass(createCSEPass)
       .addPass([]() { return createConvertVectorToSCFPass(); })
       .addPass(createCanonicalizerPass)
-      .addPass([&]() {
+      .addPass([]() {
         arith::ArithExpandOpsPassOptions options;
         options.includeBf16 = true;
         options.includeF8E8M0 = true;
@@ -70,6 +70,7 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &modulePassManager) {
         // arithmetic and math are computed in f32.
         ConvertUnsupportedFloatArithPassOptions options;
         options.includeF16 = true;
+        options.includeBf16 = true;
         options.includeMath = true;
         return createConvertUnsupportedFloatArithPass(options);
       })

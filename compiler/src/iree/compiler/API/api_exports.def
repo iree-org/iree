@@ -312,8 +312,12 @@ EXPORTS
   mlirContextDestroy
   mlirContextDetachDiagnosticHandler
   mlirContextEnableMultithreading
+  mlirContextEnableOptimizationRemarks
+  mlirContextEnableOptimizationRemarksToFile
+  mlirContextEnableOptimizationRemarksWithCallback
   mlirContextEndTransientScope
   mlirContextEqual
+  mlirContextFinalizeOptimizationRemarks
   mlirContextGetAllowUnregisteredDialects
   mlirContextGetLoadedDialect
   mlirContextGetNumLoadedDialects
@@ -321,6 +325,7 @@ EXPORTS
   mlirContextGetNumThreads
   mlirContextGetOrLoadDialect
   mlirContextGetThreadPool
+  mlirContextHasRemarkEngine
   mlirContextIsInTransientScope
   mlirContextIsRegisteredOperation
   mlirContextLoadAllAvailableDialects
@@ -483,6 +488,7 @@ EXPORTS
   mlirElementsAttrGetValue
   mlirElementsAttrIsValidIndex
   mlirEmitError
+  mlirEmitOptimizationRemark
   mlirEmitRemark
   mlirEmitWarning
   mlirEnableGlobalDebug
@@ -1015,6 +1021,17 @@ EXPORTS
   mlirRegionTakeBody
   mlirRegisterGPUPasses
   mlirRegisterLinalgPasses
+  mlirRemarkGetArgKey
+  mlirRemarkGetArgValue
+  mlirRemarkGetCategoryName
+  mlirRemarkGetFullCategoryName
+  mlirRemarkGetFunctionName
+  mlirRemarkGetId
+  mlirRemarkGetKind
+  mlirRemarkGetLocation
+  mlirRemarkGetNumArgs
+  mlirRemarkGetRemarkName
+  mlirRemarkPrint
   mlirRewritePatternSetAdd
   mlirRewritePatternSetCreate
   mlirRewritePatternSetDestroy

@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:iree_vmasm_module.bzl", "iree_vmasm_module")
 load("//build_tools/embed_data:build_defs.bzl", "iree_c_embed_data")
 
@@ -210,4 +210,15 @@ iree_vmasm_module(
 iree_vmasm_module(
     name = "shift_ops_i64",
     src = "shift_ops_i64.vmasm",
+)
+
+iree_runtime_cc_test(
+    name = "ops_test",
+    srcs = ["ops_test.cc"],
+    deps = [
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/vm",
+        "//runtime/src/iree/vm:ops",
+    ],
 )

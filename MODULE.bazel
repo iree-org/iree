@@ -18,11 +18,22 @@ bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.11")
 bazel_dep(name = "rules_python", version = "1.9.0")
 
+# Torchax export requires Python 3.12. Keep the existing default for other
+# targets; opt into this toolchain with the rules_python python_version flag.
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.defaults(python_version = "3.11")
+python.toolchain(python_version = "3.12")
+
 # Python pip dependencies
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 pip.parse(
     hub_name = "pip",
     python_version = "3.11",
+    requirements_lock = "//build_tools/bazel:requirements.txt",
+)
+pip.parse(
+    hub_name = "pip",
+    python_version = "3.12",
     requirements_lock = "//build_tools/bazel:requirements.txt",
 )
 use_repo(pip, "pip")

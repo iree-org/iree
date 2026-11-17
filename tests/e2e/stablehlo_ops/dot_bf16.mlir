@@ -18,3 +18,20 @@ func.func @bf16() {
     [70.0, 64.0, 58.0, 52.0, 46.0]]> : tensor<5x5xf32>) : tensor<5x5xf32>
   return
 }
+
+// Partial BF16 sums round away both ones before cancellation.
+func.func @bf16_accumulates_f32() {
+  %lhs = util.unfoldable_constant dense<[[256.0, 1.0, 1.0, -256.0]]> : tensor<1x4xbf16>
+  %rhs = util.unfoldable_constant dense<1.0> : tensor<4x1xbf16>
+  %res = stablehlo.dot %lhs, %rhs, precision = [HIGHEST, HIGHEST] : (tensor<1x4xbf16>, tensor<4x1xbf16>) -> tensor<1x1xbf16>
+  check.expect_eq_const(%res, dense<2.0> : tensor<1x1xbf16>) : tensor<1x1xbf16>
+  return
+}
+
+func.func @bf16_dot_general_accumulates_f32() {
+  %lhs = util.unfoldable_constant dense<[[[256.0, 1.0, 1.0, -256.0]], [[256.0, 1.0, 1.0, -256.0]]]> : tensor<2x1x4xbf16>
+  %rhs = util.unfoldable_constant dense<1.0> : tensor<2x4x1xbf16>
+  %res = stablehlo.dot_general %lhs, %rhs, batching_dims = [0] x [0], contracting_dims = [2] x [1] : (tensor<2x1x4xbf16>, tensor<2x4x1xbf16>) -> tensor<2x1x1xbf16>
+  check.expect_eq_const(%res, dense<2.0> : tensor<2x1x1xbf16>) : tensor<2x1x1xbf16>
+  return
+}

@@ -313,8 +313,12 @@ VER_0 {
     mlirContextDestroy;
     mlirContextDetachDiagnosticHandler;
     mlirContextEnableMultithreading;
+    mlirContextEnableOptimizationRemarks;
+    mlirContextEnableOptimizationRemarksToFile;
+    mlirContextEnableOptimizationRemarksWithCallback;
     mlirContextEndTransientScope;
     mlirContextEqual;
+    mlirContextFinalizeOptimizationRemarks;
     mlirContextGetAllowUnregisteredDialects;
     mlirContextGetLoadedDialect;
     mlirContextGetNumLoadedDialects;
@@ -322,6 +326,7 @@ VER_0 {
     mlirContextGetNumThreads;
     mlirContextGetOrLoadDialect;
     mlirContextGetThreadPool;
+    mlirContextHasRemarkEngine;
     mlirContextIsInTransientScope;
     mlirContextIsRegisteredOperation;
     mlirContextLoadAllAvailableDialects;
@@ -484,6 +489,7 @@ VER_0 {
     mlirElementsAttrGetValue;
     mlirElementsAttrIsValidIndex;
     mlirEmitError;
+    mlirEmitOptimizationRemark;
     mlirEmitRemark;
     mlirEmitWarning;
     mlirEnableGlobalDebug;
@@ -1016,6 +1022,17 @@ VER_0 {
     mlirRegionTakeBody;
     mlirRegisterGPUPasses;
     mlirRegisterLinalgPasses;
+    mlirRemarkGetArgKey;
+    mlirRemarkGetArgValue;
+    mlirRemarkGetCategoryName;
+    mlirRemarkGetFullCategoryName;
+    mlirRemarkGetFunctionName;
+    mlirRemarkGetId;
+    mlirRemarkGetKind;
+    mlirRemarkGetLocation;
+    mlirRemarkGetNumArgs;
+    mlirRemarkGetRemarkName;
+    mlirRemarkPrint;
     mlirRewritePatternSetAdd;
     mlirRewritePatternSetCreate;
     mlirRewritePatternSetDestroy;
