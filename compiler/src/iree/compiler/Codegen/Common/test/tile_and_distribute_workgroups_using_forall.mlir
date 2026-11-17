@@ -1498,3 +1498,30 @@ func.func @arg_compare_fold_broadcast(
 //   CHECK-NOT:     linalg.broadcast
 //       CHECK:     scf.forall {{.*}} shared_outs(%{{.*}} = %[[INIT_F16]], %{{.*}} = %[[INIT_I32]])
 //       CHECK:       iree_linalg_ext.arg_compare
+
+// -----
+
+func.func @matmul_add_empty_tiles(%lhs: tensor<8x8xf32>, %rhs: tensor<8x8xf32>, %acc: tensor<8x8xf32>) -> tensor<8x8xf32> {
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<8x8xf32>
+  %zeros = linalg.fill ins(%zero : f32) outs(%empty : tensor<8x8xf32>) -> tensor<8x8xf32>
+  %product = linalg.matmul {lowering_config = #iree_cpu.lowering_config<distribution = [4, 4, 0]>}
+      ins(%lhs, %rhs : tensor<8x8xf32>, tensor<8x8xf32>) outs(%zeros : tensor<8x8xf32>) -> tensor<8x8xf32>
+  %sum = linalg.generic {
+      indexing_maps = [affine_map<(i,j) -> (i,j)>, affine_map<(i,j) -> (i,j)>, affine_map<(i,j) -> (i,j)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%product, %acc : tensor<8x8xf32>, tensor<8x8xf32>) outs(%empty : tensor<8x8xf32>) {
+    ^bb0(%p: f32, %c: f32, %out: f32):
+      %v = arith.addf %p, %c : f32
+      linalg.yield %v : f32
+  } -> tensor<8x8xf32>
+  return %sum : tensor<8x8xf32>
+}
+
+// CHECK-LABEL: func.func @matmul_add_empty_tiles(
+// CHECK: scf.forall
+// CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<4x4xf32>
+// CHECK: %[[ZEROS:.+]] = linalg.fill
+// CHECK-SAME: outs(%[[EMPTY]] : tensor<4x4xf32>)
+// CHECK: linalg.matmul
+// CHECK-SAME: outs(%[[ZEROS]] : tensor<4x4xf32>)

@@ -413,6 +413,10 @@ void LLVMCPUTileAndFuseProducerConsumer::runOnOperation() {
     }
   }
 
+  if (failed(foldEmptyTensorSlices(funcOp))) {
+    return signalPassFailure();
+  }
+
   RewritePatternSet patterns(context);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   scf::populateSCFForLoopCanonicalizationPatterns(patterns);

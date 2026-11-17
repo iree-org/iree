@@ -50,7 +50,10 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
       iree_compiler::createTosaToLinalgExtPass());
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
+  TosaToLinalgOptions tosaToLinalgOptions;
+  tosaToLinalgOptions.allowNonFinites = false;
   TosaToLinalgNamedOptions tosaToLinalgNamedOptions;
+  tosaToLinalgNamedOptions.allowNonFinites = false;
   tosaToLinalgNamedOptions.preferConv2DKernelLayoutHWCF = true;
   tosa::TosaAttachTargetOptions tosaTargetOptions;
   tosaTargetOptions.extensions = {"dynamic", "doubleround"};
@@ -65,7 +68,7 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   // signature validation rejects for spec version <= 1.0. Disable this,
   // matching upstream tosa-to-linalg pipeline.
   tosaValidationOptions.validateFunctionSignature = false;
-  tosa::addTosaToLinalgPasses(passManager, TosaToLinalgOptions(),
+  tosa::addTosaToLinalgPasses(passManager, tosaToLinalgOptions,
                               tosaToLinalgNamedOptions, tosaValidationOptions,
                               tosaTargetOptions);
   passManager.addNestedPass<func::FuncOp>(
