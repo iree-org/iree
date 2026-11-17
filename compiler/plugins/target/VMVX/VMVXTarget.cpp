@@ -29,6 +29,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 struct VMVXOptions {
   bool enableMicrokernels = false;
+  bool reassociateFpReductions = false;
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("VMVX HAL Target");
@@ -36,17 +37,25 @@ struct VMVXOptions {
         "iree-vmvx-enable-microkernels", enableMicrokernels,
         llvm::cl::cat(category),
         llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"));
+    binder.opt<bool>(
+        "iree-vmvx-reassociate-fp-reductions", reassociateFpReductions,
+        llvm::cl::cat(category),
+        llvm::cl::desc("Allow VMVX to regroup f32 sum reductions into chunks"));
   }
 };
 
 static IREE::HAL::ExecutableTargetAttr
-getVMVXExecutableTarget(bool enableMicrokernels, MLIRContext *context,
+getVMVXExecutableTarget(const VMVXOptions &options, MLIRContext *context,
                         StringRef backend, StringRef format) {
   Builder b(context);
   SmallVector<NamedAttribute> configItems;
   configItems.emplace_back(
       b.getStringAttr("ukernels"),
-      b.getStringAttr(enableMicrokernels ? "all" : "none"));
+      b.getStringAttr(options.enableMicrokernels ? "all" : "none"));
+  if (options.reassociateFpReductions) {
+    configItems.emplace_back(b.getStringAttr("reassociate_fp_reductions"),
+                             b.getBoolAttr(true));
+  }
   configItems.emplace_back(
       b.getStringAttr(IREE::Encoding::kEncodingResolverAttrName),
       IREE::CPU::VMVXEncodingResolverAttr::get(context, {}));
@@ -65,16 +74,16 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const final {
-    executableTargetAttrs.push_back(getVMVXExecutableTarget(
-        options.enableMicrokernels, context, "vmvx", "vmvx-bytecode-fb"));
+    executableTargetAttrs.push_back(
+        getVMVXExecutableTarget(options, context, "vmvx", "vmvx-bytecode-fb"));
   }
 
   void getHostExecutableTargets(MLIRContext *context, StringRef deviceID,
                                 DictionaryAttr deviceConfigAttr,
                                 SmallVectorImpl<IREE::HAL::ExecutableTargetAttr>
                                     &executableTargetAttrs) const final {
-    executableTargetAttrs.push_back(getVMVXExecutableTarget(
-        options.enableMicrokernels, context, "vmvx", "vmvx-bytecode-fb"));
+    executableTargetAttrs.push_back(
+        getVMVXExecutableTarget(options, context, "vmvx", "vmvx-bytecode-fb"));
   }
 
   TargetBackend::SupportedTypes
@@ -237,8 +246,8 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const final {
-    executableTargetAttrs.push_back(getVMVXExecutableTarget(
-        options.enableMicrokernels, context, "vmvx-inline", "vmvx-ir"));
+    executableTargetAttrs.push_back(
+        getVMVXExecutableTarget(options, context, "vmvx-inline", "vmvx-ir"));
   }
 
   void getDependentDialects(DialectRegistry &registry) const final {

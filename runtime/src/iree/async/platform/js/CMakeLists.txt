@@ -85,6 +85,16 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+if(IREE_BUILD_TESTS AND CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  iree_wasm_cc_test(
+    NAME proactor_wasi_test
+    MAIN "${IREE_SOURCE_DIR}/build_tools/wasm/wasm_test_main.mjs"
+    SRCS "proactor_test.cc"
+    DEPS ::proactor iree::async iree::testing::gtest iree::testing::gtest_main
+    TESTONLY
+  )
+endif()
+
 iree_wasm_entry(
   NAME
     main

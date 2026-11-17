@@ -136,6 +136,33 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_regression_reassociate_vmvx
+  SRCS
+    "vmvx_reassociate_sum.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-reassociate-fp-reductions"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_reassociate_ukernel_vmvx
+  SRCS
+    "vmvx_reassociate_sum.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-vmvx-enable-microkernels"
+    "--iree-vmvx-reassociate-fp-reductions"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_regression_vulkan-spirv
   SRCS
     "i1_inlined_constant.mlir"

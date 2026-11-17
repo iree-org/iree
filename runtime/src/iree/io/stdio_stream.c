@@ -172,8 +172,12 @@ IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open_fd(
   *out_stream = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Duplicate the file descriptor so that we have our own copy of the seek
-  // position. The initial position will be preserved.
+#if defined(IREE_PLATFORM_WASI)
+  IREE_TRACE_ZONE_END(z0);
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "WASI does not support duplicating file descriptors");
+#else
+  // Duplicate the descriptor so the stream can close it independently.
   int dup_fd = iree_dup(fd);
   if (dup_fd == -1) {
     IREE_TRACE_ZONE_END(z0);
@@ -224,6 +228,7 @@ IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open_fd(
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
+#endif  // IREE_PLATFORM_WASI
 }
 
 #else

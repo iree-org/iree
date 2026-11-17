@@ -36,6 +36,36 @@ def EinsumToDotGeneral :
 def FlattenTuplesInCFG :
     Pass<"iree-stablehlo-preprocessing-flatten-cfg-tuples", "ModuleOp"> {
   let summary = "Flattens tuples in the CFG form of StableHLO";
+  let description = [{
+    Tuple arguments and results become their leaves in depth-first order.
+    Per-value metadata follows non-tuple slots, including remapped alias and
+    tie references. Attributes on tuple slots and ties to tuple slots are
+    unsupported. Tuple signatures support direct calls and result-dimension
+    helper references; other symbol uses and indirect tuple calls are rejected.
+  }];
+  let dependentDialects = [
+    "::mlir::func::FuncDialect",
+    "::mlir::cf::ControlFlowDialect",
+    "::mlir::stablehlo::StablehloDialect",
+  ];
+}
+
+def FlattenPublicTupleSignatures :
+    Pass<"iree-stablehlo-preprocessing-flatten-public-tuple-signatures",
+         "ModuleOp"> {
+  let summary = "Flattens tuples in public function signatures";
+  let description = [{
+    Public tuple arguments and results become their leaves in depth-first
+    order, and empty tuples vanish. The source signature is kept in
+    `iree.abi.declaration`, with token leaves shown as the fences they become.
+    Per-value metadata follows non-tuple slots, including remapped alias and
+    tie references. Attributes on tuple slots and ties to tuple slots are
+    unsupported. Symbol users must be direct calls to the function.
+  }];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::HAL::HALDialect",
+    "::mlir::stablehlo::StablehloDialect",
+  ];
 }
 
 def FlattenTuplesInSCF :

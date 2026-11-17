@@ -8,6 +8,7 @@
 #define IREE_COMPILER_BINDINGS_NATIVE_TRANSFORMS_PASSES_H_
 
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
@@ -47,6 +48,15 @@ void buildTransformPassPipeline(OpPassManager &passManager,
                                 const InvocationOptions &invocationOptions);
 
 void registerTransformPassPipeline();
+
+// Returns the declaration of |exportOp| exported as |publicName| as the native
+// ABI reports it. |mapType|, when set, rewrites each argument and result type
+// before it is printed.
+StringAttr formatSourceDeclaration(InvocationModel invocationModel,
+                                   FunctionOpInterface exportOp,
+                                   StringRef publicName, ArrayAttr allArgAttrs,
+                                   ArrayAttr allResultAttrs,
+                                   function_ref<Type(Type)> mapType = nullptr);
 
 //===----------------------------------------------------------------------===//
 // IREE native ABI bindings support

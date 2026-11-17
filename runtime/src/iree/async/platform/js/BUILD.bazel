@@ -8,12 +8,14 @@
 
 load(
     "//build_tools/bazel:build_defs.oss.bzl",
+    "iree_cmake_extra_content",
     "iree_runtime_cc_library",
     "iree_runtime_cc_test",
 )
 load(
     "//build_tools/bazel:iree_wasm_library.bzl",
     "iree_wasm_cc_library",
+    "iree_wasm_cc_test",
     "iree_wasm_entry",
 )
 
@@ -85,6 +87,37 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],
+)
+
+iree_wasm_cc_test(
+    name = "proactor_wasi_test",
+    srcs = ["proactor_test.cc"],
+    main = "//build_tools/wasm:wasm_test_main.mjs",
+    tags = ["skip-bazel_to_cmake"],
+    target_compatible_with = ["//build_tools/bazel/wasm:wasi"],
+    deps = [
+        ":proactor",
+        "//runtime/src:runtime_defines",
+        "//runtime/src/iree/async",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+# The converter does not recognise the custom WASI OS constraint.
+iree_cmake_extra_content(
+    content = """
+if(IREE_BUILD_TESTS AND CMAKE_SYSTEM_NAME STREQUAL "WASI")
+  iree_wasm_cc_test(
+    NAME proactor_wasi_test
+    MAIN "${IREE_SOURCE_DIR}/build_tools/wasm/wasm_test_main.mjs"
+    SRCS "proactor_test.cc"
+    DEPS ::proactor iree::async iree::testing::gtest iree::testing::gtest_main
+    TESTONLY
+  )
+endif()
+""",
+    inline = True,
 )
 
 #===------------------------------------------------------------------------===#

@@ -1,0 +1,5 @@
+-r requirements-test.txt
+# Versions used by examples/smollm2_cpu.py with the pinned model revision.
+transformers==5.22.1
+huggingface-hub==2.4.0
+safetensors==0.8.0

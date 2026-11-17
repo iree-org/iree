@@ -831,3 +831,55 @@ stream.executable private @ex {
     }
   }
 }
+
+// -----
+
+// A resource in slot one must traverse result one, not the scalar result zero.
+// CHECK-LABEL: @clone_variadic_barrier_mutation
+// CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} -> !stream.resource<transient>
+// CHECK: %[[VALUES:.+]]:2 = util.optimization_barrier %{{.+}}, %[[CLONE]] : i32, !stream.resource<transient>
+// CHECK: stream.async.fill {{.*}} %[[VALUES]]#1
+util.func private @clone_variadic_barrier_mutation(%constant: !stream.resource<constant>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1_i32 = arith.constant 1 : i32
+  %clone = stream.async.clone %constant : !stream.resource<constant>{%size} -> !stream.resource<*>{%size}
+  %values:2 = util.optimization_barrier %c1_i32, %clone : i32, !stream.resource<*>
+  %filled = stream.async.fill %c1_i32, %values#1[%c0 to %size for %size] : i32 -> %values#1 as !stream.resource<*>{%size}
+  util.return %filled : !stream.resource<*>
+}
+
+// -----
+
+// A variadic barrier with only nonmutating leaves preserves constant storage.
+// CHECK-LABEL: @clone_variadic_barrier_readonly
+// CHECK: %[[CLONE:.+]] = stream.async.clone {{.*}} -> !stream.resource<constant>
+// CHECK: util.optimization_barrier %{{.+}}, %[[CLONE]] : i32, !stream.resource<constant>
+util.func private @clone_variadic_barrier_readonly() -> !stream.resource<*> {
+  %size = arith.constant 4 : index
+  %c1_i32 = arith.constant 1 : i32
+  %constant = stream.async.constant : !stream.resource<constant>{%size} = dense<0> : tensor<i32>
+  %clone = stream.async.clone %constant : !stream.resource<constant>{%size} -> !stream.resource<*>{%size}
+  %values:2 = util.optimization_barrier %c1_i32, %clone : i32, !stream.resource<*>
+  util.return %values#1 : !stream.resource<*>
+}
+
+// -----
+
+// Independent resource slots retain independent mutation and lifetime facts.
+// CHECK-LABEL: @clone_variadic_independent_resources
+// CHECK: %[[WRITE:.+]] = stream.async.clone {{.*}} -> !stream.resource<transient>
+// CHECK: %[[READ:.+]] = stream.async.clone {{.*}} -> !stream.resource<constant>
+// CHECK: %[[VALUES:.+]]:2 = util.optimization_barrier %[[WRITE]], %[[READ]] : !stream.resource<transient>, !stream.resource<constant>
+// CHECK: stream.async.fill {{.*}} %[[VALUES]]#0
+// CHECK: util.return {{.*}}, %[[VALUES]]#1 : !stream.resource<transient>, !stream.resource<constant>
+util.func private @clone_variadic_independent_resources(%constant: !stream.resource<constant>, %input_size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %size = arith.constant 4 : index
+  %c0 = arith.constant 0 : index
+  %c1_i32 = arith.constant 1 : i32
+  %write = stream.async.clone %constant : !stream.resource<constant>{%size} -> !stream.resource<*>{%size}
+  %second = stream.async.constant : !stream.resource<constant>{%size} = dense<0> : tensor<i32>
+  %read = stream.async.clone %second : !stream.resource<constant>{%size} -> !stream.resource<*>{%size}
+  %values:2 = util.optimization_barrier %write, %read : !stream.resource<*>, !stream.resource<*>
+  %filled = stream.async.fill %c1_i32, %values#0[%c0 to %size for %size] : i32 -> %values#0 as !stream.resource<*>{%size}
+  util.return %filled, %values#1 : !stream.resource<*>, !stream.resource<*>
+}

@@ -29,6 +29,24 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+// Parse per-target policy before constructing a pipeline. Executable target
+// configuration retains this policy across textual checkpoints and resumption.
+static FailureOr<VMVXCodegenPipelineOptions>
+parseVMVXPipelineOptions(FunctionOpInterface funcOp) {
+  auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+  Attribute reassociateAttr =
+      target ? target.getConfiguration().get("reassociate_fp_reductions")
+             : Attribute();
+  if (reassociateAttr && !isa<BoolAttr>(reassociateAttr)) {
+    funcOp.emitOpError("VMVX reassociate_fp_reductions must be a boolean");
+    return failure();
+  }
+  return VMVXCodegenPipelineOptions(
+      /*enableUKernels=*/target && hasUkernel(target.getConfiguration()),
+      /*reassociateFpReductions=*/reassociateAttr &&
+          cast<BoolAttr>(reassociateAttr).getValue());
+}
+
 /// Lowers an hal.executable.variant operation to scalar/native-vector code.
 class VMVXLowerExecutableTargetPass final
     : public impl::VMVXLowerExecutableTargetPassBase<
@@ -71,9 +89,11 @@ void VMVXLowerExecutableTargetPass::runOnOperation() {
   OpPassManager &pipeline = maybePipeline.value();
 
   Attribute pipelineAttr = translationInfo.getPassPipeline();
-  auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-  VMVXCodegenPipelineOptions vmvxOptions(
-      /*enableUKernels=*/target && hasUkernel(target.getConfiguration()));
+  FailureOr<VMVXCodegenPipelineOptions> vmvxOptions =
+      parseVMVXPipelineOptions(funcOp);
+  if (failed(vmvxOptions)) {
+    return signalPassFailure();
+  }
 
   // No pipeline specified, nothing to do.
   if (isa<IREE::Codegen::NoPipelineAttr>(pipelineAttr)) {
@@ -83,7 +103,7 @@ void VMVXLowerExecutableTargetPass::runOnOperation() {
   // Check for a pipeline via PipelineAttrInterface.
   if (auto pipelineIface =
           dyn_cast<IREE::Codegen::PipelineAttrInterface>(pipelineAttr)) {
-    if (failed(pipelineIface.buildPipeline(pipeline, &vmvxOptions))) {
+    if (failed(pipelineIface.buildPipeline(pipeline, &*vmvxOptions))) {
       funcOp.emitOpError("failed to build pass pipeline");
       return signalPassFailure();
     }

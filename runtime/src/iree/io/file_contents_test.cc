@@ -17,6 +17,11 @@
 #include "iree/testing/status_matchers.h"
 #include "iree/testing/temp_file.h"
 
+#if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_MACOS)
+#include <signal.h>
+#include <sys/resource.h>
+#endif
+
 namespace iree {
 namespace io {
 namespace {
@@ -29,6 +34,74 @@ std::string GetUniqueContents(const char* unique_name,
   if (str.size() < padded_size) str.resize(padded_size, 0);
   return str;
 }
+
+static iree_status_t RejectLargeAllocations(void* self,
+                                            iree_allocator_command_t command,
+                                            const void* params,
+                                            void** inout_ptr) {
+  if (command == IREE_ALLOCATOR_COMMAND_MALLOC ||
+      command == IREE_ALLOCATOR_COMMAND_CALLOC ||
+      command == IREE_ALLOCATOR_COMMAND_REALLOC) {
+    const auto* allocation =
+        static_cast<const iree_allocator_alloc_params_t*>(params);
+    if (allocation->byte_length >= *static_cast<iree_host_size_t*>(self)) {
+      return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "test allocation limit");
+    }
+  }
+  auto system_allocator = iree_allocator_system();
+  return system_allocator.ctl(system_allocator.self, command, params,
+                              inout_ptr);
+}
+
+TEST(FileContents, ReadAllocationFailure) {
+  iree::testing::TempFilePath path("iree_file_contents_test");
+  iree_host_size_t allocation_limit_in_bytes = 65536;
+  auto payload =
+      GetUniqueContents("ReadAllocationFailure", allocation_limit_in_bytes);
+  IREE_ASSERT_OK(iree_io_file_contents_write(
+      path.path_view(),
+      iree_make_const_byte_span(payload.data(), payload.size()),
+      iree_allocator_system()));
+  iree_allocator_t allocator = {&allocation_limit_in_bytes,
+                                RejectLargeAllocations};
+  iree_io_file_contents_t* contents = nullptr;
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_RESOURCE_EXHAUSTED,
+      iree_io_file_contents_read(path.path_view(), allocator, &contents));
+  EXPECT_EQ(contents, nullptr);
+  iree_io_file_contents_free(contents);
+}
+
+#if defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_MACOS)
+TEST(FileContents, BufferedWriteFailure) {
+  iree::testing::TempFilePath path("iree_file_contents_test");
+  struct rlimit old_limit;
+  ASSERT_EQ(getrlimit(RLIMIT_FSIZE, &old_limit), 0);
+  auto old_handler = signal(SIGXFSZ, SIG_IGN);
+  ASSERT_NE(old_handler, SIG_ERR);
+  struct RestoreFileLimit {
+    struct rlimit limit;
+    void (*handler)(int);
+    ~RestoreFileLimit() {
+      EXPECT_EQ(setrlimit(RLIMIT_FSIZE, &limit), 0);
+      EXPECT_NE(signal(SIGXFSZ, handler), SIG_ERR);
+    }
+  } restore{old_limit, old_handler};
+  struct rlimit limit = old_limit;
+  limit.rlim_cur = 0;
+  ASSERT_EQ(setrlimit(RLIMIT_FSIZE, &limit), 0);
+
+  // A short fwrite can succeed into a stdio buffer even when the subsequent
+  // flush cannot write to the file. The complete write must report failure.
+  uint8_t byte = 1;
+  iree_status_t status = iree_io_file_contents_write(
+      path.path_view(), iree_make_const_byte_span(&byte, 1),
+      iree_allocator_system());
+  EXPECT_FALSE(iree_status_is_ok(status));
+  iree_status_ignore(status);
+}
+#endif  // IREE_PLATFORM_LINUX || IREE_PLATFORM_MACOS
 
 TEST(FileContents, ReadWriteContentsPreload) {
   constexpr const char* kUniqueName = "ReadWriteContents";

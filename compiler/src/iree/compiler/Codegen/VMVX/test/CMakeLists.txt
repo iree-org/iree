@@ -21,6 +21,8 @@ iree_lit_test_suite(
     "pipeline.mlir"
     "pipeline_full_smoketests.mlir"
     "select_lowering_strategy.mlir"
+    "split_reduction.mlir"
+    "split_reduction_invalid.mlir"
   TOOLS
     FileCheck
     iree-opt

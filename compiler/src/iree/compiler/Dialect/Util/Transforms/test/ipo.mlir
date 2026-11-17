@@ -150,6 +150,48 @@ util.func public @dupe_result_caller(%arg0: i1, %arg1: index) -> (index, index, 
 
 // -----
 
+// Tests that a duplicate of a pass-through result forwards the call operand.
+
+// CHECK-LABEL: util.func private @dupe_passthrough_result_callee
+// CHECK-SAME: (%[[ARG0:.+]]: index) -> index
+util.func private @dupe_passthrough_result_callee(%arg0: index, %arg1: index) -> (index, index, index) {
+  // CHECK: %[[ADD:.+]] = arith.addi %[[ARG0]], %[[ARG0]]
+  %add = arith.addi %arg0, %arg0 : index
+  // CHECK: util.return %[[ADD]] : index
+  util.return %arg1, %add, %arg1 : index, index, index
+}
+
+// CHECK: util.func public @dupe_passthrough_result_caller(%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
+util.func public @dupe_passthrough_result_caller(%arg0: index, %arg1: index) -> (index, index, index) {
+  // CHECK: %[[RET:.+]] = util.call @dupe_passthrough_result_callee(%[[ARG0]]) : (index) -> index
+  %ret:3 = util.call @dupe_passthrough_result_callee(%arg0, %arg1) : (index, index) -> (index, index, index)
+  // CHECK: util.return %[[ARG1]], %[[RET]], %[[ARG1]]
+  util.return %ret#0, %ret#1, %ret#2 : index, index, index
+}
+
+// -----
+
+// Tests that a used duplicate keeps its unused base result alive.
+
+// CHECK-LABEL: util.func private @dupe_unused_base_result_callee
+// CHECK-SAME: (%[[ARG0:.+]]: index) -> index
+util.func private @dupe_unused_base_result_callee(%arg0: index) -> (index, index) {
+  // CHECK: %[[ADD:.+]] = arith.addi %[[ARG0]], %[[ARG0]]
+  %add = arith.addi %arg0, %arg0 : index
+  // CHECK: util.return %[[ADD]] : index
+  util.return %add, %add : index, index
+}
+
+// CHECK: util.func public @dupe_unused_base_result_caller(%[[ARG0:.+]]: index)
+util.func public @dupe_unused_base_result_caller(%arg0: index) -> index {
+  // CHECK: %[[RET:.+]] = util.call @dupe_unused_base_result_callee(%[[ARG0]]) : (index) -> index
+  %ret:2 = util.call @dupe_unused_base_result_callee(%arg0) : (index) -> (index, index)
+  // CHECK: util.return %[[RET]]
+  util.return %ret#1 : index
+}
+
+// -----
+
 // Tests that uniformly constant args get inlined into callees.
 
 // CHECK-LABEL: util.func private @uniform_arg_callee

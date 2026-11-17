@@ -72,6 +72,7 @@ iree_compiler_cc_library(
     deps = [
         ":PaddingUtils",
         ":PassHeaders",
+        ":SignatureMetadata",
         "//compiler/plugins/input/StableHLO/Conversion/Preprocessing",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
@@ -227,7 +228,20 @@ iree_compiler_cc_library(
         ":PassHeaders",
         ":StableHLOLegalization",
         ":TargetRegistry",
+        "//compiler/plugins/input/StableHLO/Conversion/Preprocessing",
         "@llvm-project//mlir:Pass",
         "@stablehlo//:stablehlo_passes",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "SignatureMetadata",
+    srcs = ["StableHLOSignatureMetadata.cpp"],
+    hdrs = ["StableHLOSignatureMetadata.h"],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Transforms",
     ],
 )
