@@ -66,8 +66,11 @@ script_name="$(basename $0)"
 repo_root=$(cd "${this_dir}" && find_git_dir_parent)
 manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64:2026.11.01-2@sha256:54b271d9562a3686298880df05367909e949ed317e7b1b79b59c696d75f78676" : "ghcr.io/iree-org/manylinux_x86_64@sha256:2e0246137819cf10ed84240a971f9dd75cc3eb62dc6907dfd2080ee966b3c9f4" }')}"
 # Python versions to build. cp312 is the abi3 build (produces a wheel
-# compatible with 3.12+). Per-version builds are used for <3.12 and 3.13t.
-python_versions="${override_python_versions:-cp311-cp311 cp312-cp312 cp313-cp313t}"
+# compatible with 3.12+). Per-version builds are used for <3.12 and the
+# free-threaded 3.13t and 3.14t. A version that the image lacks is skipped:
+# current manylinux images have 3.14t but no longer 3.13t, while the x86_64
+# image still has 3.13t but not yet 3.14t.
+python_versions="${override_python_versions:-cp311-cp311 cp312-cp312 cp313-cp313t cp314-cp314t}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-base-runtime iree-base-compiler}"
 package_suffix="${package_suffix:-}"
