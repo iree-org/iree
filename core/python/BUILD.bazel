@@ -18,12 +18,15 @@ package(
 PY_SRCS = enforce_glob(
     [
         "iree/core/__init__.py",
+        "iree/core/_paths.py",
+        "iree/core/config.py",
     ],
     include = ["iree/core/**/*.py"],
 )
 
 PY_TESTS = enforce_glob(
     [
+        "test/config_test.py",
         "test/package_test.py",
     ],
     include = ["test/**/*.py"],
@@ -35,6 +38,16 @@ py_library(
     name = "core",
     srcs = PY_SRCS,
     imports = ["."],
+    deps = ["@pip//dacite"],
+)
+
+py_test(
+    name = "config_test",
+    size = "small",
+    srcs = ["test/config_test.py"],
+    legacy_create_init = False,
+    main = "test/config_test.py",
+    deps = [":core"],
 )
 
 py_test(
@@ -63,6 +76,15 @@ if(IREE_BUILD_TESTS)
     ERROR_STRIP_TRAILING_WHITESPACE
   )
   if(_IREE_CORE_REQUIREMENTS_RESULT EQUAL 0)
+    iree_local_py_test(
+      NAME
+        config_test
+      SRC
+        "test/config_test.py"
+      PACKAGE_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+
     iree_local_py_test(
       NAME
         package_test
