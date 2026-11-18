@@ -16,24 +16,16 @@ updates:
         patterns:
           - "*"
 
-  # Check for updates to the Python requirements of the build tools. The `uv`
-  # ecosystem also regenerates the PyPI deploy requirements, a hash lock made
-  # with `uv pip compile`.
+  # Check for updates to the PyPI deploy requirements, a hash lock made with
+  # `uv pip compile`, which the `uv` ecosystem regenerates.
   - package-ecosystem: "uv"
-    directories:
-      - "/build_tools/bazel"
-      - "/build_tools/github_actions"
-      - "/build_tools/python_deploy"
+    directory: "/build_tools/python_deploy"
     schedule:
       interval: "weekly"
-    # Keeps minimum versions such as `cmake>=3.26` and only changes pins.
-    versioning-strategy: "increase-if-necessary"
-    ignore:
-      # The same pin is in
-      # runtime/bindings/python/iree/runtime/build_requirements.txt. CI installs
-      # both files in one command, so the two pins must stay equal.
-      - dependency-name: "pyright"
+    # Wait a week before proposing a new release, as for GitHub Actions above.
+    cooldown:
+      default-days: 7
     groups:
-      build-tools-python:
+      pypi-deploy-requirements:
         patterns:
           - "*"
