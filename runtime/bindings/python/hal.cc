@@ -1070,22 +1070,23 @@ py::object HalDriver::Create(const std::string& device_uri,
 py::list HalDriver::QueryAvailableDevices() {
   iree_hal_device_info_t* device_infos;
   iree_host_size_t count;
-  CheckApiStatus(iree_hal_driver_query_available_devices(
-                     raw_ptr(), iree_allocator_system(), &count, &device_infos),
-                 "Error querying devices");
-  // TODO(#25083): Guard device_infos if constructing the Python result throws.
+  iree_allocator_t device_info_host_allocator = iree_allocator_system();
+  CheckApiStatus(
+      iree_hal_driver_query_available_devices(
+          raw_ptr(), device_info_host_allocator, &count, &device_infos),
+      "Error querying devices");
+
+  std::unique_ptr<iree_hal_device_info_t[], AllocatorDeleter> infos(
+      device_infos, AllocatorDeleter{device_info_host_allocator});
+
   py::list results;
   for (iree_host_size_t i = 0; i < count; ++i) {
     py::dict device_data;
-    device_data["device_id"] = py::cast(device_infos[i].device_id);
-    device_data["path"] =
-        py::str(device_infos[i].path.data, device_infos[i].path.size);
-    device_data["name"] =
-        py::str(device_infos[i].name.data, device_infos[i].name.size);
+    device_data["device_id"] = py::cast(infos[i].device_id);
+    device_data["path"] = py::str(infos[i].path.data, infos[i].path.size);
+    device_data["name"] = py::str(infos[i].name.data, infos[i].name.size);
     results.append(device_data);
   }
-
-  iree_allocator_free(iree_allocator_system(), device_infos);
   return results;
 }
 
