@@ -1023,7 +1023,7 @@ std::vector<std::string> HalDriver::Query() {
   std::vector<std::string> driver_names(driver_info_count);
   for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
     driver_names[i] = std::string(infos[i].driver_name.data, 
-                    infos[i].driver_name.size);
+                                  infos[i].driver_name.size);
   }
   return driver_names;
 }
