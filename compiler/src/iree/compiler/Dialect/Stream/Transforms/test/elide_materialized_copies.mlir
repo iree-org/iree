@@ -571,3 +571,77 @@ util.func public @transfer_chain_collapse(%input: !util.buffer) -> !util.buffer 
 }
 
 } // module
+// -----
+
+// A reused transfer shares storage with its source, so a later mutation of the
+// transfer result needs the protective clone even after copy elision.
+// CHECK-LABEL: @reuse_transfer_mutation_keeps_clone
+util.func public @reuse_transfer_mutation_keeps_clone(%size: index, %value: i32) -> (!stream.resource<transient>, !stream.resource<transient>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %source = stream.async.splat %value : i32 -> !stream.resource<transient>{%size}
+  // CHECK: %[[TRANSFER:[^ ]+]] = stream.async.transfer %[[SOURCE:[^ ]+]]
+  %shared = stream.async.transfer %source : !stream.resource<transient>{%size} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<transient>{%size} storage = reuse
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[TRANSFER]]
+  // CHECK: stream.async.fill %{{.+}}, %[[CLONE]]
+  %updated = stream.async.fill %value, %shared[%c0 to %size for %c1] : i32 -> %shared as !stream.resource<transient>{%size}
+  // CHECK: util.return %[[SOURCE]],
+  util.return %source, %updated : !stream.resource<transient>, !stream.resource<transient>
+}
+
+// -----
+
+// Mutating the original source must also leave the reused result unchanged.
+// CHECK-LABEL: @reuse_source_mutation_keeps_clone
+util.func public @reuse_source_mutation_keeps_clone(%source: !stream.resource<transient>, %size: index, %new_value: i32) -> (!stream.resource<transient>, !stream.resource<transient>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK: %[[TRANSFER:[^ ]+]] = stream.async.transfer %[[SOURCE:[^ ]+]]
+  %shared = stream.async.transfer %source : !stream.resource<transient>{%size} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<transient>{%size} storage = reuse
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SOURCE]]
+  // CHECK: stream.async.fill %{{.+}}, %[[CLONE]]
+  %updated = stream.async.fill %new_value, %source[%c0 to %size for %c1] : i32 -> %source as !stream.resource<transient>{%size}
+  // CHECK: util.return %[[TRANSFER]],
+  util.return %shared, %updated : !stream.resource<transient>, !stream.resource<transient>
+}
+
+// -----
+
+// The downstream reuse guard must still see a transfer inside a conditional
+// branch even though the source is also yielded on the other path.
+// CHECK-LABEL: @conditional_reuse_keeps_source_clone
+util.func public @conditional_reuse_keeps_source_clone(%cond: i1, %source: !stream.resource<transient>, %size: index, %new_value: i32) -> (!stream.resource<transient>, !stream.resource<transient>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK: %[[BRANCH:[^ ]+]] = scf.if
+  %branch = scf.if %cond -> !stream.resource<transient> {
+    // CHECK: %[[TRANSFER:[^ ]+]] = stream.async.transfer %[[SOURCE:[^ ]+]]
+    %shared = stream.async.transfer %source : !stream.resource<transient>{%size} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<transient>{%size} storage = reuse
+    scf.yield %shared : !stream.resource<transient>
+  } else {
+    scf.yield %source : !stream.resource<transient>
+  }
+  // CHECK: %[[CLONE:[^ ]+]] = stream.async.clone %[[SOURCE]]
+  %clone = stream.async.clone %source : !stream.resource<transient>{%size} -> !stream.resource<transient>{%size}
+  // CHECK: stream.async.fill %{{.+}}, %[[CLONE]]
+  %updated = stream.async.fill %new_value, %clone[%c0 to %size for %c1] : i32 -> %clone as !stream.resource<transient>{%size}
+  // CHECK: util.return %[[BRANCH]],
+  util.return %branch, %updated : !stream.resource<transient>, !stream.resource<transient>
+}
+
+// -----
+
+// The import is borrowed even when the stream has no other local use of it.
+// A write through a reused transfer result must leave the caller's buffer alone.
+// CHECK-LABEL: @borrowed_reuse_mutation_keeps_clone
+util.func public @borrowed_reuse_mutation_keeps_clone(%input: !util.buffer, %size: index, %value: i32) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %import = stream.tensor.import %input : !util.buffer -> tensor<4xi32> in !stream.resource<external>{%size}
+  // CHECK: %[[TRANSFER:[^ ]+]] = stream.async.transfer
+  %shared = stream.async.transfer %import : !stream.resource<external>{%size} -> !stream.resource<external>{%size} storage = reuse
+  // CHECK: %[[CLONE:[^ ]+]] = stream.async.clone %[[TRANSFER]]
+  // CHECK: stream.async.fill %{{.+}}, %[[CLONE]]
+  %updated = stream.async.fill %value, %shared[%c0 to %size for %c1] : i32 -> %shared as !stream.resource<external>{%size}
+  util.return %updated : !stream.resource<external>
+}

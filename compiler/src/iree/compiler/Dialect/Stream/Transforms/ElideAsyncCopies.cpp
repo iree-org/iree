@@ -738,7 +738,28 @@ public:
           }
           return WalkResult::advance();
         });
-    return foundTransfer || traversalResult == TraversalResult::INCOMPLETE;
+    if (foundTransfer || traversalResult == TraversalResult::INCOMPLETE) {
+      return true;
+    }
+    // A later reuse transfer also aliases this value. A clone protecting a
+    // write to the original source must survive while the transfer result is
+    // still observed by another consumer.
+    explorer.walkTransitiveUses(value, [&](OpOperand &use) -> WalkResult {
+      if (auto transferOp =
+              dyn_cast<IREE::Stream::AsyncTransferOp>(use.getOwner())) {
+        if (transferOp.getEffectiveStorage() == TransferStorage::Reuse &&
+            use.get() == transferOp.getSource()) {
+          foundTransfer = true;
+          return WalkResult::interrupt();
+        }
+      }
+      return WalkResult::advance();
+    });
+    // An incomplete downstream walk can be caused by a public return or an
+    // unknown call even when no transfer is present. Ownership, mutation, and
+    // last-use checks below handle those boundaries. Only an observed reuse
+    // transfer adds the distinct SSA alias that requires this extra guard.
+    return foundTransfer;
   }
 
   // Attempts to infer the affinity of |value| by walking up its defining ops
@@ -872,6 +893,50 @@ private:
 // Second clone elidable, first required:
 //   %0 ---> %1 = clone(%0) ---> use(%1)
 //      \--> %2 = clone(%0) ---> use(%2)  // last use of %0
+
+// A fresh splat forwarded through execution regions remains exclusively owned
+// if each value along the path has only one use. This deliberately stops at
+// imports, subviews, and other producers whose storage may have live aliases.
+static bool isExclusivelyOwnedSplat(Value value) {
+  llvm::SmallPtrSet<Value, 8> visited;
+  while (value && visited.insert(value).second) {
+    if (!value.hasOneUse()) {
+      return false;
+    }
+    if (value.getDefiningOp<IREE::Stream::AsyncSplatOp>()) {
+      return cast<IREE::Stream::ResourceType>(value.getType()).getLifetime() ==
+             IREE::Stream::Lifetime::Transient;
+    }
+    if (auto arg = dyn_cast<BlockArgument>(value)) {
+      auto executeOp =
+          dyn_cast<IREE::Stream::AsyncExecuteOp>(arg.getOwner()->getParentOp());
+      if (!executeOp) {
+        return false;
+      }
+      value = executeOp.getResourceOperands()[arg.getArgNumber()];
+      continue;
+    }
+    if (auto executeOp = value.getDefiningOp<IREE::Stream::AsyncExecuteOp>()) {
+      auto yieldOp = cast<IREE::Stream::YieldOp>(
+          executeOp.getBody().front().getTerminator());
+      auto result = cast<OpResult>(value);
+      value = yieldOp.getResourceOperands()[result.getResultNumber()];
+      continue;
+    }
+    return false;
+  }
+  return false;
+}
+
+static bool canElideExclusiveReuseClone(IREE::Stream::AsyncCloneOp cloneOp) {
+  auto transferOp =
+      cloneOp.getSource().getDefiningOp<IREE::Stream::AsyncTransferOp>();
+  return transferOp &&
+         transferOp.getEffectiveStorage() == TransferStorage::Reuse &&
+         transferOp.getResult().hasOneUse() &&
+         isExclusivelyOwnedSplat(transferOp.getSource());
+}
+
 static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
                                  ElisionAnalysis &analysis) {
   LLVM_DEBUG({
@@ -897,6 +962,13 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
                << "  - clone is a resource type cast (" << sourceType << " to "
                << targetType << "); cannot elide in this pass\n");
     return false;
+  }
+
+  if (canElideExclusiveReuseClone(cloneOp)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  + reuse transfer consumes an exclusive fresh source; "
+                  "can elide clone\n");
+    return true;
   }
 
   if (analysis.mayAliasThroughTransfer(cloneOp.getSource())) {

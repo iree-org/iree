@@ -189,3 +189,20 @@ util.func public @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>,
 ^bb2(%bb2_0: !stream.resource<*>, %bb2_1: !stream.resource<*>):
   util.return %bb2_0, %bb2_1 : !stream.resource<*>, !stream.resource<*>
 }
+// -----
+
+// A reused transfer result still aliases the source when it has one SSA use.
+// Preserve the original value for the second consumer of the shared storage.
+// CHECK-LABEL: @reuseTransferNeedsCopyOnWrite
+util.func public @reuseTransferNeedsCopyOnWrite(%size: index, %value: i32) -> (!stream.resource<transient>, !stream.resource<transient>) {
+  %c0 = arith.constant 0 : index
+  %source = stream.async.splat %value : i32 -> !stream.resource<transient>{%size}
+  // CHECK: %[[TRANSFER:[^ ]+]] = stream.async.transfer %[[SOURCE:[^ ]+]]
+  // CHECK-SAME: storage = reuse
+  %shared = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<transient>{%size} storage = reuse
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[TRANSFER]]
+  // CHECK: stream.async.fill %{{.+}}, %[[CLONE]]
+  %updated = stream.async.fill %value, %shared[%c0 to %size for %size] : i32 -> %shared as !stream.resource<transient>{%size}
+  // CHECK: util.return %[[SOURCE]],
+  util.return %source, %updated : !stream.resource<transient>, !stream.resource<transient>
+}

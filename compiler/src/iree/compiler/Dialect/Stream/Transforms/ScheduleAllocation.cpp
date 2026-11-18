@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
@@ -107,6 +108,15 @@ static void computeRegionValueAliases(Operation *regionOp,
     // handle ops in differing scopes by walking parent chains.
     if (isa<mlir::RegionBranchOpInterface>(op)) {
       computeRegionValueAliases(&op, valueAliases);
+    }
+
+    // A reuse transfer has a distinct SSA result for the device handoff, but
+    // both values occupy the same storage. Include it in liveness and range
+    // propagation before planning local transient allocations.
+    if (auto transferOp = dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
+      if (transferOp.getEffectiveStorage() == TransferStorage::Reuse) {
+        valueAliases.addAlias(transferOp.getResult(), transferOp.getSource());
+      }
     }
 
     // Tied results reuse their operand buffer.
@@ -486,19 +496,25 @@ private:
       }
 
       ResourceRange aliasRange = baseRange;
+      Value source;
       if (auto tiedOp = dyn_cast_if_present<IREE::Util::TiedOpInterface>(
               alias.getDefiningOp())) {
-        // If the source is not mapped yet, leave this alias pending and tend
-        // to the source in case it aliases a subview into an already-resolved
-        // range.
-        if (Value source = tiedOp.getTiedResultOperand(alias)) {
-          auto it = resourceRangeMap.find(source);
-          if (it == resourceRangeMap.end()) {
-            worklist.push_back(source);
-            continue;
-          }
-          aliasRange = it->second;
+        source = tiedOp.getTiedResultOperand(alias);
+      }
+      if (auto transferOp =
+              alias.getDefiningOp<IREE::Stream::AsyncTransferOp>()) {
+        if (transferOp.getEffectiveStorage() == TransferStorage::Reuse) {
+          source = transferOp.getSource();
         }
+      }
+      if (source) {
+        // Resolve the source first in case this alias leads through a subview.
+        auto it = resourceRangeMap.find(source);
+        if (it == resourceRangeMap.end()) {
+          worklist.push_back(source);
+          continue;
+        }
+        aliasRange = it->second;
       }
 
       mapResourceAlias(alias, aliasRange, asmState);
@@ -738,6 +754,14 @@ applyAsyncTransferOp(IREE::Stream::AffinityAttr executionAffinityAttr,
   auto sourceRange = scope.lookupResourceRange(asyncOp.getSource());
   auto targetRange = scope.lookupResourceRange(asyncOp.getResult());
 
+  const bool reuse = asyncOp.getEffectiveStorage() == TransferStorage::Reuse;
+  if (reuse && (sourceRange.resource != targetRange.resource ||
+                sourceRange.offset != targetRange.offset ||
+                sourceRange.length != targetRange.length)) {
+    return asyncOp.emitOpError()
+           << "reuse transfer must map to the source backing range";
+  }
+
   // Incoming transfers need invalidation.
   if (transferIn) {
     IREE::Stream::CmdInvalidateOp::create(
@@ -746,11 +770,12 @@ applyAsyncTransferOp(IREE::Stream::AffinityAttr executionAffinityAttr,
         asyncOp.getSourceAffinityAttr());
   }
 
-  // Perform the copy.
-  IREE::Stream::CmdCopyOp::create(
-      builder, asyncOp.getLoc(), sourceRange.resource, sourceRange.resourceSize,
-      sourceRange.offset, targetRange.resource, targetRange.resourceSize,
-      targetRange.offset, sourceRange.length);
+  if (!reuse) {
+    IREE::Stream::CmdCopyOp::create(
+        builder, asyncOp.getLoc(), sourceRange.resource,
+        sourceRange.resourceSize, sourceRange.offset, targetRange.resource,
+        targetRange.resourceSize, targetRange.offset, sourceRange.length);
+  }
 
   // Outgoing transfers need flushes.
   if (transferOut) {
@@ -1188,6 +1213,31 @@ allocateLocalTransients(IREE::Stream::AsyncExecuteOp executeOp,
 //===----------------------------------------------------------------------===//
 // Affinity utilities
 //===----------------------------------------------------------------------===//
+
+// Flatten optimal sets before joining them. Joining two complete optimal sets
+// can otherwise retain a nested set, which is not a valid allocation device
+// list for Stream-to-HAL's allocator selection.
+static IREE::Stream::AffinityAttr
+joinAllocationAffinities(ArrayRef<IREE::Stream::AffinityAttr> affinities) {
+  SmallVector<IREE::Stream::AffinityAttr> leaves;
+  std::function<void(IREE::Stream::AffinityAttr)> appendLeaves =
+      [&](IREE::Stream::AffinityAttr affinity) {
+        if (!affinity) {
+          return;
+        }
+        if (auto optimal = dyn_cast<IREE::HAL::DeviceOptimalAttr>(affinity)) {
+          for (auto child : optimal.getAffinities()) {
+            appendLeaves(child);
+          }
+        } else if (!llvm::is_contained(leaves, affinity)) {
+          leaves.push_back(affinity);
+        }
+      };
+  for (auto affinity : affinities) {
+    appendLeaves(affinity);
+  }
+  return IREE::Stream::AffinityAttr::joinOR(leaves);
+}
 
 // Walks up the use-def chain to find an affinity the given local value is
 // pinned to. May return nullptr if there's no assigned affinity and the
@@ -1671,6 +1721,200 @@ static bool isExecutedOnce(Operation *op) {
   return parentOp && op->getBlock() == &parentOp.getInitializerRegion().front();
 }
 
+// Follow an inner concurrent capture back to the execution region operand.
+static Value resolveExecutionCapture(Value value,
+                                     IREE::Stream::AsyncExecuteOp executeOp) {
+  value = IREE::Util::TiedOpInterface::findTiedBaseValue(value);
+  while (auto arg = dyn_cast<BlockArgument>(value)) {
+    if (arg.getOwner() == &executeOp.getBody().front()) {
+      return arg;
+    }
+    auto concurrentOp = dyn_cast<IREE::Stream::AsyncConcurrentOp>(
+        arg.getOwner()->getParentOp());
+    if (!concurrentOp) {
+      break;
+    }
+    value = IREE::Util::TiedOpInterface::findTiedBaseValue(
+        concurrentOp.getResourceOperands()[arg.getArgNumber()]);
+  }
+  return value;
+}
+
+// A concurrent region may yield a reusable transfer without tying its result.
+// Follow that yield when deciding whether an execute result needs storage.
+static IREE::Stream::AsyncTransferOp findReusableTransfer(Value value) {
+  value = IREE::Util::TiedOpInterface::findTiedBaseValue(value);
+  while (auto concurrentOp =
+             value.getDefiningOp<IREE::Stream::AsyncConcurrentOp>()) {
+    auto yieldOp = cast<IREE::Stream::YieldOp>(
+        concurrentOp.getBody().front().getTerminator());
+    value = IREE::Util::TiedOpInterface::findTiedBaseValue(
+        yieldOp.getResourceOperands()[cast<OpResult>(value).getResultNumber()]);
+  }
+  auto transferOp = value.getDefiningOp<IREE::Stream::AsyncTransferOp>();
+  if (!transferOp ||
+      transferOp.getEffectiveStorage() != TransferStorage::Reuse) {
+    return {};
+  }
+  return transferOp;
+}
+
+// A reuse transfer is a storage handoff, not a request to allocate a buffer on
+// the target. Check that the existing allocation can be used at both endpoints
+// before changing the allocation plan. In particular, a topology link alone
+// says nothing about an imported buffer or a buffer allocated for one device.
+static LogicalResult
+verifyReusableTransfer(IREE::Stream::AsyncTransferOp transferOp,
+                       IREE::Stream::AsyncExecuteOp executeOp,
+                       DenseMap<Value, IREE::Stream::AffinityAttr>
+                           &localReuseAllocationAffinities) {
+  if (transferOp.getEffectiveStorage() != TransferStorage::Reuse) {
+    return success();
+  }
+  if (transferOp.getSource().getType() != transferOp.getResult().getType()) {
+    return transferOp.emitOpError()
+           << "reuse across resource lifetimes is not supported by allocation "
+              "scheduling";
+  }
+  if (transferOp.getSourceSize() != transferOp.getResultSize()) {
+    return transferOp.emitOpError()
+           << "reuse requires the source and result to have the same size";
+  }
+
+  auto sourceAffinity = transferOp.getSourceAffinityAttr();
+  auto targetAffinity = transferOp.getResultAffinityAttr();
+  auto executionAffinity =
+      IREE::Stream::AffinityAttr::lookupOrDefault(executeOp);
+  Value source = resolveExecutionCapture(transferOp.getSource(), executeOp);
+  auto sourceArg = dyn_cast<BlockArgument>(source);
+  Value outerBase;
+  if (sourceArg && sourceArg.getOwner() == &executeOp.getBody().front()) {
+    outerBase = executeOp.getResourceOperands()[sourceArg.getArgNumber()];
+    // Imports are tied to their HAL source, but their affinity assertion is
+    // attached to the import itself. Stop there while following subviews and
+    // other forwarding resource values.
+    while (outerBase && !isa_and_nonnull<IREE::Stream::TensorImportOp,
+                                         IREE::Stream::ResourceAllocaOp,
+                                         IREE::Stream::ResourceAllocOp>(
+                            outerBase.getDefiningOp())) {
+      auto tiedOp = dyn_cast_if_present<IREE::Util::TiedOpInterface>(
+          outerBase.getDefiningOp());
+      if (!tiedOp) {
+        break;
+      }
+      Value tiedValue = tiedOp.getTiedResultOperand(outerBase);
+      if (!tiedValue) {
+        break;
+      }
+      outerBase = tiedValue;
+    }
+  }
+  IREE::Stream::AffinityAttr allocationAffinity;
+  IREE::Stream::AffinityAttr importAffinity;
+  bool hasKnownAllocation = false;
+  bool hasKnownImport = false;
+  if (outerBase) {
+    if (auto allocaOp =
+            outerBase.getDefiningOp<IREE::Stream::ResourceAllocaOp>()) {
+      hasKnownAllocation = true;
+      allocationAffinity =
+          IREE::Stream::AffinityAttr::lookupOrDefault(allocaOp);
+    } else if (auto allocOp =
+                   outerBase.getDefiningOp<IREE::Stream::ResourceAllocOp>()) {
+      hasKnownAllocation = true;
+      allocationAffinity = IREE::Stream::AffinityAttr::lookupOrDefault(allocOp);
+    } else if (auto importOp =
+                   outerBase.getDefiningOp<IREE::Stream::TensorImportOp>()) {
+      hasKnownImport = true;
+      importAffinity = IREE::Stream::AffinityAttr::lookupOrDefault(importOp);
+    }
+  }
+  if (!sourceAffinity && outerBase) {
+    sourceAffinity = importAffinity;
+  }
+  sourceAffinity = sourceAffinity ? sourceAffinity : executionAffinity;
+  targetAffinity = targetAffinity ? targetAffinity : executionAffinity;
+  if (!sourceAffinity || !targetAffinity) {
+    return transferOp.emitOpError()
+           << "reuse requires resolved source and target affinities";
+  }
+  if (hasKnownAllocation && !allocationAffinity) {
+    return transferOp.emitOpError()
+           << "reuse source allocation has unresolved affinity";
+  }
+  if (hasKnownImport && !importAffinity) {
+    return transferOp.emitOpError()
+           << "reuse imported buffer has unresolved affinity";
+  }
+  if (importAffinity && sourceAffinity != importAffinity) {
+    return transferOp.emitOpError()
+           << "reuse source affinity differs from its imported buffer";
+  }
+  if (allocationAffinity &&
+      allocationAffinity !=
+          IREE::Stream::AffinityAttr::joinOR(
+              {allocationAffinity, sourceAffinity, targetAffinity})) {
+    return transferOp.emitOpError()
+           << "reuse source allocation is not accessible to both devices";
+  }
+  if (!sourceArg && source.getDefiningOp() &&
+      source.getParentRegion() == &executeOp.getBody()) {
+    auto producerAffinity = findLocalValueAffinity(source);
+    producerAffinity = producerAffinity ? producerAffinity : executionAffinity;
+    if (!producerAffinity || sourceAffinity != producerAffinity) {
+      return transferOp.emitOpError()
+             << "reuse local source affinity differs from its producer";
+    }
+  }
+  if (sourceAffinity == targetAffinity) {
+    return success();
+  }
+
+  auto moduleOp = executeOp->getParentOfType<ModuleOp>();
+  auto topology =
+      moduleOp->getAttrOfType<IREE::Stream::AffinityTopologyAttrInterface>(
+          "stream.topology");
+  if (!topology ||
+      (!topology.hasUnifiedMemory(sourceAffinity, targetAffinity) &&
+       !topology.hasTransparentAccess(sourceAffinity, targetAffinity))) {
+    return transferOp.emitOpError()
+           << "reuse requires shared access between source and target devices";
+  }
+
+  if (!sourceArg || sourceArg.getOwner() != &executeOp.getBody().front()) {
+    // A local transient producer can use the escaping result reservation as
+    // its backing storage. Place that reservation on an optimal affinity set
+    // containing both endpoints. Stream-to-HAL's allocator.select requires
+    // its chosen allocator to service every device in the set; the topology
+    // link above only establishes that sharing is semantically permitted.
+    auto sourceType = cast<IREE::Stream::ResourceType>(source.getType());
+    auto yieldOp = cast<IREE::Stream::YieldOp>(
+        executeOp.getBody().front().getTerminator());
+    bool directlyEscapes = llvm::is_contained(yieldOp.getResourceOperands(),
+                                              transferOp.getResult());
+    if (sourceType.getLifetime() != IREE::Stream::Lifetime::Transient ||
+        source != transferOp.getSource() || !source.getDefiningOp() ||
+        source.getParentRegion() != &executeOp.getBody() || !directlyEscapes) {
+      return transferOp.emitOpError()
+             << "cross-device reuse requires a captured shared allocation "
+                "or a directly escaping local transient producer";
+    }
+    auto &allocationAffinity = localReuseAllocationAffinities[source];
+    allocationAffinity = joinAllocationAffinities(
+        {allocationAffinity, sourceAffinity, targetAffinity});
+    if (!allocationAffinity) {
+      return transferOp.emitOpError()
+             << "reuse cannot form a shared allocation affinity";
+    }
+    return success();
+  }
+  if (!allocationAffinity) {
+    return transferOp.emitOpError()
+           << "reuse source allocation is not accessible to both devices";
+  }
+  return success();
+}
+
 // TODO(benvanik): find a way to split this up. We could probably do this in
 // several passes each time pulling out different resource types, however the
 // analysis we perform needs to see the original form and getting a shared
@@ -1685,6 +1929,18 @@ static LogicalResult
 allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
                         AffinityAnalysis &affinityAnalysis) {
   LLVM_DEBUG(llvm::dbgs() << "[[ Allocating execution region ]]\n");
+
+  DenseMap<Value, IREE::Stream::AffinityAttr> localReuseAllocationAffinities;
+  WalkResult reuseCheck =
+      executeOp.getBody().walk([&](IREE::Stream::AsyncTransferOp transferOp) {
+        return failed(verifyReusableTransfer(transferOp, executeOp,
+                                             localReuseAllocationAffinities))
+                   ? WalkResult::interrupt()
+                   : WalkResult::advance();
+      });
+  if (reuseCheck.wasInterrupted()) {
+    return failure();
+  }
 
   AllocationScope scope(executeOp);
 
@@ -1815,6 +2071,14 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
     scope.mapResourceRange(arg, resourceRange, asmState.get());
   }
   ResultAllocationMap resultReservations;
+  SmallPtrSet<Value, 8> reusableSources;
+  executeOp.getBody().walk([&](IREE::Stream::AsyncTransferOp transferOp) {
+    if (transferOp.getEffectiveStorage() == TransferStorage::Reuse) {
+      reusableSources.insert(transferOp.getSource());
+    }
+  });
+  DenseMap<Value, Value> pendingSourceReservations;
+  SmallVector<std::pair<Value, Value>> pendingReuseResultAliases;
   for (auto [resultValue, resultSize] :
        llvm::zip_equal(executeOp.getResults(), executeOp.getResultSizes())) {
     auto resultType = cast<IREE::Stream::ResourceType>(resultValue.getType());
@@ -1878,6 +2142,82 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
     auto definingValue =
         IREE::Util::TiedOpInterface::findTiedBaseValue(yieldValue);
     auto *definingOp = definingValue.getDefiningOp();
+
+    if (auto transferOp = findReusableTransfer(yieldValue)) {
+      Value source = transferOp.getSource();
+      if (transferOp->getParentRegion() != &executeOp.getBody()) {
+        if (IREE::Util::TiedOpInterface::findTiedBaseValue(source) != source) {
+          return transferOp.emitOpError()
+                 << "reuse of a subview inside a concurrent region is not "
+                    "supported";
+        }
+        source = resolveExecutionCapture(source, executeOp);
+      }
+      if (scope.hasResourceRange(source)) {
+        auto sourceRange = scope.lookupResourceRange(source);
+        auto resultRange = sourceRange;
+        if (scope.hasResourceRange(yieldValue)) {
+          resultRange = scope.lookupResourceRange(yieldValue);
+        } else {
+          for (auto subrange : llvm::reverse(gatherSubranges(yieldValue))) {
+            resultRange.offset = scope.add(transferOp.getLoc(),
+                                           resultRange.offset, subrange.offset);
+            resultRange.length = subrange.length;
+          }
+        }
+        auto sourceArg = dyn_cast<BlockArgument>(sourceRange.resource);
+        if (!sourceArg || sourceArg.getOwner() != &entryBlock) {
+          return transferOp.emitOpError()
+                 << "reuse source has no captured backing allocation";
+        }
+        Value outerSource = newOperands[sourceArg.getArgNumber()];
+        Value replacement = outerSource;
+        if (!matchPattern(resultRange.offset, m_Zero()) ||
+            resultRange.length != resultRange.resourceSize) {
+          replacement = IREE::Stream::ResourceSubviewOp::create(
+                            externalBuilder, transferOp.getLoc(), outerSource,
+                            resultRange.resourceSize, resultRange.offset,
+                            resultRange.length)
+                            .getResult();
+        }
+        scope.mapResourceRange(yieldValue, resultRange, asmState.get());
+        resultReplacements.emplace_back(resultValue, replacement);
+        continue;
+      }
+
+      if (yieldValue != transferOp.getResult()) {
+        return transferOp.emitOpError()
+               << "reuse of a locally produced concurrent result is not "
+                  "supported";
+      }
+      // A locally produced source can be allocated directly into the one
+      // escaping reservation. Map the source first so the reuse result picks
+      // up the same range through the alias set.
+      if (IREE::Util::TiedOpInterface::findTiedBaseValue(source) != source) {
+        return transferOp.emitOpError()
+               << "reuse of a locally produced subview is not supported";
+      }
+      if (auto it = pendingSourceReservations.find(source);
+          it != pendingSourceReservations.end()) {
+        pendingReuseResultAliases.emplace_back(resultValue, it->second);
+        continue;
+      }
+      auto allocationAffinity = deriveResultAffinity(
+          executeOp, resultValue, yieldValue, affinityAnalysis);
+      if (auto it = localReuseAllocationAffinities.find(source);
+          it != localReuseAllocationAffinities.end()) {
+        allocationAffinity =
+            joinAllocationAffinities({allocationAffinity, it->second});
+        if (!allocationAffinity) {
+          return transferOp.emitOpError()
+                 << "reuse cannot place the local source allocation";
+        }
+      }
+      pendingSourceReservations[source] = resultValue;
+      resultReservations[allocationAffinity].push_back(
+          {transferOp.getLoc(), resultValue, resultType, resultSize, source});
+      continue;
+    }
     if (!definingOp) {
       // Directly returning an operand; this usually gets canonicalized away but
       // may be introduced by intermediate transformations.
@@ -1897,10 +2237,35 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
       continue;
     }
 
+    // The full local source must own the reservation shared with a reuse
+    // result. Reserving an escaping subview first would size that backing
+    // allocation to the view and then alias the full transfer result to it.
+    if (reusableSources.contains(definingValue) &&
+        !gatherSubranges(yieldValue).empty()) {
+      return executeOp.emitOpError()
+             << "reuse of a locally produced escaping subview is not "
+                "supported";
+    }
+
+    if (auto it = pendingSourceReservations.find(definingValue);
+        it != pendingSourceReservations.end()) {
+      pendingReuseResultAliases.emplace_back(resultValue, it->second);
+      continue;
+    }
+
     // Find a pinned affinity for the value or inherit the execution region
     // affinity.
     auto allocationAffinity = deriveResultAffinity(
         executeOp, resultValue, yieldValue, affinityAnalysis);
+    if (auto it = localReuseAllocationAffinities.find(definingValue);
+        it != localReuseAllocationAffinities.end()) {
+      allocationAffinity =
+          joinAllocationAffinities({allocationAffinity, it->second});
+      if (!allocationAffinity) {
+        return executeOp.emitOpError()
+               << "reuse cannot place the local source allocation";
+      }
+    }
 
     // Queue up the allocation for packing.
     ResultReservation resultReservation = {
@@ -1913,6 +2278,9 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
       llvm::dbgs() << "\n";
     });
     resultReservations[allocationAffinity].push_back(resultReservation);
+    if (reusableSources.contains(definingValue)) {
+      pendingSourceReservations[definingValue] = resultValue;
+    }
   }
   for (auto &resultAllocation : reserveResultAllocations(resultReservations)) {
     for (auto &reservationSet : resultAllocation.reservationSets) {
@@ -1963,6 +2331,17 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp,
                                asmState.get());
       }
     }
+  }
+
+  // Multiple escaping SSA values may share a reused source. They all replace
+  // with the one reservation selected above.
+  for (auto [aliasResult, allocatedResult] : pendingReuseResultAliases) {
+    auto it = llvm::find_if(resultReplacements, [&](auto replacement) {
+      return replacement.first == allocatedResult;
+    });
+    assert(it != resultReplacements.end() && it->second &&
+           "reused source reservation must have a replacement");
+    resultReplacements.emplace_back(aliasResult, it->second);
   }
 
   // Allocate local transients that are scoped entirely within the region.
