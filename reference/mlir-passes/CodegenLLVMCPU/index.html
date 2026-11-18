@@ -7078,13 +7078,14 @@ stack buffers.</p>
 <h3 id="-iree-llvmcpu-virtual-vector-lowering"><code>-iree-llvmcpu-virtual-vector-lowering</code><a class="headerlink" href="#-iree-llvmcpu-virtual-vector-lowering" title="Permanent link">link</a></h3>
 <p><em>Pass to lower high level vector operations like contract or multidim reduce ops to lower level vector ops.</em></p>
 <h4 id="options_10">Options<a class="headerlink" href="#options_10" title="Permanent link">link</a></h4>
-<div class="highlight"><pre><span></span><code>-split-transfers : Split vector transfers between slow (masked) and fast "
+<div class="highlight"><pre><span></span><code>-split-transfers             : Split vector transfers between slow (masked) and fast "
         "(unmasked) variants. Possible options are:\n"
           "\tnone [default]: keep unsplit vector.transfer and pay the price\n"
           "\tlinalg-copy: use memref.copy for the slow path\n"
           "\tvector-transfers: use extra small unmasked vector.transfers for"
           " the slow path\n
--enable-arm-i8mm : Enables arm i8mm lowering patterns
+-enable-arm-i8mm             : Enables arm i8mm lowering patterns
+-skip-intermediate-roundings : Allow skipping intermediate roundings, e.g. in f16 arithmetic internally using f32
 </code></pre></div>
 
 
