@@ -1010,12 +1010,12 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule,
 std::vector<std::string> HalDriver::Query() {
   iree_host_size_t driver_info_count = 0;
   iree_hal_driver_info_t* driver_infos = NULL;
-  iree_allocator_t allocator = iree_allocator_system();
-  CheckApiStatus(iree_hal_driver_registry_enumerate(
-                     iree_hal_driver_registry_default(), 
-                     allocator,
-                     &driver_info_count, &driver_infos),
-                 "Error enumerating HAL drivers");
+  iree_allocator_t driver_info_host_allocator = iree_allocator_system();
+  CheckApiStatus(
+      iree_hal_driver_registry_enumerate(iree_hal_driver_registry_default(),
+                                         driver_info_host_allocator,
+                                         &driver_info_count, &driver_infos),
+      "Error enumerating HAL drivers");
 
   std::unique_ptr<iree_hal_driver_info_t[], AllocatorDeleter> infos(
       driver_infos, AllocatorDeleter{allocator});
