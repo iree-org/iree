@@ -24,6 +24,7 @@ if ($env:output_dir) { $output_dir = $env:output_dir };
 if (!$output_dir) { $output_dir = "${PSScriptRoot}\wheelhouse" };
 
 $repo_root = resolve-path "${PSScriptRoot}\..\.."
+$orig_path = $env:PATH
 
 # Canonicalize paths.
 md -Force ${output_dir} | Out-Null
@@ -48,6 +49,7 @@ function run() {
       }
 
       Write-Host ":::: Version: $(py -${python_version} --version)"
+      install_build_requirements $python_version
       switch ($package) {
           "iree-base-runtime" {
             clean_wheels iree_base_runtime $python_version
@@ -81,11 +83,28 @@ function build_iree_compiler() {
   build_wheel $python_version $repo_root/compiler/
 }
 
-# PowerShell does not stop when a native command fails, and the CI step only
-# checks the exit code of the last command, so exit on the first failure.
+# Installs the packages that build the wheels, pinned by hash, and puts the
+# scripts of this Python first on the PATH, so that the build runs its cmake.
+function install_build_requirements() {
+  param($python_version)
+  & py -${python_version} -m pip install --require-hashes --only-binary=:all: `
+    -r "${repo_root}\build_tools\python_deploy\build_requirements.txt"
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: Installing the build requirements for Python ${python_version} failed."
+    exit $LASTEXITCODE
+  }
+  $scripts_dir = & py -${python_version} -c "import sysconfig; print(sysconfig.get_path('scripts'))"
+  $env:PATH = "${scripts_dir};${orig_path}"
+}
+
+# Builds with the packages that install_build_requirements installed, instead
+# of the newest ones in an isolated environment. PowerShell does not stop when
+# a native command fails, and the CI step only checks the exit code of the last
+# command, so exit on the first failure.
 function build_wheel() {
   param($python_version, $source_dir)
-  & py -${python_version} -m pip wheel --no-deps -v -w $output_dir $source_dir
+  & py -${python_version} -m pip wheel --no-deps --no-build-isolation `
+    --check-build-dependencies -v -w $output_dir $source_dir
   if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Building the wheel of ${source_dir} with Python ${python_version} failed."
     exit $LASTEXITCODE

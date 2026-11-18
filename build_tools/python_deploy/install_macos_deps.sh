@@ -13,6 +13,8 @@
 
 set -e -o pipefail
 
+this_dir="$(cd "$(dirname "$0")" && pwd)"
+
 if [[ "$(whoami)" != "root" ]]; then
   echo "ERROR: Must setup deps as root"
   exit 1
@@ -67,7 +69,11 @@ for python_spec in "${PYTHON_SPECS[@]}"; do
   $python_exe -m pip --version
 
   echo ":: Installing system pip packages"
-  $python_exe -m pip install --upgrade pip
+  # The packages that build the wheels, including pip, pinned by hash.
+  # build_macos_packages.sh builds without build isolation, so that the build
+  # uses these packages.
+  $python_exe -m pip install --require-hashes --only-binary=:all: \
+    -r "$this_dir/build_requirements.txt"
   $python_exe -m pip install --upgrade delocate
 done
 

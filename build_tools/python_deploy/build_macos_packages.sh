@@ -73,13 +73,20 @@ function run() {
   ls -l $output_dir
 }
 
+# Builds with the packages that install_macos_deps.sh installed, instead of the
+# newest ones in an isolated environment.
+function build_wheel() {
+  python3 -m pip wheel --no-deps --no-build-isolation \
+    --check-build-dependencies -v -w $output_dir "$@"
+}
+
 function build_iree_runtime() {
   export IREE_RUNTIME_BUILD_TRACY=ON
-  python3 -m pip wheel --no-deps -v -w $output_dir $repo_root/runtime/
+  build_wheel $repo_root/runtime/
 }
 
 function build_iree_compiler() {
-  python3 -m pip wheel --no-deps -v -w $output_dir $repo_root/compiler/
+  build_wheel $repo_root/compiler/
 }
 
 function clean_wheels() {

@@ -154,7 +154,11 @@ function run_in_docker() {
 }
 
 function build_wheel() {
-  python -m pip wheel --disable-pip-version-check --no-deps -v -w "${output_dir}" "${repo_root}/$@"
+  # Builds with the packages that prepare_python installed, instead of the
+  # newest ones in an isolated environment.
+  python -m pip wheel --disable-pip-version-check --no-deps \
+    --no-build-isolation --check-build-dependencies \
+    -v -w "${output_dir}" "${repo_root}/$@"
 }
 
 function build_iree_runtime() {
@@ -201,11 +205,11 @@ function clean_wheels() {
 }
 
 function prepare_python() {
-  # The 0.17 series of patchelf can randomly corrupt executables. Fixes
-  # have landed but not yet been released. Consider removing this pin
-  # once 0.19 is released. We just override the system version with
-  # a pip side load.
-  pip install patchelf==0.16.1.0
+  # Installs the packages that build the wheels, pinned by hash. They include
+  # patchelf, whose pinned version overrides the system version.
+  python -m pip install --disable-pip-version-check --require-hashes \
+    --only-binary=:all: \
+    -r "${repo_root}/build_tools/python_deploy/build_requirements.txt"
   hash -r
   echo "patchelf version: $(patchelf --version) (0.17 is bad: https://github.com/NixOS/patchelf/issues/446)"
 }
