@@ -275,14 +275,14 @@ module version, and whether they changed since the previous release:
 1. Push the stable tag `vX.Y.Z` at the candidate's commit. Only release
     maintainers can create `v*` tags. Pushing the tag starts the
     [Publish to PyPI](https://github.com/iree-org/iree/actions/workflows/publish_pypi.yml)
-    workflow, which publishes the candidate that the tag's message names.
-    Several nightly candidates can share a commit, so the message must name
-    the one you picked.
+    workflow, which builds the release from that commit and publishes it to
+    PyPI.
 
     ```bash
-    git fetch upstream tag iree-3.1.0rc20241119
-    git tag -a v3.1.0 iree-3.1.0rc20241119 -m "Promote iree-3.1.0rc20241119"
+    git fetch upstream main tag iree-3.1.0rc20241119
+    git tag -a v3.1.0 iree-3.1.0rc20241119 -m "Version 3.1.0 release."
     git rev-parse 'v3.1.0^{commit}'  # Check that this is the candidate's commit.
+    git merge-base --is-ancestor 'v3.1.0^{commit}' upstream/main  # Fails if the commit is not on main.
     git push upstream refs/tags/v3.1.0  # Pushes only the tag.
     ```
 
@@ -291,31 +291,32 @@ module version, and whether they changed since the previous release:
     [tag ruleset](https://github.com/iree-org/iree/rules) blocks both.
     Check the commit before you push the tag.
 
-    The `promote` job finds the candidate release at the tag's commit, then
-    downloads, promotes, checks and attests its wheels. The `publish` jobs then
-    wait until a release maintainer approves the `pypi` environment. Check the
-    `promote` job's output before approving. Each package is uploaded with
+    The workflow builds all packages at the tagged commit with the stable
+    version, in the same way as the candidates. This takes about four hours.
+    It runs the same package tests as for a candidate, then attests the wheels
+    and the `iree-dist-*.tar.xz` files. The `publish` jobs then wait until a
+    release maintainer approves the `pypi` environment. The maintainer who
+    pushed the tag cannot approve it. Check the run before approving. Each
+    package is uploaded with
     [trusted publishing](https://docs.pypi.org/trusted-publishers/), which
     needs no PyPI credentials and attaches an attestation to every file.
 
-    Download the promoted wheels and their attestation bundle
-    (`iree-X.Y.Z-pypi-wheels.sigstore.json`) for the GitHub release from the
-    run's `pypi-wheels` artifact:
+    Download the files for the GitHub release from the run's
+    `release-assets` artifact: the wheels that it publishes, the
+    `iree-dist-*.tar.xz` files and their attestation bundle
+    `iree-X.Y.Z.sigstore.json`.
 
     ```bash
     gh run list --repo iree-org/iree --workflow publish_pypi.yml --limit 1
-    WHEEL_DIR=/tmp/iree_pypi_wheels.XXXXX
+    RELEASE_DIR=/tmp/iree_release_3.1.0
     gh run download <run id> --repo iree-org/iree \
-      --name pypi-wheels --dir "${WHEEL_DIR}"
+      --name release-assets --dir "${RELEASE_DIR}"
     ```
 
-    The workflow runs as it is at the tagged commit, so it cannot promote a
-    candidate that was cut before the workflow existed. (Authorized users
-    only) For such a candidate, or for a PyPI project that has no trusted
-    publisher yet, use
-    [pypi_deploy.sh](https://github.com/iree-org/iree/blob/main//build_tools/python_deploy/pypi_deploy.sh)
-    instead. The script is a dry run by default. Check its output, then pass
-    `--publish` to upload.
+    The workflow runs as it is at the tagged commit, so it cannot release a
+    commit from before the workflow existed. Release such a commit with
+    `pypi_deploy.sh` instead, see
+    [Promoting a candidate with pypi_deploy.sh](#promoting-a-candidate-with-pypi_deploysh).
 
 2. Create a new release on GitHub:
 
@@ -342,33 +343,17 @@ module version, and whether they changed since the previous release:
 
     * Paste the release notes from the release tracking issue.
 
-    * Upload the `iree-dist-*.tar.xz` files of the release candidate, and the
-        promoted `.whl` files and their attestation bundle from step 1, to the
-        release draft. The bundle lets users verify the wheels offline with
+    * Upload the files from step 1 to the release draft. The attestation
+        bundle lets users verify the files offline with
         `gh attestation verify --bundle`.
 
-        Download the `iree-dist-*.tar.xz` files from the candidate release.
-
         ```bash
-        gh release download iree-3.1.0rc20241119 --repo iree-org/iree \
-          --pattern 'iree-dist-*' --dir "${WHEEL_DIR}"
-        gh release upload v3.1.0 --repo iree-org/iree \
-          "${WHEEL_DIR}"/*.whl "${WHEEL_DIR}"/*-pypi-wheels.sigstore.json \
-          "${WHEEL_DIR}"/iree-dist-*.tar.xz
-        ```
-
-    * Upload the candidate's attestation bundles for the `iree-dist-*.tar.xz`
-        files
-
-        ```bash
-        gh release download iree-3.1.0rc20241119 --repo iree-org/iree \
-          --pattern '*-main-dist-linux.sigstore.json' --dir "${WHEEL_DIR}"
-        gh release upload v3.1.0 --repo iree-org/iree \
-          "${WHEEL_DIR}"/*-main-dist-linux.sigstore.json
+        gh release upload v3.1.0 --repo iree-org/iree "${RELEASE_DIR}"/*
         ```
 
     * Publish the release. Uncheck the option for "pre-release", and check the
-        option for "latest" and hit publish.
+        option for "latest" and hit publish. Releases are immutable: after
+        publishing, files cannot be added, replaced or deleted.
 
         ![promote_release](./release-latest.png)
 
@@ -387,33 +372,46 @@ module version, and whether they changed since the previous release:
 5. Complete any remaining checkbox items on the release tracking issue then
    close it and open a new one for the next release.
 
+### :octicons-history-16: Promoting a candidate with pypi_deploy.sh
+
+The Publish to PyPI workflow cannot release a commit from before the workflow
+existed. (Authorized users only) For such a commit, promote the candidate's
+wheels to the stable version and upload them to PyPI with a PyPI API token,
+using
+[pypi_deploy.sh](https://github.com/iree-org/iree/blob/main/build_tools/python_deploy/pypi_deploy.sh).
+The script is a dry run by default. Check its output, then pass `--publish` to
+upload.
+
+Keep the wheel folder that the script prints, and download the candidate's
+`iree-dist-*.tar.xz` files and their attestation bundles into it:
+
+```bash
+WHEEL_DIR=/tmp/iree_pypi_wheels.XXXXX
+gh release download iree-3.1.0rc20241119 --repo iree-org/iree \
+  --pattern 'iree-dist-*' --pattern '*-main-dist-linux.sigstore.json' \
+  --dir "${WHEEL_DIR}"
+```
+
+Then push the stable tag as in step 1, which starts no workflow at such a
+commit, and create the GitHub release as in step 2 with the files in
+`${WHEEL_DIR}`.
+
 ## :octicons-stack-16: Creating a patch release
 
 1. Create a new branch.
 
     Checkout the corresponding stable release and create a branch
-    for the patch release:
+    for the patch release. Do not name the branch like the stable tag
+    `vX.Y.Z`, which the release needs.
 
     <!-- TODO(scotttodd): Does this need a branch, or would just a tag work? -->
 
     ```shell
     git checkout v3.12.0
-    git checkout -b v3.12.1
+    git checkout -b release/3.12.1
     ```
 
 2. Apply and commit the patches.
-
-    If the branch has no `.github/workflows/publish_pypi.yml`, also copy the
-    files that publish to PyPI from `main`. The workflow runs as it is at the
-    commit of the patch release.
-
-    ```shell
-    git checkout upstream/main -- .github/workflows/publish_pypi.yml \
-      build_tools/python_deploy/pypi_deploy.sh \
-      build_tools/python_deploy/pypi_deploy_requirements.in \
-      build_tools/python_deploy/pypi_deploy_requirements.txt \
-      build_tools/python_deploy/promote_whl_from_rc_to_final.py
-    ```
 
 3. Set the patch level:
 
@@ -425,20 +423,31 @@ module version, and whether they changed since the previous release:
 
 5. Trigger the
     [_Oneshot candidate release_ workflow](https://github.com/iree-org/iree/actions/workflows/oneshot_candidate_release.yml)
-    to create a release.
+    to create a candidate release `iree-X.Y.ZrcYYYYMMDD` for testing.
 
     * Select to run the workflow from the patch branch.
 
-    * Set the type of build version to produce to "stable".
+    * Keep the type of build version to produce at "rc".
 
-        ![one_shot_patch](./one-shot-patch.png)
+6. Release the candidate as in
+    [Promoting a candidate to stable](#promoting-a-candidate-to-stable),
+    but check that the commit is on the patch branch instead of `main`:
 
-6. Push the tag `vX.Y.Z` at the commit of the `iree-X.Y.Z` release, with
-   `-m "Promote iree-X.Y.Z"`, as in step 1 of promoting a candidate to stable
-   above. The workflow publishes
-   only the packages at version `X.Y.Z`. The other packages did not change.
-   The Oneshot workflow has already published `iree-X.Y.Z` as a stable
-   GitHub release, so step 2 can be skipped.
+    ```bash
+    git merge-base --is-ancestor 'v3.12.1^{commit}' upstream/release/3.12.1
+    ```
+
+    The workflow publishes only the packages at version `X.Y.Z`. The other
+    packages did not change.
+
+If the branch has no `.github/workflows/publish_pypi.yml`, use the earlier
+process instead. In step 5, set the type of build version to "stable". The
+workflow then creates and publishes the GitHub release `iree-X.Y.Z`. Upload its
+wheels to PyPI with
+[pypi_deploy.sh](#promoting-a-candidate-with-pypi_deploysh), without a stable
+tag or another GitHub release.
+
+![one_shot_patch](./one-shot-patch.png)
 
 ## :octicons-cross-reference-16: Useful references
 
