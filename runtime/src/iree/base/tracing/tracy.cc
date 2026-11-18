@@ -416,6 +416,16 @@ void iree_tracing_gpu_zone_begin_external(
     uint8_t context_id, uint16_t query_id, const char* file_name,
     size_t file_name_length, uint32_t line, const char* function_name,
     size_t function_name_length, const char* name, size_t name_length) {
+  iree_tracing_gpu_zone_begin_external_colored(
+      context_id, query_id, file_name, file_name_length, line, function_name,
+      function_name_length, name, name_length, /*color_xbgr=*/0);
+}
+
+void iree_tracing_gpu_zone_begin_external_colored(
+    uint8_t context_id, uint16_t query_id, const char* file_name,
+    size_t file_name_length, uint32_t line, const char* function_name,
+    size_t function_name_length, const char* name, size_t name_length,
+    uint32_t color_xbgr) {
   // If name is NULL or empty, use function_name as the zone name.
   if (!name || name_length == 0) {
     name = function_name;
@@ -424,7 +434,7 @@ void iree_tracing_gpu_zone_begin_external(
 
   const auto src_loc = tracy::Profiler::AllocSourceLocation(
       line, file_name, file_name_length, function_name, function_name_length,
-      name, name_length);
+      name, name_length, color_xbgr);
   auto* item = tracy::Profiler::QueueSerial();
   tracy::MemWrite(&item->hdr.type,
                   tracy::QueueType::GpuZoneBeginAllocSrcLocSerial);
@@ -453,6 +463,36 @@ void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
   tracy::MemWrite(&item->gpuTime.gpuTime, gpu_timestamp);
   tracy::MemWrite(&item->gpuTime.queryId, query_id);
   tracy::MemWrite(&item->gpuTime.context, context_id);
+  tracy::Profiler::QueueSerialFinish();
+}
+
+void iree_tracing_gpu_context_annotation_name(uint8_t context_id,
+                                              int64_t annotation_id,
+                                              const char* name,
+                                              size_t name_length) {
+  // NOTE: Tracy will unconditionally free the name so we must clone it here
+  // with its allocator (see iree_tracing_gpu_context_allocate).
+  char* cloned_name = (char*)tracy::tracy_malloc(name_length);
+  memcpy(cloned_name, name, name_length);
+  auto* item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuAnnotationName);
+  tracy::MemWrite(&item->gpuAnnotationNameFat.noteId, annotation_id);
+  tracy::MemWrite(&item->gpuAnnotationNameFat.context, context_id);
+  tracy::MemWrite(&item->gpuAnnotationNameFat.ptr, (uint64_t)cloned_name);
+  tracy::MemWrite(&item->gpuAnnotationNameFat.size,
+                  static_cast<uint16_t>(name_length));
+  tracy::Profiler::QueueSerialFinish();
+}
+
+void iree_tracing_gpu_zone_annotation(uint8_t context_id, uint16_t query_id,
+                                      int64_t annotation_id, double value) {
+  auto* item = tracy::Profiler::QueueSerial();
+  tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneAnnotation);
+  tracy::MemWrite(&item->zoneAnnotation.noteId, annotation_id);
+  tracy::MemWrite(&item->zoneAnnotation.value, value);
+  tracy::MemWrite(&item->zoneAnnotation.thread, tracy::GetThreadHandle());
+  tracy::MemWrite(&item->zoneAnnotation.queryId, query_id);
+  tracy::MemWrite(&item->zoneAnnotation.context, context_id);
   tracy::Profiler::QueueSerialFinish();
 }
 
