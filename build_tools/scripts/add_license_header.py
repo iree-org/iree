@@ -21,6 +21,7 @@ import sys
 COPYRIGHT_PATTERN = re.compile(r"Copyright\s+\d+")
 
 LICENSE_HEADER_FORMATTER = """{shebang}{start_comment} Copyright {year} {holder}
+{middle_comment}
 {middle_comment} Licensed under the Apache License v2.0 with LLVM Exceptions.
 {middle_comment} See https://llvm.org/LICENSE.txt for license information.
 {middle_comment} SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception{end_comment}
@@ -51,7 +52,7 @@ def create_multikey(d):
 
 filename_to_comment = create_multikey(
     {
-        ("BUILD", "CMakeLists.txt"): CommentSyntax("#"),
+        ("BUILD", "BUILD.bazel", "CMakeLists.txt"): CommentSyntax("#"),
     }
 )
 
