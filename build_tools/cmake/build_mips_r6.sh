@@ -70,7 +70,11 @@ args=(
 
   # Cross compiling MIPS r6 + MSA
   "-DIREE_BUILD_COMPILER=OFF"
-  "-DIREE_BUILD_SAMPLES=OFF"
+  # Build samples: samples/simple_embedding has a mips_64 case and its
+  # embedded native_test runs under QEMU as an end-to-end embedded-ELF check.
+  # Under this config (compiler off, CPU-only drivers) it is the only sample
+  # that builds a cross target; the rest self-skip or are Python/MLIR-only.
+  "-DIREE_BUILD_SAMPLES=ON"
   "-DIREE_HOST_BIN_DIR=${IREE_HOST_BIN_DIR}"
   "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
 
@@ -79,8 +83,11 @@ args=(
   # (and fail) by the host compiler; OFF keeps the build clean.
   "-DIREE_BUILD_ALL_CHECK_TEST_MODULES=OFF"
 
-  # Native codegen runs the compiled MIPS .so via the system dynamic library
-  # loader (link_embedded=false path), so that loader must be enabled.
+  # The r6/MSA gate defaults to the embedded-ELF loader (link_embedded=true,
+  # MIPS relocations in hal/local/elf/arch/mips_64.c), which is already on by
+  # default. Keep the system dynamic library loader on too so the
+  # link_embedded=false path still works (e.g. compiling a model with
+  # --iree-llvmcpu-link-embedded=false for a system .so).
   "-DIREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY=ON"
 
   # local CPU drivers only (no GPU); target backends come from the host compiler

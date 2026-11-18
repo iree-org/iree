@@ -31,7 +31,11 @@ static iree_status_t query_arch_test_file_data(
 #elif defined(IREE_ARCH_X86_64)
   pattern = iree_make_cstring_view("*_x86_64.so");
 #elif defined(IREE_ARCH_MIPS_64)
-  // No native MIPS tests, just return empty
+  // The MIPS embedded-ELF loader (arch/mips_64.c) is implemented and validated
+  // end-to-end under QEMU, but there is no checked-in
+  // elementwise_mul_mips_64.so yet: generate.sh cannot currently (re)produce
+  // these hand-authored hal.executable.source artifacts on any architecture.
+  // Skip until the testdata can be regenerated.
   *out_file_data = iree_const_byte_span_empty();
   return iree_ok_status();
 #else

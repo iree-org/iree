@@ -10,6 +10,18 @@
 set -x
 set -e
 
+# Export QEMU_LD_PREFIX from the -L <sysroot> argument. The -L flag only sets the
+# sysroot for this top-level QEMU; child processes a test spawns are re-executed
+# by binfmt_misc with a bare QEMU that reads the sysroot only from this env var.
+# Deriving it from -L keeps them in sync and overrides any stale value in the env.
+_args=("$@")
+for ((_i = 0; _i < ${#_args[@]}; ++_i)); do
+  if [[ "${_args[_i]}" == "-L" ]]; then
+    export QEMU_LD_PREFIX="${_args[_i + 1]}"
+    break
+  fi
+done
+
 if [[ ! -z "${QEMU_BIN}" ]] && [[ ! -z "${QEMU_CPU_FLAGS}" ]]; then
   "${QEMU_BIN}" "-cpu" "${QEMU_CPU_FLAGS}" "$@"
 else

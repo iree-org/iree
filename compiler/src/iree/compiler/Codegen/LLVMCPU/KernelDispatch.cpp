@@ -350,7 +350,12 @@ getNativeVectorSizeInBytes(mlir::FunctionOpInterface entryPointFn) {
 /// fallback.
 static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
                              unsigned byteWidth) {
-  return getNativeVectorSizeInBytes(entryPointFn) / byteWidth;
+  // Clamp to at least 1: on targets whose native vector is narrower than a
+  // single element (e.g. scalar MIPS has a 4-byte native vector, too small for
+  // an f64/i64), the raw division would be 0 and later divide-by-zero in the
+  // tile-size math. Returning 1 matches the documented fallback (scalar).
+  return std::max<int64_t>(1, getNativeVectorSizeInBytes(entryPointFn) /
+                                  byteWidth);
 }
 static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
                              ShapedType shapedType) {

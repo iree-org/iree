@@ -33,6 +33,8 @@ class TargetConverter:
                 "@llvm-project//llvm:AArch64CodeGen": ["IREELLVMCPUTargetDeps"],
                 "@llvm-project//llvm:ARMAsmParser": ["IREELLVMCPUTargetDeps"],
                 "@llvm-project//llvm:ARMCodeGen": ["IREELLVMCPUTargetDeps"],
+                "@llvm-project//llvm:MipsAsmParser": ["IREELLVMCPUTargetDeps"],
+                "@llvm-project//llvm:MipsCodeGen": ["IREELLVMCPUTargetDeps"],
                 "@llvm-project//llvm:RISCVAsmParser": ["IREELLVMCPUTargetDeps"],
                 "@llvm-project//llvm:RISCVCodeGen": ["IREELLVMCPUTargetDeps"],
                 "@llvm-project//llvm:WebAssemblyAsmParser": ["IREELLVMCPUTargetDeps"],

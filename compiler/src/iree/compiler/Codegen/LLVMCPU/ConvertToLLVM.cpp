@@ -36,7 +36,6 @@
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Conversion/MathToLLVM/MathToLLVM.h"
-#include "mlir/Conversion/MathToLibm/MathToLibm.h"
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -1087,38 +1086,6 @@ void ConvertToLLVMPass::runOnOperation() {
   DictionaryAttr targetConfig;
   if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(moduleOp)) {
     targetConfig = targetAttr.getConfiguration();
-  }
-
-  // On MIPS, a few transcendentals (erf, asinh, acosh) are kept off their
-  // polynomial approximation / expansion (which the LLVM MIPS MSA backend
-  // miscompiles, see MathTransform.cpp) and have no LLVM intrinsic, so they
-  // must go to scalar libm calls (erff/asinhf/acoshf). Do that conversion at
-  // module scope, before the main LLVM conversion: MathToLibm's VecOpToScalarOp
-  // scalarizes the vector and ScalarOpToLibmCall emits the call plus a
-  // declaration. Each declaration is marked `hal.import.static` (so the later
-  // extern-call-to-import rewrite leaves it as a plain libm call, like the
-  // backend-emitted `expf` for math.exp) and external (so it is exported as an
-  // undefined dynamic symbol, resolved from the process libm at load time).
-  // cbrt and atan2 are verified correct under MSA and are not touched; atan is
-  // handled via its LLVM intrinsic.
-  if (targetConfig && isMIPS(targetConfig)) {
-    RewritePatternSet libmPatterns(&getContext());
-    populateMathToLibmConversionPatterns(libmPatterns);
-    ConversionTarget libmTarget(getContext());
-    libmTarget.addLegalDialect<arith::ArithDialect, func::FuncDialect,
-                               math::MathDialect, vector::VectorDialect>();
-    libmTarget.addIllegalOp<math::ErfOp, math::AsinhOp, math::AcoshOp>();
-    if (failed(applyPartialConversion(moduleOp, libmTarget,
-                                      std::move(libmPatterns)))) {
-      return signalPassFailure();
-    }
-    for (StringRef libmName : {"erff", "asinhf", "acoshf"}) {
-      if (auto libmFunc = moduleOp.lookupSymbol<func::FuncOp>(libmName)) {
-        libmFunc.setPublic();
-        libmFunc->setDiscardableAttr("hal.import.static",
-                                     UnitAttr::get(&getContext()));
-      }
-    }
   }
 
   // Run Vector -> Vector transformations ahead of conversion to LLVM.

@@ -126,19 +126,20 @@ set(IREE_TEST_TARGET_BACKENDS "llvm-cpu;vmvx" CACHE STRING
 
 # The samples under samples/simple_embedding/ embed a precompiled module and
 # load it with the embedded-ELF loader, dispatching on a hardcoded per-arch
-# switch (x86_64/riscv/arm_64) that #errors on any other target. MIPS has no
-# arm there, and the embedded-ELF loader itself is still a stub on MIPS
-# (hal/local/elf/arch/mips_64.c), so these samples cannot build or run here
-# yet. They are demos, not part of the test gate, so disable samples for this
-# cross-build. Override with -DIREE_BUILD_SAMPLES=ON once the embedded-ELF MIPS
-# path lands.
-set(IREE_BUILD_SAMPLES OFF CACHE BOOL "Disabled for the MIPS cross-build")
+# switch. Both the embedded-ELF loader (hal/local/elf/arch/mips_64.c) and the
+# sample's own arch switch now have a mips_64 case, so the embedded sample
+# builds and its native_test runs under QEMU as a real end-to-end embedded-ELF
+# smoke test. Override with -DIREE_BUILD_SAMPLES=OFF to skip the samples.
+set(IREE_BUILD_SAMPLES ON CACHE BOOL "Build samples for the MIPS cross-build")
 
 # Native (llvm-cpu) codegen flags injected into llvm-cpu test compiles for
-# mips_64 (see iree_compile_flags_for_platform in iree_macros.cmake). MIPS uses
-# the system dynamic library loader (link_embedded=false); the embedded ELF
-# loader would need real MIPS relocations in hal/local/elf/arch/mips_64.c
-# (still a stub).
+# mips_64 (see iree_compile_flags_for_platform in iree_macros.cmake). We use the
+# default embedded-ELF loader (link_embedded=true, like RISC-V) now that the
+# MIPS relocations are implemented in hal/local/elf/arch/mips_64.c — so the test
+# modules exercise that loader under QEMU. Modules stay hermetic: the
+# transcendentals that the MSA backend miscompiles are scalarized to a correct
+# approximation on MIPS (MathTransform.cpp) rather than routed to external libm,
+# so no dynamic-libm dependency remains.
 #
 # BOTH cpu and feature flags are required, and they do different jobs:
 #  * --iree-llvmcpu-target-cpu=i6400 makes LLVM emit a Release-6 / NaN-2008 ELF
@@ -150,7 +151,6 @@ set(IREE_BUILD_SAMPLES OFF CACHE BOOL "Disabled for the MIPS cross-build")
 #    IREE inspects to set the vector width, so +msa must be passed explicitly.
 set(MIPS64_TEST_DEFAULT_LLVM_FLAGS
   "--iree-llvmcpu-target-triple=mips64el-linux-gnuabi64"
-  "--iree-llvmcpu-link-embedded=false"
   "--iree-llvmcpu-target-cpu=i6400"
   "--iree-llvmcpu-target-cpu-features=+msa"
   CACHE INTERNAL "Default llvm codegen flags for testing purposes")

@@ -57,6 +57,8 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:BitWriter",
         "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Linker",
+        "@llvm-project//llvm:MipsAsmParser",
+        "@llvm-project//llvm:MipsCodeGen",
         "@llvm-project//llvm:RISCVAsmParser",
         "@llvm-project//llvm:RISCVCodeGen",
         "@llvm-project//llvm:Support",

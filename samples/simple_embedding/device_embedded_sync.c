@@ -25,6 +25,8 @@
 #include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_riscv_32_c.h"
 #elif IREE_ARCH_RISCV_64
 #include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_riscv_64_c.h"
+#elif IREE_ARCH_MIPS_64
+#include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_mips_64_c.h"
 #elif IREE_ARCH_X86_64
 #include "samples/simple_embedding/simple_embedding_test_bytecode_module_cpu_x86_64_c.h"
 #endif
@@ -82,6 +84,9 @@ const iree_const_byte_span_t load_bytecode_module_data() {
 #elif IREE_ARCH_RISCV_64
   const struct iree_file_toc_t* module_file_toc =
       iree_samples_simple_embedding_test_module_cpu_riscv_64_create();
+#elif IREE_ARCH_MIPS_64
+  const struct iree_file_toc_t* module_file_toc =
+      iree_samples_simple_embedding_test_module_cpu_mips_64_create();
 #elif IREE_ARCH_ARM_32
   const struct iree_file_toc_t* module_file_toc =
       iree_samples_simple_embedding_test_module_cpu_arm_32_create();
