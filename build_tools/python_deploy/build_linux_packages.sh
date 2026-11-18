@@ -227,8 +227,10 @@ function install_deps() {
 
   if [[ "$uname_m" == "aarch64" ]]; then
     echo "The architecture is aarch64 and we use manylinux 2_28 so install deps"
+    # Installs only the pinned clang and lld, and the packages that they
+    # need. Updating every package would replace the toolchain of the pinned
+    # image with whatever is current.
     yum install -y epel-release
-    yum update -y
     yum install -y clang-20.1.8-2.module_el8.10.0+4062+b20d4441 lld-20.1.8-2.module_el8.10.0+4062+b20d4441
   elif [[ "$uname_m" == "x86_64" ]]; then
     echo "The architecture is x86_64 so assume we are on a managed image with deps"
