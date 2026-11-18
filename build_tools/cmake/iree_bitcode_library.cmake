@@ -86,6 +86,9 @@ function(iree_bitcode_library)
   elseif(_RULE_ARCH STREQUAL "riscv_64")
     # Same comments as above riscv_32 case.
     list(APPEND _COPTS "-mabi=lp64d")
+  elseif(_RULE_ARCH STREQUAL "mips_64")
+    # linking LLVM modules requires a matching target ABI.
+    list(APPEND _COPTS "-mabi=64")
   endif()
 
   set(_BITCODE_FILES)

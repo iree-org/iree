@@ -26,24 +26,94 @@ iree_lit_test_suite(
     "hostonly"
 )
 
-iree_check_test_suite(
+iree_check_single_backend_test_suite(
   NAME
-    check
+    check_vmvx_local-task
   SRCS
     "success.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32=false"
 )
 
-iree_check_test_suite(
+iree_check_single_backend_test_suite(
   NAME
-    check_failure
+    check_vulkan-spirv_vulkan
+  SRCS
+    "success.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32=false"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_local-task_generic
+  SRCS
+    "success.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32=false"
+    "--iree-llvmcpu-target-cpu=generic"
+  LABELS
+    "nomips"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_failure_vmvx_local-task
   SRCS
     "failure.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32=false"
   RUNNER_ARGS
     "--expect_failure"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_failure_vulkan-spirv_vulkan
+  SRCS
+    "failure.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32=false"
+  RUNNER_ARGS
+    "--expect_failure"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_failure_llvm-cpu_local-task_generic
+  SRCS
+    "failure.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32=false"
+    "--iree-llvmcpu-target-cpu=generic"
+  RUNNER_ARGS
+    "--expect_failure"
+  LABELS
+    "nomips"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
