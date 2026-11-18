@@ -440,6 +440,9 @@ commit, and create the GitHub release as in step 2 with the files in
     The workflow publishes only the packages at version `X.Y.Z`. The other
     packages did not change.
 
+    When you publish the GitHub release, check "latest" only if no newer
+    minor version is released, e.g. not for 3.12.1 after 3.13.0.
+
 If the branch has no `.github/workflows/publish_pypi.yml`, use the earlier
 process instead. In step 5, set the type of build version to "stable". The
 workflow then creates and publishes the GitHub release `iree-X.Y.Z`. Upload its
