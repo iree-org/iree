@@ -11,6 +11,7 @@
 name: Build Release Packages
 
 # Note: this workflow is typically invoked by schedule_candidate_release.yml.
+# publish_pypi.yml calls it to build a stable release.
 on:
   workflow_dispatch:
     inputs:
@@ -37,6 +38,44 @@ on:
       commit:
         description: "Commit to check out"
         default: ""
+      require_all_builds:
+        description: "Fail if any build fails, including the experimental ones"
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      package_suffix:
+        description: "Suffix to append to package names"
+        type: string
+        default: ""
+      legacy_package_version:
+        description: "Version of the iree-tools-tf and iree-tools-tflite packages"
+        type: string
+        required: true
+      package_version:
+        description: "Version of the package"
+        type: string
+        required: true
+      compiler_package_version:
+        description: "Version of the iree-base-compiler package"
+        type: string
+        required: true
+      runtime_package_version:
+        description: "Version of the iree-base-runtime package"
+        type: string
+        required: true
+      release_id:
+        description: "Release id to upload artifacts to"
+        type: string
+        default: ""
+      commit:
+        description: "Commit to check out"
+        type: string
+        default: ""
+      require_all_builds:
+        description: "Fail if any build fails, including the experimental ones"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -55,17 +94,17 @@ jobs:
           persist-credentials: false
           path: "c" # Windows can hit path length limits, so use a short path.
           submodules: false
-          ref: ${{ github.event.inputs.commit }}
+          ref: ${{ inputs.commit }}
 
       - name: Write version info (release)
         id: version_local
         shell: bash
         env:
-          PACKAGE_SUFFIX: ${{ github.event.inputs.package_suffix }}
-          LEGACY_PACKAGE_VERSION: ${{ github.event.inputs.legacy_package_version }}
-          PACKAGE_VERSION: ${{ github.event.inputs.package_version }}
-          COMPILER_PACKAGE_VERSION: ${{ github.event.inputs.compiler_package_version }}
-          RUNTIME_PACKAGE_VERSION: ${{ github.event.inputs.runtime_package_version }}
+          PACKAGE_SUFFIX: ${{ inputs.package_suffix }}
+          LEGACY_PACKAGE_VERSION: ${{ inputs.legacy_package_version }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+          COMPILER_PACKAGE_VERSION: ${{ inputs.compiler_package_version }}
+          RUNTIME_PACKAGE_VERSION: ${{ inputs.runtime_package_version }}
         run: |
           # Note: `version_info.json` holds the CalVer version and is still used
           # for iree-tools-tf and iree-tools-tflite.
@@ -122,7 +161,9 @@ jobs:
     name: "${{ matrix.build-family }} :: Build ${{ matrix.build-package }} Package"
     needs: setup_metadata
     runs-on: ${{ matrix.runs-on }}
-    continue-on-error: ${{ matrix.experimental }}
+    # An experimental build may fail without failing the workflow, unless all
+    # builds are required, as for a stable release from publish_pypi.yml.
+    continue-on-error: ${{ matrix.experimental && !inputs.require_all_builds }}
     permissions:
       contents: read
       # Required by actions/attest to sign and store build provenance.
@@ -201,7 +242,7 @@ jobs:
           persist-credentials: false
           path: "c" # Windows can hit path length limits, so use a short path.
           submodules: true
-          ref: ${{ github.event.inputs.commit }}
+          ref: ${{ inputs.commit }}
 
       ##########################################################################
       # OS specific setup
@@ -270,7 +311,7 @@ jobs:
         if: "matrix.build-package == 'py-runtime-pkg' && contains(matrix.build-family, 'linux')"
         shell: bash
         env:
-          package_suffix: ${{ github.event.inputs.package_suffix }}
+          package_suffix: ${{ inputs.package_suffix }}
           packages: "iree-base-runtime"
           output_dir: "${{ github.workspace }}/bindist"
         run: |
@@ -281,7 +322,7 @@ jobs:
         if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'macos'"
         shell: bash
         env:
-          package_suffix: ${{ github.event.inputs.package_suffix }}
+          package_suffix: ${{ inputs.package_suffix }}
           packages: "iree-base-runtime"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11 3.12"
@@ -293,7 +334,7 @@ jobs:
         if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'windows'"
         shell: powershell
         env:
-          package_suffix: ${{ github.event.inputs.package_suffix }}
+          package_suffix: ${{ inputs.package_suffix }}
           packages: "iree-base-runtime"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11 3.12"
@@ -312,7 +353,7 @@ jobs:
         if: "matrix.build-package == 'py-compiler-pkg' && contains(matrix.build-family, 'linux')"
         shell: bash
         env:
-          package_suffix: ${{ github.event.inputs.package_suffix }}
+          package_suffix: ${{ inputs.package_suffix }}
           packages: "iree-base-compiler"
           output_dir: "${{ github.workspace }}/bindist"
         run: |
@@ -323,7 +364,7 @@ jobs:
         if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'macos'"
         shell: bash
         env:
-          package_suffix: ${{ github.event.inputs.package_suffix }}
+          package_suffix: ${{ inputs.package_suffix }}
           packages: "iree-base-compiler"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11 3.12"
@@ -335,7 +376,7 @@ jobs:
         if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'windows'"
         shell: powershell
         env:
-          package_suffix: ${{ github.event.inputs.package_suffix }}
+          package_suffix: ${{ inputs.package_suffix }}
           packages: "iree-base-compiler"
           output_dir: "${{ github.workspace }}/bindist"
           override_python_versions: "3.11 3.12"
@@ -370,7 +411,7 @@ jobs:
       # so users can verify them with `gh attestation verify`.
       - name: Attest Release Assets
         id: attest
-        if: github.event.inputs.release_id != ''
+        if: inputs.release_id != ''
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: ./bindist/iree*.*
@@ -386,7 +427,7 @@ jobs:
         shell: bash
         env:
           BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
-          PACKAGE_VERSION: ${{ github.event.inputs.package_version }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
           BUILD_FAMILY: ${{ matrix.build-family }}
           BUILD_PACKAGE: ${{ matrix.build-package }}
         run: |
@@ -396,13 +437,13 @@ jobs:
 
       # TODO: Upload the tar.bz2 files too when ready
       - name: Upload Release Assets
-        if: github.event.inputs.release_id != ''
+        if: inputs.release_id != ''
         id: upload-release-assets
         uses: dwenegar/upload-release-assets@fe47e06814723c7b1bea3a7e46cf93d5f020d0c3 # v3
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
-          release_id: ${{ github.event.inputs.release_id }}
+          release_id: ${{ inputs.release_id }}
           # Only upload iree artifacts and their attestation bundle.
           assets_path: |
             ./bindist/iree*.*
@@ -411,7 +452,7 @@ jobs:
   validate_and_publish:
     name: "Trigger validate and publish release"
     needs: build_packages
-    if: github.event.inputs.release_id != ''
+    if: inputs.release_id != ''
     runs-on: ubuntu-24.04
     steps:
       - name: "Invoke workflow :: Validate and Publish Release"
@@ -419,4 +460,4 @@ jobs:
         with:
           workflow: Validate and Publish Release
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          inputs: '{"release_id": "${{ github.event.inputs.release_id }}", "package_version": "${{ github.event.inputs.package_version }}", "compiler_package_version": "${{ github.event.inputs.compiler_package_version }}", "runtime_package_version": "${{ github.event.inputs.runtime_package_version }}", "legacy_package_version": "${{ github.event.inputs.legacy_package_version }}", "build_run_id": "${{ github.run_id }}"}'
+          inputs: '{"release_id": "${{ inputs.release_id }}", "package_version": "${{ inputs.package_version }}", "compiler_package_version": "${{ inputs.compiler_package_version }}", "runtime_package_version": "${{ inputs.runtime_package_version }}", "legacy_package_version": "${{ inputs.legacy_package_version }}", "build_run_id": "${{ github.run_id }}"}'
