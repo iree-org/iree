@@ -1095,10 +1095,9 @@ static TransferElisionAction getTransferElisionAction(
 
   // Topology can select reuse for an unannotated transfer. An explicit copy
   // still follows the pre-PR elision path.
-  const auto elisionAction =
-      topologyAllowsElision && !transferOp.getStorage()
-          ? TransferElisionAction::Reuse
-          : TransferElisionAction::Elide;
+  const auto elisionAction = topologyAllowsElision && !transferOp.getStorage()
+                                 ? TransferElisionAction::Reuse
+                                 : TransferElisionAction::Elide;
 
   // Same affinity can be a no-op; shared cross-device storage follows the
   // same elision safety checks.
