@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iree-base-core"
+description = "IREE Python components shared by the compiler and runtime"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+    { name = "IREE Authors", email = "iree-technical-discussion@lists.lfaidata.foundation" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+# Version ranges. requirements.txt pins them with hashes for builds and CI:
+# regenerate it after a change here, with the command at its top.
+dependencies = []
+# Computed by setup.py.
+dynamic = ["version"]
+
+[project.readme]
+content-type = "text/markdown"
+text = """
+# IREE Core Python Components
+
+Pure-Python components shared by the IREE compiler (`iree-base-compiler`) and
+runtime (`iree-base-runtime`) packages, importable as `iree.core`.
+"""
+
+[project.urls]
+homepage = "https://iree.dev/"
+repository = "https://github.com/iree-org/iree"
+
+[tool.setuptools.packages.find]
+include = ["iree.core*"]
+namespaces = true

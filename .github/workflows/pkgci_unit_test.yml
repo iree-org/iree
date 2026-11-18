@@ -53,9 +53,20 @@ jobs:
             --fetch-gh-workflow="${ARTIFACT_RUN_ID}"
           source ${VENV_DIR}/bin/activate
           pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+          pip install --require-hashes --only-binary=:all: -r core/python/requirements.txt
         env:
           ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate core wheel
+        run: |
+          source ${VENV_DIR}/bin/activate
+          echo "Testing core package:"
+          # Runs from before the package existed have no wheel for it.
+          if ! python -m pip show iree-base-core; then
+            echo "This run has no iree-base-core wheel, skipping its tests"
+            exit 0
+          fi
+          python core/python/test/package_test.py
       - name: Validate runtime wheel
         run: |
           source ${VENV_DIR}/bin/activate

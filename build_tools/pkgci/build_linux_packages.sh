@@ -26,6 +26,7 @@
 #   cp311-cp311 cp312-cp312
 #
 # Valid packages:
+#   iree-base-core
 #   iree-base-runtime
 #   iree-base-compiler
 #
@@ -68,7 +69,7 @@ manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 =
 python_versions="${override_python_versions:-cp311-cp311}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 cache_dir="${cache_dir:-}"
-packages="${packages:-iree-base-runtime iree-base-compiler}"
+packages="${packages:-iree-base-core iree-base-runtime iree-base-compiler}"
 package_suffix="${package_suffix:-}"
 toolchain_suffix="${toolchain_suffix:-release}"
 # Return ON if we are on a supported platform for CUDA.
@@ -155,6 +156,13 @@ function run_in_docker() {
       # replace dashes with underscores
       package_suffix="${package_suffix//-/_}"
       case "${package}" in
+        iree-base-core)
+          # Pure Python: one wheel serves every Python version, so it is built
+          # once, and it needs no auditwheel repair.
+          clean_wheels "iree_base_core" "py3"
+          build_iree_core
+          break
+          ;;
         iree-base-runtime)
           clean_wheels "iree_base_runtime${package_suffix}" "${python_version}"
           build_iree_runtime
@@ -185,6 +193,12 @@ function run_in_docker() {
 
 function build_wheel() {
   python -m pip wheel --disable-pip-version-check -v -w "${output_dir}" "${repo_root}/$@"
+}
+
+function build_iree_core() {
+  # Without --no-deps, pip would also download the dependencies, unpinned,
+  # although only the iree wheels are kept.
+  build_wheel core/python/ --no-deps
 }
 
 function build_iree_runtime() {

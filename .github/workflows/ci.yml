@@ -107,7 +107,9 @@ jobs:
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: Install Python requirements
-        run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+        run: |
+          pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+          pip install --require-hashes --only-binary=:all: -r ./core/python/requirements.txt
       - name: ccache
         uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
         with:

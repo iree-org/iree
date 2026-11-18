@@ -35,6 +35,7 @@
 /build_tools/third_party/ @AGindinson @devtbi @stellaraccident
 
 # Other Top-Level Directories
+/core/ @devtbi @Manewing @schuermans-roofline
 /docs/ @AGindinson @devtbi @jschuhmacher @schuermans-roofline
 /tools/ @benvanik @devtbi @schuermans-roofline
 
