@@ -1288,10 +1288,9 @@ static Value createMmaOp(OpBuilder &builder, Location loc,
 
 // Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
 // type.
-LogicalResult
-MMAAttr::buildUnderlyingOperations(OpBuilder &builder, Location loc,
-                                   ValueRange inputs, ValueRange outputs,
-                                   SmallVectorImpl<Value> &results) const {
+LogicalResult MMAAttr::buildUnderlyingOperations(
+    OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
+    SmallVectorImpl<Value> &results, bool /*skipIntermediateRoundings*/) const {
   if (inputs.size() != 2) {
     return failure();
   }
@@ -1568,7 +1567,7 @@ DataTiledMMAAttr::getOperandIteratorTypes() const {
 
 LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
-    SmallVectorImpl<Value> &results) const {
+    SmallVectorImpl<Value> &results, bool /*skipIntermediateRoundings*/) const {
   SmallVector<VectorType> regTypes;
   getDistributedTileTypes(regTypes);
   if (inputs.size() != 2 || outputs.size() != 1 ||
@@ -2105,7 +2104,7 @@ static LogicalResult buildVDMFMAOps(OpBuilder &builder, Location loc,
 // type.
 LogicalResult VirtualMMAAttr::buildUnderlyingOperations(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
-    SmallVectorImpl<Value> &results) const {
+    SmallVectorImpl<Value> &results, bool /*skipIntermediateRoundings*/) const {
   if (inputs.size() != 2) {
     return failure();
   }
@@ -2582,7 +2581,7 @@ LogicalResult ScaledMMAAttr::populateOperandOffsetsSizesStrides(
 
 LogicalResult ScaledMMAAttr::buildUnderlyingOperations(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
-    SmallVectorImpl<Value> &results) const {
+    SmallVectorImpl<Value> &results, bool /*skipIntermediateRoundings*/) const {
   if (inputs.size() != 4) {
     return failure();
   }
@@ -2744,7 +2743,7 @@ static Value createScaledMmaOp(OpBuilder &builder, Location loc,
 
 LogicalResult DataTiledScaledMMAAttr::buildUnderlyingOperations(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
-    SmallVectorImpl<Value> &results) const {
+    SmallVectorImpl<Value> &results, bool /*skipIntermediateRoundings*/) const {
   // Validation. Similar to MMAAttr::buildMmaOperation.
   if (inputs.size() != 4) {
     return failure();

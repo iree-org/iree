@@ -28,7 +28,10 @@ static constexpr llvm::StringLiteral kAddUnitDims = "add_unit_dims";
 namespace {
 struct LowerInnerTiledPattern final
     : OpRewritePattern<IREE::Codegen::InnerTiledOp> {
-  using Base::Base;
+  LowerInnerTiledPattern(MLIRContext *context, bool skipIntermediateRoundings)
+      : OpRewritePattern(context),
+        skipIntermediateRoundings(skipIntermediateRoundings) {}
+
   LogicalResult matchAndRewrite(IREE::Codegen::InnerTiledOp tiledOp,
                                 PatternRewriter &rewriter) const override {
     if (tiledOp.hasTensorSemantics()) {
@@ -84,7 +87,8 @@ struct LowerInnerTiledPattern final
     SmallVector<Value> results;
     LogicalResult couldLower = tiledOp.getKind().buildUnderlyingOperations(
         rewriter, tiledOp.getLoc(), ValueRange{operands}.take_front(numInputs),
-        ValueRange{operands}.drop_front(numInputs), results);
+        ValueRange{operands}.drop_front(numInputs), results,
+        skipIntermediateRoundings);
     if (failed(couldLower)) {
       tiledOp.emitOpError(
           "failed to lower to concrete inner tiled operations.");
@@ -111,11 +115,15 @@ struct LowerInnerTiledPattern final
     rewriter.replaceOp(tiledOp, results);
     return success();
   }
+
+  bool skipIntermediateRoundings;
 };
 } // namespace
 
-void populateLowerInnerTiledPatterns(RewritePatternSet &patterns) {
-  patterns.add<LowerInnerTiledPattern>(patterns.getContext());
+void populateLowerInnerTiledPatterns(RewritePatternSet &patterns,
+                                     bool skipIntermediateRoundings) {
+  patterns.add<LowerInnerTiledPattern>(patterns.getContext(),
+                                       skipIntermediateRoundings);
 }
 
 //===----------------------------------------------------------------------===//

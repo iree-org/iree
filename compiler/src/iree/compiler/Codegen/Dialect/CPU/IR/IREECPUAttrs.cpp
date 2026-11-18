@@ -1369,7 +1369,7 @@ static LogicalResult lowerGenericScalarToVectorContract(
 
 LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
     OpBuilder &builder, Location loc, ValueRange inputs, ValueRange outputs,
-    SmallVectorImpl<Value> &results) const {
+    SmallVectorImpl<Value> &results, bool skipIntermediateRoundings) const {
   SmallVector<VectorType> regTypes;
   getDistributedTileTypes(regTypes);
   if (inputs.size() != 2 || outputs.size() != 1 ||
@@ -1411,9 +1411,9 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
         intrinsic == MMAIntrinsic::MMA_RISCV_V_VFMACC_8VLsx1x1_F16_F16_WIDENF32;
     auto legalizeAcc = [widenF16Acc](OpBuilder &b, Location loc,
                                      Value v) -> Value {
-      // Zvfhmin has no f16 MAC. This pair is lossy (extf(truncf(x)) != x):
-      // hoisting keeps the acc in f32 across K and skips per-K f16 rounding.
-      // TODO(#25058): honor --iree-llvmcpu-skip-intermediate-roundings=false.
+      // Zvfhmin has no f16 MAC: widen the accumulator to f32 for the FMA. When
+      // intermediate roundings are required this runs around every MA step
+      // instead of being hoisted out of the K loop.
       if (widenF16Acc) {
         Type f32 = b.getF32Type();
         auto vt = cast<VectorType>(v.getType());
@@ -1432,6 +1432,27 @@ LogicalResult DataTiledMMAAttr::buildUnderlyingOperations(
       }
       return v;
     };
+    // When roundings are kept, apply the lossy f16 -> f32 -> f16 round-trip
+    // around each MA step directly. This keeps the per-K rounding in the loop
+    // and avoids emitting the hoistable distribute/reassemble conversion pair
+    // around the accumulator.
+    bool applyIntermediateRoundings = widenF16Acc && !skipIntermediateRoundings;
+    if (applyIntermediateRoundings) {
+      auto emitIntrinsicWithRounding = [&](OpBuilder &b, Location loc,
+                                           Value lhs, Value rhs,
+                                           Value acc) -> Value {
+        acc = legalizeAcc(b, loc, acc);
+        Value result = createCpuMmaIntrinsicCall(b, loc, intrinsic, lhs, rhs,
+                                                 acc, getVlen());
+        return restoreAcc(b, loc, result);
+      };
+      return Codegen::buildDataTiledMMAUnderlyingOperations(
+          builder, loc, getSwizzle(*this, /*operandIdx=*/0),
+          getSwizzle(*this, /*operandIdx=*/1),
+          getSwizzle(*this, /*operandIdx=*/2), getIntrinsicsM(),
+          getIntrinsicsN(), getIntrinsicsK(), inputs, outputs,
+          emitIntrinsicWithRounding, results);
+    }
     return Codegen::buildDataTiledMMAUnderlyingOperations(
         builder, loc, getSwizzle(*this, /*operandIdx=*/0),
         getSwizzle(*this, /*operandIdx=*/1),
