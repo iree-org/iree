@@ -1136,52 +1136,66 @@ static bool exceedsBindingBytes(int64_t bytes, int64_t baselineBytes,
          bytes > baselineBytes;
 }
 
-/// Returns the producers that getCloneableOps would select for a dispatch
-/// formed from `ops`. This mirrors its walk over the inputs of the dispatch,
-/// including the refusal of clones that exceed `options.maxBindingBytes`.
+/// Selects the producers to clone into a dispatch made of `ops`, starting from
+/// `inputs`, the values the dispatch uses from outside. Walks the use-def
+/// chains of the inputs and selects each producer that is cloneable, has no
+/// unfusable use (if `hasUnfusableUse` is given), and does not make the
+/// dispatch exceed `options.maxBindingBytes`. Used by getCloneableOps for an
+/// existing dispatch region and by getFormedDispatchBindingBytes to predict
+/// what will be cloned into a dispatch before the region exists.
 static SmallVector<Operation *>
-getProducersToClone(ArrayRef<Operation *> ops,
-                    CloneableIntoDispatchOptions options) {
+selectProducersToClone(ArrayRef<Operation *> ops, ArrayRef<Value> inputs,
+                       CloneableIntoDispatchOptions options,
+                       llvm::function_ref<bool(Value)> hasUnfusableUse) {
   llvm::SmallPtrSet<Operation *, 8> opSet(ops.begin(), ops.end());
-  SmallVector<Value> worklist;
-  auto addInputs = [&](Operation *op) {
-    llvm::append_range(worklist, op->getOperands());
-    mlir::visitUsedValuesDefinedAbove(op->getRegions(), [&](OpOperand *use) {
-      worklist.push_back(use->get());
-    });
-  };
-  for (Operation *op : ops) {
-    addInputs(op);
-  }
-
-  SmallVector<Operation *> clonedOps;
-  llvm::SmallPtrSet<Operation *, 8> visited;
+  SmallVector<Operation *> result;
+  llvm::DenseSet<Value> visited;
+  SmallVector<Value> worklist(inputs);
   int64_t bytes =
       options.maxBindingBytes > 0 ? getDispatchBindingBytes(ops) : 0;
   while (!worklist.empty()) {
-    Operation *producer = worklist.pop_back_val().getDefiningOp();
-    if (!producer || isOpInside(producer, opSet) ||
-        !visited.insert(producer).second ||
-        !isCloneableIntoDispatchOp(producer, options)) {
+    Value value = worklist.pop_back_val();
+    if (!visited.insert(value).second) {
       continue;
     }
-    clonedOps.push_back(producer);
+    Operation *definingOp = value.getDefiningOp();
+    if (!definingOp || isOpInside(definingOp, opSet) ||
+        !isCloneableIntoDispatchOp(definingOp, options) ||
+        (hasUnfusableUse && hasUnfusableUse(value))) {
+      continue;
+    }
+    result.push_back(definingOp);
     if (options.maxBindingBytes > 0) {
-      int64_t newBytes = getDispatchBindingBytes(ops, clonedOps);
+      int64_t newBytes = getDispatchBindingBytes(ops, result);
       if (exceedsBindingBytes(newBytes, bytes, options.maxBindingBytes)) {
-        clonedOps.pop_back();
+        result.pop_back();
         continue;
       }
       bytes = newBytes;
     }
-    addInputs(producer);
+    worklist.append(definingOp->operand_begin(), definingOp->operand_end());
+    llvm::SetVector<Value> nestedValues;
+    mlir::getUsedValuesDefinedAbove(definingOp->getRegions(), nestedValues);
+    worklist.append(nestedValues.begin(), nestedValues.end());
   }
-  return clonedOps;
+  return result;
 }
 
 int64_t getFormedDispatchBindingBytes(ArrayRef<Operation *> ops,
                                       CloneableIntoDispatchOptions options) {
-  return getDispatchBindingBytes(ops, getProducersToClone(ops, options));
+  SmallVector<Value> inputs;
+  for (Operation *op : ops) {
+    llvm::append_range(inputs, op->getOperands());
+    llvm::SetVector<Value> nestedValues;
+    mlir::getUsedValuesDefinedAbove(op->getRegions(), nestedValues);
+    llvm::append_range(inputs, nestedValues);
+  }
+  // There is no dispatch region yet, so unfusable uses within it cannot be
+  // checked. The estimate may assume a clone that getCloneableOps refuses
+  // later.
+  SmallVector<Operation *> clonedOps =
+      selectProducersToClone(ops, inputs, options, /*hasUnfusableUse=*/{});
+  return getDispatchBindingBytes(ops, clonedOps);
 }
 
 bool wouldFusionExceedDispatchBindingBytes(
@@ -1217,47 +1231,11 @@ SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
 
   // Traverse the defining ops of these values (and the ops on their reverse
   // SSA use-def chain).
-  SmallVector<Operation *> result;
-  llvm::SetVector<Value> visited;
-  SmallVector<Value> worklist;
-  worklist.assign(valuesDefinedAbove.begin(), valuesDefinedAbove.end());
-  while (!worklist.empty()) {
-    Value outsideValue = worklist.pop_back_val();
-    // Skip values that were already visited.
-    if (visited.contains(outsideValue)) {
-      continue;
-    }
-    visited.insert(outsideValue);
-
-    Operation *definingOp = outsideValue.getDefiningOp();
-    auto cloneExceedsBindingBytes = [&]() {
-      if (options.maxBindingBytes <= 0) {
-        return false;
-      }
-      SmallVector<Operation *> clonedOps(result);
-      int64_t baselineBytes =
-          getDispatchBindingBytes(regionOp.getOperation(), clonedOps);
-      clonedOps.push_back(definingOp);
-      return exceedsBindingBytes(
-          getDispatchBindingBytes(regionOp.getOperation(), clonedOps),
-          baselineBytes, options.maxBindingBytes);
-    };
-    if (!definingOp ||
-        !IREE::Flow::isCloneableIntoDispatchOp(definingOp, options) ||
-        hasUnfusableUseInDispatch(outsideValue, regionOp,
-                                  unfusableInitSources) ||
-        cloneExceedsBindingBytes()) {
-      valuesDefinedAbove.insert(outsideValue);
-      continue;
-    }
-    result.push_back(definingOp);
-    worklist.append(definingOp->operand_begin(), definingOp->operand_end());
-    llvm::SetVector<Value> nestedValues;
-    mlir::getUsedValuesDefinedAbove(definingOp->getRegions(), nestedValues);
-    worklist.append(nestedValues.begin(), nestedValues.end());
-  }
-
-  return result;
+  return selectProducersToClone(
+      regionOp.getOperation(), valuesDefinedAbove.getArrayRef(), options,
+      [&](Value value) {
+        return hasUnfusableUseInDispatch(value, regionOp, unfusableInitSources);
+      });
 }
 
 /// Clone producers into the dispatch region.
