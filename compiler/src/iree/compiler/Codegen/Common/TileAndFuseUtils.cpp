@@ -20,16 +20,57 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Interfaces/TilingInterface.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include <cassert>
 
 #define DEBUG_TYPE "iree-codegen-common-tile-and-fuse-utils"
 
 namespace mlir::iree_compiler {
+
+namespace {
+// When a forall result is unused, slices of its shared-output argument can
+// instead read the loop's initializer. If that initializer is tensor.empty,
+// the slices can then fold to smaller tensor.empty ops. Do this before other
+// cleanup rules redirect the slices to a shared output that is still needed,
+// which would prevent the empty-tensor fold and can cause bufferization copies.
+struct FoldSliceOfUnusedEmptyForallOutput
+    : OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp slice,
+                                PatternRewriter &rewriter) const override {
+    auto arg = dyn_cast<BlockArgument>(slice.getSource());
+    if (!arg) {
+      return failure();
+    }
+    auto loop = dyn_cast<scf::ForallOp>(arg.getOwner()->getParentOp());
+    if (!loop || arg.getArgNumber() < loop.getRank()) {
+      return failure();
+    }
+    OpOperand *init = loop.getTiedOpOperand(arg);
+    if (!loop.getTiedOpResult(init).use_empty() ||
+        !init->get().getDefiningOp<tensor::EmptyOp>()) {
+      return failure();
+    }
+    rewriter.modifyOpInPlace(
+        slice, [&] { slice.getSourceMutable().assign(init->get()); });
+    return success();
+  }
+};
+} // namespace
+
+LogicalResult foldEmptyTensorSlices(Operation *op) {
+  RewritePatternSet patterns(op->getContext());
+  patterns.add<FoldSliceOfUnusedEmptyForallOutput>(op->getContext());
+  tensor::populateFoldTensorEmptyPatterns(patterns);
+  linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
+  return applyPatternsGreedily(op, std::move(patterns));
+}
 
 scf::InnerTileAlignmentFnTy
 makeInnerTileAlignmentFn(IREE::CPU::TilingLevel tilingLevel) {

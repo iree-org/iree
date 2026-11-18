@@ -130,12 +130,11 @@ func.func @shared_out_operand(%arg0: tensor<391x384xf32>, %arg1: tensor<384x384x
 // CHECK-SAME:    %[[DST:[a-zA-Z0-9]+]]
 //  CHECK-DAG:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
 //      CHECK:   scf.forall {{.+}} shared_outs(%[[ITER:.+]] = %[[DST]])
-//      CHECK:       %[[OUT_SLICE:.+]] = tensor.extract_slice %[[DST]]
+//      CHECK:       %[[OUT_SLICE:.+]] = tensor.extract_slice %[[ITER]]
 //      CHECK:       %{{.+}} = linalg.fill ins(%[[CST0]] : f32) outs(%[[OUT_SLICE]]
 //      CHECK:       %{{.+}} = linalg.matmul
-//      CHECK:       %[[OUT_SLICE2:.+]] = tensor.extract_slice %[[ITER]]
 //      CHECK:       %{{.+}} = linalg.generic
-// CHECK-SAME:         outs(%[[OUT_SLICE2]]
+// CHECK-SAME:         outs(%[[OUT_SLICE]]
 
 // -----
 

@@ -411,6 +411,10 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     }
   }
 
+  if (failed(foldEmptyTensorSlices(funcOp))) {
+    return signalPassFailure();
+  }
+
   // Cleanup patterns for tile and distribute
   {
     RewritePatternSet patterns(context);
