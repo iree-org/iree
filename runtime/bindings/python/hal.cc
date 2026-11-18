@@ -1012,7 +1012,8 @@ std::vector<std::string> HalDriver::Query() {
   iree_hal_driver_info_t* driver_infos = NULL;
   iree_allocator_t allocator = iree_allocator_system();
   CheckApiStatus(iree_hal_driver_registry_enumerate(
-                     iree_hal_driver_registry_default(), allocator,
+                     iree_hal_driver_registry_default(), 
+                     allocator,
                      &driver_info_count, &driver_infos),
                  "Error enumerating HAL drivers");
 
@@ -1022,7 +1023,8 @@ std::vector<std::string> HalDriver::Query() {
   std::vector<std::string> driver_names(driver_info_count);
   for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
     driver_names[i] =
-        std::string(infos[i].driver_name.data, infos[i].driver_name.size);
+        std::string(infos[i].driver_name.data, 
+                    infos[i].driver_name.size);
   }
   return driver_names;
 }
