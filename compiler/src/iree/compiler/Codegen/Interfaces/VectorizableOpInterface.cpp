@@ -1589,7 +1589,7 @@ struct ScanOpVectorizationModel
 
     // Write results back to tensors.
     Value output = vector::createWriteOrMaskedWrite(
-                       rewriter, loc, vectorScanOp.getDest(),
+                       rewriter, loc, vectorScanOp.getResult(),
                        scanOp.getOutput(), inputIndices,
                        /*useInBoundsInsteadOfMasking=*/!needsInputMasking)
                        ->getResult(0);

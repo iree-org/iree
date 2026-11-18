@@ -17,10 +17,16 @@ on:
         type: string
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   test_w7900:
     # Disabled until an iree-w7900 runner is available.
     if: false
+    permissions:
+      contents: read
+      actions: read  # setup_venv.py --fetch-gh-workflow (dispatch with artifact_run_id).
     runs-on: [Linux, X64, iree-w7900]
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
@@ -36,6 +42,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: false
       - name: Check out runtime submodules
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
@@ -52,8 +59,9 @@ jobs:
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
-            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+            --fetch-gh-workflow="${ARTIFACT_RUN_ID}"
         env:
+          ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build tests

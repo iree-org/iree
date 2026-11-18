@@ -29,6 +29,199 @@ func.func @sort_drop_unused_results(%arg0 : tensor<?x10xf32>,
 
 // -----
 
+// A stable sort with an operand that holds the positions along the sort
+// dimension: the comparator orders the elements it does not order itself by
+// position, and the sort does not have to be stable anymore.
+func.func @sort_fold_stability_into_comparator(%arg0: tensor<3x4xf32>)
+    -> (tensor<3x4xf32>, tensor<3x4xi64>) {
+  %empty_pos = tensor.empty() : tensor<3x4xi64>
+  %positions = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      outs(%empty_pos : tensor<3x4xi64>) {
+  ^bb0(%out: i64):
+    %i = linalg.index 1 : index
+    %i64 = arith.index_cast %i : index to i64
+    linalg.yield %i64 : i64
+  } -> tensor<3x4xi64>
+  %empty = tensor.empty() : tensor<3x4xf32>
+  %0:2 = iree_linalg_ext.sort dimension(1) is_stable(true)
+      ins(%arg0, %positions : tensor<3x4xf32>, tensor<3x4xi64>)
+      outs(%empty, %empty_pos : tensor<3x4xf32>, tensor<3x4xi64>) {
+  ^bb0(%arg2: f32, %arg3: f32, %arg4: i64, %arg5: i64):
+    %1 = arith.cmpf oge, %arg2, %arg3 : f32
+    iree_linalg_ext.yield %1 : i1
+  } -> tensor<3x4xf32>, tensor<3x4xi64>
+  return %0#0, %0#1 : tensor<3x4xf32>, tensor<3x4xi64>
+}
+// CHECK-LABEL: func.func @sort_fold_stability_into_comparator
+//       CHECK:   %[[POSITIONS:.+]] = linalg.generic
+//       CHECK:   iree_linalg_ext.sort
+//   CHECK-NOT:       is_stable
+//  CHECK-SAME:       dimension(1)
+//  CHECK-SAME:       ins(%{{.+}}, %[[POSITIONS]] : tensor<3x4xf32>, tensor<3x4xi64>)
+//       CHECK:   ^bb0(%[[LHS:.+]]: f32, %[[RHS:.+]]: f32, %[[LHS_POS:.+]]: i64, %[[RHS_POS:.+]]: i64):
+//       CHECK:     %[[BEFORE:.+]] = arith.cmpf oge, %[[LHS]], %[[RHS]] : f32
+//       CHECK:     %[[AFTER:.+]] = arith.cmpf oge, %[[RHS]], %[[LHS]] : f32
+//       CHECK:     %[[ORDERED:.+]] = arith.xori %[[BEFORE]], %[[AFTER]] : i1
+//       CHECK:     %[[LOWER_POS:.+]] = arith.cmpi slt, %[[LHS_POS]], %[[RHS_POS]] : i64
+//       CHECK:     %[[RESULT:.+]] = arith.select %[[ORDERED]], %[[BEFORE]], %[[LOWER_POS]] : i1
+//       CHECK:     iree_linalg_ext.yield %[[RESULT]] : i1
+
+// -----
+
+// Positions along another dimension than the sorted one do not tell the input
+// order of the elements of a sorted slice. The sort stays stable.
+func.func @sort_stable_positions_of_other_dimension(%arg0: tensor<3x4xf32>)
+    -> (tensor<3x4xf32>, tensor<3x4xi64>) {
+  %empty_pos = tensor.empty() : tensor<3x4xi64>
+  %positions = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      outs(%empty_pos : tensor<3x4xi64>) {
+  ^bb0(%out: i64):
+    %i = linalg.index 0 : index
+    %i64 = arith.index_cast %i : index to i64
+    linalg.yield %i64 : i64
+  } -> tensor<3x4xi64>
+  %empty = tensor.empty() : tensor<3x4xf32>
+  %0:2 = iree_linalg_ext.sort dimension(1) is_stable(true)
+      ins(%arg0, %positions : tensor<3x4xf32>, tensor<3x4xi64>)
+      outs(%empty, %empty_pos : tensor<3x4xf32>, tensor<3x4xi64>) {
+  ^bb0(%arg2: f32, %arg3: f32, %arg4: i64, %arg5: i64):
+    %1 = arith.cmpf oge, %arg2, %arg3 : f32
+    iree_linalg_ext.yield %1 : i1
+  } -> tensor<3x4xf32>, tensor<3x4xi64>
+  return %0#0, %0#1 : tensor<3x4xf32>, tensor<3x4xi64>
+}
+// CHECK-LABEL: func.func @sort_stable_positions_of_other_dimension
+//       CHECK:   iree_linalg_ext.sort
+//  CHECK-SAME:       dimension(1) is_stable(true)
+//       CHECK:   ^bb0(%[[LHS:.+]]: f32, %[[RHS:.+]]: f32, %{{.+}}: i64, %{{.+}}: i64):
+//  CHECK-NEXT:     %[[BEFORE:.+]] = arith.cmpf oge, %[[LHS]], %[[RHS]] : f32
+//  CHECK-NEXT:     iree_linalg_ext.yield %[[BEFORE]] : i1
+
+// -----
+
+// The sorted positions are not used. The operand is dropped instead of being
+// kept for the comparator, and the sort of the remaining operand stays stable.
+func.func @sort_stable_unused_positions(%arg0: tensor<3x4xf32>)
+    -> tensor<3x4xf32> {
+  %empty_pos = tensor.empty() : tensor<3x4xi64>
+  %positions = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      outs(%empty_pos : tensor<3x4xi64>) {
+  ^bb0(%out: i64):
+    %i = linalg.index 1 : index
+    %i64 = arith.index_cast %i : index to i64
+    linalg.yield %i64 : i64
+  } -> tensor<3x4xi64>
+  %empty = tensor.empty() : tensor<3x4xf32>
+  %0:2 = iree_linalg_ext.sort dimension(1) is_stable(true)
+      ins(%arg0, %positions : tensor<3x4xf32>, tensor<3x4xi64>)
+      outs(%empty, %empty_pos : tensor<3x4xf32>, tensor<3x4xi64>) {
+  ^bb0(%arg2: f32, %arg3: f32, %arg4: i64, %arg5: i64):
+    %1 = arith.cmpf oge, %arg2, %arg3 : f32
+    iree_linalg_ext.yield %1 : i1
+  } -> tensor<3x4xf32>, tensor<3x4xi64>
+  return %0#0 : tensor<3x4xf32>
+}
+// CHECK-LABEL: func.func @sort_stable_unused_positions
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<3x4xf32>
+//       CHECK:   iree_linalg_ext.sort
+//  CHECK-SAME:       dimension(1) is_stable(true)
+//  CHECK-SAME:       ins(%[[ARG0]] : tensor<3x4xf32>)
+//       CHECK:   ^bb0(%[[LHS:.+]]: f32, %[[RHS:.+]]: f32):
+//  CHECK-NEXT:     %[[BEFORE:.+]] = arith.cmpf oge, %[[LHS]], %[[RHS]] : f32
+//  CHECK-NEXT:     iree_linalg_ext.yield %[[BEFORE]] : i1
+
+// -----
+
+// A sort that is not stable is left alone.
+func.func @sort_unstable_with_positions(%arg0: tensor<3x4xf32>)
+    -> (tensor<3x4xf32>, tensor<3x4xi64>) {
+  %empty_pos = tensor.empty() : tensor<3x4xi64>
+  %positions = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      outs(%empty_pos : tensor<3x4xi64>) {
+  ^bb0(%out: i64):
+    %i = linalg.index 1 : index
+    %i64 = arith.index_cast %i : index to i64
+    linalg.yield %i64 : i64
+  } -> tensor<3x4xi64>
+  %empty = tensor.empty() : tensor<3x4xf32>
+  %0:2 = iree_linalg_ext.sort dimension(1)
+      ins(%arg0, %positions : tensor<3x4xf32>, tensor<3x4xi64>)
+      outs(%empty, %empty_pos : tensor<3x4xf32>, tensor<3x4xi64>) {
+  ^bb0(%arg2: f32, %arg3: f32, %arg4: i64, %arg5: i64):
+    %1 = arith.cmpf oge, %arg2, %arg3 : f32
+    iree_linalg_ext.yield %1 : i1
+  } -> tensor<3x4xf32>, tensor<3x4xi64>
+  return %0#0, %0#1 : tensor<3x4xf32>, tensor<3x4xi64>
+}
+// CHECK-LABEL: func.func @sort_unstable_with_positions
+//       CHECK:   iree_linalg_ext.sort
+//       CHECK:   ^bb0(%[[LHS:.+]]: f32, %[[RHS:.+]]: f32, %{{.+}}: i64, %{{.+}}: i64):
+//  CHECK-NEXT:     %[[BEFORE:.+]] = arith.cmpf oge, %[[LHS]], %[[RHS]] : f32
+//  CHECK-NEXT:     iree_linalg_ext.yield %[[BEFORE]] : i1
+
+// -----
+
+// Integers that an integer comparison does not order are the same value, so
+// their order cannot be observed and the sort does not have to be stable.
+func.func @sort_drop_unobservable_stability(%arg0: tensor<128xi32>)
+    -> tensor<128xi32> {
+  %empty = tensor.empty() : tensor<128xi32>
+  %0 = iree_linalg_ext.sort dimension(0) is_stable(true)
+      ins(%arg0 : tensor<128xi32>) outs(%empty : tensor<128xi32>) {
+  ^bb0(%arg1: i32, %arg2: i32):
+    %1 = arith.cmpi sle, %arg1, %arg2 : i32
+    iree_linalg_ext.yield %1 : i1
+  } -> tensor<128xi32>
+  return %0 : tensor<128xi32>
+}
+// CHECK-LABEL: func.func @sort_drop_unobservable_stability
+//       CHECK:   iree_linalg_ext.sort
+//   CHECK-NOT:       is_stable
+//  CHECK-SAME:       dimension(0)
+//  CHECK-SAME:       ins(
+
+// -----
+
+// Floats that compare equal can differ (0.0 and -0.0), and a comparator that
+// does more than comparing its arguments can leave different elements
+// unordered. These sorts stay stable.
+func.func @sort_keep_observable_stability(%arg0: tensor<128xf32>,
+    %arg1: tensor<128xi32>) -> (tensor<128xf32>, tensor<128xi32>) {
+  %empty0 = tensor.empty() : tensor<128xf32>
+  %0 = iree_linalg_ext.sort dimension(0) is_stable(true)
+      ins(%arg0 : tensor<128xf32>) outs(%empty0 : tensor<128xf32>) {
+  ^bb0(%arg2: f32, %arg3: f32):
+    %1 = arith.cmpf ole, %arg2, %arg3 : f32
+    iree_linalg_ext.yield %1 : i1
+  } -> tensor<128xf32>
+  %empty1 = tensor.empty() : tensor<128xi32>
+  %2 = iree_linalg_ext.sort dimension(0) is_stable(true)
+      ins(%arg1 : tensor<128xi32>) outs(%empty1 : tensor<128xi32>) {
+  ^bb0(%arg2: i32, %arg3: i32):
+    %c4 = arith.constant 4 : i32
+    %lhs = arith.shrsi %arg2, %c4 : i32
+    %rhs = arith.shrsi %arg3, %c4 : i32
+    %3 = arith.cmpi sle, %lhs, %rhs : i32
+    iree_linalg_ext.yield %3 : i1
+  } -> tensor<128xi32>
+  return %0, %2 : tensor<128xf32>, tensor<128xi32>
+}
+// CHECK-LABEL: func.func @sort_keep_observable_stability
+//       CHECK:   iree_linalg_ext.sort
+//  CHECK-SAME:       dimension(0) is_stable(true)
+//       CHECK:   iree_linalg_ext.sort
+//  CHECK-SAME:       dimension(0) is_stable(true)
+
+// -----
+
 func.func @gather_to_extract_slice_expand(%source : tensor<1024x128xi32>, %indices : tensor<1x1xi32>) -> (tensor<1x1x128xi32>) {
   %empty = tensor.empty() : tensor<1x1x128xi32>
   %result = iree_linalg_ext.gather dimension_map = [0]

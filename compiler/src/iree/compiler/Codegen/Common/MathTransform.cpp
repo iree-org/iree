@@ -6,10 +6,12 @@
 
 #include "iree/compiler/Codegen/Common/FastMathPatterns.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/Transforms/Approximation.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -63,6 +65,10 @@ static bool predicateRewrite(StringRef name,
     // something that we can really prevent. Avoiding this rewrite helps a bit.
     return false;
   }
+  if (name == math::RoundEvenOp::getOperationName() &&
+      hasNativeRoundEven(target)) {
+    return false;
+  }
   // Currently enable all non-approximative rewrites.
   return true;
 }
@@ -98,7 +104,8 @@ static bool predicateApprox(StringRef name,
     // https://github.com/gpuweb/gpuweb/issues/5109 means we get compilation
     // errors whenever Inf or NaN values arise at compile-time, which is not
     // something that we can really prevent. Avoiding this rewrite helps a bit.
-    return false;
+    // cbrt has no WGSL builtin and its expansion uses only finite constants.
+    return name == math::CbrtOp::getOperationName();
   }
 
   // Compute hasFastExp from target attribute.

@@ -12,7 +12,7 @@
 # with directory names under:
 #   /Library/Frameworks/Python.framework/Versions
 #
-# MacOS convention is to refer to this as major.minor (i.e. "3.10", "3.11").
+# MacOS convention is to refer to this as major.minor (i.e. "3.11", "3.12").
 # Valid packages:
 #   iree-base-runtime
 #   iree-base-compiler

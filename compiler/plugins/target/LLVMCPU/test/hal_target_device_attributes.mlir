@@ -32,6 +32,14 @@
 //
 // CHECK-INCORRECT-OPT-STACK-VALUE: for the --iree-llvmcpu-stack-allocation-limit option: '64266' value not a power-of-two
 
+// A triple that no LLVM target supports must fail with an error, not crash,
+// also in builds without assertions (`not` fails on a crash).
+//
+// RUN: not iree-compile --compile-to=preprocessing --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu --iree-llvmcpu-target-triple=unknownarch-unknown-unknown %s \
+// RUN: 2>&1 | FileCheck %s --check-prefix=CHECK-UNKNOWN-TARGET
+//
+// CHECK-UNKNOWN-TARGET: LLVM ERROR: createTargetMachine(unknownarch-unknown-unknown-eabi-elf) failed; machine may not be enabled in LLVM
+
 // RUN: iree-compile --compile-to=preprocessing --iree-hal-target-device=local --iree-hal-local-target-device-backends=llvm-cpu --iree-llvmcpu-target-triple=x86_64-linux-gnu --iree-llvmcpu-enable-inner-tiled %s \
 // RUN: | FileCheck %s --check-prefix=CHECK-INNER-TILED-FLAG
 //

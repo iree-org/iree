@@ -491,7 +491,6 @@ setup(
         "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
@@ -501,6 +500,7 @@ setup(
         "repository": "https://github.com/iree-org/iree",
         "documentation": "https://iree.dev/reference/bindings/python/",
     },
+    python_requires=">=3.11",
     ext_modules=[
         CMakeExtension("iree.compiler._mlir_libs._mlir", py_limited_api=_is_abi3_build),
         # TODO: MHLO has been broken for a while so disabling. If re-enabling,

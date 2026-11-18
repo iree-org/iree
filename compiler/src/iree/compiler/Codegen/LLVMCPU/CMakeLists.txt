@@ -138,6 +138,7 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSCFUtils
+    MLIRSideEffectInterfaces
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTilingInterface

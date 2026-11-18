@@ -65,7 +65,7 @@ struct MapDistributeBroadcast final
   LogicalResult matchAndRewrite(vector::BroadcastOp broadcastOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    auto dst = cast<VectorValue>(broadcastOp.getVector());
+    auto dst = cast<VectorValue>(broadcastOp.getResult());
     auto dstLayout = dyn_cast<PackLayoutAttr>(signature[dst]);
     if (!dstLayout) {
       return rewriter.notifyMatchFailure(broadcastOp, "not a PackLayout");

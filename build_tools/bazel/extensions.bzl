@@ -10,6 +10,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository", "new_local_repository")
 load("//build_tools/bazel:amdgpu_device_libs_repository.bzl", "amdgpu_device_libs_repository")
 load("//build_tools/bazel:amdgpu_device_toolchain_repo.bzl", "amdgpu_device_toolchain_repo")
+load("//build_tools/bazel:external_hal_drivers.bzl", "external_hal_driver_tag", "iree_external_hal_drivers_repo")
 load("//build_tools/bazel:workspace.bzl", "cuda_auto_configure")
 load("//build_tools/wasm:wasi_sdk_repo.bzl", "wasi_sdk_repo")
 
@@ -174,6 +175,17 @@ def _iree_extension_impl(module_ctx):
         name = "wasi_sdk",
     )
 
+    # External HAL drivers. Collected from the external_hal_driver tags of all
+    # modules that use this extension. Empty if no module adds a tag.
+    # See build_tools/bazel/EXTERNAL_DRIVERS.md.
+    iree_external_hal_drivers_repo(
+        module_ctx,
+        name = "iree_external_hal_drivers",
+    )
+
 iree_extension = module_extension(
     implementation = _iree_extension_impl,
+    tag_classes = {
+        "external_hal_driver": external_hal_driver_tag,
+    },
 )

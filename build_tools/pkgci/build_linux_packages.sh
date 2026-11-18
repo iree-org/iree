@@ -16,14 +16,14 @@
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Build specific Python versions and packages to custom directory:
-#   override_python_versions="cp310-cp310 cp311-cp311" \
+#   override_python_versions="cp311-cp311 cp312-cp312" \
 #   packages="iree-base-runtime" \
 #   output_dir="/tmp/wheelhouse" \
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Valid Python versions match a subdirectory under /opt/python in the docker
 # image. Typically:
-#   cp310-cp310 cp311-cp311
+#   cp311-cp311 cp312-cp312
 #
 # Valid packages:
 #   iree-base-runtime
@@ -240,8 +240,6 @@ function install_native_deps() {
     echo "The architecture is aarch64 and we use manylinux 2_28 so install deps"
     yum install -y epel-release
     yum update -y
-    # Required for Tracy
-    yum install -y libzstd-devel
     yum install -y clang lld
   elif [[ "$uname_m" == "x86_64" ]]; then
     echo "The architecture is x86_64 so assume we are on a managed image with deps"

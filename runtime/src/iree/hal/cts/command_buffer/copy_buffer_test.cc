@@ -264,6 +264,40 @@ TEST_P(CommandBufferCopyBufferTest, CopySizeAndAlignmentClasses) {
   RunCopyBufferTest(/*source_offset=*/0, /*target_offset=*/0, 1024 * 1024);
 }
 
+TEST_P(CommandBufferCopyBufferTest, CopyAlignedDisjointRangesWithinSameBuffer) {
+  for (iree_device_size_t length : {4, 16, 256, 1024}) {
+    for (iree_device_size_t source_offset : {iree_device_size_t{0}, length}) {
+      iree_device_size_t target_offset = length - source_offset;
+      SCOPED_TRACE(::testing::Message()
+                   << "length=" << length << " source_offset=" << source_offset
+                   << " target_offset=" << target_offset);
+      std::vector<uint8_t> expected = MakeDeterministicBytes(2 * length + 16);
+      Ref<iree_hal_buffer_t> buffer;
+      IREE_ASSERT_OK(CreateDeviceBufferWithData(expected.data(),
+                                                expected.size(), buffer.out()));
+
+      Ref<iree_hal_command_buffer_t> command_buffer;
+      IREE_ASSERT_OK(iree_hal_command_buffer_create(
+          device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+          IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+          binding_capacity(), command_buffer.out()));
+      IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+      IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
+          command_buffer,
+          MakeRef(buffer, kSourceBufferSlot, source_offset, length),
+          MakeRef(buffer, kTargetBufferSlot, target_offset, length),
+          IREE_HAL_COPY_FLAG_NONE));
+      IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+      IREE_ASSERT_OK(SubmitWithBindings(command_buffer, buffer, buffer));
+
+      std::memcpy(expected.data() + target_offset,
+                  expected.data() + source_offset, length);
+      EXPECT_THAT(ReadBufferBytes(buffer, 0, expected.size()),
+                  ContainerEq(expected));
+    }
+  }
+}
+
 CTS_REGISTER_COMMAND_BUFFER_TEST_SUITE(CommandBufferCopyBufferTest);
 
 }  // namespace iree::hal::cts

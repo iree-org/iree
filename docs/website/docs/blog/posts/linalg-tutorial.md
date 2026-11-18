@@ -61,13 +61,13 @@ learning compiler.
 [IREE](https://iree.dev/) is a MLIR compiler and runtime that can lower MLIR
 programs through successive, ever lower-level dialects, ultimately producing
 machine code for various CPU, GPU and other hardware targets. Check out the
-[Developer overview docs](../../../developers/general/developer-overview.md)
-and the [ML frameworks docs](../../../guides/ml-frameworks/index.md).
+[Developer overview docs](../../developers/general/developer-overview.md)
+and the [ML frameworks docs](../../guides/ml-frameworks/index.md).
 
 Front-ends can ingest source programs from various machine-learning frameworks
 into MLIR Linalg dialect. Boundaries are in flux, but it is a good enough mental
 model to think of anything up to Linalg as "front-end". One example is, for
-[ingesting PyTorch](../../../guides/ml-frameworks/pytorch.md) programs,
+[ingesting PyTorch](../../guides/ml-frameworks/pytorch.md) programs,
 the front-end is [torch-mlir](https://github.com/llvm/torch-mlir) and end-users
 are encouraged to use [iree-turbine](https://github.com/iree-org/iree-turbine),
 which integrates IREE, torch-mlir and PyTorch.
@@ -81,8 +81,8 @@ is the intermediate representation in this compiler.
 ### Getting IREE binaries
 
 IREE builds can be [downloaded](https://github.com/iree-org/iree/releases) or
-installed as Python [packages](../../../reference/bindings/python.md) or
-[built](../../../building-from-source/index.md) from sources.
+installed as Python [packages](../../reference/bindings/python.md) or
+[built](../../building-from-source/index.md) from sources.
 
 ## First linalg programs
 
@@ -196,7 +196,7 @@ $ iree-compile \
           on, pass  `--iree-llvmcpu-target-cpu=host`. That works regardless of
           CPU architecture.
     * Check out
-      [these docs](../../../developers/general/developer-tips.md) for
+      [these docs](../../developers/general/developer-tips.md) for
       more useful `iree-compile` flags.
 
 Run it like this:

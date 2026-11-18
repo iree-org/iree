@@ -7,8 +7,8 @@ util.global private @device_a : !hal.device
 util.global private @device_b : !hal.device
 util.global private @device_c : !hal.device
 
-// CHECK: util.global private @__allocator_select_device[[DEVICE_0:.*]] : !hal.device
-// CHECK: util.global private @__allocator_select_affinity[[AFFINITY_0:.*]] : i64
+// CHECK: util.global private @__allocator_select_device : !hal.device
+// CHECK: util.global private @__allocator_select_affinity : i64
 // CHECK: util.initializer
 // CHECK:   %[[I0_DEVICE_A:.+]] = util.global.load @device_a
 // CHECK:   %[[I0_AFFINITY_A:.+]] = arith.constant -1
@@ -20,14 +20,14 @@ util.global private @device_c : !hal.device
 // CHECK:     (%[[I0_DEVICE_A]], %[[I0_AFFINITY_A]] : !hal.device, i64),
 // CHECK:     (%[[I0_DEVICE_B]], %[[I0_AFFINITY_B]] : !hal.device, i64)
 // CHECK:   ]) type(%[[I0_MEMORY_TYPE]]) usage(%[[I0_BUFFER_USAGE]])
-// CHECK:   util.global.store %[[I0_DEVICE]], @__allocator_select_device[[DEVICE_0]]
-// CHECK:   util.global.store %[[I0_AFFINITY]], @__allocator_select_affinity[[AFFINITY_0]]
+// CHECK:   util.global.store %[[I0_DEVICE]], @__allocator_select_device : !hal.device
+// CHECK:   util.global.store %[[I0_AFFINITY]], @__allocator_select_affinity : i64
 
 // CHECK: @fn1
 util.func public @fn1() -> (!hal.device, i64) {
   // CHECK-NOT: hal.allocator.select
-  // CHECK: %[[FN1_DEVICE:.+]] = util.global.load @__allocator_select_device[[DEVICE_0]]
-  // CHECK: %[[FN1_AFFINITY:.+]] = util.global.load @__allocator_select_affinity[[AFFINITY_0]]
+  // CHECK: %[[FN1_DEVICE:.+]] = util.global.load @__allocator_select_device : !hal.device
+  // CHECK: %[[FN1_AFFINITY:.+]] = util.global.load @__allocator_select_affinity : i64
   %memory_type = hal.memory_type<"HostLocal"> : i32
   %buffer_usage = hal.buffer_usage<"Transfer"> : i32
   %device_a = util.global.load @device_a : !hal.device
@@ -45,8 +45,8 @@ util.func public @fn1() -> (!hal.device, i64) {
 // CHECK: @fn2
 util.func public @fn2() -> (!hal.device, i64) {
   // CHECK-NOT: hal.allocator.select
-  // CHECK: %[[FN2_DEVICE:.+]] = util.global.load @__allocator_select_device[[DEVICE_0]]
-  // CHECK: %[[FN2_AFFINITY:.+]] = util.global.load @__allocator_select_affinity[[AFFINITY_0]]
+  // CHECK: %[[FN2_DEVICE:.+]] = util.global.load @__allocator_select_device : !hal.device
+  // CHECK: %[[FN2_AFFINITY:.+]] = util.global.load @__allocator_select_affinity : i64
   %memory_type = hal.memory_type<"HostLocal"> : i32
   %buffer_usage = hal.buffer_usage<"Transfer"> : i32
   %device_a = util.global.load @device_a : !hal.device
@@ -61,15 +61,15 @@ util.func public @fn2() -> (!hal.device, i64) {
   util.return %device, %queue_affinity : !hal.device, i64
 }
 
-// CHECK: util.global private @__allocator_select_device[[DEVICE_1:.*]] : !hal.device
-// CHECK: util.global private @__allocator_select_affinity[[AFFINITY_1:.*]] : i64
+// CHECK: util.global private @__allocator_select_device_0 : !hal.device
+// CHECK: util.global private @__allocator_select_affinity_1 : i64
 // CHECK: util.initializer
 
 // CHECK: @fn3
 util.func public @fn3() -> (!hal.device, i64) {
   // CHECK-NOT: hal.allocator.select
-  // CHECK: %[[FN3_DEVICE:.+]] = util.global.load @__allocator_select_device[[DEVICE_1]]
-  // CHECK: %[[FN3_AFFINITY:.+]] = util.global.load @__allocator_select_affinity[[AFFINITY_1]]
+  // CHECK: %[[FN3_DEVICE:.+]] = util.global.load @__allocator_select_device_0 : !hal.device
+  // CHECK: %[[FN3_AFFINITY:.+]] = util.global.load @__allocator_select_affinity_1 : i64
   %memory_type = hal.memory_type<"HostLocal"> : i32
   %buffer_usage = hal.buffer_usage<"DispatchStorage"> : i32
   %device_a = util.global.load @device_a : !hal.device

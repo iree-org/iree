@@ -18,6 +18,10 @@
 #include <queue>
 
 namespace mlir::iree_compiler {
+/// Fold independent empty tiles before shared-output canonicalization can hide
+/// their empty initializers, including slices of unused forall outputs.
+LogicalResult foldEmptyTensorSlices(Operation *op);
+
 /// Tile and fuse producers of extract slice operations from the worklist into
 /// the given loops, adding any new fusion opportunities back to the worklist,
 /// proceeding recursively until fixed point is reached.

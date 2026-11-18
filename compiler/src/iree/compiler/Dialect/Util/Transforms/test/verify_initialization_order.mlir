@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --verify-diagnostics --iree-util-verify-initialization-order %s | FileCheck %s
+// RUN: not iree-opt --split-input-file --iree-util-verify-initialization-order %s 2>&1 | FileCheck %s --check-prefix=FAILURE
 
 // Valid: Basic module with correct initialization order.
 
@@ -103,6 +104,7 @@ util.initializer {
 // -----
 
 // Error: Forward reference in initializer.
+// FAILURE: error: initializer at position 0 accesses global '@later_global' defined at position 1
 
 util.initializer {
   // expected-error @+1 {{initializer at position 0 accesses global '@later_global' defined at position 1}}
@@ -126,6 +128,7 @@ util.global private @forward_store : i32
 // -----
 
 // Error: Double initialization of immutable global.
+// FAILURE: error: immutable global '@double_init' is initialized both by initial value and by store in initializer
 
 util.global private @double_init = 10 : i32
 util.initializer {
@@ -150,6 +153,7 @@ util.global private @modified_init_value = 42 : i32
 // -----
 
 // Error: Store to immutable global in externally reachable function.
+// FAILURE: error: store to immutable global '@no_external_store' in function 'public_func' which is reachable from non-initializer contexts
 
 util.func public @public_func() {
   %c42 = arith.constant 42 : i32

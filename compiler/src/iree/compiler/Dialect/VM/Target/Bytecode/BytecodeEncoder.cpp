@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeEncoder.h"
 
+#include <limits>
+
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
@@ -82,9 +84,7 @@ public:
   LogicalResult encodeType(Type type) override {
     // HACK: it'd be nice to remove the implicit ref wrapper hiding.
     if (auto refType = dyn_cast<IREE::VM::RefType>(type)) {
-      if (isa<IREE::VM::ListType>(refType.getObjectType())) {
-        type = refType.getObjectType();
-      }
+      type = refType.getObjectType();
     }
     auto it = typeTable_->find(type);
     if (it == typeTable_->end()) {
@@ -483,9 +483,21 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
   }
   result.bytecodeData = bytecodeData.value();
   result.bytecodeLength = finalLength;
-  result.blockCount = funcOp.getBlocks().size();
   result.i32RegisterCount = registerAllocation.getMaxI32RegisterOrdinal() + 1;
   result.refRegisterCount = registerAllocation.getMaxRefRegisterOrdinal() + 1;
+
+  // The descriptor stores the block count as an int16. Check the full count
+  // before it is narrowed into the result, and fail instead of silently
+  // truncating it into a module that the runtime misinterprets.
+  constexpr size_t kMaxBlockCount = std::numeric_limits<int16_t>::max();
+  size_t blockCount = funcOp.getBlocks().size();
+  if (blockCount > kMaxBlockCount) {
+    funcOp.emitError() << "function has " << blockCount
+                       << " blocks; VM currently restricts functions to "
+                       << kMaxBlockCount << " blocks";
+    return std::nullopt;
+  }
+  result.blockCount = blockCount;
   return result;
 }
 

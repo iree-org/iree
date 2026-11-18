@@ -32,6 +32,9 @@ permissions:
 
 jobs:
   riscv64:
+    permissions:
+      contents: read
+      actions: read  # setup_venv.py --fetch-gh-workflow (dispatch with artifact_run_id).
     runs-on: ubuntu-24.04
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
@@ -46,6 +49,8 @@ jobs:
       # General setup.
       - name: "Checking out repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -68,22 +73,28 @@ jobs:
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
-            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+            --fetch-gh-workflow="${ARTIFACT_RUN_ID}"
         env:
+          ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Bootstrap
         env:
           IREE_ARTIFACT_URL: "https://sharkpublic.blob.core.windows.net/sharkpublic/GCP-Migration-Files"
+          # These are also set in: build_tools/riscv/riscv_bootstrap.sh
           RISCV_CLANG_TOOLCHAIN_FILE_NAME: "toolchain_iree_manylinux_2_28_20231012.tar.gz"
+          RISCV_CLANG_TOOLCHAIN_FILE_SHA: "3af56a58551ed5ae7441214822461a5368fee9403d7c883762fa902489bfbff0"
           QEMU_FILE_NAME: "qemu-riscv_8.1.2_manylinux_2.28_20231026.tar.gz"
+          QEMU_FILE_SHA: "dd77b39820d45b80bafab9155581578b4c625cb92fd6db9e9adbb9798fde3597"
         run: |
-          mkdir -p ${{ env.BOOTSTRAP_WORK_DIR }}
-          mkdir -p ${{ env.RISCV_TOOLCHAIN_ROOT }}
-          mkdir -p ${{ env.QEMU_PATH_PREFIX }}
+          mkdir -p "${BOOTSTRAP_WORK_DIR}"
+          mkdir -p "${RISCV_TOOLCHAIN_ROOT}"
+          mkdir -p "${QEMU_PATH_PREFIX}"
           wget --progress=bar:force:noscroll --directory-prefix="${BOOTSTRAP_WORK_DIR}" "${IREE_ARTIFACT_URL}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}"
-          tar -C "${{ env.RISCV_TOOLCHAIN_ROOT }}" -xf "${BOOTSTRAP_WORK_DIR}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}" --no-same-owner --strip-components=1
+          echo "${RISCV_CLANG_TOOLCHAIN_FILE_SHA}  ${BOOTSTRAP_WORK_DIR}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}" | sha256sum -c -
+          tar -C "${RISCV_TOOLCHAIN_ROOT}" -xf "${BOOTSTRAP_WORK_DIR}/${RISCV_CLANG_TOOLCHAIN_FILE_NAME}" --no-same-owner --strip-components=1
           wget --progress=bar:force:noscroll --directory-prefix="${BOOTSTRAP_WORK_DIR}" "${IREE_ARTIFACT_URL}/${QEMU_FILE_NAME}"
-          tar -C "${{ env.QEMU_PATH_PREFIX }}" -xf "${BOOTSTRAP_WORK_DIR}/${QEMU_FILE_NAME}" --no-same-owner --strip-components=1
+          echo "${QEMU_FILE_SHA}  ${BOOTSTRAP_WORK_DIR}/${QEMU_FILE_NAME}" | sha256sum -c -
+          tar -C "${QEMU_PATH_PREFIX}" -xf "${BOOTSTRAP_WORK_DIR}/${QEMU_FILE_NAME}" --no-same-owner --strip-components=1
       - name: Build riscv64
         env:
           IREE_HOST_BIN_DIR: ${{ env.VENV_DIR }}/bin
@@ -94,6 +105,9 @@ jobs:
         run: ./build_tools/cmake/test_riscv.sh
 
   riscv64-baremetal:
+    permissions:
+      contents: read
+      actions: read  # setup_venv.py --fetch-gh-workflow (dispatch with artifact_run_id).
     runs-on: ubuntu-24.04
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
@@ -108,6 +122,8 @@ jobs:
       # General setup.
       - name: "Checking out repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -130,8 +146,9 @@ jobs:
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
-            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+            --fetch-gh-workflow="${ARTIFACT_RUN_ID}"
         env:
+          ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Restore toolchain cache
         id: restore-toolchain

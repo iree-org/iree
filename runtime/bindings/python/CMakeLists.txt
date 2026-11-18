@@ -329,6 +329,13 @@ iree_py_test(
 
 iree_py_test(
   NAME
+    hal_device_loop_test
+  SRCS
+    "tests/hal_device_loop_test.py"
+)
+
+iree_py_test(
+  NAME
     flags_test
   SRCS
     "tests/flags_test.py"
@@ -339,6 +346,13 @@ iree_py_test(
     function_test
   SRCS
     "tests/function_test.py"
+)
+
+iree_py_test(
+  NAME
+    hal_enums_test
+  SRCS
+    "tests/hal_enums_test.py"
 )
 
 iree_py_test(

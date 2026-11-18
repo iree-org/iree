@@ -363,3 +363,22 @@ func.func @with_input_indices() {
 
   return
 }
+
+// Tie-breaking must move values together with their original indices.
+func.func @topk_signed_zero_pairing() {
+  %values = util.unfoldable_constant dense<[1.0, -100.0, -101.0]> : tensor<3xf32>
+  %indices = util.unfoldable_constant dense<[3, 4, 5]> : tensor<3xi32>
+  %seed = util.unfoldable_constant dense<[0.0, -0.0, 0.0]> : tensor<3xf32>
+  %seed_indices = util.unfoldable_constant dense<[0, 1, 2]> : tensor<3xi32>
+  %0:2 = iree_linalg_ext.topk_v2 dimension(0)
+      ins(%values, %indices : tensor<3xf32>, tensor<3xi32>)
+      outs(%seed, %seed_indices : tensor<3xf32>, tensor<3xi32>) {
+    ^bb0(%lhs: f32, %rhs: f32):
+      %before = arith.cmpf ogt, %lhs, %rhs : f32
+      iree_linalg_ext.yield %before : i1
+  } -> tensor<3xf32>, tensor<3xi32>
+  %bits = arith.bitcast %0#0 : tensor<3xf32> to tensor<3xi32>
+  check.expect_eq_const(%bits, dense<[1065353216, 0, -2147483648]> : tensor<3xi32>) : tensor<3xi32>
+  check.expect_eq_const(%0#1, dense<[3, 0, 1]> : tensor<3xi32>) : tensor<3xi32>
+  return
+}

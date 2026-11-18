@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Conversion/VectorToNVGPU/VectorToNVGPU.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/NVGPU/Utils/MMAUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -145,8 +146,7 @@ public:
         RewritePatternSet vectorContractPatterns(funcOp.getContext());
         mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(
             vectorContractPatterns);
-        mlir::populatePrepareVectorToMMAPatterns(vectorContractPatterns,
-                                                 /*useMMASync=*/true);
+        mlir::populatePrepareVectorToNVMMAPatterns(vectorContractPatterns);
         if (failed(applyPatternsGreedily(getOperation(),
                                          std::move(vectorContractPatterns)))) {
           return signalPassFailure();

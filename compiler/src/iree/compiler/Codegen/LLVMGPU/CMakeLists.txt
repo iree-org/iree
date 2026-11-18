@@ -200,6 +200,7 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorToGPU
     MLIRVectorToLLVM
+    MLIRVectorToNVGPU
     MLIRVectorToSCF
     MLIRVectorTransforms
     MLIRVectorUtils

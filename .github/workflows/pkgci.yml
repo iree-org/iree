@@ -17,6 +17,9 @@ on:
       # Short term feature branches:
       - sdxl
 
+permissions:
+  contents: read
+
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
   # queued and in-progress runs for the same PR (presubmit) or commit
@@ -27,20 +30,30 @@ concurrency:
 
 jobs:
   setup:
-    uses: ./.github/workflows/setup.yml
+    uses: $/.github/workflows/setup.yml
+    # A called workflow can't exceed the permissions granted here.
+    permissions:
+      contents: read
+      pull-requests: read
 
   build_packages:
     name: Build Packages
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_packages')
-    uses: ./.github/workflows/pkgci_build_packages.yml
+    uses: $/.github/workflows/pkgci_build_packages.yml
 
   # Package sanity checks.
   unit_test:
     name: Unit Test
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'unit_test')
-    uses: ./.github/workflows/pkgci_unit_test.yml
+    uses: $/.github/workflows/pkgci_unit_test.yml
+    # The pkgci test workflows need actions: read when dispatched with
+    # artifact_run_id, and a called workflow can't exceed its caller's
+    # permissions.
+    permissions:
+      contents: read
+      actions: read
 
   ########################### Hardware/accelerators ###########################
   # Jobs that run unit tests on special hardware platforms or accelerators
@@ -50,26 +63,38 @@ jobs:
     name: Test AMD W7900
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_w7900')
-    uses: ./.github/workflows/pkgci_test_amd_w7900.yml
+    uses: $/.github/workflows/pkgci_test_amd_w7900.yml
+    permissions:
+      contents: read
+      actions: read
 
   test_amd_r9700:
     name: Test AMD R9700
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_r9700')
-    uses: ./.github/workflows/pkgci_test_amd_r9700.yml
+    uses: $/.github/workflows/pkgci_test_amd_r9700.yml
+    permissions:
+      contents: read
+      actions: read
 
   # TODO(#18238): migrate to new runner cluster
   # test_nvidia_t4:
   #   name: Test NVIDIA T4
   #   needs: [setup, build_packages]
   #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_nvidia_t4')
-  #   uses: ./.github/workflows/pkgci_test_nvidia_t4.yml
+  #   uses: $/.github/workflows/pkgci_test_nvidia_t4.yml
+  #   permissions:
+  #     contents: read
+  #     actions: read
 
   test_android:
     name: Test Android
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_android')
-    uses: ./.github/workflows/pkgci_test_android.yml
+    uses: $/.github/workflows/pkgci_test_android.yml
+    permissions:
+      contents: read
+      actions: read
     with:
       write-caches: ${{ needs.setup.outputs.write-caches }}
 
@@ -77,7 +102,10 @@ jobs:
     name: Test RISC-V 64
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_riscv64')
-    uses: ./.github/workflows/pkgci_test_riscv64.yml
+    uses: $/.github/workflows/pkgci_test_riscv64.yml
+    permissions:
+      contents: read
+      actions: read
     with:
       write-caches: ${{ needs.setup.outputs.write-caches }}
 
@@ -89,31 +117,46 @@ jobs:
     name: Test ONNX
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_onnx')
-    uses: ./.github/workflows/pkgci_test_onnx.yml
+    uses: $/.github/workflows/pkgci_test_onnx.yml
+    permissions:
+      contents: read
+      actions: read
 
   test_sharktank:
     name: Test Sharktank
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_sharktank')
-    uses: ./.github/workflows/pkgci_test_sharktank.yml
+    uses: $/.github/workflows/pkgci_test_sharktank.yml
+    permissions:
+      contents: read
+      actions: read
 
   test_torch:
     name: Test Torch
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_torch')
-    uses: ./.github/workflows/pkgci_test_torch.yml
+    uses: $/.github/workflows/pkgci_test_torch.yml
+    permissions:
+      contents: read
+      actions: read
 
   test_tensorflow:
     name: Test TensorFlow
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tensorflow')
-    uses: ./.github/workflows/pkgci_test_tensorflow.yml
+    uses: $/.github/workflows/pkgci_test_tensorflow.yml
+    permissions:
+      contents: read
+      actions: read
 
   test_pjrt:
     name: Test PJRT plugin
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_pjrt')
-    uses: ./.github/workflows/pkgci_test_pjrt.yml
+    uses: $/.github/workflows/pkgci_test_pjrt.yml
+    permissions:
+      contents: read
+      actions: read
     with:
       write-caches: ${{ needs.setup.outputs.write-caches }}
 
@@ -135,7 +178,8 @@ jobs:
       - test_sharktank
       - test_tensorflow
       - test_pjrt
-    uses: ./.github/workflows/workflow_summary.yml
-    secrets: inherit
+    uses: $/.github/workflows/workflow_summary.yml
+    secrets:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
     with:
       jobs-json: ${{ toJson(needs) }}

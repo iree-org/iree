@@ -31,6 +31,14 @@ static llvm::cl::opt<bool> clConvertQDQToIntegerMath(
                    "changes floating-point rounding and exceptional-value "
                    "behavior)."),
     llvm::cl::init(true));
+static llvm::cl::opt<bool> clEnableSubByteQuantizedStorage(
+    "iree-global-opt-enable-sub-byte-quantized-storage",
+    llvm::cl::desc("Packs constant quantized values whose quantization range "
+                   "fits 2 or 4 bits into i2 or i4 storage. Requires "
+                   "const-expr hoisting and const-eval. With data tiling, "
+                   "contractions on packed values currently lose the "
+                   "data-tiling speedup."),
+    llvm::cl::init(false));
 static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",
     llvm::cl::desc(
@@ -130,15 +138,6 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Util::createOptimizeIntArithmeticPass)
       .addPass(createLinalgQuantizedConvToConvPass)
       .addPass(createLinalgQuantizedMatmulToMatmulPass)
-      // Run propagation immediately before the QDQ rewrite so contractions
-      // consume dequantize results directly. This must happen before im2col
-      // inserts a packing operation between dequantize and its matmul.
-      .addPredicatedPass(clConvertQDQToIntegerMath,
-                         createPropagateAffineQuantizationPass)
-      .addPredicatedPass(clConvertQDQToIntegerMath,
-                         createConvertQDQToIntegerMathPass)
-      .addPredicatedPass(transformOptions.useIm2colForConvs,
-                         createConvertConvToIm2ColPass)
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(createRemoveZeroExtentTensorsPass)
       .addPass(createDetachElementwiseFromNamedOpsPass)
@@ -179,21 +178,13 @@ void buildGlobalOptimizationPassPipeline(
   mainPassManager.addPass(DispatchCreation::createFoldUnitExtentDimsPass());
   FunctionLikeNest(mainPassManager)
       .addPass(DispatchCreation::createFoldReshapesIntoTensorBarriersPass)
-      .addPass([&]() {
-        return createDemoteContractionInputsPass(
-            clDemoteContractionInputsType, clDemoteContractionInputsOperations);
-      })
       .addPredicatedPass(clEnableQuantizedMatmulReassociation,
                          createFuseDequantizationMatmulPass)
       .addPass(IREE::Flow::createCanonicalizePass)
-      .addPass(mlir::createCSEPass)
-      // Convert broadcast + batch_matmul before transpose propagation so we
-      // can match the pure broadcast patterns before they get fused with
-      // transposes.
-      .addPass(GlobalOptimization::createConvertBatchMatmulToMatmulPass);
+      .addPass(mlir::createCSEPass);
 
   FunctionLikeNest(mainPassManager)
-      // Propagate transposes immediately before set encoding/data tiling
+      // Propagate transposes before QDQ conversion and set encoding/data tiling
       // because transpose propagation cannot take an opinion on the preferred
       // layout of various operations. This simplifies local propagation
       // decisions as SetEncoding is expected to pick the ideal layout for
@@ -214,20 +205,59 @@ void buildGlobalOptimizationPassPipeline(
                                clEnableEdgeReshapePropagation;
                            return createPropagateLinalgTransposePass(options);
                          })
-      // Run propagation immediately before the QDQ rewrite again: earlier
-      // reshape/transpose passes can separate dequantize from its consumers.
+      // Normalize contractions and detach bias before converting QDQ. Restore
+      // direct dequantize producers after the preceding reshape/transpose
+      // transformations, before im2col or input demotion can hide them.
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createPropagateAffineQuantizationPass)
+      // Fold broadcasts into batch_matmul indexing maps once transposes have
+      // been propagated and folded into dequantizes and broadcasts, so a
+      // transposed and broadcast operand reaches the fold as a single
+      // producer. The contraction then reads its operands at their native
+      // rank and consumes its dequantize producers directly.
+      .addPass(createFoldBroadcastIntoBatchMatmulPass);
+  // Pack sub-byte constants between propagation, which moves reshapes onto the
+  // i8 values, and the QDQ rewrite, so the integer contraction reads the packed
+  // storage. Without hoisting and const-eval, the packing would run at runtime.
+  if (clEnableSubByteQuantizedStorage && transformOptions.constExprHoisting &&
+      transformOptions.constEval) {
+    mainPassManager.addPass(createPackSubByteQuantizedConstantsPass());
+  }
+  FunctionLikeNest(mainPassManager)
       .addPredicatedPass(clConvertQDQToIntegerMath,
                          createConvertQDQToIntegerMathPass)
+      // The QDQ rewrite replaces named contractions, which unit dim folding
+      // skips, with generics. Fold the unit dims those generics still carry.
+      .addPredicatedPass(clConvertQDQToIntegerMath,
+                         DispatchCreation::createFoldUnitExtentDimsForFuncPass)
+      .addPredicatedPass(transformOptions.useIm2colForConvs,
+                         createConvertConvToIm2ColPass)
+      .addPass([&]() {
+        return createDemoteContractionInputsPass(
+            clDemoteContractionInputsType, clDemoteContractionInputsOperations);
+      })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass);
   mainPassManager.addPass(
       GlobalOptimization::createConvertStridedContractionToContractionPass());
+  // After transposes have been folded into their consumers, so an oversized
+  // constant is read by the op that indexes it, and before constant
+  // expressions are hoisted and evaluated into new globals.
+  mainPassManager.addPass(GlobalOptimization::createSplitLargeConstantsPass());
 
   // Enable data tiling after they are in a canonical form.
-  if (transformOptions.dataTiling) {
+  if (transformOptions.earlyDataTiling) {
+    const DispatchCreation::DataTilingEncodingOptions &encodingOptions =
+        transformOptions.earlyDataTilingEncodingOptions;
+    mainPassManager.addPass(createEarlyDataTilingPass(
+        {encodingOptions.opTypes, encodingOptions.encodingOption}));
+  } else if (transformOptions.dataTiling) {
     FunctionLikeNest(mainPassManager)
+        // Data tiling wants a single M, N and K dim. Collapse contractions
+        // whose loops merge, such as a batch_matmul with a batch-broadcast
+        // weight after the fold above, before annotating them. The dispatch
+        // creation data tiling path collapses after dispatch formation instead.
+        .addPass(DispatchCreation::createCollapseContractionDimensionsPass)
         .addPass(DispatchCreation::createAnnotateDataTilingHintsPass)
         .addPass([&]() {
           return DispatchCreation::createSetEncodingPass(

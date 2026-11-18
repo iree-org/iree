@@ -32,6 +32,7 @@ struct LLVMCPUVectorLoweringPassOptions {
   bool lowerVectorTransposeToAVX2 = false;
   bool enableArmI8mm = false;
   bool enableArmSME = false;
+  bool skipIntermediateRoundings = true;
 };
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

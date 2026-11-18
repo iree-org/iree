@@ -10,6 +10,9 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   linux_x64_bazel:
     runs-on: azure-linux-scale
@@ -26,6 +29,7 @@ jobs:
       - name: "Checking out repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: true
       - name: Install Python requirements
         run: python3 -m pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
@@ -33,7 +37,7 @@ jobs:
         env:
           IREE_CUDA_DEPS_DIR: /usr/local/iree_cuda_deps
         run: |
-          ./build_tools/bazel/install_bazelisk.sh 1.21.0
+          ./build_tools/bazel/install_bazelisk.sh 1.30.0
           cp ./build_tools/scripts/fetch_cuda_deps.sh /usr/local/bin
           /usr/local/bin/fetch_cuda_deps.sh ${IREE_CUDA_DEPS_DIR}
           ./build_tools/bazel/build_test_all.sh

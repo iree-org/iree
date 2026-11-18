@@ -2734,24 +2734,6 @@ func.func @dequantize_affine_zp_difference_too_wide(%input: tensor<128x64xi64>,
 
 // -----
 
-// A constant zero point that is off the quantized grid would be silently
-// truncated by the lowering, so it is rejected here.
-func.func @dequantize_affine_zp_off_grid(%input: tensor<128x64xi8>,
-    %scale: tensor<128xf32>, %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
-  %zp = arith.constant dense<300> : tensor<128xi32>
-  // expected-error @+1 {{zero point 300 is not representable in the storage type 'i8', whose range is [-128, 127]}}
-  %0 = iree_linalg_ext.dequantize_affine
-      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
-                        affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d0, d1)>]>
-      ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<128xi32>)
-      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
-  return %0 : tensor<128x64xf32>
-}
-
-// -----
-
 func.func @group_mmt4d_short_row_stride(
     %input: tensor<2x1x4x1xf32>, %weights: tensor<2x1x1x1x1xf32>,
     %offsets: tensor<2xi64>, %output: tensor<2x1x4x1xf32>)

@@ -12,6 +12,12 @@ on:
     - cron: "15 9 * * 1-5"
   workflow_dispatch:
   workflow_call:
+    secrets:
+      DISCORD_WEBHOOK:
+        required: false
+
+permissions:
+  contents: read
 
 jobs:
   linux_x64_clang_byollvm:
@@ -25,10 +31,21 @@ jobs:
       - name: "Checking out repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: true
       - name: Install Python requirements
         run: python3 -m pip install -r ./build_tools/github_actions/ci_requirements.txt
       - name: "Building and testing with bring-your-own-LLVM"
+        env:
+          # TODO: Remove when the ubuntu-24.04 runner image has a kernel with
+          # https://github.com/torvalds/linux/commit/4de32fd05ce9.
+          # On kernel 7.0.0-1017-azure, AppArmor dereferences a NULL pointer
+          # when a confined process writes to a connected AF_UNIX datagram
+          # socket. In this container, that ends the main thread of
+          # socket_tests in UnixDgram_ConnectedLoopback, and the test hangs
+          # until the ctest timeout.
+          IREE_EXTRA_NEWLINE_SEPARATED_CTEST_TESTS_TO_EXCLUDE: |-
+            iree/async/platform/posix/cts/socket_tests
         run: ./build_tools/cmake/build_and_test_byo_llvm.sh
 
       - name: Post to Discord on Failure

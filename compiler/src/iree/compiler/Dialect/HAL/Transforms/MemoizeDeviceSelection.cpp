@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "llvm/ADT/MapVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
@@ -30,7 +31,7 @@ struct SelectOpOperands {
   IntegerAttr memoryType;
   IntegerAttr bufferUsage;
 
-  // Ideally the SelectOpOperands should be a valid key to the DenseMap, so we
+  // Ideally the SelectOpOperands should be a valid key to the MapVector, so we
   // could use it directly. However, we just take the shortcut of
   // converting to an ArrayAttr and using that as the key.
   ArrayAttr toArrayAttr(MLIRContext *context) const {
@@ -158,8 +159,9 @@ struct MemoizeDeviceSelectionPass
     // Gather all select ops in the program and bucket by unique key.
     // For each bucket the first op will be the first that appears in the
     // module for that given bucket.
-    DenseMap<ArrayAttr, std::pair<SelectOpOperands,
-                                  SmallVector<IREE::HAL::AllocatorSelectOp>>>
+    llvm::MapVector<
+        ArrayAttr,
+        std::pair<SelectOpOperands, SmallVector<IREE::HAL::AllocatorSelectOp>>>
         selectOps;
     for (auto callableOp : moduleOp.getOps<mlir::CallableOpInterface>()) {
       // TODO(benvanik): an interface for when we have other select ops. For now

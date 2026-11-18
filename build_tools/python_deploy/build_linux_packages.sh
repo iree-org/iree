@@ -16,14 +16,14 @@
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Build specific Python versions and packages to custom directory:
-#   override_python_versions="cp310-cp310 cp311-cp311" \
+#   override_python_versions="cp311-cp311 cp312-cp312" \
 #   packages="iree-base-runtime" \
 #   output_dir="/tmp/wheelhouse" \
 #   ./build_tools/python_deploy/build_linux_packages.sh
 #
 # Valid Python versions match a subdirectory under /opt/python in the docker
 # image. Typically:
-#   cp310-cp310 cp311-cp311
+#   cp311-cp311 cp312-cp312
 #
 # Valid packages:
 #   iree-base-runtime
@@ -64,10 +64,10 @@ function find_git_dir_parent() {
 this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
 repo_root=$(cd "${this_dir}" && find_git_dir_parent)
-manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "ghcr.io/iree-org/manylinux_x86_64@sha256:2e0246137819cf10ed84240a971f9dd75cc3eb62dc6907dfd2080ee966b3c9f4" }')}"
+manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64:2026.11.01-2@sha256:54b271d9562a3686298880df05367909e949ed317e7b1b79b59c696d75f78676" : "ghcr.io/iree-org/manylinux_x86_64@sha256:2e0246137819cf10ed84240a971f9dd75cc3eb62dc6907dfd2080ee966b3c9f4" }')}"
 # Python versions to build. cp312 is the abi3 build (produces a wheel
 # compatible with 3.12+). Per-version builds are used for <3.12 and 3.13t.
-python_versions="${override_python_versions:-cp310-cp310 cp311-cp311 cp312-cp312 cp313-cp313t}"
+python_versions="${override_python_versions:-cp311-cp311 cp312-cp312 cp313-cp313t}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-base-runtime iree-base-compiler}"
 package_suffix="${package_suffix:-}"
@@ -222,8 +222,6 @@ function install_deps() {
     echo "The architecture is aarch64 and we use manylinux 2_28 so install deps"
     yum install -y epel-release
     yum update -y
-    # Required for Tracy
-    yum install -y libzstd-devel
     yum install -y clang-20.1.8-2.module_el8.10.0+4062+b20d4441 lld-20.1.8-2.module_el8.10.0+4062+b20d4441
   elif [[ "$uname_m" == "x86_64" ]]; then
     echo "The architecture is x86_64 so assume we are on a managed image with deps"

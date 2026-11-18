@@ -67,6 +67,16 @@ repos:
     hooks:
       - id: do-not-submit
 
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: 06a39750ec31860bb44f2acf67182c40016cd1e7 # frozen: v1.32.0
+    hooks:
+      - id: zizmor
+        name: Run zizmor on GitHub Actions workflows
+        # Offline audits only, so results depend only on the checked-out files
+        # and the hook needs no GitHub token or API quota. Informational
+        # findings are not reported.
+        args: ["--no-progress", "--offline", "--min-severity=low"]
+
   - repo: local
     hooks:
       - id: buildifier

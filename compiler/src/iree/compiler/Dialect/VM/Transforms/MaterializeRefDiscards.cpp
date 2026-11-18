@@ -272,7 +272,6 @@ class MaterializeRefDiscardsPass
     // Collect refs dying on each edge (pred, succ pair).
     // Use a vector to maintain deterministic ordering.
     SmallVector<std::tuple<Block *, Block *, SmallVector<Value>>> edgeDiscards;
-    llvm::DenseMap<std::pair<Block *, Block *>, size_t> edgeToIndex;
 
     for (Block &block : funcOp.getBlocks()) {
       Operation *terminator = block.getTerminator();

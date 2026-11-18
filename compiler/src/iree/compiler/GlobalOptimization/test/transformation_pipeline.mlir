@@ -1,4 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-global-optimization-transformation-pipeline %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-global-optimization-transformation-pipeline="aggressive-transpose-propagation=true" --iree-global-opt-demote-contraction-inputs-type=f16 --iree-global-opt-demote-contraction-inputs-operations=all %s | FileCheck %s --check-prefix=DEMOTE
+// RUN: iree-opt --split-input-file --iree-global-optimization-transformation-pipeline="aggressive-transpose-propagation=true" --iree-global-opt-demote-contraction-inputs-type=bf16 --iree-global-opt-demote-contraction-inputs-operations=all %s | FileCheck %s --check-prefix=DEMOTE
 
 // CHECK-LABEL: @empty
 util.func public @empty() {
@@ -61,3 +63,22 @@ util.func public @transpose_with_strided_conv(%arg0: tensor<40x1x1x32xbf16>, %ar
 //  CHECK-SAME:     ins(%[[CONTRACT]] : tensor<16x96x64x40xf32>)
 //       CHECK:   %[[END:.+]] = iree_tensor_ext.compute_barrier.end %[[TRUNC]]
 //       CHECK:   util.return %[[END]]
+
+// -----
+
+// Input demotion must still recognize the generic contraction produced by
+// aggressive transpose propagation.
+util.func public @matmul_output_transpose(%a: tensor<32x64xf32>, %b: tensor<64x16xf32>) -> tensor<16x32xf32> {
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<32x16xf32>
+  %init = linalg.fill ins(%zero : f32) outs(%empty : tensor<32x16xf32>) -> tensor<32x16xf32>
+  %mm = linalg.matmul ins(%a, %b : tensor<32x64xf32>, tensor<64x16xf32>) outs(%init : tensor<32x16xf32>) -> tensor<32x16xf32>
+  %out = tensor.empty() : tensor<16x32xf32>
+  %result = linalg.transpose ins(%mm : tensor<32x16xf32>) outs(%out : tensor<16x32xf32>) permutation = [1, 0]
+  util.return %result : tensor<16x32xf32>
+}
+// CHECK-LABEL: util.func public @matmul_output_transpose(
+// DEMOTE-LABEL: util.func public @matmul_output_transpose(
+// DEMOTE: arith.truncf {{.*}} : f32 to {{(f16|bf16)}}
+// DEMOTE: arith.truncf {{.*}} : f32 to {{(f16|bf16)}}
+// DEMOTE: arith.mulf

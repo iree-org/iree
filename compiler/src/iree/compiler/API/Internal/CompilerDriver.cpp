@@ -616,6 +616,7 @@ Session::Session(GlobalInit &globalInit)
 
   // Register each options struct with the binder so we can manipulate
   // mnemonically via the API.
+  pluginManagerOptions.bindOptions(binder);
   pipelineOptions.bindOptions(binder);
   bindingOptions.bindOptions(binder);
   preprocessingOptions.bindOptions(binder);
@@ -1152,6 +1153,13 @@ void Invocation::dumpCompilationPhase(IREEVMPipelinePhase phase,
           std::string(path.begin(), path.end())}));
 }
 
+/// Prints the number of passes and the pretty-printed pipeline to stderr.
+void printPassPipeline(const OpPassManager &passManager) {
+  llvm::errs() << "Pass Manager with " << passManager.size() << " passes:\n";
+  passManager.printAsTextualPipeline(llvm::errs(), /*pretty=*/true);
+  llvm::errs() << "\n";
+}
+
 bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   auto passManager = createPassManager();
 
@@ -1240,7 +1248,7 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   }
 
   if (session.globalInit.printPipelinePasses) {
-    passManager->dump();
+    printPassPipeline(*passManager);
   }
   if (failed(passManager->run(parsedModule))) {
     return false;
@@ -1258,7 +1266,7 @@ bool Invocation::runTextualPassPipeline(const char *textPassPipeline) {
   }
 
   if (session.globalInit.printPipelinePasses) {
-    passManager->dump();
+    printPassPipeline(*passManager);
   }
   if (failed(passManager->run(parsedModule))) {
     return false;

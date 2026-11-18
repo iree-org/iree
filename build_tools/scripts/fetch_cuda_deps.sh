@@ -37,7 +37,7 @@ if [ -z "$TARGET_DIR" ]; then
   exit 1
 fi
 
-DOWNLOAD_SCRIPT_URL="https://raw.githubusercontent.com/NVIDIA/build-system-archive-import-examples/main/parse_redist.py"
+DOWNLOAD_SCRIPT_URL="https://raw.githubusercontent.com/NVIDIA/build-system-archive-import-examples/6ce1321daa48f5fa09de72a166011c397e29997b/parse_redist.py"
 DOWNLOAD_DIR="$TARGET_DIR/download"
 DOWNLOAD_SCRIPT_PATH="$DOWNLOAD_DIR/parse_redist.py"
 

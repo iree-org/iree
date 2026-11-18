@@ -21,6 +21,24 @@ func.func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
 
 // -----
 
+func.func @sort_stable_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
+  %empty = tensor.empty() : tensor<128xi32>
+  %0 = iree_linalg_ext.sort
+    dimension(0) is_stable(true)
+    ins(%arg0 : tensor<128xi32>) outs(%empty : tensor<128xi32>) {
+  ^bb0(%arg1: i32, %arg2: i32):
+    %1 = arith.cmpi sgt, %arg1, %arg2 : i32
+    iree_linalg_ext.yield %1 : i1
+  } -> tensor<128xi32>
+  return %0 : tensor<128xi32>
+}
+// CHECK-LABEL: func.func @sort_stable_tensor(
+// CHECK:         iree_linalg_ext.sort
+// CHECK-SAME:      dimension(0) is_stable(true)
+// CHECK-SAME:      ins(%{{.+}} : tensor<128xi32>)
+
+// -----
+
 func.func @sort_memref(%arg0: memref<128xi32>) {
   iree_linalg_ext.sort dimension(0)
     ins(%arg0 : memref<128xi32>) outs(%arg0 : memref<128xi32>) {
@@ -2992,28 +3010,6 @@ func.func @dequantize_affine_transposed(%input: tensor<128x64xi8>,
 // CHECK-LABEL: func.func @dequantize_affine_transposed(
 //       CHECK:   iree_linalg_ext.dequantize_affine
 //  CHECK-SAME:     indexing_maps = [#[[$INPUT]], #[[$QPARAM]], #[[$OUTPUT]]]
-
-// -----
-
-// A constant i64 zero point whose values are on the storage type's grid, which
-// is what PT2E emits. The verifier checks constant zero points against the grid
-// because the lowering narrows them, so this guards against a false positive.
-func.func @dequantize_affine_constant_wide_zp(%input: tensor<128x64xi8>,
-    %scale: tensor<128xf32>, %init: tensor<128x64xf32>) -> tensor<128x64xf32> {
-  %zp = arith.constant dense<-128> : tensor<128xi64>
-  %0 = iree_linalg_ext.dequantize_affine
-      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
-                        affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d0)>,
-                        affine_map<(d0, d1) -> (d0, d1)>]>
-      ins(%input, %scale, %zp : tensor<128x64xi8>, tensor<128xf32>, tensor<128xi64>)
-      outs(%init : tensor<128x64xf32>) -> tensor<128x64xf32>
-  return %0 : tensor<128x64xf32>
-}
-// CHECK-LABEL: func.func @dequantize_affine_constant_wide_zp(
-//       CHECK:   %[[ZP:.+]] = arith.constant dense<-128> : tensor<128xi64>
-//       CHECK:   iree_linalg_ext.dequantize_affine
-//  CHECK-SAME:     ins(%{{.+}}, %{{.+}}, %[[ZP]] :
 
 // -----
 

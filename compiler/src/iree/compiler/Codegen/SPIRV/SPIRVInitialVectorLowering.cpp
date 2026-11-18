@@ -106,7 +106,7 @@ Operation *stripElementBitPatternPreservingParents(Value op) {
   while (Operation *parentOp = op.getDefiningOp()) {
     Value source = TypeSwitch<Operation *, Value>(parentOp)
                        .Case([](vector::BroadcastOp broadcast) {
-                         return broadcast.getVector();
+                         return broadcast.getResult();
                        })
                        .Case<vector::ExtractOp, vector::ExtractStridedSliceOp,
                              vector::ShapeCastOp>(

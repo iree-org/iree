@@ -21,9 +21,17 @@ QEMU_BIN="${QEMU_BIN:-qemu-system-riscv64}"
 IREE_TARGET_BUILD_DIR="${IREE_TARGET_BUILD_DIR:-build-riscv-baremetal}"
 SAMPLE_DIR="${IREE_TARGET_BUILD_DIR}/samples/baremetal_riscv64"
 
+if ! command -v "${QEMU_BIN}" > /dev/null; then
+  echo "error: '${QEMU_BIN}' not found; install qemu-system-riscv64 or set" \
+    "QEMU_BIN (see samples/baremetal_riscv64/README.md)." >&2
+  exit 1
+fi
+
 for runner in runner_llvmcpu runner_vmvx; do
-  timeout 120 "${QEMU_BIN}" -machine virt -m 512M -nographic -semihosting \
-    -bios none \
+  # --foreground: without it QEMU is stopped by SIGTTOU and the run hangs when
+  # this script is started from an interactive terminal (CI is unaffected).
+  timeout --foreground 120 "${QEMU_BIN}" -machine virt -m 512M -nographic \
+    -semihosting -bios none \
     -device loader,file="${SAMPLE_DIR}/${runner}",cpu-num=0 \
     2>&1 | tee "${SAMPLE_DIR}/${runner}.log"
   grep -q "PASS: single-op inference on bare-metal riscv64" \

@@ -32,13 +32,29 @@ void GlobalPipelineOptions::bindOptions(OptionsBinder &binder) {
   binder.opt<bool>(
       "iree-opt-data-tiling", dataTiling,
       llvm::cl::desc(
-          "Enables data tiling optimization. There are two data-tiling "
-          "paths; it is the global flag that enables data-tiling with the"
+          "Enables data tiling optimization. There are three data-tiling "
+          "paths; it is the global flag that enables data-tiling with the "
           "suggested path. You can choose one of them to enable explicitly, if "
-          "you have a preference. See `iree-global-opt-data-tiling` and "
-          "`iree-dispatch-creation-data-tiling` for details. Note that this "
-          "flag will override the other two flags, because it has a higher "
-          "priority."),
+          "you have a preference. See `iree-dispatch-creation-data-tiling`, "
+          "`iree-global-opt-data-tiling` and the experimental "
+          "`iree-opt-experimental-early-data-tiling` for details. Note that "
+          "this flag will override the first two flags, because it has a "
+          "higher priority, and that "
+          "`iree-opt-experimental-early-data-tiling` overrides this flag."),
+      llvm::cl::cat(category));
+
+  binder.opt<bool>(
+      "iree-opt-experimental-early-data-tiling", earlyDataTiling,
+      llvm::cl::desc(
+          "Experimental. Assigns, propagates and materializes data-tiling "
+          "layouts before dispatch creation for supported single-target CPU "
+          "modules, so that data-tiled ops fuse with their epilogues; other "
+          "modules use dispatch-time data tiling. Unlike "
+          "--iree-global-opt-data-tiling with early materialization, it also "
+          "normalizes contraction dimensions and propagates layouts through "
+          "elementwise ops. Overrides the other data-tiling placement flags, "
+          "and uses the operation families and encoding strategy of "
+          "dispatch-time data tiling."),
       llvm::cl::cat(category));
 
   binder.opt<bool>(

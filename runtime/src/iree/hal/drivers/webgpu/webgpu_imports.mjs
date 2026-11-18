@@ -270,10 +270,21 @@ export function createImports(context) {
 
           if ((effectiveSrc & 3) === 0 && (effectiveDst & 3) === 0 &&
               (length & 3) === 0) {
-            // Aligned: use native copyBufferToBuffer.
-            encoder.copyBufferToBuffer(
-                buffers[srcSlot], effectiveSrc, buffers[dstSlot], effectiveDst,
-                length);
+            if (buffers[srcSlot] === buffers[dstSlot]) {
+              const scratch = device.createBuffer({
+                usage: 0x0004 | 0x0008,  // COPY_SRC | COPY_DST
+                size: length,
+              });
+              temporaryBuffers.push(scratch);
+              encoder.copyBufferToBuffer(
+                  buffers[srcSlot], effectiveSrc, scratch, 0, length);
+              encoder.copyBufferToBuffer(
+                  scratch, 0, buffers[dstSlot], effectiveDst, length);
+            } else {
+              encoder.copyBufferToBuffer(
+                  buffers[srcSlot], effectiveSrc, buffers[dstSlot],
+                  effectiveDst, length);
+            }
           } else {
             // Unaligned: dispatch copy builtin shader.
             const params = device.createBuffer({

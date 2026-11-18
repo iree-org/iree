@@ -7,6 +7,7 @@
 name: Pull Request Greeter
 
 on:
+  # zizmor: ignore[dangerous-triggers] runs base-branch code only; PR fields reach it via env
   pull_request_target:
     types:
       - opened

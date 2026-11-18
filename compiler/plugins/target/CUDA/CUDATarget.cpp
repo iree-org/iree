@@ -348,7 +348,7 @@ static void optimizeModule(llvm::Module &module,
 
   fam.registerPass([&] { return targetMachine.getTargetIRAnalysis(); });
 
-  llvm::PipelineTuningOptions pto(&module.getContext().getLibraryOptions());
+  llvm::PipelineTuningOptions pto;
   pto.SLPVectorization = false;
 
   llvm::PassInstrumentationCallbacks pic;
