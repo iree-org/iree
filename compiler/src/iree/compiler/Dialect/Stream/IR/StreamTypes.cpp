@@ -248,7 +248,8 @@ void ResourceConfigAttr::print(AsmPrinter &p) const {
   os << "max_buffer_range = " << getMaxBufferRange() << ", ";
   os << "min_buffer_range_alignment = " << getMinBufferRangeAlignment() << ", ";
   os << "index_bits = " << getIndexBits() << ", ";
-  os << "alias_mutable_bindings = " << getAliasMutableBindings() << ", ";
+  os << "alias_mutable_bindings = "
+     << (getAliasMutableBindings() ? "true" : "false") << ", ";
   os << "memory_model = " << stringifyMemoryModel(getMemoryModel());
   os << "}>";
 }

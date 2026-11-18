@@ -15,6 +15,8 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "conv2d.mlir"
+    "early_data_tiling_convolutions.mlir"
+    "early_data_tiling_matmuls.mlir"
     "fp4_f32_conversion.mlir"
     "fp_to_subbyte.mlir"
     "gather_like_ops.mlir"
@@ -31,6 +33,42 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
+  LABELS
+    "nowasm"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_early_dt_local-task
+  SRCS
+    "early_data_tiling_matmuls.mlir"
+    "narrow_n_matmuls.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-experimental-early-data-tiling"
+    "--iree-llvmcpu-target-cpu=generic"
+  LABELS
+    "nowasm"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_early_dt_conv_local-task
+  SRCS
+    "conv2d.mlir"
+    "early_data_tiling_convolutions.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-dispatch-creation-experimental-set-data-tiling-ops=convolution"
+    "--iree-global-opt-use-im2col-for-convs=false"
+    "--iree-opt-experimental-early-data-tiling"
     "--iree-llvmcpu-target-cpu=generic"
   LABELS
     "nowasm"

@@ -10,39 +10,13 @@
 // RUN: cat %t/x86/*.linked.ll | FileCheck %s --check-prefix=LINKED
 // RUN: cat %t/x86/*.optimized.ll | FileCheck %s --check-prefix=OPT
 
-// aarch64, i8mm:
-// RUN: iree-compile --iree-hal-target-device=local \
-// RUN:   --iree-hal-local-target-device-backends=llvm-cpu \
-// RUN:   --iree-llvmcpu-target-triple=aarch64-none-elf \
-// RUN:   --iree-llvmcpu-target-cpu-features=+i8mm \
-// RUN:   --iree-opt-data-tiling --iree-llvmcpu-enable-ukernels=mmt4d \
-// RUN:   --iree-hal-dump-executable-intermediates-to=%t/i8mm %s -o /dev/null
-// RUN: cat %t/i8mm/*.linked.ll | FileCheck %s --check-prefix=LINKED
-// RUN: cat %t/i8mm/*.optimized.ll | FileCheck %s --check-prefix=OPT
-
-// aarch64, dotprod:
-// RUN: iree-compile --iree-hal-target-device=local \
-// RUN:   --iree-hal-local-target-device-backends=llvm-cpu \
-// RUN:   --iree-llvmcpu-target-triple=aarch64-none-elf \
-// RUN:   --iree-llvmcpu-target-cpu-features=+dotprod \
-// RUN:   --iree-opt-data-tiling --iree-llvmcpu-enable-ukernels=mmt4d \
-// RUN:   --iree-hal-dump-executable-intermediates-to=%t/dotprod %s -o /dev/null
-// RUN: cat %t/dotprod/*.linked.ll | FileCheck %s --check-prefix=LINKED
-// RUN: cat %t/dotprod/*.optimized.ll | FileCheck %s --check-prefix=OPT
-
-// riscv64, RVV + xsmtvdot:
-// RUN: iree-compile --iree-hal-target-device=local \
-// RUN:   --iree-hal-local-target-device-backends=llvm-cpu \
-// RUN:   --iree-llvmcpu-target-triple=riscv64-unknown-elf \
-// RUN:   --iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+c,+v,+xsmtvdot,+zvl256b \
-// RUN:   --iree-opt-data-tiling --iree-llvmcpu-enable-ukernels=mmt4d \
-// RUN:   --iree-hal-dump-executable-intermediates-to=%t/rvv %s -o /dev/null
-// RUN: cat %t/rvv/*.linked.ll | FileCheck %s --check-prefix=LINKED
-// RUN: cat %t/rvv/*.optimized.ll | FileCheck %s --check-prefix=OPT
-
 // Ukernels must inline into the dispatch so their compile-time specialization
-// can be DCE'd. For each target above, check that a ukernel is linked in and
-// that, after optimization, no call to a ukernel symbol survives in the dispatch.
+// can be DCE'd. Check that a ukernel is linked in and that, after optimization,
+// no call to a ukernel symbol survives in the dispatch.
+//
+// ukernel_inlining_aarch64.mlir and ukernel_inlining_riscv64.mlir run the same
+// checks on other targets. They are separate tests because they need LLVM
+// targets that not every LLVM build includes.
 
 // LINKED: call {{.*}}@iree_uk_mmt4d(
 // OPT: define {{.*}}_dispatch_0

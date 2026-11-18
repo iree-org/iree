@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DebugLog.h"
@@ -526,6 +527,10 @@ static Value warpReduction(Location loc, OpBuilder &builder, Value input,
 static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
                                           vector::CombiningKind combiningKind,
                                           Type type) {
+  auto getIntegerBitWidth = [type]() {
+    return type.isIndex() ? IndexType::kInternalStorageBitWidth
+                          : cast<IntegerType>(type).getWidth();
+  };
   switch (combiningKind) {
   case vector::CombiningKind::ADD:
     return builder.getZeroAttr(type);
@@ -536,13 +541,17 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
     return builder.getFloatAttr(type, 1);
   }
   case vector::CombiningKind::MINUI:
-  case vector::CombiningKind::MINSI:
-    return builder.getIntegerAttr(type, std::numeric_limits<int64_t>::max());
-  case vector::CombiningKind::MAXUI:
-  case vector::CombiningKind::MAXSI:
-    return builder.getIntegerAttr(type, std::numeric_limits<int64_t>::min());
   case vector::CombiningKind::AND:
-    return builder.getIntegerAttr(type, 1);
+    return builder.getIntegerAttr(type,
+                                  APInt::getAllOnes(getIntegerBitWidth()));
+  case vector::CombiningKind::MINSI:
+    return builder.getIntegerAttr(
+        type, APInt::getSignedMaxValue(getIntegerBitWidth()));
+  case vector::CombiningKind::MAXUI:
+    return builder.getZeroAttr(type);
+  case vector::CombiningKind::MAXSI:
+    return builder.getIntegerAttr(
+        type, APInt::getSignedMinValue(getIntegerBitWidth()));
   case vector::CombiningKind::OR:
   case vector::CombiningKind::XOR:
     return builder.getZeroAttr(type);

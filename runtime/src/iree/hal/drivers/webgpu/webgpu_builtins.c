@@ -155,7 +155,7 @@ static iree_status_t iree_hal_webgpu_builtins_create_pipeline(
   // Create the bind group layout.
   iree_hal_webgpu_handle_t bind_group_layout =
       iree_hal_webgpu_import_device_create_bind_group_layout(
-          device_handle, (uint32_t)(uintptr_t)layout_entries,
+          device_handle, (uintptr_t)layout_entries,
           (uint32_t)layout_entry_count);
   if (!bind_group_layout) {
     return iree_make_status(
@@ -166,7 +166,7 @@ static iree_status_t iree_hal_webgpu_builtins_create_pipeline(
   // Create the pipeline layout from the single bind group layout.
   iree_hal_webgpu_handle_t pipeline_layout =
       iree_hal_webgpu_import_device_create_pipeline_layout(
-          device_handle, (uint32_t)(uintptr_t)&bind_group_layout,
+          device_handle, (uintptr_t)&bind_group_layout,
           /*layout_count=*/1);
   if (!pipeline_layout) {
     iree_hal_webgpu_import_handle_release(bind_group_layout);
@@ -178,8 +178,8 @@ static iree_status_t iree_hal_webgpu_builtins_create_pipeline(
   // Create the compute pipeline.
   iree_hal_webgpu_handle_t pipeline =
       iree_hal_webgpu_import_device_create_compute_pipeline(
-          device_handle, pipeline_layout, (uint32_t)(uintptr_t)wgsl_source,
-          (uint32_t)wgsl_length, (uint32_t)(uintptr_t)entry_point,
+          device_handle, pipeline_layout, (uintptr_t)wgsl_source,
+          (uint32_t)wgsl_length, (uintptr_t)entry_point,
           (uint32_t)strlen(entry_point));
 
   // The pipeline layout handle is consumed by the pipeline — release ours.

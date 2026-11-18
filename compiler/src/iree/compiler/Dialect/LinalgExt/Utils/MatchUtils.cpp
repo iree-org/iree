@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/LinalgExt/Utils/MatchUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
@@ -46,23 +47,6 @@ enum class MatchContractionResult {
 //===----------------------------------------------------------------------===//
 // ScaledContractionOpInterface implementation
 //===----------------------------------------------------------------------===//
-
-/// If the value is defined by a chain of unary side-effect free, go up the
-/// use-def chain until the first value that isn't defined by such an op.
-// TODO: relax to multi-operands with constants, which are technically unary ops
-// as needed (e.g. add5).
-static Value getSourceSkipUnary(Value value) {
-  Operation *op = value.getDefiningOp();
-  while (op && op->getNumOperands() == 1) {
-    auto iface = dyn_cast<MemoryEffectOpInterface>(op);
-    if (!iface || !iface.hasNoEffect()) {
-      break;
-    }
-    value = op->getOperand(0);
-    op = value.getDefiningOp();
-  }
-  return value;
-}
 
 /// Returns true if the two operations are ones supported by scaled mfmas.
 static bool isValidScaledMmaPair(Operation *add, Operation *mul) {

@@ -7,11 +7,18 @@ Using a
 [MobileNet model](https://github.com/onnx/models/tree/main/validated/vision/classification/mobilenet)
 as an example, import using IREE's [ONNX importer](../ml-frameworks/onnx.md):
 
-```bash
-# Download the model you want to compile and run.
-wget https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classification/mobilenet/model/mobilenetv2-10.onnx
+Download the model you want to compile and run.
 
-# Import to MLIR using IREE's ONNX importer.
-pip install iree-base-compiler[onnx]
+```bash
+wget https://github.com/onnx/models/raw/refs/heads/main/validated/vision/classification/mobilenet/model/mobilenetv2-10.onnx
+```
+
+Import to MLIR using IREE's ONNX importer.
+
+```bash
+pip install "iree-base-compiler[onnx]"
+```
+
+```bash
 iree-import-onnx mobilenetv2-10.onnx --opset-version 17 -o mobilenetv2.mlir
 ```

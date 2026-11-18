@@ -31,6 +31,7 @@
 // IREE_MEMORY_ACCESS_ALIGNMENT_REQUIRED_64 (0/1)
 //
 // IREE_COMPILER_CLANG
+// IREE_COMPILER_EMSCRIPTEN
 // IREE_COMPILER_GCC
 // IREE_COMPILER_GCC_COMPAT
 // IREE_COMPILER_MSVC
@@ -199,6 +200,10 @@ enum iree_arch_enum_e {
 #else
 #error Unrecognized compiler.
 #endif  // compiler versions
+
+#if defined(__EMSCRIPTEN__)
+#define IREE_COMPILER_EMSCRIPTEN 1
+#endif  // __EMSCRIPTEN__
 
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)

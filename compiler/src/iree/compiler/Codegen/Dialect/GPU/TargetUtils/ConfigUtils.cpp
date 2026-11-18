@@ -464,7 +464,6 @@ static std::optional<ArrayAttr> getPaddingConvSizes(
   DenseMap<int64_t, AffineExpr> convToIgemmMap =
       convToIgemmInfo->convToIgemmDimMap;
   DenseSet<int64_t> paddedIGEMMDims;
-  DenseMap<int64_t, SmallVector<int64_t>> paddedReductionConvDims;
   linalg::ConvolutionDimensions convDims = convToIgemmInfo->convDims;
   SetVector<int64_t> inputChannelDims(llvm::from_range, convDims.inputChannel);
   SmallVector<int64_t> paddingConvSizes(convToIgemmMap.size(), 0);

@@ -830,7 +830,7 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
   LogicalResult matchAndRewrite(vector::BroadcastOp broadcastOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    VectorValue dstVector = broadcastOp.getVector();
+    VectorValue dstVector = broadcastOp.getResult();
     auto vectorLayout = dyn_cast<NestedLayoutAttr>(signature[dstVector]);
     if (!vectorLayout) {
       return rewriter.notifyMatchFailure(broadcastOp,
@@ -2758,7 +2758,7 @@ struct DistributeScan final : OpDistributionPattern<vector::ScanOp> {
       // The user init is applied once at the end for exclusive mode.
       auto localScanOp = vector::ScanOp::create(
           rewriter, loc, kind, srcChunk, localIdentityInit, elemIdx, inclusive);
-      Value localScan = localScanOp.getDest();
+      Value localScan = localScanOp.getResult();
       Value localTotal = localScanOp.getAccumulatedValue();
 
       // For exclusive scan, accumulated_value is the last dest element

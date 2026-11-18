@@ -29,6 +29,7 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Conversion/VectorToNVGPU/VectorToNVGPU.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -227,7 +228,11 @@ void transform_dialect::ApplyFoldTensorSliceIntoTransferPatternsOp::
 
 void transform_dialect::ApplyPrepareVectorToMMAPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
-  populatePrepareVectorToMMAPatterns(patterns, getUseNvGpu());
+  if (getUseNvGpu()) {
+    populatePrepareVectorToNVMMAPatterns(patterns);
+  } else {
+    populatePrepareVectorToMMAPatterns(patterns);
+  }
 }
 
 //===----------------------------------------------------------------------===//

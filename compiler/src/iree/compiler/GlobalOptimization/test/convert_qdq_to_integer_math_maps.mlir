@@ -403,14 +403,16 @@ func.func @conv_2d_nhwc_hwcf_image_sum(%aq: tensor<1x8x8x4xi8>, %sa: tensor<f32>
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
 //  CHECK-SAME:     outs(%{{.+}} : tensor<1x6x6x16xi32>)
-// The window dims are named by a shape-only operand, sized from the filter.
-//       CHECK:   %[[W:.+]] = tensor.empty() : tensor<3x3xi8>
+// The window dims are named by a shape-only operand indexed like the filter
+// without F, so the image sum is a convolution with a ones filter that im2col
+// can rewrite to read the gather of the convolution above.
+//       CHECK:   %[[W:.+]] = tensor.empty() : tensor<3x3x4xi8>
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1 + d3, d2 + d4, d5)>,
-//  CHECK-SAME:                      affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4)>,
+//  CHECK-SAME:                      affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5)>,
 //  CHECK-SAME:                      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>]
 //  CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]
-//  CHECK-SAME:     ins(%{{.+}}, %[[W]] : tensor<1x8x8x4xi8>, tensor<3x3xi8>)
+//  CHECK-SAME:     ins(%{{.+}}, %[[W]] : tensor<1x8x8x4xi8>, tensor<3x3x4xi8>)
 //  CHECK-SAME:     outs(%{{.+}} : tensor<1x6x6xi32>)
 
 // -----
@@ -452,15 +454,15 @@ func.func @depthwise_conv_image_sum(%aq: tensor<1x8x8x4xi8>, %sa: tensor<f32>,
 //  CHECK-SAME:     outs(%{{.+}} : tensor<1x6x6x4xi32>)
 // The image sum has the same iteration space and the same result shape as the
 // contraction above it, because C is kept rather than reduced: the image map and
-// the result map below are the same two maps again, with only the filter operand
-// replaced by the window witness.
-//       CHECK:   %[[W:.+]] = tensor.empty() : tensor<3x3xi8>
+// the result map below are the same two maps again, and so is the filter map,
+// with only the filter operand replaced by the shape-only window witness.
+//       CHECK:   %[[W:.+]] = tensor.empty() : tensor<3x3x4xi8>
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1 + d4, d2 + d5, d3)>,
-//  CHECK-SAME:                      affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d5)>,
+//  CHECK-SAME:                      affine_map<(d0, d1, d2, d3, d4, d5) -> (d4, d5, d3)>,
 //  CHECK-SAME:                      affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3)>]
 //  CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]
-//  CHECK-SAME:     ins(%{{.+}}, %[[W]] : tensor<1x8x8x4xi8>, tensor<3x3xi8>)
+//  CHECK-SAME:     ins(%{{.+}}, %[[W]] : tensor<1x8x8x4xi8>, tensor<3x3x4xi8>)
 //  CHECK-SAME:     outs(%{{.+}} : tensor<1x6x6x4xi32>)
 
 // -----
@@ -496,10 +498,11 @@ func.func @conv_strided_dilated_image_sum(%aq: tensor<1x7x7x2xi8>, %sa: tensor<f
 // CHECK-LABEL: func.func @conv_strided_dilated_image_sum(
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     outs(%{{.+}} : tensor<1x3x3x2xi32>)
-//       CHECK:   %[[W:.+]] = tensor.empty() : tensor<2x2xi8>
+//       CHECK:   %[[W:.+]] = tensor.empty() : tensor<2x2x2xi8>
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1 * 2 + d3 * 2, d2 * 2 + d4 * 2, d5)>
-//  CHECK-SAME:     ins(%{{.+}}, %[[W]] : tensor<1x7x7x2xi8>, tensor<2x2xi8>)
+//  CHECK-SAME:     affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d4, d5)>
+//  CHECK-SAME:     ins(%{{.+}}, %[[W]] : tensor<1x7x7x2xi8>, tensor<2x2x2xi8>)
 //  CHECK-SAME:     outs(%{{.+}} : tensor<1x3x3xi32>)
 
 // -----

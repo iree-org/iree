@@ -124,8 +124,6 @@ struct DecomposeWinogradFilterTransform
     const int64_t inputTileSize = transformOp.getInputTileSize();
     const int64_t kernelSize = transformOp.getKernelSize();
     ArrayRef<int64_t> kernelDims = transformOp.getKernelDimensions();
-    llvm::SmallSetVector<int64_t, 2> kernelDimsSet(kernelDims.begin(),
-                                                   kernelDims.end());
     Type elementType = transformOp.getOutputType().getElementType();
     Value zeroF32 = arith::ConstantOp::create(
         rewriter, loc, rewriter.getZeroAttr(elementType));

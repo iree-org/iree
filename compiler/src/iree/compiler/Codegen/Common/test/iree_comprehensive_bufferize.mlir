@@ -2324,7 +2324,8 @@ func.func @sort1D() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) alignment(64) offset(%c0) : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi32>>
   %1 = iree_tensor_ext.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !iree_tensor_ext.dispatch.tensor<readwrite:tensor<4xi32>> -> tensor<4xi32>
-  %2 = iree_linalg_ext.sort dimension(0) outs(%1 : tensor<4xi32>) {
+  %empty = tensor.empty() : tensor<4xi32>
+  %2 = iree_linalg_ext.sort dimension(0) ins(%1 : tensor<4xi32>) outs(%empty : tensor<4xi32>) {
   ^bb0(%arg0: i32, %arg1: i32):
     %3 = arith.cmpi slt, %arg0, %arg1 : i32
     iree_linalg_ext.yield %3 : i1
@@ -2334,8 +2335,9 @@ func.func @sort1D() {
 }
 // CHECK-LABEL: func.func @sort1D
 // CHECK:        %[[BUF:.+]] = hal.interface.binding.subspan layout({{.+}}) binding(0) alignment(64) offset(%c0) : memref<4xi32, #hal.descriptor_type<storage_buffer>>
+// CHECK:        %[[ALLOC:.+]] = memref.alloc() : memref<4xi32>
 // CHECK:        iree_linalg_ext.sort
-// CHECK-SAME:     outs(%[[BUF]] : memref<4xi32{{.+}}>)
+// CHECK-SAME:     ins(%[[BUF]] : memref<4xi32{{.+}}>) outs(%[[ALLOC]] : memref<4xi32>)
 
 // -----
 

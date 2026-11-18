@@ -6,7 +6,7 @@
 
 // Wasm import declarations for the WebGPU bridge.
 //
-// When compiling for wasm32, these are declared as wasm imports using
+// When compiling for WebAssembly, these are declared as wasm imports using
 // __attribute__((import_module("iree_webgpu"), import_name(...))). The JS
 // host provides the implementations via webgpu_imports.mjs.
 //
@@ -49,7 +49,7 @@ extern "C" {
 __attribute__((import_module("iree_webgpu"),
                import_name("request_adapter"))) extern void
 iree_hal_webgpu_import_request_adapter(uint32_t options_flags,
-                                       uint32_t out_adapter_handle_ptr,
+                                       uintptr_t out_adapter_handle_ptr,
                                        uint32_t token);
 
 // Requests a device from an adapter. Async: completion delivered via proactor
@@ -59,7 +59,7 @@ iree_hal_webgpu_import_request_adapter(uint32_t options_flags,
 __attribute__((import_module("iree_webgpu"),
                import_name("adapter_request_device"))) extern void
 iree_hal_webgpu_import_adapter_request_device(uint32_t adapter_handle,
-                                              uint32_t out_device_handle_ptr,
+                                              uintptr_t out_device_handle_ptr,
                                               uint32_t token);
 
 // Destroys a device and releases its handle.
@@ -108,7 +108,7 @@ __attribute__((import_module("iree_webgpu"),
                import_name("buffer_get_mapped_range"))) extern void
 iree_hal_webgpu_import_buffer_get_mapped_range(uint32_t buffer_handle,
                                                uint64_t offset, uint64_t size,
-                                               uint32_t dest_ptr);
+                                               uintptr_t dest_ptr);
 
 // Copies data from wasm linear memory into a mapped GPU buffer range.
 // The buffer must be in mapped state. |src_ptr| is a wasm memory pointer.
@@ -116,7 +116,7 @@ __attribute__((import_module("iree_webgpu"),
                import_name("buffer_set_mapped_range"))) extern void
 iree_hal_webgpu_import_buffer_set_mapped_range(uint32_t buffer_handle,
                                                uint64_t offset, uint64_t size,
-                                               uint32_t src_ptr);
+                                               uintptr_t src_ptr);
 
 // Unmaps a previously mapped buffer. The buffer returns to unmapped state.
 __attribute__((import_module("iree_webgpu"),
@@ -149,7 +149,7 @@ __attribute__((import_module("iree_webgpu"),
                import_name("pass_set_bind_group"))) extern void
 iree_hal_webgpu_import_pass_set_bind_group(uint32_t pass_handle, uint32_t index,
                                            uint32_t bind_group_handle,
-                                           uint32_t dynamic_offsets_ptr,
+                                           uintptr_t dynamic_offsets_ptr,
                                            uint32_t dynamic_offsets_count);
 
 // Dispatches compute work.
@@ -189,8 +189,8 @@ iree_hal_webgpu_import_encoder_finish(uint32_t encoder_handle);
 __attribute__((import_module("iree_webgpu"),
                import_name("device_create_compute_pipeline"))) extern uint32_t
 iree_hal_webgpu_import_device_create_compute_pipeline(
-    uint32_t device_handle, uint32_t layout_handle, uint32_t wgsl_ptr,
-    uint32_t wgsl_length, uint32_t entry_point_ptr,
+    uint32_t device_handle, uint32_t layout_handle, uintptr_t wgsl_ptr,
+    uint32_t wgsl_length, uintptr_t entry_point_ptr,
     uint32_t entry_point_length);
 
 // Returns a bind group layout from a compute pipeline.
@@ -207,7 +207,7 @@ iree_hal_webgpu_import_pipeline_get_bind_group_layout(uint32_t pipeline_handle,
 __attribute__((import_module("iree_webgpu"),
                import_name("device_create_pipeline_layout"))) extern uint32_t
 iree_hal_webgpu_import_device_create_pipeline_layout(uint32_t device_handle,
-                                                     uint32_t layouts_ptr,
+                                                     uintptr_t layouts_ptr,
                                                      uint32_t layout_count);
 
 // Creates a bind group layout.
@@ -220,7 +220,7 @@ iree_hal_webgpu_import_device_create_pipeline_layout(uint32_t device_handle,
 __attribute__((import_module("iree_webgpu"),
                import_name("device_create_bind_group_layout"))) extern uint32_t
 iree_hal_webgpu_import_device_create_bind_group_layout(uint32_t device_handle,
-                                                       uint32_t entries_ptr,
+                                                       uintptr_t entries_ptr,
                                                        uint32_t entry_count);
 
 // Creates a bind group.
@@ -233,7 +233,7 @@ __attribute__((import_module("iree_webgpu"),
                import_name("device_create_bind_group"))) extern uint32_t
 iree_hal_webgpu_import_device_create_bind_group(uint32_t device_handle,
                                                 uint32_t layout_handle,
-                                                uint32_t entries_ptr,
+                                                uintptr_t entries_ptr,
                                                 uint32_t entry_count);
 
 //===----------------------------------------------------------------------===//
@@ -257,10 +257,10 @@ iree_hal_webgpu_import_device_create_bind_group(uint32_t device_handle,
 __attribute__((import_module("iree_webgpu"),
                import_name("execute_instructions"))) extern uint32_t
 iree_hal_webgpu_import_execute_instructions(
-    uint32_t device_handle, uint32_t queue_handle, uint32_t block_table_ptr,
+    uint32_t device_handle, uint32_t queue_handle, uintptr_t block_table_ptr,
     uint32_t block_count, uint32_t block_word_capacity,
-    uint32_t last_block_word_count, uint32_t binding_table_ptr,
-    uint32_t binding_count, uint32_t builtins_ptr);
+    uint32_t last_block_word_count, uintptr_t binding_table_ptr,
+    uint32_t binding_count, uintptr_t builtins_ptr);
 
 // Creates a recording: copies instruction stream blocks to JS, resolves static
 // bindings, caches builtins. Returns a handle to the JS-side recording object.
@@ -276,10 +276,10 @@ iree_hal_webgpu_import_execute_instructions(
 __attribute__((import_module("iree_webgpu"),
                import_name("create_recording"))) extern uint32_t
 iree_hal_webgpu_import_create_recording(
-    uint32_t device_handle, uint32_t block_table_ptr, uint32_t block_count,
+    uint32_t device_handle, uintptr_t block_table_ptr, uint32_t block_count,
     uint32_t block_word_capacity, uint32_t last_block_word_count,
-    uint32_t static_binding_table_ptr, uint32_t static_binding_count,
-    uint32_t dynamic_binding_count, uint32_t builtins_ptr);
+    uintptr_t static_binding_table_ptr, uint32_t static_binding_count,
+    uint32_t dynamic_binding_count, uintptr_t builtins_ptr);
 
 // Executes a cached recording. Only dynamic bindings are read from wasm memory.
 // After execution, dynamic GPUBuffer references are released.
@@ -295,7 +295,7 @@ __attribute__((import_module("iree_webgpu"),
                import_name("execute_recording"))) extern uint32_t
 iree_hal_webgpu_import_execute_recording(uint32_t recording_handle,
                                          uint32_t queue_handle,
-                                         uint32_t dynamic_binding_table_ptr);
+                                         uintptr_t dynamic_binding_table_ptr);
 
 //===----------------------------------------------------------------------===//
 // Queue
@@ -325,7 +325,7 @@ __attribute__((import_module("iree_webgpu"),
 iree_hal_webgpu_import_queue_write_buffer(uint32_t queue_handle,
                                           uint32_t buffer_handle,
                                           uint64_t buffer_offset,
-                                          uint32_t data_ptr,
+                                          uintptr_t data_ptr,
                                           uint64_t data_size);
 
 //===----------------------------------------------------------------------===//
@@ -337,14 +337,14 @@ iree_hal_webgpu_import_queue_write_buffer(uint32_t queue_handle,
 __attribute__((import_module("iree_webgpu"),
                import_name("adapter_get_info"))) extern void
 iree_hal_webgpu_import_adapter_get_info(uint32_t adapter_handle,
-                                        uint32_t dest_ptr);
+                                        uintptr_t dest_ptr);
 
 // Writes device limits into wasm linear memory at |dest_ptr|.
 // The limits struct layout is defined by iree_hal_webgpu_device_limits_t.
 __attribute__((import_module("iree_webgpu"),
                import_name("device_get_limits"))) extern void
 iree_hal_webgpu_import_device_get_limits(uint32_t device_handle,
-                                         uint32_t dest_ptr);
+                                         uintptr_t dest_ptr);
 
 //===----------------------------------------------------------------------===//
 // File ↔ GPU transfer
@@ -428,13 +428,13 @@ iree_hal_webgpu_import_get_preconfigured_device(void);
 #else  // !IREE_PLATFORM_WASM — native stubs
 
 static inline void iree_hal_webgpu_import_request_adapter(
-    uint32_t options_flags, uint32_t out_adapter_handle_ptr, uint32_t token) {
+    uint32_t options_flags, uintptr_t out_adapter_handle_ptr, uint32_t token) {
   (void)options_flags;
   (void)out_adapter_handle_ptr;
   (void)token;
 }
 static inline void iree_hal_webgpu_import_adapter_request_device(
-    uint32_t adapter_handle, uint32_t out_device_handle_ptr, uint32_t token) {
+    uint32_t adapter_handle, uintptr_t out_device_handle_ptr, uint32_t token) {
   (void)adapter_handle;
   (void)out_device_handle_ptr;
   (void)token;
@@ -474,14 +474,15 @@ static inline void iree_hal_webgpu_import_buffer_map_async(
   (void)token;
 }
 static inline void iree_hal_webgpu_import_buffer_get_mapped_range(
-    uint32_t buffer_handle, uint64_t offset, uint64_t size, uint32_t dest_ptr) {
+    uint32_t buffer_handle, uint64_t offset, uint64_t size,
+    uintptr_t dest_ptr) {
   (void)buffer_handle;
   (void)offset;
   (void)size;
   (void)dest_ptr;
 }
 static inline void iree_hal_webgpu_import_buffer_set_mapped_range(
-    uint32_t buffer_handle, uint64_t offset, uint64_t size, uint32_t src_ptr) {
+    uint32_t buffer_handle, uint64_t offset, uint64_t size, uintptr_t src_ptr) {
   (void)buffer_handle;
   (void)offset;
   (void)size;
@@ -507,7 +508,7 @@ static inline void iree_hal_webgpu_import_pass_set_pipeline(
 }
 static inline void iree_hal_webgpu_import_pass_set_bind_group(
     uint32_t pass_handle, uint32_t index, uint32_t bind_group_handle,
-    uint32_t dynamic_offsets_ptr, uint32_t dynamic_offsets_count) {
+    uintptr_t dynamic_offsets_ptr, uint32_t dynamic_offsets_count) {
   (void)pass_handle;
   (void)index;
   (void)bind_group_handle;
@@ -540,8 +541,8 @@ static inline uint32_t iree_hal_webgpu_import_encoder_finish(
   return 0;
 }
 static inline uint32_t iree_hal_webgpu_import_device_create_compute_pipeline(
-    uint32_t device_handle, uint32_t layout_handle, uint32_t wgsl_ptr,
-    uint32_t wgsl_length, uint32_t entry_point_ptr,
+    uint32_t device_handle, uint32_t layout_handle, uintptr_t wgsl_ptr,
+    uint32_t wgsl_length, uintptr_t entry_point_ptr,
     uint32_t entry_point_length) {
   (void)device_handle;
   (void)layout_handle;
@@ -558,21 +559,21 @@ static inline uint32_t iree_hal_webgpu_import_pipeline_get_bind_group_layout(
   return 0;
 }
 static inline uint32_t iree_hal_webgpu_import_device_create_pipeline_layout(
-    uint32_t device_handle, uint32_t layouts_ptr, uint32_t layout_count) {
+    uint32_t device_handle, uintptr_t layouts_ptr, uint32_t layout_count) {
   (void)device_handle;
   (void)layouts_ptr;
   (void)layout_count;
   return 0;
 }
 static inline uint32_t iree_hal_webgpu_import_device_create_bind_group_layout(
-    uint32_t device_handle, uint32_t entries_ptr, uint32_t entry_count) {
+    uint32_t device_handle, uintptr_t entries_ptr, uint32_t entry_count) {
   (void)device_handle;
   (void)entries_ptr;
   (void)entry_count;
   return 0;
 }
 static inline uint32_t iree_hal_webgpu_import_device_create_bind_group(
-    uint32_t device_handle, uint32_t layout_handle, uint32_t entries_ptr,
+    uint32_t device_handle, uint32_t layout_handle, uintptr_t entries_ptr,
     uint32_t entry_count) {
   (void)device_handle;
   (void)layout_handle;
@@ -581,10 +582,10 @@ static inline uint32_t iree_hal_webgpu_import_device_create_bind_group(
   return 0;
 }
 static inline uint32_t iree_hal_webgpu_import_execute_instructions(
-    uint32_t device_handle, uint32_t queue_handle, uint32_t block_table_ptr,
+    uint32_t device_handle, uint32_t queue_handle, uintptr_t block_table_ptr,
     uint32_t block_count, uint32_t block_word_capacity,
-    uint32_t last_block_word_count, uint32_t binding_table_ptr,
-    uint32_t binding_count, uint32_t builtins_ptr) {
+    uint32_t last_block_word_count, uintptr_t binding_table_ptr,
+    uint32_t binding_count, uintptr_t builtins_ptr) {
   (void)device_handle;
   (void)queue_handle;
   (void)block_table_ptr;
@@ -597,10 +598,10 @@ static inline uint32_t iree_hal_webgpu_import_execute_instructions(
   return 0;
 }
 static inline uint32_t iree_hal_webgpu_import_create_recording(
-    uint32_t device_handle, uint32_t block_table_ptr, uint32_t block_count,
+    uint32_t device_handle, uintptr_t block_table_ptr, uint32_t block_count,
     uint32_t block_word_capacity, uint32_t last_block_word_count,
-    uint32_t static_binding_table_ptr, uint32_t static_binding_count,
-    uint32_t dynamic_binding_count, uint32_t builtins_ptr) {
+    uintptr_t static_binding_table_ptr, uint32_t static_binding_count,
+    uint32_t dynamic_binding_count, uintptr_t builtins_ptr) {
   (void)device_handle;
   (void)block_table_ptr;
   (void)block_count;
@@ -614,7 +615,7 @@ static inline uint32_t iree_hal_webgpu_import_create_recording(
 }
 static inline uint32_t iree_hal_webgpu_import_execute_recording(
     uint32_t recording_handle, uint32_t queue_handle,
-    uint32_t dynamic_binding_table_ptr) {
+    uintptr_t dynamic_binding_table_ptr) {
   (void)recording_handle;
   (void)queue_handle;
   (void)dynamic_binding_table_ptr;
@@ -632,7 +633,7 @@ static inline void iree_hal_webgpu_import_queue_on_submitted_work_done(
 }
 static inline void iree_hal_webgpu_import_queue_write_buffer(
     uint32_t queue_handle, uint32_t buffer_handle, uint64_t buffer_offset,
-    uint32_t data_ptr, uint64_t data_size) {
+    uintptr_t data_ptr, uint64_t data_size) {
   (void)queue_handle;
   (void)buffer_handle;
   (void)buffer_offset;
@@ -640,12 +641,12 @@ static inline void iree_hal_webgpu_import_queue_write_buffer(
   (void)data_size;
 }
 static inline void iree_hal_webgpu_import_adapter_get_info(
-    uint32_t adapter_handle, uint32_t dest_ptr) {
+    uint32_t adapter_handle, uintptr_t dest_ptr) {
   (void)adapter_handle;
   (void)dest_ptr;
 }
 static inline void iree_hal_webgpu_import_device_get_limits(
-    uint32_t device_handle, uint32_t dest_ptr) {
+    uint32_t device_handle, uintptr_t dest_ptr) {
   (void)device_handle;
   (void)dest_ptr;
 }

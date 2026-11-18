@@ -29,14 +29,11 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
-#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/DialectResourceBlobManager.h"
-#include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -996,23 +993,138 @@ void MapStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// GroupMatmulOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult GroupMatmulOp::verify() {
+  auto inputType = cast<RankedTensorType>(getInput().getType());
+  auto weightsType = cast<RankedTensorType>(getExpertWeights().getType());
+  auto offsetsType = cast<RankedTensorType>(getExpertOffsets().getType());
+  auto outputType = cast<RankedTensorType>(getOutput().getType());
+
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  ArrayRef<int64_t> weightsShape = weightsType.getShape();
+  ArrayRef<int64_t> offsetsShape = offsetsType.getShape();
+  ArrayRef<int64_t> outputShape = outputType.getShape();
+
+  if (ShapedType::isDynamic(weightsShape[0]) ||
+      ShapedType::isDynamic(offsetsShape[0])) {
+    return emitOpError("expert count must be static");
+  }
+  if (!ShapedType::isDynamic(inputShape[1]) &&
+      !ShapedType::isDynamic(weightsShape[1]) &&
+      inputShape[1] != weightsShape[1]) {
+    return emitOpError("input's N dimension must match expert_weights' N");
+  }
+  if (offsetsShape[0] != weightsShape[0]) {
+    return emitOpError(
+        "expert_offsets' E dimension must match expert_weights' E");
+  }
+  if (!ShapedType::isDynamic(outputShape[1]) &&
+      !ShapedType::isDynamic(weightsShape[2]) &&
+      outputShape[1] != weightsShape[2]) {
+    return emitOpError("output's M dimension must match expert_weights' M");
+  }
+  if (!ShapedType::isDynamic(inputShape[0]) &&
+      !ShapedType::isDynamic(outputShape[0]) &&
+      inputShape[0] != outputShape[0]) {
+    return emitOpError("output's T dimension must match input's T");
+  }
+  if (inputType.getElementType() != weightsType.getElementType() ||
+      inputType.getElementType() != outputType.getElementType()) {
+    return emitOpError(
+        "input, expert_weights, and output element types must match");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// GroupMmt4DOp
+//===----------------------------------------------------------------------===//
+
+ArrayRef<int64_t> GroupMmt4DOp::getOutputPermutation() const {
+  static constexpr int64_t kIdentity[] = {0, 1, 2, 3};
+  static constexpr int64_t kTransposed[] = {1, 0, 3, 2};
+  return const_cast<GroupMmt4DOp *>(this)->getTransposed()
+             ? ArrayRef<int64_t>(kTransposed)
+             : ArrayRef<int64_t>(kIdentity);
+}
+
+ArrayRef<int64_t> GroupMmt4DOp::getLoopPermutation() const {
+  static constexpr int64_t kIdentity[] = {0, 1, 2, 3, 4, 5};
+  static constexpr int64_t kTransposed[] = {1, 0, 2, 4, 3, 5};
+  return const_cast<GroupMmt4DOp *>(this)->getTransposed()
+             ? ArrayRef<int64_t>(kTransposed)
+             : ArrayRef<int64_t>(kIdentity);
+}
+
+LogicalResult GroupMmt4DOp::verify() {
+  auto inputType = cast<RankedTensorType>(getInput().getType());
+  auto weightsType = cast<RankedTensorType>(getExpertWeights().getType());
+  auto offsetsType = cast<RankedTensorType>(getExpertOffsets().getType());
+  auto outputType = cast<RankedTensorType>(getOutput().getType());
+  auto dimsMatch = [](int64_t lhs, int64_t rhs) {
+    return ShapedType::isDynamic(lhs) || ShapedType::isDynamic(rhs) ||
+           lhs == rhs;
+  };
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  ArrayRef<int64_t> weightsShape = weightsType.getShape();
+  ArrayRef<int64_t> outputShape = outputType.getShape();
+  ArrayRef<int64_t> outputPermutation = getOutputPermutation();
+  if (ShapedType::isDynamic(weightsShape[0]) ||
+      ShapedType::isDynamic(offsetsType.getDimSize(0))) {
+    return emitOpError("expert count must be static");
+  }
+  if (!dimsMatch(inputShape[0], outputShape[outputPermutation[0]]) ||
+      !dimsMatch(inputShape[1], weightsShape[2]) ||
+      !dimsMatch(outputShape[outputPermutation[1]], weightsShape[1]) ||
+      !dimsMatch(inputShape[2], outputShape[outputPermutation[2]]) ||
+      !dimsMatch(outputShape[outputPermutation[3]], weightsShape[3]) ||
+      !dimsMatch(inputShape[3], weightsShape[4])) {
+    return emitOpError("operand dimensions must match mmt4d");
+  }
+  if (offsetsType.getDimSize(0) != weightsType.getDimSize(0)) {
+    return emitOpError(
+        "expert_offsets' E dimension must match expert_weights' E");
+  }
+  if (inputType.getElementType() != weightsType.getElementType() ||
+      inputType.getElementType() != outputType.getElementType()) {
+    return emitOpError(
+        "input, expert_weights, and output element types must match");
+  }
+  if (auto stride = getConstantIntValue(getRowStride())) {
+    if (*stride < 0 ||
+        (!inputType.isDynamicDim(2) && *stride < inputShape[2])) {
+      return emitOpError("row_stride must be nonnegative and at least the "
+                         "inner row dimension");
+    }
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // SortOp
 //===----------------------------------------------------------------------===//
 
 LogicalResult SortOp::verify() {
   Operation *op = getOperation();
-  if (getNumDpsInputs()) {
-    return op->emitOpError("does not expect to take any inputs");
+  if (getNumDpsInputs() == 0) {
+    return op->emitOpError("expected at least one `ins` operand");
   }
   if (getNumDpsInits() == 0) {
     return op->emitOpError("expected at least one `outs` operand");
   }
+  if (getNumDpsInputs() != getNumDpsInits()) {
+    return op->emitOpError(
+               "expected the same number of `ins` and `outs` operands, got ")
+           << getNumDpsInputs() << " and " << getNumDpsInits();
+  }
 
   Block &block = getRegion().front();
-  size_t numOutputs = getNumDpsInits();
-  if (block.getNumArguments() != 2 * numOutputs) {
+  size_t numInputs = getNumDpsInputs();
+  if (block.getNumArguments() != 2 * numInputs) {
     return op->emitOpError("region block should have ")
-           << 2 * numOutputs << " arguments";
+           << 2 * numInputs << " arguments";
   }
 
   int64_t rank = getOperandRank();
@@ -1022,7 +1134,7 @@ LogicalResult SortOp::verify() {
   }
 
   ArrayRef<int64_t> shape = getOperandShape();
-  for (auto [index, operand] : llvm::enumerate(getOutputs())) {
+  for (auto [index, operand] : llvm::enumerate(getInputs())) {
     auto operandType = getOperandType(index);
     if (operandType.getRank() != rank) {
       return op->emitOpError("expected operand ")
@@ -1040,6 +1152,20 @@ LogicalResult SortOp::verify() {
                << i << " should be of type " << elemType << " but got "
                << argType;
       }
+    }
+
+    auto outputType = cast<ShapedType>(getOutputs()[index].getType());
+    if (outputType.getRank() != rank) {
+      return op->emitOpError("expected output ")
+             << index << " to be rank " << rank << ", same as inputs";
+    }
+    if (outputType.getShape() != shape) {
+      return op->emitOpError("expected output ")
+             << index << " to have same shape as inputs";
+    }
+    if (outputType.getElementType() != operandType.getElementType()) {
+      return op->emitOpError("expected output ")
+             << index << " to have the same element type as input " << index;
     }
   }
 
@@ -1071,8 +1197,11 @@ namespace {
 ///
 /// For example:
 ///
-/// %0:2 = iree_linalg_ext.sort dimension(1) outs(%arg0, %arg1:
-/// tensor<?x10xf32>, tensor<?x10xi64>) {
+/// %empty0 = tensor.empty(...) : tensor<?x10xf32>
+/// %empty1 = tensor.empty(...) : tensor<?x10xi64>
+/// %0:2 = iree_linalg_ext.sort dimension(1)
+/// ins(%arg0, %arg1: tensor<?x10xf32>, tensor<?x10xi64>)
+/// outs(%empty0, %empty1: tensor<?x10xf32>, tensor<?x10xi64>) {
 ///   ^bb0(%arg2: f32, %arg3: f32, %arg4: i64, %arg5: i64):
 ///    %42 = arith.cmpf oge, %arg2, %arg3 : f32
 ///    iree_linalg_ext.yield %42 : i1
@@ -1080,7 +1209,9 @@ namespace {
 ///
 /// ->
 ///
-/// %0 = iree_linalg_ext.sort dimension(1) outs(%arg0: tensor<?x10xf32>) {
+/// %0 = iree_linalg_ext.sort dimension(1)
+/// ins(%arg0: tensor<?x10xf32>)
+/// outs(%empty0: tensor<?x10xf32>) {
 ///   ^bb0(%arg2: f32, %arg3: f32):
 ///    %42 = arith.cmpf oge, %arg2, %arg3 : f32
 ///    iree_linalg_ext.yield %42 : i1
@@ -1096,7 +1227,8 @@ struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
     // To avoid problems in dispatches associated with unused results, prune
     // them here.
     Location loc = sortOp->getLoc();
-    auto operands = sortOp.getOutputs();
+    auto inputs = sortOp.getInputs();
+    auto outputs = sortOp.getOutputs();
     auto results = sortOp.getResults();
     unsigned numRes = sortOp.getNumResults();
 
@@ -1108,14 +1240,15 @@ struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
 
     Block &block = sortOp.getRegion().front();
     auto blockArgs = block.getArguments();
-    SmallVector<Value> usedBlockArgs, usedOperands, usedResults;
+    SmallVector<Value> usedInputs, usedOutputs, usedResults;
     SmallVector<Type> usedResultTypes;
     BitVector eraseArg(numRes * 2, false);
     for (auto idx : llvm::seq<unsigned>(numRes)) {
       // If result or associated block arg is used, do not erase.
       if (!results[idx].use_empty() || !blockArgs[2 * idx].use_empty() ||
           !blockArgs[2 * idx + 1].use_empty()) {
-        usedOperands.push_back(operands[idx]);
+        usedInputs.push_back(inputs[idx]);
+        usedOutputs.push_back(outputs[idx]);
         usedResults.push_back(results[idx]);
         usedResultTypes.push_back(results[idx].getType());
         continue;
@@ -1132,7 +1265,8 @@ struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
     // args.
     auto newSortOp = IREE::LinalgExt::SortOp::create(
         rewriter, loc, usedResultTypes,
-        /*inputs=*/ValueRange{}, usedOperands, sortOp.getDimension());
+        /*inputs=*/usedInputs, usedOutputs, sortOp.getDimension(),
+        sortOp.getIsStable());
     newSortOp.getRegion().takeBody(sortOp.getRegion());
     newSortOp.getRegion().front().eraseArguments(eraseArg);
     rewriter.replaceAllUsesWith(usedResults, newSortOp.getResults());
@@ -1140,11 +1274,158 @@ struct RemoveUnusedSortOpResults : OpRewritePattern<IREE::LinalgExt::SortOp> {
     return success();
   }
 };
+
+/// Returns true if `value` holds, at every position, the index of that
+/// position along `dimension`: a `linalg.generic` without inputs that yields
+/// `linalg.index dimension`, optionally cast to an integer type.
+static bool isIndexAlongDimension(Value value, int64_t dimension) {
+  auto genericOp = value.getDefiningOp<linalg::GenericOp>();
+  if (!genericOp || genericOp.getNumDpsInputs() != 0 ||
+      genericOp.getNumDpsInits() != 1 ||
+      !genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0))
+           .isIdentity()) {
+    return false;
+  }
+  Block *body = genericOp.getBlock();
+  Value yielded = body->getTerminator()->getOperand(0);
+  if (auto castOp = yielded.getDefiningOp<arith::IndexCastOp>()) {
+    yielded = castOp.getIn();
+  }
+  auto indexOp = yielded.getDefiningOp<linalg::IndexOp>();
+  return indexOp && indexOp->getBlock() == body &&
+         static_cast<int64_t>(indexOp.getDim()) == dimension;
+}
+
+/// Turns a stable sort into an unstable one if one of its operands holds the
+/// positions along the sort dimension. That operand tells the input order of
+/// two elements, so the comparator can order the elements that it does not
+/// order itself by position. It then is a strict total order: no two elements
+/// are left for which the order is unspecified, and every sorting algorithm
+/// returns the result of the stable sort. The unstable sort lowers to a
+/// faster algorithm.
+///
+/// For example:
+///
+/// %0:2 = iree_linalg_ext.sort dimension(0) is_stable(true)
+/// ins(%keys, %positions : tensor<?xf32>, tensor<?xi64>)
+/// outs(%empty0, %empty1 : tensor<?xf32>, tensor<?xi64>) {
+///   ^bb0(%lhs: f32, %rhs: f32, %lhs_pos: i64, %rhs_pos: i64):
+///    %before = arith.cmpf oge, %lhs, %rhs : f32
+///    iree_linalg_ext.yield %before : i1
+/// } -> tensor<?xf32>, tensor<?xi64>
+///
+/// ->
+///
+/// %0:2 = iree_linalg_ext.sort dimension(0)
+/// ins(%keys, %positions : tensor<?xf32>, tensor<?xi64>)
+/// outs(%empty0, %empty1 : tensor<?xf32>, tensor<?xi64>) {
+///   ^bb0(%lhs: f32, %rhs: f32, %lhs_pos: i64, %rhs_pos: i64):
+///    %before = arith.cmpf oge, %lhs, %rhs : f32
+///    %after = arith.cmpf oge, %rhs, %lhs : f32
+///    %ordered = arith.xori %before, %after : i1
+///    %lower_pos = arith.cmpi slt, %lhs_pos, %rhs_pos : i64
+///    %result = arith.select %ordered, %before, %lower_pos : i1
+///    iree_linalg_ext.yield %result : i1
+/// } -> tensor<?xf32>, tensor<?xi64>
+///
+/// The rewrite is limited to position operands whose result is used. An
+/// unused one is removed by `RemoveUnusedSortOpResults` instead, which avoids
+/// keeping its buffer only for the sake of the comparator.
+struct FoldSortStabilityIntoComparator
+    : OpRewritePattern<IREE::LinalgExt::SortOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::SortOp sortOp,
+                                PatternRewriter &rewriter) const override {
+    if (!sortOp.getIsStable()) {
+      return rewriter.notifyMatchFailure(sortOp, "sort is not stable");
+    }
+    if (sortOp.hasPureBufferSemantics()) {
+      return rewriter.notifyMatchFailure(sortOp, "expected tensor semantics");
+    }
+    int64_t dimension = sortOp.getDimension();
+    std::optional<unsigned> positionOperand;
+    for (auto [index, input] : llvm::enumerate(sortOp.getInputs())) {
+      if (isIndexAlongDimension(input, dimension) &&
+          !sortOp.getResult(index).use_empty()) {
+        positionOperand = index;
+        break;
+      }
+    }
+    if (!positionOperand) {
+      return rewriter.notifyMatchFailure(
+          sortOp, "no used operand holds the positions along the dimension");
+    }
+
+    Block &block = sortOp.getRegion().front();
+    Operation *terminator = block.getTerminator();
+    Location loc = sortOp.getLoc();
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(terminator);
+
+    // Evaluate the comparator a second time with the elements swapped.
+    IRMapping swapped;
+    for (unsigned i = 0, e = block.getNumArguments(); i < e; i += 2) {
+      swapped.map(block.getArgument(i), block.getArgument(i + 1));
+      swapped.map(block.getArgument(i + 1), block.getArgument(i));
+    }
+    SmallVector<Operation *> bodyOps(
+        llvm::make_pointer_range(block.without_terminator()));
+    for (Operation *op : bodyOps) {
+      rewriter.clone(*op, swapped);
+    }
+    Value before = terminator->getOperand(0);
+    Value after = swapped.lookupOrDefault(before);
+
+    // The comparator orders two elements if it holds in exactly one direction.
+    Value isOrdered = arith::XOrIOp::create(rewriter, loc, before, after);
+    Value lowerPosition =
+        arith::CmpIOp::create(rewriter, loc, arith::CmpIPredicate::slt,
+                              block.getArgument(2 * *positionOperand),
+                              block.getArgument(2 * *positionOperand + 1));
+    Value result = arith::SelectOp::create(rewriter, loc, isOrdered, before,
+                                           lowerPosition);
+    rewriter.modifyOpInPlace(terminator,
+                             [&]() { terminator->setOperand(0, result); });
+    rewriter.modifyOpInPlace(sortOp, [&]() { sortOp.setIsStable(false); });
+    return success();
+  }
+};
+
+/// Turns a stable sort into an unstable one if the order of the elements that
+/// the comparator does not order cannot be observed: a single integer operand
+/// whose comparator is an integer comparison of its two arguments. Two
+/// elements that such a comparator does not order are the same value.
+struct DropUnobservableSortStability
+    : OpRewritePattern<IREE::LinalgExt::SortOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(IREE::LinalgExt::SortOp sortOp,
+                                PatternRewriter &rewriter) const override {
+    if (!sortOp.getIsStable()) {
+      return rewriter.notifyMatchFailure(sortOp, "sort is not stable");
+    }
+    if (sortOp.getNumDpsInputs() != 1) {
+      return rewriter.notifyMatchFailure(sortOp, "expected a single operand");
+    }
+    Block &block = sortOp.getRegion().front();
+    Value lhs = block.getArgument(0);
+    Value rhs = block.getArgument(1);
+    auto cmpOp =
+        block.getTerminator()->getOperand(0).getDefiningOp<arith::CmpIOp>();
+    if (!cmpOp || !((cmpOp.getLhs() == lhs && cmpOp.getRhs() == rhs) ||
+                    (cmpOp.getLhs() == rhs && cmpOp.getRhs() == lhs))) {
+      return rewriter.notifyMatchFailure(
+          sortOp, "comparator is not an integer comparison of its arguments");
+    }
+    rewriter.modifyOpInPlace(sortOp, [&]() { sortOp.setIsStable(false); });
+    return success();
+  }
+};
 } // namespace
 
 void SortOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                          MLIRContext *ctx) {
-  results.add<RemoveUnusedSortOpResults>(ctx);
+  results.add<RemoveUnusedSortOpResults, FoldSortStabilityIntoComparator,
+              DropUnobservableSortStability>(ctx);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2595,33 +2876,9 @@ LogicalResult DequantizeAffineOp::verify() {
                        "got ")
            << realType;
   }
-  if (getZeroPoint()) {
-    if (!getZeroPointDifferenceType()) {
-      return emitOpError("cannot subtract a zero point from a ")
-             << storageType << " value without exceeding 64 bits";
-    }
-    // The zero point is narrowed to the width the storage grid needs, so a
-    // constant that is off the grid would be silently truncated. Reject it
-    // here rather than miscompile it.
-    DenseIntElementsAttr zeroPointAttr;
-    if (matchPattern(getZeroPoint(), m_Constant(&zeroPointAttr))) {
-      unsigned storageWidth = cast<IntegerType>(storageType).getWidth();
-      bool isUnsigned = getInputUnsigned();
-      int64_t lowerBound = isUnsigned ? 0 : llvm::minIntN(storageWidth);
-      int64_t upperBound =
-          isUnsigned ? static_cast<int64_t>(llvm::maxUIntN(storageWidth))
-                     : llvm::maxIntN(storageWidth);
-      for (const APInt &value : zeroPointAttr.getValues<APInt>()) {
-        int64_t zeroPoint =
-            getZpUnsigned() ? value.getZExtValue() : value.getSExtValue();
-        if (zeroPoint < lowerBound || zeroPoint > upperBound) {
-          return emitOpError("zero point ")
-                 << zeroPoint << " is not representable in the storage type "
-                 << storageType << ", whose range is [" << lowerBound << ", "
-                 << upperBound << "]";
-        }
-      }
-    }
+  if (getZeroPoint() && !getZeroPointDifferenceType()) {
+    return emitOpError("cannot subtract a zero point from a ")
+           << storageType << " value without exceeding 64 bits";
   }
   std::optional<int64_t> quantMin = getQuantMin();
   std::optional<int64_t> quantMax = getQuantMax();
@@ -2637,36 +2894,6 @@ LogicalResult DequantizeAffineOp::verify() {
 }
 
 namespace {
-
-/// True when every byte of `data` is zero.
-static bool isAllZeroBytes(ArrayRef<char> data) {
-  return llvm::all_of(data, [](char byte) { return byte == 0; });
-}
-
-/// True when `value` is a constant that is zero in every element.
-static bool isKnownZero(Value value) {
-  Attribute constant;
-  if (!matchPattern(value, m_Constant(&constant))) {
-    return false;
-  }
-  if (auto intAttr = dyn_cast<IntegerAttr>(constant)) {
-    return intAttr.getValue().isZero();
-  }
-  // A splat answers from its one stored element rather than scanning a
-  // blockwise operand that has an entry per block.
-  auto elements = dyn_cast<ElementsAttr>(constant);
-  if (elements && elements.isSplat()) {
-    return elements.getSplatValue<APInt>().isZero();
-  }
-  if (auto dense = dyn_cast<DenseElementsAttr>(constant)) {
-    return isAllZeroBytes(dense.getRawData());
-  }
-  if (auto resource = dyn_cast<DenseResourceElementsAttr>(constant)) {
-    const AsmResourceBlob *blob = resource.getRawHandle().getBlob();
-    return blob && isAllZeroBytes(blob->getData());
-  }
-  return false;
-}
 
 /// Drops a zero point that is known to be zero: the ops treat a missing zero
 /// point as symmetric, and adding or subtracting zero changes nothing, so the
@@ -3805,6 +4032,8 @@ LogicalResult IREE::LinalgExt::IndexOp::verify() {
 
 DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(GatherOp)
+DEFINE_OP_GET_EFFECTS(GroupMatmulOp)
+DEFINE_OP_GET_EFFECTS(GroupMmt4DOp)
 DEFINE_OP_GET_EFFECTS(MapStoreOp)
 DEFINE_OP_GET_EFFECTS(MapLoadOp)
 DEFINE_OP_GET_EFFECTS(SortOp)

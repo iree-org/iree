@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
 #define DEBUG_TYPE "linalg-ext-tiling"
 
@@ -867,7 +868,7 @@ SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
-  Value source = getOperand(0);
+  Value source = getInputs()[0];
   for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
     loopBounds[dim].offset = zero;
     loopBounds[dim].size = getDim(builder, loc, source, dim);
@@ -886,16 +887,27 @@ SortOp::getTiledImplementation(OpBuilder &builder,
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
   SmallVector<Operation *> slices;
-  SmallVector<Value> tiledOperands(getOutputs().size());
+  SmallVector<Value> tiledInputs(getInputs().size());
+  SmallVector<Value> tiledOutputs(getOutputs().size());
+  SmallVector<Value> tiledOperands;
+  tiledOperands.reserve(getInputs().size() + getOutputs().size());
+  for (auto [idx, input] : llvm::enumerate(getInputs())) {
+    Operation *slice =
+        getSlice(builder, getLoc(), input, offsets, sizes, strides);
+    tiledInputs[idx] = slice->getResult(0);
+    tiledOperands.push_back(tiledInputs[idx]);
+    slices.push_back(slice);
+  }
   for (auto [idx, output] : llvm::enumerate(getOutputs())) {
     Operation *slice =
         getSlice(builder, getLoc(), output, offsets, sizes, strides);
-    tiledOperands[idx] = slice->getResult(0);
+    tiledOutputs[idx] = slice->getResult(0);
+    tiledOperands.push_back(tiledOutputs[idx]);
     slices.push_back(slice);
   }
   SmallVector<Type, 4> resultTypes;
   if (getNumResults()) {
-    resultTypes = llvm::map_to_vector<4>(tiledOperands,
+    resultTypes = llvm::map_to_vector<4>(tiledOutputs,
                                          [&](Value v) { return v.getType(); });
   }
   Operation *tiledSortOp =
@@ -973,23 +985,313 @@ static void emitBubbleSortSweep(OpBuilder &b, Location loc, Value zero,
       });
 }
 
-LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
-                                                   ValueRange ivs) {
-  auto sortDim = getDimension();
+namespace {
+/// What the loop lowering of a sort operates on: the buffers that are sorted
+/// in place and the slice of them that is sorted. An element of the sort
+/// consists of one scalar per buffer.
+struct SortLoweringState {
+  Location loc;
+  /// The buffers holding the elements. All of them are permuted together.
+  SmallVector<Value> buffers;
+  /// The position of the sorted slice in the dimensions other than `sortDim`.
+  /// The entry of `sortDim` is ignored.
+  SmallVector<Value> ivs;
+  int64_t sortDim;
+  /// Gets the scalars of two elements as interleaved pairs and yields whether
+  /// the first element has to be placed before the second.
+  Block *comparator;
+};
+} // namespace
+
+/// Loads the element at position `pos` of the sorted slice.
+static SmallVector<Value>
+loadSortElement(OpBuilder &b, const SortLoweringState &state, Value pos) {
+  SmallVector<Value> indices(state.ivs);
+  indices[state.sortDim] = pos;
+  return llvm::map_to_vector(state.buffers, [&](Value buffer) -> Value {
+    return memref::LoadOp::create(b, state.loc, buffer, indices);
+  });
+}
+
+/// Stores `element` at position `pos` of the sorted slice.
+static void storeSortElement(OpBuilder &b, const SortLoweringState &state,
+                             ArrayRef<Value> element, Value pos) {
+  SmallVector<Value> indices(state.ivs);
+  indices[state.sortDim] = pos;
+  for (auto [buffer, scalar] : llvm::zip_equal(state.buffers, element)) {
+    memref::StoreOp::create(b, state.loc, scalar, buffer, indices);
+  }
+}
+
+/// Inlines the comparator for the elements `lhs` and `rhs` and returns its
+/// result: an i1 that is true if `lhs` has to be placed before `rhs`.
+static Value emitSortComparator(OpBuilder &b, const SortLoweringState &state,
+                                ArrayRef<Value> lhs, ArrayRef<Value> rhs) {
+  IRMapping map;
+  for (auto [index, scalars] : llvm::enumerate(llvm::zip_equal(lhs, rhs))) {
+    map.map(state.comparator->getArgument(2 * index), std::get<0>(scalars));
+    map.map(state.comparator->getArgument(2 * index + 1), std::get<1>(scalars));
+  }
+  for (Operation &op : state.comparator->without_terminator()) {
+    b.clone(op, map);
+  }
+  return map.lookup(state.comparator->getTerminator()->getOperand(0));
+}
+
+/// Returns an i1 that is true if the comparator orders `lhs` before `rhs`: it
+/// holds for (lhs, rhs) and not for (rhs, lhs). Unlike the comparator itself
+/// this is false for elements it does not order, also when it is a non-strict
+/// comparison that returns true for them.
+static Value emitIsStrictlyBefore(OpBuilder &b, const SortLoweringState &state,
+                                  ArrayRef<Value> lhs, ArrayRef<Value> rhs) {
+  Value before = emitSortComparator(b, state, lhs, rhs);
+  Value after = emitSortComparator(b, state, rhs, lhs);
+  Value trueVal = arith::ConstantIntOp::create(b, state.loc, b.getI1Type(), 1);
+  Value notAfter = arith::XOrIOp::create(b, state.loc, after, trueVal);
+  return arith::AndIOp::create(b, state.loc, before, notAfter);
+}
+
+/// Places `element` into the heap that occupies the positions [0, `end`),
+/// starting at the vacant position `root` and moving it down until neither
+/// child has to be placed after it. The heap keeps the element that sorts
+/// last at position 0; the children of position i are at 2i+1 and 2i+2.
+///
+///   hole = root
+///   while (2 * hole + 1 < end) {
+///     child = <the child of hole that sorts last>
+///     if (!comparator(element, child)) break
+///     slice[hole] = child; hole = <position of child>
+///   }
+///   slice[hole] = element
+static void emitHeapSiftDown(OpBuilder &b, const SortLoweringState &state,
+                             Value root, ArrayRef<Value> element, Value end) {
+  Location loc = state.loc;
+  Type indexType = b.getIndexType();
+  Type i1Type = b.getI1Type();
+  Value one = arith::ConstantIndexOp::create(b, loc, 1);
+  Value two = arith::ConstantIndexOp::create(b, loc, 2);
+  Value trueVal = arith::ConstantIntOp::create(b, loc, i1Type, 1);
+  Value falseVal = arith::ConstantIntOp::create(b, loc, i1Type, 0);
+  Value lastPos = arith::SubIOp::create(b, loc, end, one);
+
+  // Loop state: the vacant position and whether to continue.
+  auto whileOp = scf::WhileOp::create(
+      b, loc, TypeRange{indexType, i1Type}, ValueRange{root, trueVal},
+      [loc](OpBuilder &b, Location, ValueRange args) {
+        scf::ConditionOp::create(b, loc, args[1], args);
+      },
+      [&state, loc, element, end, one, two, falseVal,
+       lastPos](OpBuilder &b, Location, ValueRange args) {
+        Value hole = args[0];
+        Value left = arith::AddIOp::create(
+            b, loc, arith::MulIOp::create(b, loc, hole, two), one);
+        Value hasChild =
+            arith::CmpIOp::create(b, loc, arith::CmpIPredicate::slt, left, end);
+        auto ifOp = scf::IfOp::create(
+            b, loc, hasChild,
+            [&state, loc, element, hole, left, one, lastPos](OpBuilder &b,
+                                                             Location) {
+              // The right child may not exist. Clamping it to the last heap
+              // position then compares the left child with itself.
+              Value right = arith::MinSIOp::create(
+                  b, loc, arith::AddIOp::create(b, loc, left, one), lastPos);
+              SmallVector<Value> leftElement = loadSortElement(b, state, left);
+              SmallVector<Value> rightElement =
+                  loadSortElement(b, state, right);
+              Value takeRight =
+                  emitSortComparator(b, state, leftElement, rightElement);
+              Value child =
+                  arith::SelectOp::create(b, loc, takeRight, right, left);
+              SmallVector<Value> childElement;
+              for (auto [l, r] : llvm::zip_equal(leftElement, rightElement)) {
+                childElement.push_back(
+                    arith::SelectOp::create(b, loc, takeRight, r, l));
+              }
+              Value moveDown =
+                  emitSortComparator(b, state, element, childElement);
+              scf::IfOp::create(
+                  b, loc, moveDown,
+                  [&state, loc, &childElement, hole](OpBuilder &b, Location) {
+                    storeSortElement(b, state, childElement, hole);
+                    scf::YieldOp::create(b, loc);
+                  });
+              Value newHole =
+                  arith::SelectOp::create(b, loc, moveDown, child, hole);
+              scf::YieldOp::create(b, loc, ValueRange{newHole, moveDown});
+            },
+            [loc, hole, falseVal](OpBuilder &b, Location) {
+              scf::YieldOp::create(b, loc, ValueRange{hole, falseVal});
+            });
+        scf::YieldOp::create(b, loc, ifOp.getResults());
+      });
+  storeSortElement(b, state, element, whileOp.getResult(0));
+}
+
+/// Emits an in-place heapsort of the `size` elements of the slice: O(n log n)
+/// comparisons and no storage besides the buffers. It is not stable: elements
+/// that the comparator does not order end up in unspecified order.
+///
+///   for (root = size / 2 - 1; root >= 0; --root)   // build the heap
+///     siftDown(root, slice[root], size)
+///   for (end = size - 1; end > 0; --end) {         // move its first element
+///     last = slice[end]; slice[end] = slice[0]     // behind the heap
+///     siftDown(0, last, end)
+///   }
+static void emitHeapSort(OpBuilder &b, const SortLoweringState &state,
+                         Value size) {
+  Location loc = state.loc;
   Value zero = arith::ConstantIndexOp::create(b, loc, 0);
   Value one = arith::ConstantIndexOp::create(b, loc, 1);
-  Value ub;
+  Value two = arith::ConstantIndexOp::create(b, loc, 2);
+
+  Value half = arith::DivSIOp::create(b, loc, size, two);
+  Value lastRoot = arith::SubIOp::create(b, loc, half, one);
+  scf::ForOp::create(b, loc, zero, half, one, ValueRange{},
+                     [&state, loc, lastRoot, size](OpBuilder &b, Location,
+                                                   Value iv, ValueRange) {
+                       Value root = arith::SubIOp::create(b, loc, lastRoot, iv);
+                       SmallVector<Value> element =
+                           loadSortElement(b, state, root);
+                       emitHeapSiftDown(b, state, root, element, size);
+                       scf::YieldOp::create(b, loc);
+                     });
+
+  Value lastPos = arith::SubIOp::create(b, loc, size, one);
+  scf::ForOp::create(b, loc, zero, lastPos, one, ValueRange{},
+                     [&state, loc, lastPos, zero](OpBuilder &b, Location,
+                                                  Value iv, ValueRange) {
+                       Value end = arith::SubIOp::create(b, loc, lastPos, iv);
+                       SmallVector<Value> first =
+                           loadSortElement(b, state, zero);
+                       SmallVector<Value> last = loadSortElement(b, state, end);
+                       storeSortElement(b, state, first, end);
+                       emitHeapSiftDown(b, state, zero, last, end);
+                       scf::YieldOp::create(b, loc);
+                     });
+}
+
+/// Emits an in-place binary insertion sort of the `size` elements of the
+/// slice. It is stable and needs no storage besides the buffers, at the cost
+/// of O(n^2) element moves (and O(n log n) comparisons).
+///
+///   for (i = 1; i < size; ++i) {
+///     element = slice[i]
+///     // First position in the sorted prefix [0, i) whose element has to
+///     // stay behind `element`.
+///     lo = 0; hi = i
+///     while (lo < hi) {
+///       mid = (lo + hi) / 2
+///       if (isStrictlyBefore(element, slice[mid])) hi = mid else lo = mid + 1
+///     }
+///     for (j = i; j > lo; --j) slice[j] = slice[j - 1]
+///     slice[lo] = element
+///   }
+static void emitStableInsertionSort(OpBuilder &b,
+                                    const SortLoweringState &state,
+                                    Value size) {
+  Location loc = state.loc;
+  Value zero = arith::ConstantIndexOp::create(b, loc, 0);
+  Value one = arith::ConstantIndexOp::create(b, loc, 1);
+  Value two = arith::ConstantIndexOp::create(b, loc, 2);
+  scf::ForOp::create(
+      b, loc, one, size, one, ValueRange{},
+      [&state, loc, zero, one, two](OpBuilder &b, Location, Value i,
+                                    ValueRange) {
+        SmallVector<Value> element = loadSortElement(b, state, i);
+        Type indexType = b.getIndexType();
+        auto searchOp = scf::WhileOp::create(
+            b, loc, TypeRange{indexType, indexType}, ValueRange{zero, i},
+            [loc](OpBuilder &b, Location, ValueRange args) {
+              Value inRange = arith::CmpIOp::create(
+                  b, loc, arith::CmpIPredicate::slt, args[0], args[1]);
+              scf::ConditionOp::create(b, loc, inRange, args);
+            },
+            [&state, loc, &element, one, two](OpBuilder &b, Location,
+                                              ValueRange args) {
+              Value lo = args[0];
+              Value hi = args[1];
+              Value mid = arith::DivSIOp::create(
+                  b, loc, arith::AddIOp::create(b, loc, lo, hi), two);
+              SmallVector<Value> midElement = loadSortElement(b, state, mid);
+              Value before =
+                  emitIsStrictlyBefore(b, state, element, midElement);
+              Value newLo = arith::SelectOp::create(
+                  b, loc, before, lo, arith::AddIOp::create(b, loc, mid, one));
+              Value newHi = arith::SelectOp::create(b, loc, before, mid, hi);
+              scf::YieldOp::create(b, loc, ValueRange{newLo, newHi});
+            });
+        Value insertPos = searchOp.getResult(0);
+        Value numToMove = arith::SubIOp::create(b, loc, i, insertPos);
+        scf::ForOp::create(b, loc, zero, numToMove, one, ValueRange{},
+                           [&state, loc, i, one](OpBuilder &b, Location,
+                                                 Value iv, ValueRange) {
+                             Value to = arith::SubIOp::create(b, loc, i, iv);
+                             Value from =
+                                 arith::SubIOp::create(b, loc, to, one);
+                             SmallVector<Value> moved =
+                                 loadSortElement(b, state, from);
+                             storeSortElement(b, state, moved, to);
+                             scf::YieldOp::create(b, loc);
+                           });
+        storeSortElement(b, state, element, insertPos);
+        scf::YieldOp::create(b, loc);
+      });
+}
+
+LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
+                                                   ValueRange ivs) {
+  int64_t sortDim = getDimension();
+  Value zero = arith::ConstantIndexOp::create(b, loc, 0);
+  Value one = arith::ConstantIndexOp::create(b, loc, 1);
+  Value sortDimSize;
   if (getOperandType(0).isDynamicDim(sortDim)) {
-    ub = memref::DimOp::create(b, loc, getOperand(0), sortDim);
+    sortDimSize = memref::DimOp::create(b, loc, getInputs()[0], sortDim);
   } else {
-    ub = arith::ConstantIndexOp::create(b, loc,
-                                        getOperandType(0).getDimSize(sortDim));
+    sortDimSize = arith::ConstantIndexOp::create(
+        b, loc, getOperandType(0).getDimSize(sortDim));
   }
-  ub = arith::SubIOp::create(b, loc, ub, one);
-  SmallVector<Value> compareOperands(getDpsInits().begin(),
-                                     getDpsInits().end());
-  emitBubbleSortSweep(b, loc, zero, one, ub, sortDim, ivs, compareOperands,
-                      /*carryOperands=*/{}, getRegion());
+  SortLoweringState state{loc, llvm::to_vector(getDpsInits()),
+                          llvm::to_vector(ivs), sortDim, &getRegion().front()};
+  // Operands that are sorted in place need no copy.
+  SmallVector<std::pair<Value, Value>> copies;
+  for (auto [input, output] : llvm::zip_equal(getDpsInputs(), getDpsInits())) {
+    if (input != output) {
+      copies.emplace_back(input, output);
+    }
+  }
+  bool isStable = getIsStable();
+
+  // The loop nest built from the iteration domain also iterates over the sort
+  // dimension. A slice is sorted as a whole, so everything happens in the
+  // first of these iterations: copy the inputs to the outputs, then sort the
+  // outputs in place.
+  Value firstIteration = arith::CmpIOp::create(b, loc, arith::CmpIPredicate::eq,
+                                               ivs[sortDim], zero);
+  scf::IfOp::create(
+      b, loc, firstIteration,
+      [&state, &copies, loc, zero, one, sortDimSize, isStable](OpBuilder &b,
+                                                               Location) {
+        if (!copies.empty()) {
+          scf::ForOp::create(
+              b, loc, zero, sortDimSize, one, ValueRange{},
+              [&state, &copies, loc](OpBuilder &b, Location, Value iv,
+                                     ValueRange) {
+                SmallVector<Value> indices(state.ivs);
+                indices[state.sortDim] = iv;
+                for (auto [input, output] : copies) {
+                  Value v = memref::LoadOp::create(b, loc, input, indices);
+                  memref::StoreOp::create(b, loc, v, output, indices);
+                }
+                scf::YieldOp::create(b, loc);
+              });
+        }
+        if (isStable) {
+          emitStableInsertionSort(b, state, sortDimSize);
+        } else {
+          emitHeapSort(b, state, sortDimSize);
+        }
+        scf::YieldOp::create(b, loc);
+      });
   return success();
 }
 
@@ -1497,8 +1799,8 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
     // True if N > K or N came before K
     Value indexCmpRes =
         arith::OrIOp::create(b, loc, forwardCmpRes, combinedCmpEqRes);
-    // Select results for K based on comparisons
-    Value resultKValue = arith::SelectOp::create(b, loc, forwardCmpRes,
+    // Keep values paired with their indices when breaking ties.
+    Value resultKValue = arith::SelectOp::create(b, loc, indexCmpRes,
                                                  loopCarryValues[0], kValue);
     Value resultKIndex = arith::SelectOp::create(b, loc, indexCmpRes,
                                                  loopCarryValues[1], kIndex);
@@ -1506,7 +1808,7 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
     memref::StoreOp::create(b, loc, resultKIndex, getOutputIndices(), indices);
     // Select loop carry, opposite of K results
     Value resultCarryValue = arith::SelectOp::create(
-        b, loc, forwardCmpRes, kValue, loopCarryValues[0]);
+        b, loc, indexCmpRes, kValue, loopCarryValues[0]);
     Value resultCarryIndex = arith::SelectOp::create(
         b, loc, indexCmpRes, kIndex, loopCarryValues[1]);
     scf::YieldOp::create(b, loc,
@@ -1693,14 +1995,7 @@ LogicalResult TopkV2Op::generateScalarImplementation(OpBuilder &b, Location loc,
         Value forwardCmpRes =
             bvmF.lookup(srcBlock.getTerminator()->getOperand(0));
 
-        Value resultKValue = arith::SelectOp::create(
-            b, loc, forwardCmpRes, loopCarryValues[0], kValue);
-        memref::StoreOp::create(b, loc, resultKValue, outputValues, indices);
-        Value resultCarryValue = arith::SelectOp::create(
-            b, loc, forwardCmpRes, kValue, loopCarryValues[0]);
-
-        SmallVector<Value> yieldValues = {resultCarryValue};
-
+        Value cmpRes = forwardCmpRes;
         // With output indices, also clone the reverse mapping f(y,x) for
         // strict weak ordering tie-breaking.
         if (outputIndices) {
@@ -1723,13 +2018,24 @@ LogicalResult TopkV2Op::generateScalarImplementation(OpBuilder &b, Location loc,
               b, loc, arith::CmpIPredicate::slt, loopCarryValues[1], kIndex);
           Value combinedCmpEqRes =
               arith::AndIOp::create(b, loc, cmpValuesEqual, cmpFirstIndex);
-          Value indexCmpRes =
+          cmpRes =
               arith::OrIOp::create(b, loc, forwardCmpRes, combinedCmpEqRes);
+        }
+
+        // Keep values paired with their indices when breaking ties.
+        Value resultKValue =
+            arith::SelectOp::create(b, loc, cmpRes, loopCarryValues[0], kValue);
+        memref::StoreOp::create(b, loc, resultKValue, outputValues, indices);
+        Value resultCarryValue =
+            arith::SelectOp::create(b, loc, cmpRes, kValue, loopCarryValues[0]);
+
+        SmallVector<Value> yieldValues = {resultCarryValue};
+        if (outputIndices) {
           Value resultKIndex = arith::SelectOp::create(
-              b, loc, indexCmpRes, loopCarryValues[1], kIndex);
+              b, loc, cmpRes, loopCarryValues[1], kIndex);
           memref::StoreOp::create(b, loc, resultKIndex, outputIndices, indices);
           Value resultCarryIndex = arith::SelectOp::create(
-              b, loc, indexCmpRes, kIndex, loopCarryValues[1]);
+              b, loc, cmpRes, kIndex, loopCarryValues[1]);
           yieldValues.push_back(resultCarryIndex);
         }
 
@@ -3575,56 +3881,6 @@ static linalg::ReduceOp reduceOnK2(OnlineAttentionOp attn, AffineMap partialMap,
       });
 };
 
-template <typename T>
-static Value elementwiseValueInPlace(OpBuilder &builder, Location loc,
-                                     AffineMap inputMap, AffineMap scaleMap,
-                                     Value value, Value scale) {
-  SmallVector<AffineMap> compressedMaps =
-      compressUnusedDims(SmallVector<AffineMap>{inputMap, scaleMap});
-  inputMap = compressedMaps[0];
-  scaleMap = compressedMaps[1];
-
-  SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
-                                                 utils::IteratorType::parallel);
-
-  auto genericOp = linalg::GenericOp::create(
-      builder, loc, value.getType(), scale, value,
-      SmallVector<AffineMap>{scaleMap, inputMap}, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        // Convert scale to the same datatype as input.
-        Value scale = convertScalarToDtype(b, loc, args[0], args[1].getType(),
-                                           /*isUnsignedCast=*/false);
-        Value result = T::create(b, loc, scale, args[1]);
-        linalg::YieldOp::create(b, loc, result);
-      });
-  return genericOp.getResult(0);
-}
-
-// Compute output = exp2(output - input)
-static Value computeSubAndExp2(OpBuilder &builder, Location loc,
-                               AffineMap inputMap, AffineMap outputMap,
-                               Value input, Value output) {
-  SmallVector<AffineMap> compressedMaps =
-      compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
-  inputMap = compressedMaps[0];
-  outputMap = compressedMaps[1];
-
-  SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
-                                                 utils::IteratorType::parallel);
-  auto genericOp = linalg::GenericOp::create(
-      builder, loc, output.getType(), input, output,
-      SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        // Convert input to the same datatype as output.
-        Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
-                                        /*isUnsignedCast=*/false);
-        Value diff = arith::SubFOp::create(b, loc, args[1], in);
-        Value weight = math::Exp2Op::create(b, loc, diff);
-        linalg::YieldOp::create(b, loc, weight);
-      });
-  return genericOp.getResult(0);
-}
-
 FailureOr<MergeResult> OnlineAttentionOp::mergeReductions(
     OpBuilder &b, Location loc, ValueRange partialReduce,
     const llvm::SetVector<unsigned> &reductionDims) {
@@ -3644,8 +3900,9 @@ FailureOr<MergeResult> OnlineAttentionOp::mergeReductions(
       *this, partialMaxMap, opInfo, b, loc, partialReduce[1], getMax());
 
   // norm = exp2(partialMax - newMax)
-  Value norm = computeSubAndExp2(b, loc, getMaxMap(), partialMaxMap,
-                                 reducedMax.getResult(0), partialReduce[1]);
+  Value norm = computeSubAndExp(b, loc, getMaxMap(), partialMaxMap,
+                                reducedMax.getResult(0), partialReduce[1],
+                                /*useExp2=*/true);
 
   // normSum = norm * partialSum
   Value normSum = elementwiseValueInPlace<arith::MulFOp>(
@@ -4324,6 +4581,211 @@ FailureOr<TilingResult> ConcatOpTilingExternalModel::getTiledImplementation(
                   ValueRange(sliceValues));
   return TilingResult{
       {tiledConcatOp}, SmallVector<Value>(tiledConcatOp->getResults()), slices};
+}
+
+namespace {
+
+static bool isFullReductionTile(Value input, int64_t dim, OpFoldResult offset,
+                                OpFoldResult size) {
+  if (!isConstantIntValue(offset, 0)) {
+    return false;
+  }
+  FailureOr<bool> equal = ValueBoundsConstraintSet::areEqual(
+      size, ValueBoundsConstraintSet::Variable(input, dim));
+  return succeeded(equal) && *equal;
+}
+
+struct GroupMatmulTilingExternalModel
+    : TilingInterface::ExternalModel<GroupMatmulTilingExternalModel,
+                                     GroupMatmulOp> {
+  SmallVector<utils::IteratorType> getLoopIteratorTypes(Operation *) const {
+    return {utils::IteratorType::parallel, utils::IteratorType::parallel,
+            utils::IteratorType::reduction};
+  }
+
+  SmallVector<Range> getIterationDomain(Operation *op,
+                                        OpBuilder &builder) const {
+    auto groupMatmul = cast<GroupMatmulOp>(op);
+    OpFoldResult zero = builder.getIndexAttr(0);
+    OpFoldResult one = builder.getIndexAttr(1);
+    Location loc = groupMatmul.getLoc();
+    return {{zero, getDim(builder, loc, groupMatmul.getInput(), 0), one},
+            {zero, getDim(builder, loc, groupMatmul.getOutput(), 1), one},
+            {zero, getDim(builder, loc, groupMatmul.getInput(), 1), one}};
+  }
+
+  FailureOr<TilingResult>
+  getTiledImplementation(Operation *op, OpBuilder &builder,
+                         ArrayRef<OpFoldResult> offsets,
+                         ArrayRef<OpFoldResult> sizes) const {
+    auto groupMatmul = cast<GroupMatmulOp>(op);
+    if (!isFullReductionTile(groupMatmul.getInput(), 1, offsets[2], sizes[2])) {
+      return groupMatmul.emitOpError(
+          "partial reduction tiling is unsupported; expected zero offset and "
+          "full K size");
+    }
+    Location loc = groupMatmul.getLoc();
+    OpFoldResult zero = builder.getIndexAttr(0);
+    OpFoldResult one = builder.getIndexAttr(1);
+    SmallVector<OpFoldResult> inputOffsets{offsets[0], offsets[2]};
+    SmallVector<OpFoldResult> inputSizes{sizes[0], sizes[2]};
+    Value input = tensor::ExtractSliceOp::create(
+        builder, loc, groupMatmul.getInput(), inputOffsets, inputSizes,
+        SmallVector<OpFoldResult>{one, one});
+    SmallVector<OpFoldResult> weightOffsets{zero, offsets[2], offsets[1]};
+    SmallVector<OpFoldResult> weightSizes{
+        getDim(builder, loc, groupMatmul.getExpertWeights(), 0), sizes[2],
+        sizes[1]};
+    Value weights = tensor::ExtractSliceOp::create(
+        builder, loc, groupMatmul.getExpertWeights(), weightOffsets,
+        weightSizes, SmallVector<OpFoldResult>{one, one, one});
+    SmallVector<OpFoldResult> outputOffsets{offsets[0], offsets[1]};
+    SmallVector<OpFoldResult> outputSizes{sizes[0], sizes[1]};
+    Value output = tensor::ExtractSliceOp::create(
+        builder, loc, groupMatmul.getOutput(), outputOffsets, outputSizes,
+        SmallVector<OpFoldResult>{one, one});
+    Value tileRowOffset =
+        getValueOrCreateConstantIndexOp(builder, loc, offsets[0]);
+    Value rowBase = arith::AddIOp::create(
+        builder, loc, groupMatmul.getRowBase(), tileRowOffset);
+    Operation *tiledOp = mlir::clone(
+        builder, groupMatmul.getOperation(), TypeRange{output.getType()},
+        ValueRange{input, weights, groupMatmul.getExpertOffsets(), rowBase,
+                   output});
+    return TilingResult{{tiledOp},
+                        SmallVector<Value>(tiledOp->getResults()),
+                        {input.getDefiningOp(), weights.getDefiningOp(),
+                         output.getDefiningOp()}};
+  }
+
+  FailureOr<TilingResult> getTiledImplementation(
+      Operation *op, OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+      ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) const {
+    return getTiledImplementation(op, builder, offsets, sizes);
+  }
+
+  LogicalResult getResultTilePosition(
+      Operation *, OpBuilder &, unsigned, ArrayRef<OpFoldResult> offsets,
+      ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+      SmallVector<OpFoldResult> &resultSizes) const {
+    resultOffsets.assign(offsets.begin(), offsets.begin() + 2);
+    resultSizes.assign(sizes.begin(), sizes.begin() + 2);
+    return success();
+  }
+};
+
+struct GroupMmt4DTilingExternalModel
+    : TilingInterface::ExternalModel<GroupMmt4DTilingExternalModel,
+                                     GroupMmt4DOp> {
+  SmallVector<utils::IteratorType> getLoopIteratorTypes(Operation *) const {
+    return {utils::IteratorType::parallel,  utils::IteratorType::parallel,
+            utils::IteratorType::reduction, utils::IteratorType::parallel,
+            utils::IteratorType::parallel,  utils::IteratorType::reduction};
+  }
+
+  SmallVector<Range> getIterationDomain(Operation *op,
+                                        OpBuilder &builder) const {
+    auto groupMmt4d = cast<GroupMmt4DOp>(op);
+    Location loc = groupMmt4d.getLoc();
+    OpFoldResult zero = builder.getIndexAttr(0);
+    OpFoldResult one = builder.getIndexAttr(1);
+    ArrayRef<int64_t> outputPermutation = groupMmt4d.getOutputPermutation();
+    return {{zero, getDim(builder, loc, groupMmt4d.getInput(), 0), one},
+            {zero,
+             getDim(builder, loc, groupMmt4d.getOutput(), outputPermutation[1]),
+             one},
+            {zero, getDim(builder, loc, groupMmt4d.getInput(), 1), one},
+            {zero, getDim(builder, loc, groupMmt4d.getInput(), 2), one},
+            {zero,
+             getDim(builder, loc, groupMmt4d.getOutput(), outputPermutation[3]),
+             one},
+            {zero, getDim(builder, loc, groupMmt4d.getInput(), 3), one}};
+  }
+
+  FailureOr<TilingResult>
+  getTiledImplementation(Operation *op, OpBuilder &builder,
+                         ArrayRef<OpFoldResult> offsets,
+                         ArrayRef<OpFoldResult> sizes) const {
+    auto groupMmt4d = cast<GroupMmt4DOp>(op);
+    if (!isFullReductionTile(groupMmt4d.getInput(), 1, offsets[2], sizes[2]) ||
+        !isFullReductionTile(groupMmt4d.getInput(), 3, offsets[5], sizes[5])) {
+      return groupMmt4d.emitOpError(
+          "partial reduction tiling is unsupported; expected zero offsets and "
+          "full outer and inner K sizes");
+    }
+    Location loc = groupMmt4d.getLoc();
+    OpFoldResult zero = builder.getIndexAttr(0);
+    OpFoldResult one = builder.getIndexAttr(1);
+    SmallVector<OpFoldResult> inputOffsets{offsets[0], offsets[2], offsets[3],
+                                           offsets[5]};
+    SmallVector<OpFoldResult> inputSizes{sizes[0], sizes[2], sizes[3],
+                                         sizes[5]};
+    Value input = tensor::ExtractSliceOp::create(
+        builder, loc, groupMmt4d.getInput(), inputOffsets, inputSizes,
+        SmallVector<OpFoldResult>(4, one));
+    SmallVector<OpFoldResult> weightOffsets{zero, offsets[1], offsets[2],
+                                            offsets[4], offsets[5]};
+    SmallVector<OpFoldResult> weightSizes{
+        getDim(builder, loc, groupMmt4d.getExpertWeights(), 0), sizes[1],
+        sizes[2], sizes[4], sizes[5]};
+    Value weights = tensor::ExtractSliceOp::create(
+        builder, loc, groupMmt4d.getExpertWeights(), weightOffsets, weightSizes,
+        SmallVector<OpFoldResult>(5, one));
+    ArrayRef<int64_t> outputPermutation = groupMmt4d.getOutputPermutation();
+    SmallVector<OpFoldResult> outputOffsets{offsets[0], offsets[1], offsets[3],
+                                            offsets[4]};
+    SmallVector<OpFoldResult> outputSizes{sizes[0], sizes[1], sizes[3],
+                                          sizes[4]};
+    applyPermutationToVector(outputOffsets, outputPermutation);
+    applyPermutationToVector(outputSizes, outputPermutation);
+    Value output = tensor::ExtractSliceOp::create(
+        builder, loc, groupMmt4d.getOutput(), outputOffsets, outputSizes,
+        SmallVector<OpFoldResult>(4, one));
+    Value outerRowOffset =
+        getValueOrCreateConstantIndexOp(builder, loc, offsets[0]);
+    Value innerRowOffset =
+        getValueOrCreateConstantIndexOp(builder, loc, offsets[3]);
+    Value rowBase = arith::AddIOp::create(
+        builder, loc, groupMmt4d.getRowBase(),
+        arith::AddIOp::create(builder, loc,
+                              arith::MulIOp::create(builder, loc,
+                                                    outerRowOffset,
+                                                    groupMmt4d.getRowStride()),
+                              innerRowOffset));
+    Operation *tiledOp = mlir::clone(
+        builder, groupMmt4d.getOperation(), TypeRange{output.getType()},
+        ValueRange{input, weights, groupMmt4d.getExpertOffsets(), rowBase,
+                   groupMmt4d.getRowStride(), output});
+    return TilingResult{{tiledOp},
+                        SmallVector<Value>(tiledOp->getResults()),
+                        {input.getDefiningOp(), weights.getDefiningOp(),
+                         output.getDefiningOp()}};
+  }
+
+  FailureOr<TilingResult> getTiledImplementation(
+      Operation *op, OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+      ArrayRef<OpFoldResult> sizes, ArrayRef<mlir::InnerTileAlignment>) const {
+    return getTiledImplementation(op, builder, offsets, sizes);
+  }
+
+  LogicalResult getResultTilePosition(
+      Operation *op, OpBuilder &, unsigned, ArrayRef<OpFoldResult> offsets,
+      ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+      SmallVector<OpFoldResult> &resultSizes) const {
+    ArrayRef<int64_t> outputPermutation =
+        cast<GroupMmt4DOp>(op).getOutputPermutation();
+    resultOffsets = {offsets[0], offsets[1], offsets[3], offsets[4]};
+    resultSizes = {sizes[0], sizes[1], sizes[3], sizes[4]};
+    applyPermutationToVector(resultOffsets, outputPermutation);
+    applyPermutationToVector(resultSizes, outputPermutation);
+    return success();
+  }
+};
+} // namespace
+
+void registerGroupMatmulTilingInterfaceExternalModel(MLIRContext *ctx) {
+  GroupMatmulOp::attachInterface<GroupMatmulTilingExternalModel>(*ctx);
+  GroupMmt4DOp::attachInterface<GroupMmt4DTilingExternalModel>(*ctx);
 }
 
 void registerConcatOpTilingInterfaceExternalModel(MLIRContext *ctx) {

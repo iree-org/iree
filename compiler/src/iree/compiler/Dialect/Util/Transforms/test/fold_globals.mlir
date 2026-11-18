@@ -317,3 +317,25 @@ util.func @use_typed() -> !util.list<i32> {
   %0 = util.global.load @typed_list : !util.list<i32>
   util.return %0 : !util.list<i32>
 }
+
+// -----
+
+// An initializer can read the original value before replacing it. Preserve
+// both the initial value and mutability when the replacement is not constant.
+// CHECK: util.global private mutable @initialized = 0 : i32
+util.global private mutable @initialized = 0 : i32
+util.func private @transform(i32) -> i32
+util.initializer {
+  // CHECK: %[[OLD:.*]] = util.global.load @initialized : i32
+  %old = util.global.load @initialized : i32
+  // CHECK: %[[NEW:.*]] = util.call @transform(%[[OLD]]) : (i32) -> i32
+  %new = util.call @transform(%old) : (i32) -> i32
+  // CHECK: util.global.store %[[NEW]], @initialized : i32
+  util.global.store %new, @initialized : i32
+  util.return
+}
+util.func public @read_initialized() -> i32 {
+  // CHECK: %[[VALUE:.*]] = util.global.load @initialized : i32
+  %value = util.global.load @initialized : i32
+  util.return %value : i32
+}

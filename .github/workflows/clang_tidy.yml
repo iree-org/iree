@@ -20,8 +20,7 @@ on:
       - '.github/workflows/clang_tidy.yml'
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -33,6 +32,10 @@ jobs:
     if: >-
       github.event.pull_request.stack == null ||
       github.event.pull_request.stack.base.ref == github.event.pull_request.base.ref
+    permissions:
+      contents: read
+      actions: read  # Download iree-clang-tidy from a build_clang_tidy.yml run.
+      pull-requests: read  # Fetch the PR diff (here and in cpp-linter).
     runs-on: ubuntu-24.04
     container:
       image: ghcr.io/iree-org/cpubuilder_ubuntu_jammy@sha256:78a558b999b230f7e1da376639e14b44f095f30f1777d6a272ba48c0bbdd4ccb
@@ -45,6 +48,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: false
           fetch-depth: 0
 
@@ -54,7 +58,7 @@ jobs:
           git submodule update --init --depth=1
 
       - name: Download iree-clang-tidy artifact
-        uses: dawidd6/action-download-artifact@eab87c9830c39eff17e5a6eadb20bfb4bc880477 # v27
+        uses: dawidd6/action-download-artifact@a92c7ae74cf1df8810783758581e485ac3aaa309 # v28
         with:
           workflow: build_clang_tidy.yml
           name: iree-clang-tidy-linux-x86_64
@@ -68,12 +72,17 @@ jobs:
           cat .iree-clang-tidy/llvm-project-revision.txt
           .iree-clang-tidy/clang-tidy --version
 
+      # Use uv instead of plain pip since cpp-linter uses it anyway.
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.7"
+          # uv-x86_64-unknown-linux-gnu.tar.gz, as published in uv's release.
+          checksum: "c5221ff41b7892bfc223543883600125f6a47fe845093e0f5bdff4f359196d83"
+          enable-cache: false
+
       - name: Install Python requirements
         run: |
-          # Use uv instead of plain pip since cpp-linter uses it anyway.
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          export PATH="$HOME/.local/bin:$PATH"
           uv pip install --system -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
           uv pip install --system -r ./build_tools/github_actions/ci_requirements.txt
 
@@ -93,14 +102,18 @@ jobs:
             "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
           if [[ "${status_code}" == "200" ]]; then
             echo "use_cpp_linter=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "GitHub PR diff request returned ${status_code}; running clang-tidy locally on changed files."
+          elif [[ "${status_code}" == "406" ]] && grep -qE '"code": ?"too_large"' /tmp/pr.diff; then
+            echo "GitHub refused the PR diff as too large; skipping clang-tidy."
             echo "use_cpp_linter=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "::error title=PR diff request failed::GitHub returned HTTP ${status_code} for the PR diff."
+            cat /tmp/pr.diff
+            exit 1
           fi
 
       - name: Run clang-tidy
         if: steps.tidy-diff-mode.outputs.use_cpp_linter == 'true'
-        uses: cpp-linter/cpp-linter-action@8120e05c7fbd25fa09fa93424ec49f55f7b304ab # v1.11.4
+        uses: cpp-linter/cpp-linter-action@774040af57f011a5fc47911f08ff0c3059d1835a # v2.24.0
         id: linter
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -133,4 +146,4 @@ jobs:
             exit 0
           fi
 
-          echo "::warning title=clang-tidy skipped::GitHub refused the PR diff because it exceeds the 20,000-line API limit, so cpp-linter cannot compute changed-line diagnostics for $(wc -l < "${changed_files}") changed C/C++ files."
+          echo "::warning title=clang-tidy skipped::GitHub refused the PR diff as too large (the API caps diffs at 300 files and 20,000 lines), so cpp-linter cannot compute changed-line diagnostics for $(wc -l < "${changed_files}") changed C/C++ files."

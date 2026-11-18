@@ -30,6 +30,7 @@ iree_cc_library(
     MLIRPass
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::DispatchCreation::PassHeaders
   PUBLIC
 )
 
@@ -72,7 +73,6 @@ iree_cc_library(
     "Utils.h"
   SRCS
     "CleanupNumericNarrowing.cpp"
-    "ConvertBatchMatmulToMatmul.cpp"
     "ConvertConvToIm2Col.cpp"
     "ConvertQDQToIntegerMath.cpp"
     "ConvertStridedContractionToContraction.cpp"
@@ -80,14 +80,17 @@ iree_cc_library(
     "DecomposeConcat.cpp"
     "DemoteContractionInputs.cpp"
     "DetachElementwiseFromNamedOps.cpp"
+    "EarlyDataTiling.cpp"
     "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"
+    "FoldBroadcastIntoBatchMatmul.cpp"
     "FuseDequantizationMatmul.cpp"
     "GeneralizeLinalgNamedOps.cpp"
     "GlobalLoopInvariantCodeMotion.cpp"
     "InferNumericNarrowing.cpp"
     "MaterializeHomogeneousEncodings.cpp"
     "OptimizeNumerics.cpp"
+    "PackSubByteQuantizedConstants.cpp"
     "Passes.cpp"
     "PropagateAffineQuantization.cpp"
     "PropagateLinalgTranspose.cpp"
@@ -96,6 +99,7 @@ iree_cc_library(
     "RaiseSpecialOps.cpp"
     "RemoveZeroExtentTensors.cpp"
     "SimplifyPackUnpack.cpp"
+    "SplitLargeConstants.cpp"
     "TransposePropagationPatterns.cpp"
     "Utils.cpp"
     "WarnOnUninitializedValues.cpp"
@@ -106,9 +110,11 @@ iree_cc_library(
     ::QuantizedContraction
     LLVMSupport
     MLIRAffineDialect
+    MLIRAnalysis
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowDialect
+    MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
@@ -124,6 +130,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTensorUtils
+    MLIRTilingInterface
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Codegen::Common
@@ -138,9 +145,11 @@ iree_cc_library(
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::LinalgExt::Utils
+    iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::TensorExt::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
+    iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms

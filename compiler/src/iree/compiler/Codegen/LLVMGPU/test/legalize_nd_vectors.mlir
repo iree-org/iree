@@ -120,6 +120,30 @@ func.func @extract_scalar(%v: vector<2x4xf32>) -> f32 {
 
 // -----
 
+// A dynamic innermost index extracts from the statically selected 1-D slice.
+func.func @extract_dynamic_inner(%v: vector<2x4xf32>, %i: index) -> f32 {
+  %0 = vector.extract %v[1, %i] : f32 from vector<2x4xf32>
+  return %0 : f32
+}
+// CHECK-LABEL: func.func @extract_dynamic_inner(
+//  CHECK-SAME:   %[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[I:.+]]: index)
+//       CHECK:   %[[S:.+]] = vector.extract %[[V1]][%[[I]]] : f32 from vector<4xf32>
+//       CHECK:   return %[[S]] : f32
+
+// -----
+
+// Multiple static outer indices select the correct flattened slice.
+func.func @extract_dynamic_inner_3d(%v: vector<2x3x4xf32>, %i: index) -> f32 {
+  %0 = vector.extract %v[1, 1, %i] : f32 from vector<2x3x4xf32>
+  return %0 : f32
+}
+// CHECK-LABEL: func.func @extract_dynamic_inner_3d(
+//  CHECK-SAME:   %[[V0:.+]]: vector<4xf32>, %[[V1:.+]]: vector<4xf32>, %[[V2:.+]]: vector<4xf32>, %[[V3:.+]]: vector<4xf32>, %[[V4:.+]]: vector<4xf32>, %[[V5:.+]]: vector<4xf32>, %[[I:.+]]: index)
+//       CHECK:   %[[S:.+]] = vector.extract %[[V4]][%[[I]]] : f32 from vector<4xf32>
+//       CHECK:   return %[[S]] : f32
+
+// -----
+
 // Extracting a 2-D sub-vector from a 3-D vector selects the first group of flat vectors.
 func.func @extract_3d(%v: vector<2x3x4xf32>) -> vector<3x4xf32> {
   %0 = vector.extract %v[0] : vector<3x4xf32> from vector<2x3x4xf32>

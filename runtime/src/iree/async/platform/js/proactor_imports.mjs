@@ -159,6 +159,8 @@ function createInlineImports(context) {
         wasmView[i * 2 + 1] = entry.statusCode;
       }
       completionQueue.splice(0, count);
+      // Schedule another poll if this batch did not consume all completions.
+      if (completionQueue.length > 0) scheduleDrain();
       return count;
     },
 

@@ -1,5 +1,4 @@
 <!-- markdownlint-disable -->
-$ iree-run-module --list_drivers
 
 # ============================================================================
 # Available HAL drivers

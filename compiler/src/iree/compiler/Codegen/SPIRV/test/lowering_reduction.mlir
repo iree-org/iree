@@ -278,6 +278,7 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK-LABEL: func.func @dynamic_softmax
 // CHECK-DAG:     %[[ADD_PAD:.+]] = arith.constant dense<0.000000e+00> : vector<1xf16>
 // CHECK-DAG:     %[[MIN_F16:.+]] = arith.constant dense<0xFE00> : vector<1xf16>
+// CHECK-DAG:     %[[MAX_INIT:.+]] = arith.constant -6.550400e+04 : f16
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C64:.+]] = arith.constant 64 : index
 // CHECK-DAG:     %[[PV:.+]] = ub.poison : f16
@@ -304,10 +305,11 @@ func.func @dynamic_softmax() attributes {hal.executable.target = #executable_tar
 // CHECK:         vector.transfer_read {{.*}} : memref<1x64xf16, #gpu.address_space<workgroup>>, vector<1xf16>
 // CHECK:         %[[V11:.*]] = vector.extract {{.*}} : f16 from vector<1xf16>
 // CHECK:         %[[MAXNUMF:.+]] = gpu.subgroup_reduce maxnumf %[[V11]] : (f16) -> f16
+// CHECK:         %[[INITIALIZED_MAX:.+]] = arith.maxnumf %[[MAXNUMF]], %[[MAX_INIT]] : f16
 
 // Do the elementwise scaling and second local reduction.
 // CHECK:         vector.transfer_write %[[ADD_PAD]], %{{.*}} : vector<1xf16>, memref<1x64xf16, #gpu.address_space<workgroup>>
-// CHECK:         %[[MAXNUMF_BCAST:.+]] = vector.broadcast %[[MAXNUMF]] : f16 to vector<1xf16>
+// CHECK:         %[[MAXNUMF_BCAST:.+]] = vector.broadcast %[[INITIALIZED_MAX]] : f16 to vector<1xf16>
 // CHECK:         scf.for {{.*}} %[[C0]] to %[[DYNAMIC_SIZE]] step %[[C64]]
 // CHECK:           %[[MASK2:.+]] = vector.create_mask %{{.*}} : vector<1xi1>
 // CHECK:           vector.transfer_read %{{.*}}, %[[MASK]] {{.*}} : memref<32x?xf16, #hal.descriptor_type<storage_buffer>>, vector<1xf16>

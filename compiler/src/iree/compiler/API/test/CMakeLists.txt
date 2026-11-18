@@ -34,6 +34,19 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+iree_cc_test(
+  NAME
+    plugin-flags-test
+  SRCS
+    "plugin_flags_test.cc"
+  DEPS
+    gmock
+    gtest
+    iree::compiler::API::Impl
+    iree::compiler::bindings::c::headers
+    iree::testing::gtest_main
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # Move to bin/ directory and systematically name more appropriately.

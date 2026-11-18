@@ -208,7 +208,7 @@ class HalDeviceLoopBridge {
     IREE_PY_TRACEF("HalDeviceLoopBridge::CancelFuture(%p)", future.ptr());
     py::gil_scoped_acquire acquire_gil;
     try {
-      future.attr("cancel")();
+      loop_call_soon_(future.attr("cancel"));
     } catch (py::python_error& e) {
       ReportUncaughtException(e);
     }

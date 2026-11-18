@@ -26,6 +26,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Conversion/ArithCommon/CeilFloorDivExpansion.h"
 #include "mlir/Conversion/ArithToSPIRV/ArithToSPIRV.h"
 #include "mlir/Conversion/ComplexToSPIRV/ComplexToSPIRV.h"
 #include "mlir/Conversion/ControlFlowToSPIRV/ControlFlowToSPIRVPass.h"
@@ -189,6 +190,18 @@ static InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
         resourceVars[key] = resource.var;
       }
       assert(resource.var);
+
+      // A variable may be shared by multiple subspans. Only mark it
+      // non-writable if all of their bindings are read-only.
+      bool readOnly =
+          bitEnumContainsAll(subspanOp.getPipelineBindingAttr().getFlags(),
+                             IREE::HAL::DescriptorFlags::ReadOnly);
+      if (!existingVar && readOnly) {
+        resource.var->setAttr("non_writable",
+                              UnitAttr::get(module.getContext()));
+      } else if (!readOnly) {
+        resource.var->removeAttr("non_writable");
+      }
       interfaceToResourceInfo[subspanOp] = resource;
     }
   }

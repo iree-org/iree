@@ -133,7 +133,10 @@ static inline iree_host_size_t iree_host_size_next_power_of_two(
   value |= value >> 8;
   value |= value >> 16;
   if (sizeof(iree_host_size_t) == 8) {
-    value |= value >> 32;
+    // Shift by 32 as two shifts of 16: on 32-bit targets iree_host_size_t
+    // is 32 bits wide and "value >> 32" triggers -Werror=shift-count-overflow
+    // even though this branch is never taken.
+    value |= (value >> 16) >> 16;
   }
   return value + 1;
 }
@@ -181,7 +184,10 @@ static inline iree_device_size_t iree_device_size_next_power_of_two(
   value |= value >> 8;
   value |= value >> 16;
   if (sizeof(iree_device_size_t) == 8) {
-    value |= value >> 32;
+    // Shift by 32 as two shifts of 16: on 32-bit targets iree_device_size_t
+    // is 32 bits wide and "value >> 32" triggers -Werror=shift-count-overflow
+    // even though this branch is never taken.
+    value |= (value >> 16) >> 16;
   }
   return value + 1;
 }

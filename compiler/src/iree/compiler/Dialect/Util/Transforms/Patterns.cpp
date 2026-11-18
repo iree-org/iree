@@ -487,6 +487,13 @@ struct MergeIndexSwitchPattern : OpRewritePattern<scf::IndexSwitchOp> {
       return failure();
     }
 
+    // The merged switch takes prevOp's selector: both must switch on the same
+    // value (e.g. the variant selections of two dispatches of executables with
+    // different variant conditions differ).
+    if (prevOp.getArg() != nextOp.getArg()) {
+      return rewriter.notifyMatchFailure(nextOp, "selectors differ");
+    }
+
     // Require that the cases line up exactly. There's probably some merging
     // we could do in other cases but it'd be best to leave other patterns to
     // hoist/CSE cases/etc instead.
@@ -558,7 +565,7 @@ struct MergeIndexSwitchPattern : OpRewritePattern<scf::IndexSwitchOp> {
       for (auto yieldValue : yieldB.getOperands()) {
         // Track the new local values yielded by the region, ensuring we check
         // what the first region may have produced and been captured implicitly.
-        yieldValues.push_back(localMapping.lookupOrNull(yieldValue));
+        yieldValues.push_back(localMapping.lookupOrDefault(yieldValue));
       }
 
       // Add the merged yield containing results from both regions.

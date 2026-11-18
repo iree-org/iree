@@ -79,6 +79,17 @@ def LLVMCPUCheckIRBeforeLLVMConversionPass :
   ];
 }
 
+def LLVMCPUDecomposeGroupMmt4DPass :
+    InterfacePass<"iree-llvmcpu-decompose-group-mmt4d", "mlir::FunctionOpInterface"> {
+  let summary = "Decomposes grouped mmt4d ops after workgroup tiling";
+  let dependentDialects = [
+    "::mlir::arith::ArithDialect",
+    "::mlir::linalg::LinalgDialect",
+    "::mlir::scf::SCFDialect",
+    "::mlir::tensor::TensorDialect"
+  ];
+}
+
 def LLVMCPUEmitVectorizationRemarksPass :
     InterfacePass<"iree-llvmcpu-emit-vectorization-remarks", "mlir::FunctionOpInterface"> {
   let summary = "Emit vectorization remarks on Linalg ops";
@@ -270,12 +281,16 @@ def LLVMCPUVirtualVectorLoweringPass :
       [{Split vector transfers between slow (masked) and fast "
         "(unmasked) variants. Possible options are:\n"
           "\tnone [default]: keep unsplit vector.transfer and pay the price\n"
-          "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
+          "\tlinalg-copy: use memref.copy for the slow path\n"
           "\tvector-transfers: use extra small unmasked vector.transfers for"
           " the slow path\n}]>,
     Option<"enableArmI8mm", "enable-arm-i8mm", "bool",
       /*default=*/ "false",
       "Enables arm i8mm lowering patterns">,
+    Option<"skipIntermediateRoundings", "skip-intermediate-roundings", "bool",
+      /*default=*/ "true",
+      "Allow skipping intermediate roundings, e.g. in f16 arithmetic "
+      "internally using f32">,
   ];
 }
 

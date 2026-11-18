@@ -27,7 +27,6 @@ func.func @main(%arg0: tensor<?x240x320x3xi8>) -> tensor<?x6xi8> {
   %c1 = arith.constant 1 : index
   %0 = tensor.empty() : tensor<4420xi32>
   %1 = tensor.empty() : tensor<i32>
-  %2 = tensor.empty() : tensor<4420x6xi8>
   %3 = tensor.empty() : tensor<4420xi1>
   %expanded = tensor.expand_shape %3 [[0, 1, 2]] output_shape [1, 4420, 1] : tensor<4420xi1> into tensor<1x4420x1xi1>
   // Loop carries two aliasable transients: %arg2 (counter) and %arg3 (accumulator).
@@ -76,16 +75,13 @@ func.func @main(%arg0: tensor<?x240x320x3xi8>) -> tensor<?x6xi8> {
   %extracted = tensor.extract %4#0[] : tensor<i32>
   %5 = arith.index_cast %extracted : i32 to index
   %extracted_slice = tensor.extract_slice %collapsed[0] [%5] [1] : tensor<4420xi32> to tensor<?xi32>
-  %expanded_2 = tensor.expand_shape %2 [[0, 1], [2]] output_shape [1, 4420, 6] : tensor<4420x6xi8> into tensor<1x4420x6xi8>
   %expanded_3 = tensor.expand_shape %extracted_slice [[0, 1]] output_shape [1, %5] : tensor<?xi32> into tensor<1x?xi32>
   %dim = tensor.dim %expanded_3, %c1 : tensor<1x?xi32>
   %6 = tensor.empty(%dim) : tensor<1x?x6xi8>
   %7 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%expanded_3 : tensor<1x?xi32>) outs(%6 : tensor<1x?x6xi8>) {
   ^bb0(%in: i32, %out: i8):
-    %8 = arith.index_cast %in : i32 to index
-    %9 = linalg.index 2 : index
-    %extracted_5 = tensor.extract %expanded_2[%c0, %8, %9] : tensor<1x4420x6xi8>
-    linalg.yield %extracted_5 : i8
+    %8 = arith.trunci %in : i32 to i8
+    linalg.yield %8 : i8
   } -> tensor<1x?x6xi8>
   %collapsed_4 = tensor.collapse_shape %7 [[0, 1], [2]] : tensor<1x?x6xi8> into tensor<?x6xi8>
   return %collapsed_4 : tensor<?x6xi8>

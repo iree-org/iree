@@ -116,6 +116,10 @@ bool hasLlvmUkernel(DictionaryAttr attr, StringRef ukernelCategory = "");
 /// Returns true if `attr` has `feature` in its CPU features.
 bool hasFeature(DictionaryAttr targetConfig, StringRef feature);
 
+/// Returns true if the CPU target configuration enables inner-tiled data-tiling
+/// layouts (`enable_inner_tiled`).
+bool isInnerTiledEnabled(DictionaryAttr targetConfig);
+
 /// Architecture identification.
 bool isX86(DictionaryAttr targetConfig);
 bool isX86_64(DictionaryAttr targetConfig);
@@ -123,6 +127,7 @@ bool isAArch64(DictionaryAttr targetConfig);
 bool isRISCV(DictionaryAttr targetConfig);
 bool isRISCV32(DictionaryAttr targetConfig);
 bool isRISCV64(DictionaryAttr targetConfig);
+bool isWasm(DictionaryAttr targetConfig);
 
 /// Get maximum workgroup count in [x, y, z] for target attribute if it is
 /// available. Returns ShapedType::kDynamic if it is unknown.

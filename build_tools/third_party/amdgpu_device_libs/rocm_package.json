@@ -1,0 +1,6 @@
+{
+  "url": "https://stable.repo.amd.com/rocm/core/packages/ubuntu2404/pool/main/amdrocm-llvm10.1_10.1.0-3_amd64.deb",
+  "sha256": "6a4727102d830f6c97b911351192b15623189278afad9b4558514a6fe51ca58a",
+  "payload": "data.tar.xz",
+  "bitcode_path": "opt/rocm/core-10.1/lib/llvm/amdgcn/bitcode"
+}

@@ -2,7 +2,8 @@
 // RUN: FileCheck %s
 
 func.func @sort1D(%1: tensor<4xi32>) -> tensor<4xi32> {
-  %2 = iree_linalg_ext.sort dimension(0) outs(%1 : tensor<4xi32>) {
+  %empty = tensor.empty() : tensor<4xi32>
+  %2 = iree_linalg_ext.sort dimension(0) ins(%1 : tensor<4xi32>) outs(%empty : tensor<4xi32>) {
   ^bb0(%arg0: i32, %arg1: i32):
     %3 = arith.cmpi slt, %arg0, %arg1 : i32
     iree_linalg_ext.yield %3 : i1
@@ -20,7 +21,8 @@ func.func @sort1D(%1: tensor<4xi32>) -> tensor<4xi32> {
 // -----
 
 func.func @sort2D_static_shape(%1: tensor<2000x30000xi32>) -> tensor<2000x30000xi32> {
-  %2 = iree_linalg_ext.sort dimension(1) outs(%1 : tensor<2000x30000xi32>) {
+  %empty = tensor.empty() : tensor<2000x30000xi32>
+  %2 = iree_linalg_ext.sort dimension(1) ins(%1 : tensor<2000x30000xi32>) outs(%empty : tensor<2000x30000xi32>) {
   ^bb0(%arg0: i32, %arg1: i32):
     %3 = arith.cmpi slt, %arg0, %arg1 : i32
     iree_linalg_ext.yield %3 : i1
@@ -36,7 +38,8 @@ func.func @sort2D_static_shape(%1: tensor<2000x30000xi32>) -> tensor<2000x30000x
 
 // -----
 func.func @sort3D_dynamic_shape(%4: index, %6: tensor<?x2x4xi32>) -> tensor<?x2x4xi32> {
-  %7 = iree_linalg_ext.sort dimension(2) outs(%6 : tensor<?x2x4xi32>) {
+  %empty = tensor.empty(%4) : tensor<?x2x4xi32>
+  %7 = iree_linalg_ext.sort dimension(2) ins(%6 : tensor<?x2x4xi32>) outs(%empty : tensor<?x2x4xi32>) {
   ^bb0(%arg0: i32, %arg1: i32):
     %8 = arith.cmpi slt, %arg0, %arg1 : i32
     iree_linalg_ext.yield %8 : i1
@@ -52,7 +55,8 @@ func.func @sort3D_dynamic_shape(%4: index, %6: tensor<?x2x4xi32>) -> tensor<?x2x
 
 // -----
 func.func @sort5D_static_shape(%1: tensor<4x100x100x200x300xi32>) -> tensor<4x100x100x200x300xi32> {
-  %2 = iree_linalg_ext.sort dimension(0) outs(%1 : tensor<4x100x100x200x300xi32>) {
+  %empty = tensor.empty() : tensor<4x100x100x200x300xi32>
+  %2 = iree_linalg_ext.sort dimension(0) ins(%1 : tensor<4x100x100x200x300xi32>) outs(%empty : tensor<4x100x100x200x300xi32>) {
   ^bb0(%arg0: i32, %arg1: i32):
     %3 = arith.cmpi sgt, %arg0, %arg1 : i32
     iree_linalg_ext.yield %3 : i1

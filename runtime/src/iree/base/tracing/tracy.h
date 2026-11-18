@@ -147,7 +147,7 @@ void iree_tracing_mutex_terminate(uint32_t lock_id);
 void iree_tracing_mutex_before_lock(uint32_t lock_id);
 void iree_tracing_mutex_after_lock(uint32_t lock_id);
 void iree_tracing_mutex_after_try_lock(uint32_t lock_id, bool was_acquired);
-void iree_tracing_mutex_after_unlock(uint32_t lock_id);
+void iree_tracing_mutex_before_unlock(uint32_t lock_id);
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
@@ -280,15 +280,26 @@ void* iree_tracing_obscure_ptr(void* ptr);
 #define IREE_TRACE_FRAME_MARK_END_NAMED(name_literal) \
   ___tracy_emit_frame_mark_end(name_literal)
 
-#define IREE_TRACE_MESSAGE(level, value_literal) \
-  ___tracy_emit_messageLC(value_literal, IREE_TRACING_MESSAGE_LEVEL_##level, 0)
+// Maps IREE_TRACING_MESSAGE_LEVEL_* to Tracy message severities.
+#define IREE_TRACING_MESSAGE_LEVEL_ERROR_SEVERITY TracyMessageSeverityError
+#define IREE_TRACING_MESSAGE_LEVEL_WARNING_SEVERITY TracyMessageSeverityWarning
+#define IREE_TRACING_MESSAGE_LEVEL_INFO_SEVERITY TracyMessageSeverityInfo
+#define IREE_TRACING_MESSAGE_LEVEL_VERBOSE_SEVERITY TracyMessageSeverityTrace
+#define IREE_TRACING_MESSAGE_LEVEL_DEBUG_SEVERITY TracyMessageSeverityDebug
+
+#define IREE_TRACE_MESSAGE(level, value_literal)                          \
+  ___tracy_emit_logStringL(IREE_TRACING_MESSAGE_LEVEL_##level##_SEVERITY, \
+                           IREE_TRACING_MESSAGE_LEVEL_##level, 0,         \
+                           value_literal)
 #define IREE_TRACE_MESSAGE_COLORED(color, value_literal) \
-  ___tracy_emit_messageLC(value_literal, color, 0)
-#define IREE_TRACE_MESSAGE_DYNAMIC(level, value, value_length) \
-  ___tracy_emit_messageC(value, value_length,                  \
-                         IREE_TRACING_MESSAGE_LEVEL_##level, 0)
-#define IREE_TRACE_MESSAGE_DYNAMIC_COLORED(color, value, value_length) \
-  ___tracy_emit_messageC(value, value_length, color, 0)
+  ___tracy_emit_logStringL(TracyMessageSeverityInfo, color, 0, value_literal)
+#define IREE_TRACE_MESSAGE_DYNAMIC(level, value, value_length)                 \
+  ___tracy_emit_logString(IREE_TRACING_MESSAGE_LEVEL_##level##_SEVERITY,       \
+                          IREE_TRACING_MESSAGE_LEVEL_##level, 0, value_length, \
+                          value)
+#define IREE_TRACE_MESSAGE_DYNAMIC_COLORED(color, value, value_length)      \
+  ___tracy_emit_logString(TracyMessageSeverityInfo, color, 0, value_length, \
+                          value)
 
 // Utilities:
 #define IREE_TRACE_IMPL_GET_VARIADIC_HELPER_(_1, _2, _3, NAME, ...) NAME
@@ -307,24 +318,24 @@ void* iree_tracing_obscure_ptr(void* ptr);
 
 #define IREE_TRACE_ALLOC(ptr, size)               \
   ___tracy_emit_memory_alloc_callstack(ptr, size, \
-                                       IREE_TRACING_MAX_CALLSTACK_DEPTH, 0)
+                                       IREE_TRACING_MAX_CALLSTACK_DEPTH)
 #define IREE_TRACE_FREE(ptr) \
-  ___tracy_emit_memory_free_callstack(ptr, IREE_TRACING_MAX_CALLSTACK_DEPTH, 0)
+  ___tracy_emit_memory_free_callstack(ptr, IREE_TRACING_MAX_CALLSTACK_DEPTH)
 #define IREE_TRACE_ALLOC_NAMED(name, ptr, size) \
   ___tracy_emit_memory_alloc_callstack_named(   \
-      ptr, size, IREE_TRACING_MAX_CALLSTACK_DEPTH, 0, name)
+      ptr, size, IREE_TRACING_MAX_CALLSTACK_DEPTH, name)
 #define IREE_TRACE_FREE_NAMED(name, ptr)     \
   ___tracy_emit_memory_free_callstack_named( \
-      ptr, IREE_TRACING_MAX_CALLSTACK_DEPTH, 0, name)
+      ptr, IREE_TRACING_MAX_CALLSTACK_DEPTH, name)
 
 #else
 
-#define IREE_TRACE_ALLOC(ptr, size) ___tracy_emit_memory_alloc(ptr, size, 0)
-#define IREE_TRACE_FREE(ptr) ___tracy_emit_memory_free(ptr, 0)
+#define IREE_TRACE_ALLOC(ptr, size) ___tracy_emit_memory_alloc(ptr, size)
+#define IREE_TRACE_FREE(ptr) ___tracy_emit_memory_free(ptr)
 #define IREE_TRACE_ALLOC_NAMED(name_literal, ptr, size) \
-  ___tracy_emit_memory_alloc_named(ptr, size, 0, name_literal)
+  ___tracy_emit_memory_alloc_named(ptr, size, name_literal)
 #define IREE_TRACE_FREE_NAMED(name_literal, ptr) \
-  ___tracy_emit_memory_free_named(ptr, 0, name_literal)
+  ___tracy_emit_memory_free_named(ptr, name_literal)
 
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS
 

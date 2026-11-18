@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
@@ -208,11 +209,17 @@ public:
                           OperandRange targetOperands);
 
 private:
-  // Internal implementation that handles MOVE bit computation.
+  // Returns registers for all forwarded successor operands, including those
+  // coalesced with their destinations. Ref registers carry edge-specific MOVE
+  // bits shared by IR annotation and branch register remapping.
+  SmallVector<Register, 8>
+  getSuccessorOperandRegisters(Operation *branchOp, unsigned successorIndex);
+
+  // Orders register remaps and resolves cycles using precomputed source
+  // registers and their MOVE bits.
   SmallVector<std::pair<Register, Register>, 8>
   remapSuccessorRegisters(Operation *branchOp, Block *targetBlock,
-                          OperandRange targetOperands,
-                          unsigned baseOperandIndex);
+                          ArrayRef<Register> operandRegisters);
 
 public:
   // Returns true if the given discard op can be fully elided because all its

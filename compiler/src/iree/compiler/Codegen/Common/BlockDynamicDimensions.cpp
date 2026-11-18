@@ -226,7 +226,6 @@ static LogicalResult blockDynamicDimensions(
     std::optional<ReshapeOps> reshapes =
         blockDynamicDimensionsOfValue(rewriter, resultDivisibilityInfo, result);
     if (reshapes) {
-      llvm::SmallPtrSet<Operation *, 1> ignoreUses;
       auto replaceIf = [&](OpOperand &use) {
         Operation *user = use.getOwner();
         if (user == reshapes->expandShapeOp) {

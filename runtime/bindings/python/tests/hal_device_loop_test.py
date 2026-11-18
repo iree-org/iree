@@ -75,5 +75,22 @@ class HalDeviceLoopBridgeTest(unittest.TestCase):
         self.allocator = self.device.allocator
 
 
+class HalDeviceLoopBridgeCancellationTest(unittest.IsolatedAsyncioTestCase):
+    async def test_stop_cancels_pending_future_on_its_event_loop(self):
+        loop = asyncio.get_running_loop()
+        loop.set_debug(True)
+        device = get_device("local-sync")
+        bridge = HalDeviceLoopBridge(device, loop)
+        try:
+            future = bridge.on_semaphore(device.create_semaphore(0), 1, "pending")
+            cancelled = asyncio.Event()
+            future.add_done_callback(lambda _: cancelled.set())
+            bridge.stop()
+            await asyncio.wait_for(cancelled.wait(), 1)
+            self.assertTrue(future.cancelled())
+        finally:
+            bridge.stop()
+
+
 if __name__ == "__main__":
     unittest.main()

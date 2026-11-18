@@ -60,7 +60,10 @@ void createTorchToIREEPipeline(
   pm.addNestedPass<func::FuncOp>(torch::Torch::createFuseQuantizedOpsPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<func::FuncOp>(torch::Torch::createScalarizeShapesPass());
-  pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTMTensorPass());
+  pm.addNestedPass<func::FuncOp>(
+      torch::Torch::createRestructureNonConstantAxesPass());
+  pm.addNestedPass<func::FuncOp>(
+      torch::createConvertTorchToTMTensorPass(options.allowNonFinites));
   pm.addNestedPass<func::FuncOp>(
       TorchInput::createConvertTMTensorToLinalgExtPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTensorPass());
@@ -68,7 +71,8 @@ void createTorchToIREEPipeline(
       TorchInput::createConvertTorchUnstructuredToLinalgExtPass());
   pm.addNestedPass<func::FuncOp>(
       TorchInput::createConvertTorchQuantizationToLinalgExtPass());
-  pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToLinalgPass());
+  pm.addNestedPass<func::FuncOp>(
+      torch::createConvertTorchToLinalgPass(options.allowNonFinites));
   pm.addNestedPass<func::FuncOp>(createCSEPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToSCFPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToArithPass());

@@ -8,7 +8,13 @@ name: CI - Windows x64 MSVC
 
 on:
   workflow_call:
+    secrets:
+      AZURE_CCACHE_CONNECTION_STRING:
+        required: false
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   windows_x64_msvc:
@@ -23,6 +29,7 @@ jobs:
       - name: "Checking out repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           submodules: true
       # TODO(#18813): Remove this. Environment setup needs to happen on runners, not in workflows.
       - name: "Create build dir"
@@ -35,7 +42,7 @@ jobs:
           echo  "BUILD_DIR_BASH=$bashBuildDir" >> $env:GITHUB_ENV
           Write-Host "Converted Build Directory For Bash: $bashBuildDir"
       - name: "Setting up Python"
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.11"
       - name: "Installing Python packages"
@@ -67,11 +74,11 @@ jobs:
       - name: "Building IREE"
         shell: bash
         run: |
-          echo "Building in ${{ env.BUILD_DIR_BASH }}"
+          echo "Building in ${BUILD_DIR_BASH}"
           source ./build_tools/cmake/setup_sccache.sh
-          bash ./build_tools/cmake/build_all.sh ${{ env.BUILD_DIR_BASH }}
+          bash ./build_tools/cmake/build_all.sh "${BUILD_DIR_BASH}"
       - name: "Testing IREE"
-        run: bash ./build_tools/cmake/ctest_all.sh ${{ env.BUILD_DIR_BASH }}
+        run: bash ./build_tools/cmake/ctest_all.sh "$env:BUILD_DIR_BASH"
       - name: "Clean up build dir"
         if: always()
         run: if (Test-Path -Path "$Env:BUILD_DIR_POWERSHELL") {Remove-Item -Path "$Env:BUILD_DIR_POWERSHELL" -Recurse -Force}

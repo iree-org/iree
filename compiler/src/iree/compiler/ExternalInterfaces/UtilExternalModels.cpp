@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -48,7 +49,7 @@ getDivisibilityOfOperand(Value v,
   APInt intVal;
   if (matchPattern(v, m_ConstantInt(&intVal))) {
     uint64_t udiv = intVal.getZExtValue();
-    uint64_t sdiv = std::abs(intVal.getSExtValue());
+    uint64_t sdiv = llvm::AbsoluteValue(intVal.getSExtValue());
     return IREE::Util::ConstantIntDivisibility(udiv, sdiv);
   }
   return IREE::Util::ConstantIntDivisibility(1, 1);
@@ -70,7 +71,7 @@ public:
   IREE::Util::ConstantIntDivisibility
   visitConstantExpr(AffineConstantExpr expr) {
     // Constant expressions are trivial, since they are always static.
-    uint64_t constValue = std::abs(expr.getValue());
+    uint64_t constValue = llvm::AbsoluteValue(expr.getValue());
     return IREE::Util::ConstantIntDivisibility(constValue, constValue);
   }
 
@@ -144,7 +145,7 @@ public:
     if (!constRhs || constRhs.getValue() == 0) {
       return IREE::Util::ConstantIntDivisibility(1, 1);
     }
-    auto constValue = static_cast<uint64_t>(std::abs(constRhs.getValue()));
+    uint64_t constValue = llvm::AbsoluteValue(constRhs.getValue());
     IREE::Util::ConstantIntDivisibility lhsDiv = visit(expr.getLHS());
     // If the LHS is always a multiple of constValue, x mod constValue is
     // always zero. Divisibility 0 is the lattice top ("divides everything").
@@ -177,7 +178,7 @@ private:
     if (!constRhs || constRhs.getValue() == 0) {
       return IREE::Util::ConstantIntDivisibility(1, 1);
     }
-    auto constValue = static_cast<uint64_t>(std::abs(constRhs.getValue()));
+    uint64_t constValue = llvm::AbsoluteValue(constRhs.getValue());
     IREE::Util::ConstantIntDivisibility lhsDiv = visit(expr.getLHS());
     uint64_t divUDiv =
         lhsDiv.udiv() % constValue == 0 ? lhsDiv.udiv() / constValue : 1;
@@ -424,7 +425,7 @@ struct ArithConstantInferIntDivisibilityOpInterface
     if (constAttr) {
       const APInt &value = constAttr.getValue();
       uint64_t udiv = value.getZExtValue();
-      uint64_t sdiv = std::abs(value.getSExtValue());
+      uint64_t sdiv = llvm::AbsoluteValue(value.getSExtValue());
       setResultDivs(constOp.getResult(),
                     IREE::Util::ConstantIntDivisibility(udiv, sdiv));
     }
@@ -471,8 +472,9 @@ struct ArithDivUIInferIntDivisibilityOpInterface
                            ? lhsDivisibility.udiv() / intVal.getZExtValue()
                            : 1;
     uint64_t divSDiv =
-        lhsDivisibility.sdiv() % std::abs(intVal.getSExtValue()) == 0
-            ? lhsDivisibility.sdiv() / std::abs(intVal.getSExtValue())
+        lhsDivisibility.sdiv() % llvm::AbsoluteValue(intVal.getSExtValue()) == 0
+            ? lhsDivisibility.sdiv() /
+                  llvm::AbsoluteValue(intVal.getSExtValue())
             : 1;
 
     setResultDivs(divOp, IREE::Util::ConstantIntDivisibility(divUDiv, divSDiv));
@@ -647,6 +649,16 @@ struct LinalgOpTiedOpInterface
   getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
     return {linalgOp.getDpsInitsMutable()[resultIndex].getOperandNumber()};
+  }
+
+  std::pair<unsigned, unsigned>
+  getTiedOperandsIndexAndLength(Operation *op) const {
+    auto linalgOp = cast<OpTy>(op);
+    MutableOperandRange inits = linalgOp.getDpsInitsMutable();
+    if (inits.empty()) {
+      return {op->getNumOperands(), 0};
+    }
+    return {inits.begin()->getOperandNumber(), inits.size()};
   }
 
   SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {

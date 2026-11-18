@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "llvm/Support/DebugLog.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -101,44 +100,9 @@ static LogicalResult packPartialReduction(IRRewriter &rewriter,
   // To bypass this for now, this pass expects that padding should be done
   // properly before this pass. This pass is generally placed after
   // GPUApplyPaddingLevel, which is the only reason it works, otherwise it's
-  // wrong in general. The other problem with the transformation is it does
-  // not account for linalg.index in the body of the op. These commonly come
-  // up because general masking of reductions requires this. We fix up the index
-  // ops after the fact, but it would be better if linalg::pack just handled
-  // this correctly in the first place. The ideal solution is to implement a
+  // wrong in general. The ideal solution is to implement a
   // more general version of linalg::pack that works on IndexingOpInterface and
   // handles things correctly.
-  //
-  // Fix linalg.index ops in the body. After packing, dimension d is split into
-  // [outer=d, inner=numLoops+idx]. The original linalg.index d now refers to
-  // the outer dimension. Replace it with: outer * T + inner.
-  SmallVector<linalg::IndexOp> indexOps;
-  packedOp.getBlock()->walk(
-      [&](linalg::IndexOp op) { indexOps.push_back(op); });
-  for (linalg::IndexOp indexOp : indexOps) {
-    uint64_t dim = indexOp.getDim();
-    auto it = llvm::find(dimsToPackVec, dim);
-    if (it == dimsToPackVec.end()) {
-      continue;
-    }
-    unsigned idx = std::distance(dimsToPackVec.begin(), it);
-    unsigned innerDim = numLoops + idx;
-    int64_t tileSize = threadSizes[dim];
-
-    rewriter.setInsertionPointAfter(indexOp);
-    Location loc = indexOp.getLoc();
-    Value inner = linalg::IndexOp::create(rewriter, loc, innerDim);
-    AffineExpr outerExpr, innerExpr;
-    bindDims(rewriter.getContext(), outerExpr, innerExpr);
-    OpFoldResult combined = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, outerExpr * tileSize + innerExpr,
-        {getAsOpFoldResult(indexOp.getResult()), getAsOpFoldResult(inner)});
-    Value combinedVal =
-        getValueOrCreateConstantIndexOp(rewriter, loc, combined);
-    rewriter.replaceUsesWithIf(indexOp, combinedVal, [&](OpOperand &use) {
-      return use.getOwner() != combinedVal.getDefiningOp();
-    });
-  }
 
   // Now build the updated lowering config for the packed op.
   // The packed op has numLoops + dimsToPackVec.size() dimensions.

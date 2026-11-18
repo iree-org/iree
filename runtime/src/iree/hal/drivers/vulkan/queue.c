@@ -2284,6 +2284,18 @@ static iree_status_t iree_hal_vulkan_queue_acquire_native_replay_under_lock(
         queue->native_replay_cache.one_shot_bypass_count + 1;
     return iree_ok_status();
   }
+  // Replay only refreshes dispatch BDA binding tables. Copy commands and
+  // indirect dispatch parameters resolve binding table slots into the native
+  // command buffer when it is recorded, so replaying one against a different
+  // binding table would access the buffers of the submission that recorded it.
+  // Fill and update commands do the same but already bypassed above because
+  // they require descriptor sets.
+  if (iree_hal_vulkan_command_buffer_has_binding_table_dependent_commands(
+          submission->execute.command_buffer)) {
+    queue->native_replay_cache.binding_table_bypass_count =
+        queue->native_replay_cache.binding_table_bypass_count + 1;
+    return iree_ok_status();
+  }
   if (iree_hal_vulkan_queue_profile_requests_queue_device_event(submission) ||
       iree_hal_vulkan_queue_profile_requests_dispatch_events(submission)) {
     queue->native_replay_cache.profile_bypass_count =
@@ -6323,6 +6335,10 @@ bool iree_hal_vulkan_queue_query_i64(iree_hal_vulkan_queue_t* queue,
   } else if (iree_string_view_equal(key, IREE_SV("one_shot_bypass_count"))) {
     *out_value = iree_hal_vulkan_queue_i64_saturate_u64(
         queue->native_replay_cache.one_shot_bypass_count);
+  } else if (iree_string_view_equal(key,
+                                    IREE_SV("binding_table_bypass_count"))) {
+    *out_value = iree_hal_vulkan_queue_i64_saturate_u64(
+        queue->native_replay_cache.binding_table_bypass_count);
   } else if (iree_string_view_equal(key, IREE_SV("capacity_bypass_count"))) {
     *out_value = iree_hal_vulkan_queue_i64_saturate_u64(
         queue->native_replay_cache.capacity_bypass_count);

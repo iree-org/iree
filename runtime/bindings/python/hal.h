@@ -184,7 +184,8 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
                     py::handle signal_semaphores);
   void QueueCopy(HalBuffer& src_buffer, HalBuffer& dst_buffer,
                  py::handle wait_semaphores, py::handle signal_semaphores);
-  HalBufferView FromDLPackCapsule(py::object capsule);
+  HalBufferView FromDLPackCapsule(py::object capsule, int memory_type,
+                                  int memory_access);
   py::object CreateDLPackCapsule(HalBufferView& bufferView,
                                  int device_type_code, int device_id);
 
@@ -316,10 +317,16 @@ class HalMappedMemory {
   static HalMappedMemory Create(iree_hal_buffer_t* buffer) {
     iree_device_size_t byte_length = iree_hal_buffer_byte_length(buffer);
     iree_hal_buffer_mapping_t mapped_memory = {{0}};
+    // Preserve contents and expose writes only when the buffer permits them.
+    iree_hal_memory_access_t allowed_access =
+        iree_hal_buffer_allowed_access(buffer);
+    iree_hal_memory_access_t access = IREE_HAL_MEMORY_ACCESS_READ;
+    if (iree_any_bit_set(allowed_access, IREE_HAL_MEMORY_ACCESS_WRITE)) {
+      access |= IREE_HAL_MEMORY_ACCESS_WRITE;
+    }
     CheckApiStatus(
-        iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-                                  IREE_HAL_MEMORY_ACCESS_READ, 0, byte_length,
-                                  &mapped_memory),
+        iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED, access,
+                                  0, byte_length, &mapped_memory),
         "Could not map memory");
     return HalMappedMemory(mapped_memory, buffer);
   }
@@ -332,7 +339,7 @@ class HalMappedMemory {
 
   iree_hal_buffer_mapping_t& mapped_memory() { return mapped_memory_; }
 
-  // Buffer protocol for PyMemoryView_FromObject (used by SimpleNewFromData).
+  // Buffer protocol for PyMemoryView_FromObject and NumPy arrays.
   int HandleBufferProtocol(Py_buffer* view, int flags);
 
  private:

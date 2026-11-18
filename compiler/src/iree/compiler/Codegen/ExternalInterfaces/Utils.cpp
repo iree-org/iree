@@ -423,7 +423,11 @@ Operation *lowerGenericOpWithResolvedLayouts(
     // an explicit layout conversion, which is not supported. We do not expect
     // such instances to arise from dispatch creation / data tiling.
     for (OpOperand &operand : genericOp->getOpOperands()) {
-      auto operandType = cast<RankedTensorType>(operand.get().getType());
+      auto operandType = dyn_cast<RankedTensorType>(operand.get().getType());
+      // Scalar inputs have no layout to materialize.
+      if (!operandType) {
+        continue;
+      }
       MaterializeEncodingInfo materializeEncodingInfo =
           getEncodingInfoFromLayout(operandType, layoutAttr);
       if (!IREE::Codegen::isIdentityLayout(materializeEncodingInfo)) {

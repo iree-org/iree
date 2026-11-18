@@ -750,8 +750,9 @@ func.func @warp_and_lane_foralls_with_fusions(%2: tensor<2x2x64xf32>) -> tensor<
 //     CHECK-DAG:     %[[IN_SLICE:.+]] = tensor.extract_slice %[[INPUT]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
 //     CHECK-DAG:     %[[OUT_SLICE:.+]] = tensor.extract_slice %[[INIT_ARG]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
 //     CHECK-DAG:     %[[PRODUCER:.+]] = linalg.copy ins(%[[IN_SLICE]]{{.*}}
-//     CHECK-DAG:     %[[COPY:.+]] = linalg.copy ins(%[[PRODUCER]]{{.*}}
-//     CHECK-DAG:     %[[CONSUMER:.+]] = linalg.copy ins(%[[COPY]]{{.*}} outs(%[[OUT_SLICE]]
+//     CHECK-DAG:     %[[COPY:.+]] = linalg.copy ins(%[[PRODUCER]]{{.*}} outs(%[[OUT_SLICE]]
+//     CHECK-DAG:     %[[CONSUMER_OUT_SLICE:.+]] = tensor.extract_slice %[[INIT_ARG]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
+//     CHECK-DAG:     %[[CONSUMER:.+]] = linalg.copy ins(%[[COPY]]{{.*}} outs(%[[CONSUMER_OUT_SLICE]]
 //         CHECK:     scf.forall.in_parallel {
 //     CHECK-DAG:       tensor.parallel_insert_slice %[[CONSUMER]] into %[[INIT_ARG]][%[[TID0]], %[[TID1]], %[[TID2]]] [1, 1, 1]
 //         CHECK:     }

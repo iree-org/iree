@@ -326,6 +326,12 @@ bool hasFeature(DictionaryAttr targetConfig, StringRef feature) {
   return false;
 }
 
+bool isInnerTiledEnabled(DictionaryAttr targetConfig) {
+  auto enabled = dyn_cast_if_present<BoolAttr>(
+      targetConfig ? targetConfig.get("enable_inner_tiled") : Attribute());
+  return enabled && enabled.getValue();
+}
+
 bool isX86(DictionaryAttr targetConfig) {
   std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isX86();
@@ -354,6 +360,11 @@ bool isRISCV32(DictionaryAttr targetConfig) {
 bool isRISCV64(DictionaryAttr targetConfig) {
   std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isRISCV64();
+}
+
+bool isWasm(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
+  return triple && triple.value().isWasm();
 }
 
 std::array<int64_t, 3> getMaxWorkgroupCount(DictionaryAttr targetConfig) {

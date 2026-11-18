@@ -1,7 +1,7 @@
 ---
 date: 2026-07-23
 authors:
-  - egebeysel   # from docs/website/docs/community/blog/.authors.yml
+  - egebeysel   # from docs/website/docs/blog/.authors.yml
 categories:
   - Performance
 tags:
@@ -122,8 +122,8 @@ layout that maps cleanly onto the vector unit. It is off by default; most models
 especially matmul-heavy models, benefit from this. On RISC-V the tile shape
 depends on
 VLEN, so the `+zvl*b` value chosen above also determines the produced layout. The
-[data-tiling walkthrough](https://iree.dev/community/blog/2025-08-25-data-tiling-walkthrough/)
-and [mmt4d blogpost](https://iree.dev/community/blog/2021-10-13-matrix-multiplication-with-mmt4d/)
+[data-tiling walkthrough](./data-tiling-walkthrough.md)
+and [mmt4d blogpost](./mmt4d.md)
 cover the mechanism in detail.
 
 ### im2col for convolutions
@@ -149,8 +149,8 @@ on RISC-V. Enabling data-tiling while disabling microkernels makes the packed
 `mmt4d` fall back to generic vectorization; although this also generally produces
 efficient code, the microkernel path is currently the most stable one.
 For background, see the
-[microkernels](https://iree.dev/community/blog/2024-01-22-microkernels/) and
-[mmt4d](https://iree.dev/community/blog/2021-10-13-mmt4d/) posts.
+[microkernels](./microkernels.md) and
+[mmt4d](./mmt4d.md) posts.
 
 ### Static vs. scalable RVV
 

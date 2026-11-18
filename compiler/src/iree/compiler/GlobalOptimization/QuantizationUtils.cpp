@@ -20,19 +20,26 @@ int64_t getStorageMagnitude(unsigned bitWidth, bool isUnsigned) {
   return isUnsigned ? llvm::maxUIntN(bitWidth) : llvm::maxIntN(bitWidth) + 1;
 }
 
+std::optional<QuantMinMax> getStorageRange(unsigned bitWidth, bool isUnsigned) {
+  int64_t magnitude = getStorageMagnitude(bitWidth, isUnsigned);
+  if (!magnitude) {
+    return std::nullopt;
+  }
+  return isUnsigned ? QuantMinMax{0, magnitude}
+                    : QuantMinMax{-magnitude, magnitude - 1};
+}
+
 std::optional<QuantizedOperandRanges>
 getQuantizedOperandRanges(unsigned storageBitWidth, bool storageIsUnsigned,
                           std::optional<QuantMinMax> quantMinMax,
                           bool isSymmetric) {
-  int64_t magnitude = getStorageMagnitude(storageBitWidth, storageIsUnsigned);
-  if (!magnitude) {
+  std::optional<QuantMinMax> storage =
+      getStorageRange(storageBitWidth, storageIsUnsigned);
+  if (!storage) {
     return std::nullopt;
   }
-  QuantMinMax storage = storageIsUnsigned
-                            ? QuantMinMax{0, magnitude}
-                            : QuantMinMax{-magnitude, magnitude - 1};
-  QuantMinMax input = quantMinMax.value_or(storage);
-  QuantMinMax zeroPoint = isSymmetric ? QuantMinMax{0, 0} : storage;
+  QuantMinMax input = quantMinMax.value_or(*storage);
+  QuantMinMax zeroPoint = isSymmetric ? QuantMinMax{0, 0} : *storage;
   return QuantizedOperandRanges{input, zeroPoint};
 }
 

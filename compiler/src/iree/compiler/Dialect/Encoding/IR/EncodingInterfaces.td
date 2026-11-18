@@ -147,6 +147,51 @@ def IREEEncoding_SerializableAttr :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns true if the encoding can be dropped after storage element-type
+        legalization has consumed its information, without any further
+        encoding-specific tensor materialization. This does not permit dropping
+        the encoding before element-type legalization.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"canDropWithoutTensorMaterialization",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if importing this encoding may bypass buffer-view metadata
+        assertions. This bypasses shape, element-type, and encoding assertions;
+        it does not imply that arbitrary buffer-view metadata is valid.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"canSkipBufferViewAssertions",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if any otherwise-valid dimension collapse preserves the
+        storage interpretation with this exact encoding attribute, including
+        for dynamic dimensions. Encodings requiring a shape-specific attribute
+        rewrite must not opt in; they can instead implement getCollapsedEncoding
+        for callers that know the original and target shapes.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isInvariantUnderDimCollapse",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns true if the encoding is known as an identity layout.
       }],
       /*retTy=*/"bool",

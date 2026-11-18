@@ -170,7 +170,7 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
       llvm::StringSwitch<vector::VectorTransferSplit>(
           splitVectorTransfersTo.getValue())
           .Case("none", vector::VectorTransferSplit::None)
-          .Case("linalg-copy", vector::VectorTransferSplit::LinalgCopy)
+          .Case("linalg-copy", vector::VectorTransferSplit::MemRefCopy)
           .Case("vector-transfers", vector::VectorTransferSplit::VectorTransfer)
           .Default(vector::VectorTransferSplit::None);
 
@@ -254,7 +254,8 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
     // dimensions of `inner_tiled` itself, so they don't conflict.
     IREE::Codegen::populateUnrollInnerTiledPatterns(patterns);
     IREE::Codegen::populateDropInnerTiledUnitDimsPatterns(patterns);
-    IREE::Codegen::populateLowerInnerTiledPatterns(patterns);
+    IREE::Codegen::populateLowerInnerTiledPatterns(patterns,
+                                                   skipIntermediateRoundings);
 
     (void)applyPatternsGreedily(funcOp, std::move(patterns));
   }

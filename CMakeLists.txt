@@ -84,6 +84,7 @@ set(IREE_NATIVE_TEST_TIMEOUT_DEFAULT 60 CACHE STRING
 option(IREE_BUILD_DOCS "Builds IREE documentation files." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
+option(IREE_BUILD_COMPILER_PYTHON_TOOLS "Bundle compiler tools with Python bindings" ON)
 option(IREE_BUILD_TRACY "Enables building the 'iree-tracy-capture' CLI tool and includes it in runtime Python bindings." OFF)
 option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
 option(IREE_BUILD_CLANG_TOOLS_EXTRA "Enables building the 'clang-tools-extra' LLVM targets." OFF)
@@ -769,15 +770,15 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # "Bootstrapping" by first looking for the optional Development component
   # seems to be robust generally.
   # See: https://reviews.llvm.org/D118148
-  # If building Python packages, we have a hard requirement on 3.10+.
-  find_package(Python3 3.10 COMPONENTS Interpreter Development NumPy)
-  find_package(Python3 3.10 COMPONENTS Interpreter Development.Module Development.SABIModule NumPy REQUIRED)
+  # If building Python packages, we have a hard requirement on 3.11+.
+  find_package(Python3 3.11 COMPONENTS Interpreter Development NumPy)
+  find_package(Python3 3.11 COMPONENTS Interpreter Development.Module Development.SABIModule NumPy REQUIRED)
   # Some parts of the build use FindPython instead of FindPython3. Why? No
   # one knows, but they are different. So make sure to bootstrap this one too.
   # Not doing this here risks them diverging, which on multi-Python systems,
   # can be troublesome. Note that nanobind requires FindPython.
   set(Python_EXECUTABLE "${Python3_EXECUTABLE}")
-  find_package(Python 3.10 COMPONENTS Interpreter Development.Module Development.SABIModule NumPy REQUIRED)
+  find_package(Python 3.11 COMPONENTS Interpreter Development.Module Development.SABIModule NumPy REQUIRED)
 
   # Auto-detect IREE_ENABLE_PYTHON_STABLE_ABI: enable for CPython 3.12+ with
   # GIL. Can be overridden by explicitly setting the cache variable.
@@ -978,12 +979,14 @@ else()
   endif()
 
   # Ensure that LLVM-based dependencies needed for testing are included.
-  add_dependencies(iree-test-deps FileCheck)
-  if(IREE_LLD_TARGET)
-    add_dependencies(iree-test-deps ${IREE_LLD_TARGET})
-  endif()
-  if(IREE_CLANG_TARGET)
-    add_dependencies(iree-test-deps ${IREE_CLANG_TARGET})
+  if(IREE_BUILD_TESTS)
+    add_dependencies(iree-test-deps FileCheck)
+    if(IREE_LLD_TARGET)
+      add_dependencies(iree-test-deps ${IREE_LLD_TARGET})
+    endif()
+    if(IREE_CLANG_TARGET)
+      add_dependencies(iree-test-deps ${IREE_CLANG_TARGET})
+    endif()
   endif()
 
   set(BUILD_SHARED_LIBS ${_IREE_ORIG_BUILD_SHARED_LIBS} CACHE BOOL "" FORCE)
@@ -1013,6 +1016,9 @@ if((IREE_ENABLE_RUNTIME_TRACING OR IREE_ENABLE_COMPILER_TRACING) AND
     IREE_TRACING_PROVIDER STREQUAL "tracy")
   message(STATUS "Configuring third_party/tracy")
   list(APPEND CMAKE_MESSAGE_INDENT "  ")
+  # Tracy >= 0.14 defaults TRACY_ENABLE to OFF. Keep it on so the exported
+  # TracyClient target is functional and propagates TRACY_ENABLE to consumers.
+  set(TRACY_ENABLE ON)
   add_subdirectory(third_party/tracy EXCLUDE_FROM_ALL)
   list(POP_BACK CMAKE_MESSAGE_INDENT)
   iree_install_targets(

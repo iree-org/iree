@@ -201,7 +201,7 @@ iree_zone_id_t iree_tracing_zone_begin_impl(
     tracy::MemWrite(&item->zoneTextFat.text,
                     reinterpret_cast<uint64_t>(name_ptr));
     tracy::MemWrite(&item->zoneTextFat.size,
-                    static_cast<uint64_t>(name_length));
+                    static_cast<uint16_t>(name_length));
     TracyQueueCommitC(zoneTextFatThread);
   }
 
@@ -317,7 +317,7 @@ void iree_tracing_mutex_after_try_lock(uint32_t lock_id, bool was_acquired) {
   }
 }
 
-void iree_tracing_mutex_after_unlock(uint32_t lock_id) {
+void iree_tracing_mutex_before_unlock(uint32_t lock_id) {
   auto item = tracy::Profiler::QueueSerial();
   tracy::MemWrite(&item->hdr.type, tracy::QueueType::LockRelease);
   tracy::MemWrite(&item->lockReleaseShared.thread, tracy::GetThreadHandle());
@@ -347,18 +347,20 @@ uint8_t iree_tracing_gpu_context_allocate(iree_tracing_gpu_context_type_t type,
     context_id %= 255;
   }
 
-  uint8_t context_flags = 0;
+  tracy::GpuContextFlags context_flags = tracy::GpuContextNone;
   if (is_calibrated) {
     // Tell tracy we'll be passing calibrated timestamps and not to mess with
     // the times. We'll periodically send GpuCalibration events in case the
     // times drift.
-    context_flags |= tracy::GpuContextCalibration;
+    context_flags = tracy::GpuContextCalibration;
   }
   {
     auto* item = tracy::Profiler::QueueSerial();
     tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuNewContext);
-    tracy::MemWrite(&item->gpuNewContext.cpuTime, cpu_timestamp);
-    tracy::MemWrite(&item->gpuNewContext.gpuTime, gpu_timestamp);
+    tracy::MemWrite(&item->gpuNewContext.cpuTime,
+                    static_cast<int64_t>(cpu_timestamp));
+    tracy::MemWrite(&item->gpuNewContext.gpuTime,
+                    static_cast<int64_t>(gpu_timestamp));
     memset(&item->gpuNewContext.thread, 0, sizeof(item->gpuNewContext.thread));
     tracy::MemWrite(&item->gpuNewContext.period, timestamp_period);
     tracy::MemWrite(&item->gpuNewContext.context, context_id);
@@ -378,7 +380,8 @@ uint8_t iree_tracing_gpu_context_allocate(iree_tracing_gpu_context_type_t type,
     tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuContextName);
     tracy::MemWrite(&item->gpuContextNameFat.context, context_id);
     tracy::MemWrite(&item->gpuContextNameFat.ptr, (uint64_t)cloned_name);
-    tracy::MemWrite(&item->gpuContextNameFat.size, name_length);
+    tracy::MemWrite(&item->gpuContextNameFat.size,
+                    static_cast<uint16_t>(name_length));
     tracy::Profiler::QueueSerialFinish();
   }
 
@@ -508,8 +511,8 @@ void iree_tracing_context_calibrate_executor(
     iree_tracing_context_t* context, iree_tracing_executor_id_t executor_id,
     int64_t cpu_delta, uint64_t host_timestamp, uint64_t executor_timestamp) {
   IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::GpuCalibration);
-  tracy::MemWrite(&item->gpuCalibration.gpuTime, executor_timestamp);
-  tracy::MemWrite(&item->gpuCalibration.cpuTime, host_timestamp);
+  tracy::MemWrite(&item->gpuCalibration.gpuTime, (int64_t)executor_timestamp);
+  tracy::MemWrite(&item->gpuCalibration.cpuTime, (int64_t)host_timestamp);
   tracy::MemWrite(&item->gpuCalibration.cpuDelta, cpu_delta);
   tracy::MemWrite(&item->gpuCalibration.context, executor_id);
   IREE_TRACING_CONTEXT_END_WRITE(context);
@@ -519,7 +522,7 @@ void iree_tracing_context_zone_begin(iree_tracing_context_t* context,
                                      uint64_t timestamp,
                                      const iree_tracing_location_t* src_loc) {
   IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::ZoneBegin);
-  tracy::MemWrite(&item->zoneBegin.time, timestamp);
+  tracy::MemWrite(&item->zoneBegin.time, (int64_t)timestamp);
   tracy::MemWrite(&item->zoneBegin.srcloc, reinterpret_cast<uint64_t>(src_loc));
   IREE_TRACING_CONTEXT_END_WRITE(context);
 }
@@ -527,7 +530,7 @@ void iree_tracing_context_zone_begin(iree_tracing_context_t* context,
 void iree_tracing_context_zone_end(iree_tracing_context_t* context,
                                    uint64_t timestamp) {
   IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::ZoneEnd);
-  tracy::MemWrite(&item->zoneEnd.time, timestamp);
+  tracy::MemWrite(&item->zoneEnd.time, (int64_t)timestamp);
   IREE_TRACING_CONTEXT_END_WRITE(context);
 }
 
@@ -566,19 +569,19 @@ void iree_tracing_context_execution_zone_begin(
 #if IREE_TRACING_CONTEXT_SERIAL_FALLBACK
   auto* item = tracy::Profiler::QueueSerial();
   tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneBeginSerial);
-  tracy::MemWrite(&item->gpuZoneBegin.cpuTime, timestamp);
-  tracy::MemWrite(&item->gpuZoneBegin.srcloc, src_loc);
+  tracy::MemWrite(&item->gpuZoneBegin.cpuTime, (int64_t)timestamp);
+  tracy::MemWrite(&item->gpuZoneBegin.srcloc, (uint64_t)src_loc);
   tracy::MemWrite(&item->gpuZoneBegin.thread, context->thread_id);
   tracy::MemWrite(&item->gpuZoneBegin.queryId, query_id);
   tracy::MemWrite(&item->gpuZoneBegin.context, executor_id);
   tracy::Profiler::QueueSerialFinish();
 #else
   IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::GpuZoneBegin);
-  tracy::MemWrite(&item->gpuZoneBegin.cpuTime, timestamp);
+  tracy::MemWrite(&item->gpuZoneBegin.cpuTime, (int64_t)timestamp);
   tracy::MemWrite(&item->gpuZoneBegin.thread, context->thread_id);
   tracy::MemWrite(&item->gpuZoneBegin.queryId, query_id);
   tracy::MemWrite(&item->gpuZoneBegin.context, executor_id);
-  tracy::MemWrite(&item->gpuZoneBegin.srcloc, src_loc);
+  tracy::MemWrite(&item->gpuZoneBegin.srcloc, (uint64_t)src_loc);
   IREE_TRACING_CONTEXT_END_WRITE(context);
 #endif  // IREE_TRACING_CONTEXT_SERIAL_FALLBACK
 }
@@ -589,14 +592,14 @@ void iree_tracing_context_execution_zone_end(
 #if IREE_TRACING_CONTEXT_SERIAL_FALLBACK
   auto* item = tracy::Profiler::QueueSerial();
   tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuZoneEndSerial);
-  tracy::MemWrite(&item->gpuZoneEnd.cpuTime, timestamp);
+  tracy::MemWrite(&item->gpuZoneEnd.cpuTime, (int64_t)timestamp);
   tracy::MemWrite(&item->gpuZoneEnd.thread, context->thread_id);
   tracy::MemWrite(&item->gpuZoneEnd.queryId, query_id);
   tracy::MemWrite(&item->gpuZoneEnd.context, executor_id);
   tracy::Profiler::QueueSerialFinish();
 #else
   IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::GpuZoneEnd);
-  tracy::MemWrite(&item->gpuZoneEnd.cpuTime, timestamp);
+  tracy::MemWrite(&item->gpuZoneEnd.cpuTime, (int64_t)timestamp);
   tracy::MemWrite(&item->gpuZoneEnd.thread, context->thread_id);
   tracy::MemWrite(&item->gpuZoneEnd.queryId, query_id);
   tracy::MemWrite(&item->gpuZoneEnd.context, executor_id);
@@ -611,13 +614,13 @@ void iree_tracing_context_execution_zone_notify(
   iree_tracing_gpu_zone_notify(executor_id, query_id, query_timestamp);
   auto* item = tracy::Profiler::QueueSerial();
   tracy::MemWrite(&item->hdr.type, tracy::QueueType::GpuTime);
-  tracy::MemWrite(&item->gpuTime.gpuTime, query_timestamp);
+  tracy::MemWrite(&item->gpuTime.gpuTime, (int64_t)query_timestamp);
   tracy::MemWrite(&item->gpuTime.queryId, query_id);
   tracy::MemWrite(&item->gpuTime.context, executor_id);
   tracy::Profiler::QueueSerialFinish();
 #else
   IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::GpuTime);
-  tracy::MemWrite(&item->gpuTime.gpuTime, query_timestamp);
+  tracy::MemWrite(&item->gpuTime.gpuTime, (int64_t)query_timestamp);
   tracy::MemWrite(&item->gpuTime.queryId, query_id);
   tracy::MemWrite(&item->gpuTime.context, executor_id);
   IREE_TRACING_CONTEXT_END_WRITE(context);
@@ -644,8 +647,12 @@ void iree_tracing_context_message_literal(iree_tracing_context_t* context,
                                           uint64_t timestamp,
                                           const char* value) {
   IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::MessageLiteral);
-  tracy::MemWrite(&item->messageLiteral.time, timestamp);
-  tracy::MemWrite(&item->messageLiteral.text, (uint64_t)value);
+  tracy::MemWrite(&item->messageLiteral.time, (int64_t)timestamp);
+  tracy::MemWrite(&item->messageLiteral.textAndMetadata,
+                  tracy::TaggedUserlandAddress(
+                      (uint64_t)value, tracy::MakeMessageMetadata(
+                                           tracy::MessageSourceType::User,
+                                           tracy::MessageSeverity::Info)));
   IREE_TRACING_CONTEXT_END_WRITE(context);
 }
 
@@ -655,8 +662,12 @@ void iree_tracing_context_message_dynamic(iree_tracing_context_t* context,
   auto ptr = (char*)tracy::tracy_malloc(value_length);
   memcpy(ptr, value, value_length);
   IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::Message);
-  tracy::MemWrite(&item->messageFat.time, timestamp);
-  tracy::MemWrite(&item->messageFat.text, (uint64_t)ptr);
+  tracy::MemWrite(&item->messageFat.time, (int64_t)timestamp);
+  tracy::MemWrite(&item->messageFat.textAndMetadata,
+                  tracy::TaggedUserlandAddress(
+                      (uint64_t)ptr, tracy::MakeMessageMetadata(
+                                         tracy::MessageSourceType::User,
+                                         tracy::MessageSeverity::Info)));
   tracy::MemWrite(&item->messageFat.size, (uint16_t)value_length);
   IREE_TRACING_CONTEXT_END_WRITE(context);
 }
@@ -678,7 +689,7 @@ void iree_tracing_context_plot_value_i64(iree_tracing_context_t* context,
                                          const char* plot_name, int64_t value) {
   IREE_TRACING_CONTEXT_BEGIN_WRITE(context, tracy::QueueType::PlotDataInt);
   tracy::MemWrite(&item->plotDataInt.name, (uint64_t)plot_name);
-  tracy::MemWrite(&item->plotDataInt.time, timestamp);
+  tracy::MemWrite(&item->plotDataInt.time, (int64_t)timestamp);
   tracy::MemWrite(&item->plotDataInt.val, value);
   IREE_TRACING_CONTEXT_END_WRITE(context);
 }

@@ -97,7 +97,10 @@ typedef struct iree_vm_bytecode_frame_storage_t {
 // Maps a type ID to a type def with clamping for out of bounds values.
 static inline iree_vm_type_def_t iree_vm_map_type(
     iree_vm_bytecode_module_t* module, int32_t type_id) {
-  type_id = type_id >= module->type_count ? 0 : type_id;
+  if (IREE_UNLIKELY(type_id < 0 ||
+                    (iree_host_size_t)type_id >= module->type_count)) {
+    return iree_vm_make_undefined_type_def();
+  }
   return module->type_table[type_id];
 }
 

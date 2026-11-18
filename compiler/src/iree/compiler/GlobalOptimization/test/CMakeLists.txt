@@ -16,16 +16,24 @@ iree_lit_test_suite(
   SRCS
     "cleanup_numeric_narrowing.mlir"
     "conv_to_im2col.mlir"
-    "convert_batch_matmul_to_matmul.mlir"
+    "conv_to_im2col_pipeline.mlir"
     "convert_qdq_to_integer_math_algebra.mlir"
+    "convert_qdq_to_integer_math_biased_pipeline.mlir"
     "convert_qdq_to_integer_math_maps.mlir"
     "convert_qdq_to_integer_math_negative.mlir"
     "convert_qdq_to_integer_math_pipeline.mlir"
     "convert_qdq_to_integer_math_scale_range.mlir"
     "data_layout_propagation.mlir"
     "demote_contraction_inputs.mlir"
+    "demote_generic_contraction_inputs.mlir"
     "detach_elementwise_from_named_ops.mlir"
+    "early_data_tiling.mlir"
+    "early_data_tiling_fallback.mlir"
+    "early_data_tiling_invalid.mlir"
     "expand_tensor_shapes.mlir"
+    "fold_broadcast_into_batch_matmul.mlir"
+    "fold_broadcast_into_batch_matmul_pipeline.mlir"
+    "fold_broadcast_into_batch_matmul_stages.mlir"
     "fuse_dequantization_matmul.mlir"
     "generalize_named_ops.mlir"
     "global_loop_invariant_code_motion.mlir"
@@ -34,10 +42,14 @@ iree_lit_test_suite(
     "linalg_quantized_conv_to_conv.mlir"
     "linalg_quantized_matmul_to_matmul.mlir"
     "optimize_numerics.mlir"
+    "pack_sub_byte_quantized_constants.mlir"
+    "pack_sub_byte_quantized_constants_pipeline.mlir"
     "propagate_affine_quantization.mlir"
     "propagate_linalg_transpose.mlir"
     "raise_special_ops.mlir"
     "remove_zero_extent_tensors.mlir"
+    "split_large_constants.mlir"
+    "split_large_constants_resource.mlir"
     "strided_contraction_to_contraction.mlir"
     "transformation_pipeline.mlir"
     "transpose_and_decompose_concat.mlir"
@@ -45,6 +57,7 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-opt
+    not
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

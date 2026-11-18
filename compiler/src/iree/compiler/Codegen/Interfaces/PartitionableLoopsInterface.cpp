@@ -225,6 +225,21 @@ struct AllParallelAsPartitionableLoops
   }
 };
 
+template <typename OpTy>
+struct GroupMatmulPartitionableLoops
+    : PartitionableLoopsInterface::ExternalModel<
+          GroupMatmulPartitionableLoops<OpTy>, OpTy> {
+  llvm::SmallVector<unsigned>
+  getPartitionableLoops(Operation *,
+                        std::optional<unsigned> maxNumPartitionedLoops) const {
+    SmallVector<unsigned> loops{0, 1};
+    if (maxNumPartitionedLoops && *maxNumPartitionedLoops < loops.size()) {
+      loops.erase(loops.begin(), loops.end() - *maxNumPartitionedLoops);
+    }
+    return loops;
+  }
+};
+
 /// Registers the `LinalgOpPartitionableLoops` model for all Linalg ops. This
 /// needs to be done on a op-by-op basis since registration is on an op-by-op
 /// basis.
@@ -305,6 +320,10 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
         AllParallelAsPartitionableLoops<IREE::LinalgExt::MapStoreOp>>(*ctx);
     IREE::LinalgExt::MapLoadOp::attachInterface<
         AllParallelAsPartitionableLoops<IREE::LinalgExt::MapLoadOp>>(*ctx);
+    IREE::LinalgExt::GroupMatmulOp::attachInterface<
+        GroupMatmulPartitionableLoops<IREE::LinalgExt::GroupMatmulOp>>(*ctx);
+    IREE::LinalgExt::GroupMmt4DOp::attachInterface<
+        GroupMatmulPartitionableLoops<IREE::LinalgExt::GroupMmt4DOp>>(*ctx);
   });
   registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
     tensor::PadOp::attachInterface<

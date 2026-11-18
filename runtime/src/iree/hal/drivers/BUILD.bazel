@@ -5,7 +5,15 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("@bazel_skylib//rules:common_settings.bzl", "string_list_flag")
+
+# External HAL drivers. Modules that depend on IREE opt in by adding
+# iree_extension.external_hal_driver tags to their MODULE.bazel. iree_extension
+# collects them into @iree_external_hal_drivers (an empty list without tags).
+# See build_tools/bazel/EXTERNAL_DRIVERS.md.
+load("@iree_external_hal_drivers//:drivers.bzl", "get_external_hal_drivers")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:hal_driver_init_gen.bzl", "iree_hal_driver_init_c_generator")
+load("//build_tools/bazel:load_external_hal_drivers_utils.bzl", "get_register_fns", "get_targets")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -24,6 +32,19 @@ string_list_flag(
         "null",
         "vulkan",
     ],
+)
+
+_EXTERNAL_DRIVERS = get_external_hal_drivers()
+
+_EXTERNAL_DRIVER_TARGETS = get_targets(_EXTERNAL_DRIVERS)
+
+_EXTERNAL_DRIVER_REGISTER_FNS = get_register_fns(_EXTERNAL_DRIVERS)
+
+iree_hal_driver_init_c_generator(
+    name = "init_external_c",
+    out = "init_external.c",
+    registration_functions = _EXTERNAL_DRIVER_REGISTER_FNS,
+    template = "init_external.c.in",
 )
 
 UNCONDITIONAL_DRIVERS = [
@@ -70,12 +91,13 @@ config_setting(
 
 iree_runtime_cc_library(
     name = "drivers",
-    srcs = ["init.c"],
+    srcs = ["init.c"] + (["init_external.c"] if _EXTERNAL_DRIVERS else []),
     hdrs = ["init.h"],
+    local_defines = ["IREE_HAVE_HAL_EXTERNAL_DRIVERS=1"] if _EXTERNAL_DRIVERS else [],
     deps = [
                "//runtime/src/iree/base",
                "//runtime/src/iree/hal",
-           ] + select({
+           ] + _EXTERNAL_DRIVER_TARGETS + select({
                ":amdgpu_enabled": ["//runtime/src/iree/hal/drivers/amdgpu/registration"],
                "//conditions:default": [],
            }) + select({
@@ -102,3 +124,5 @@ iree_runtime_cc_library(
                "//conditions:default": [],
            }),
 )
+
+exports_files(["init_external.c.in"])

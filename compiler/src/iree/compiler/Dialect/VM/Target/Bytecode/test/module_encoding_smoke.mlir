@@ -48,3 +48,17 @@ vm.module @simple_module {
   // CHECK-NEXT:   0
   // CHECK-NEXT: ]
 }
+
+// -----
+
+// CHECK: "name": "reference_list"
+// CHECK: "full_name": "!hal.buffer_view"
+// CHECK: "bytecode_data":
+vm.module @reference_list {
+  vm.export @make
+  vm.func @make() -> !vm.list<!vm.ref<!hal.buffer_view>> {
+    %capacity = vm.const.i32 1
+    %list = vm.list.alloc %capacity : (i32) -> !vm.list<!vm.ref<!hal.buffer_view>>
+    vm.return %list : !vm.list<!vm.ref<!hal.buffer_view>>
+  }
+}

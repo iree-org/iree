@@ -30,7 +30,10 @@ py_library(
 exports_files(glob([
     "iree/**/*.py",
     "iree/**/*.pyi",
-]))
+]) + [
+    "tests/hal_test.py",
+    "tests/array_interop_test.py",
+])
 
 whl_filegroup(
     name = "numpy_includes",

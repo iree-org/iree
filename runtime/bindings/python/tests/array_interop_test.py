@@ -7,6 +7,7 @@
 import copy
 import pickle
 import gc
+import weakref
 import numpy as np
 import unittest
 
@@ -20,6 +21,74 @@ class DeviceHalTest(unittest.TestCase):
         self.allocator = self.device.allocator
         # Make sure device setup maintains proper references.
         gc.collect()
+
+    def testMappedArrayRejectsOutOfBoundsShape(self):
+        source = np.arange(6, dtype=np.int32)
+        buffer_view = self.allocator.allocate_buffer_copy(
+            memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
+            allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+            device=self.device,
+            buffer=source,
+            element_type=iree.runtime.HalElementType.SINT_32,
+        )
+        mapped = buffer_view.map()
+        with self.assertRaisesRegex(TypeError, "buffer is too small"):
+            mapped.asarray([7], source.dtype)
+        with self.assertRaises(ValueError):
+            mapped.asarray([-2], source.dtype)
+
+    def testMappedArrayRejectsObjectDtypes(self):
+        source = np.zeros(6, dtype=np.int64)
+        buffer_view = self.allocator.allocate_buffer_copy(
+            memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
+            allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+            device=self.device,
+            buffer=source,
+            element_type=iree.runtime.HalElementType.SINT_64,
+        )
+        mapped = buffer_view.map()
+        for dtype in (np.dtype(object), np.dtype([("value", object)])):
+            with self.subTest(dtype=dtype):
+                with self.assertRaisesRegex(ValueError, "object dtype"):
+                    mapped.asarray([1], dtype)
+        np.testing.assert_array_equal(
+            mapped.asarray(source.shape, source.dtype), source
+        )
+
+    def testDLPackHostAccessAndLifetime(self):
+        for access in (
+            iree.runtime.MemoryAccess.READ,
+            iree.runtime.MemoryAccess.READ | iree.runtime.MemoryAccess.WRITE,
+        ):
+            with self.subTest(access=access):
+                source = np.arange(6, dtype=np.int32)
+                source_ref = weakref.ref(source)
+                buffer_view = self.device.from_dlpack_capsule(
+                    source.__dlpack__(),
+                    memory_type=iree.runtime.MemoryType.HOST_LOCAL
+                    | iree.runtime.MemoryType.DEVICE_VISIBLE,
+                    memory_access=iree.runtime.MemoryAccess.UNALIGNED | access,
+                )
+                array = iree.runtime.DeviceArray(self.device, buffer_view)
+                host = array.to_host()
+                self.assertTrue(np.shares_memory(host, source))
+                writable = bool(int(access) & int(iree.runtime.MemoryAccess.WRITE))
+                self.assertEqual(host.flags.writeable, writable)
+                if writable:
+                    host[0] = 42
+                    self.assertEqual(source[0], 42)
+                else:
+                    with self.assertRaisesRegex(ValueError, "read-only"):
+                        host[0] = 42
+                retained = host.reshape(2, 3)[:, 1:]
+                expected = source.reshape(2, 3)[:, 1:].copy()
+                del host, array, buffer_view, source
+                gc.collect()
+                self.assertIsNotNone(source_ref())
+                np.testing.assert_array_equal(retained, expected)
+                del retained
+                gc.collect()
+                self.assertIsNone(source_ref())
 
     def testGcShutdownFiasco(self):
         init_ary = np.zeros([3, 4], dtype=np.int32) + 2

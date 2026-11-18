@@ -519,6 +519,11 @@ def ReplaceSlowMinMaxOpsPass
 def EliminateEmptyTensorsPass :
     InterfacePass<"iree-eliminate-empty-tensors", "mlir::FunctionOpInterface"> {
   let summary = "Eliminate tensor.empty ops to avoid buffer allocations";
+  let options = [
+    Option<"allowReturnAllocsFromLoops", "allow-return-allocs-from-loops", "bool",
+           /*default=*/"false",
+           "Allow newly allocated buffers to be returned from loops">,
+  ];
 }
 
 def EmulateNarrowTypePass :
@@ -764,6 +769,9 @@ def IREEComprehensiveBufferizePass :
     InterfacePass<"iree-codegen-iree-comprehensive-bufferize", "mlir::FunctionOpInterface"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
   let options = [
+    Option<"allowReturnAllocsFromLoops", "allow-return-allocs-from-loops", "bool",
+           /*default=*/"false",
+           "Allow newly allocated buffers to be returned from loops">,
     Option<"testAnalysisOnly", "test-analysis-only", "bool",
             /*default=*/"false",
            "Only runs inplaceability analysis (for testing purposes only)">,
@@ -1031,7 +1039,8 @@ def MathTransformPass :
   let summary = "Apply math ops transformations: approximations, rewrites to other math ops, operand casts.";
   let dependentDialects = [
     "mlir::scf::SCFDialect",
-    "mlir::arith::ArithDialect"
+    "mlir::arith::ArithDialect",
+    "mlir::vector::VectorDialect"
   ];
 }
 
@@ -1138,7 +1147,7 @@ def SplitFullPartialTransferPass :
       [{Split vector transfers between slow (masked) and fast "
         "(unmasked) variants. Possible options are:\n"
           "\tnone [default]: keep unsplit vector.transfer and pay the price\n"
-          "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
+          "\tlinalg-copy: use memref.copy for the slow path\n"
           "\tvector-transfers: use extra small unmasked vector.transfers for"
           " the slow path\n}]>,
   ];

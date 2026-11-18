@@ -42,4 +42,32 @@ iree_check_single_backend_test_suite(
     "--gtest_filter=-*_rewritten"
 )
 
+iree_check_single_backend_test_suite(
+  NAME
+    check_sub_byte_llvm-cpu_local-task
+  SRCS
+    "sub_byte_weights.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
+    "--iree-global-opt-enable-sub-byte-quantized-storage=true"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_sub_byte_reference_llvm-cpu_local-task
+  SRCS
+    "sub_byte_weights.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
+    "--iree-global-opt-enable-sub-byte-quantized-storage=false"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

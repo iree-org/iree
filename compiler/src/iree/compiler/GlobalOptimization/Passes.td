@@ -14,16 +14,6 @@ def CleanupNumericNarrowingPass :
   let summary = "Cleans up any numeric narrowing ops inserted by iree-global-opt-infer-numeric-narrowing.";
 }
 
-def ConvertBatchMatmulToMatmulPass :
-    Pass<"iree-global-opt-convert-batch-matmul-to-matmul", ""> {
-  let summary = "Converts batch_matmul to reshape + matmul + reshape.";
-  let dependentDialects = [
-    "mlir::arith::ArithDialect",
-    "mlir::linalg::LinalgDialect",
-    "mlir::tensor::TensorDialect",
-  ];
-}
-
 def ConvertConvToIm2ColPass :
     Pass<"iree-global-opt-convert-conv-to-im2col", ""> {
   let summary = "Rewrites convolutions as contractions over an im2col gather";
@@ -31,11 +21,17 @@ def ConvertConvToIm2ColPass :
     Rewrites every linalg op that implements a convolution, named or generic,
     as an all-parallel `linalg.generic` that gathers the convolved input
     windows, followed by a contraction over the gathered tensor with the
-    original payload. Contraction loops are collapsed wherever the operand
+    original payload. The match is on the input access, a sum of scaled loops
+    that is not a projected permutation, so it also covers what unit dimension
+    folding leaves of a convolution whose filter window has extent one along a
+    strided axis, which is no longer a convolution. Contraction loops are collapsed wherever the operand
     layouts allow, so standard layouts become plain or batched matmuls.
     Convolutions without an output channel dimension, i.e. depthwise
     convolutions with a unit multiplier and pooling ops, are left unchanged:
-    nothing reuses the gathered input, so the rewrite never pays off.
+    nothing reuses the gathered input, so the rewrite never pays off. The
+    exception is a convolution whose gather is identical to that of another
+    rewritten convolution, such as the input window sum of a quantized
+    convolution with a weight zero point; it reads the shared gather.
 
     The pass expects quantization to be lowered already: quantized
     convolutions such as `linalg.conv_2d_nhwc_hwcf_q` are not matched, and
@@ -105,6 +101,46 @@ def DetachElementwiseFromNamedOpsPass :
   let summary = "Detaches elementwise ops from named Linalg ops.";
 }
 
+def EarlyDataTilingPass : Pass<"iree-global-opt-early-data-tiling", "mlir::ModuleOp"> {
+  let summary = "Materializes data-tiling layouts before dispatch creation for a supported target.";
+  let description = [{
+    For a module with a single executable target that supports host encoding
+    materialization, normalizes contraction dimensions, assigns data-tiling
+    encodings, propagates them through elementwise producers and consumers,
+    and materializes them into packed layouts such as linalg.pack,
+    linalg.mmt4d and linalg.unpack. Records the target in the
+    `iree.encoding.materialized_layout_target` module attribute, which keeps
+    dispatch creation from assigning encodings again and from compiling the
+    module for another target. Other modules are left unchanged, so they use
+    dispatch-time data tiling. The options select the operation families and
+    encoding strategy, as for iree-dispatch-creation-assign-data-tiling-encodings.
+    Only the default encoding strategy materializes into packed layouts, so
+    modules are left unchanged for other strategies.
+  }];
+  let options = [
+    ListOption<
+        "opTypes", "data-tiling-op-types",
+        "mlir::iree_compiler::IREE::Encoding::EncodingOpType",
+        "Op families eligible for data tiling. "
+        "Defaults to {matmul, scaled_matmul}.",
+        [{::llvm::cl::list_init(
+            mlir::iree_compiler::DispatchCreation::getDefaultDataTilingOpTypes())}]>,
+    Option<
+        "encodingOption", "encoding-option",
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions",
+        /*default=*/
+        "mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic",
+        "Select the type of encoding options to add.",
+        [{::llvm::cl::values(
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Padding,
+                "padding", "Encode tensors that need to be padded."),
+            clEnumValN(
+                mlir::iree_compiler::DispatchCreation::EncodingOptions::Generic,
+                "default", "Uses EncodingAttr which encodes as much information as possible."))}]>,
+  ];
+}
+
 def EraseUnusedLinalgOperandsPass :
     Pass<"iree-global-opt-erase-unused-linalg-operands", "mlir::ModuleOp"> {
   let summary = "Erases unused linalg operand and remove dead code.";
@@ -113,6 +149,39 @@ def EraseUnusedLinalgOperandsPass :
 def ExpandTensorShapesPass :
     Pass<"iree-global-opt-expand-tensor-shapes", "mlir::ModuleOp"> {
   let summary = "Expands tensor shape dimensions into SSA values across the program.";
+}
+
+def FoldBroadcastIntoBatchMatmulPass :
+    InterfacePass<"iree-global-opt-fold-broadcast-into-batch-matmul", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Folds broadcasts of contraction inputs into its indexing maps.";
+  let description = [{
+    Rewrites `batch_matmul(A, broadcast(B))`, where the weight is shared across
+    the batch, into a `batch_matmul` over `A` and `B` whose RHS indexing map
+    drops the batch dim. Broadcasts on either input, as `linalg.broadcast` or
+    as a broadcasting generic, are folded by composing their map into the
+    contraction's map. When the named op cannot express the folded map (its
+    verifier accepts only a few broadcast forms, e.g. a batch-broadcast RHS
+    must be [K, N]), the contraction is carried by a `linalg.generic` with the
+    same body instead of moving data. The contraction then consumes its
+    producers directly, so rewrites that match on them (such as the
+    dequantization folding) still apply, and no broadcast is materialized.
+
+    A broadcast under an `iree_linalg_ext.dequantize_affine` that only feeds
+    the contraction folds too, when the scale and zero point do not vary along
+    the broadcast dims: the dequantize is rebuilt at the rank of the
+    broadcast's source and the broadcast is folded into the contraction map in
+    the same step, so the weights are dequantized once rather than once per
+    batch element.
+
+    A contraction that is already a `linalg.generic`, such as a `batch_matmul`
+    generalized earlier in the pipeline, is recognized through the contraction
+    interface and folded the same way; it stays a generic.
+  }];
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+  ];
 }
 
 def PropagateAffineQuantizationPass :
@@ -124,10 +193,58 @@ def PropagateAffineQuantizationPass :
     or a zero `tensor.pad` whose padded dimensions do not index the scale and
     whose zero point is per-tensor, before `iree_linalg_ext.dequantize_affine`.
     These shape operations then run on quantized values. A consumer-side
-    `linalg.transpose` is fused into the dequantize's output map instead. When
-    a contraction consumes the result, the dequantize becomes its direct
-    producer so the integer contraction rewrite can match it.
+    `linalg.transpose` is fused into the dequantize's output map instead. A
+    `tensor.collapse_shape` of a dequantized value is absorbed by a consuming
+    `linalg.transpose`, or by a contraction whose inputs are all dequantized,
+    by expanding the consumer's iteration space; a blockwise matmul over
+    collapsed `[M, G, L]` and `[N, G, L]` operands thus iterates over
+    `(m, n, g, l)`. When a contraction consumes the result, the dequantize
+    becomes its direct producer so the integer contraction rewrite can match
+    it. A pad is not moved onto storage that is not byte-aligned, such as `i4`,
+    where it could shift values off byte boundaries.
   }];
+}
+
+def PackSubByteQuantizedConstantsPass :
+    Pass<"iree-global-opt-pack-sub-byte-quantized-constants", "mlir::ModuleOp"> {
+  let summary = "Packs constant quantized values with sub-byte ranges into i2 or i4 storage.";
+  let description = [{
+    Packs the constant `i8` input of an `iree_linalg_ext.dequantize_affine`
+    into `i2` or `i4` storage, which the dequantize then reads through an
+    `iree_tensor_ext.bitcast`. With `w`-bit storage, element `k * i + j` of the
+    innermost dimension goes to bits `[j * w, (j + 1) * w)` of byte `i`, where
+    `k = 8 / w`.
+
+    A dequantize can use `w`-bit storage if its `quant_min`/`quant_max` range
+    and its zero point fit `w` bits. The zero point must be a constant, and the
+    input must have a static, non-empty shape whose innermost dimension is a
+    multiple of `k`. Each dequantize needs the narrowest such type. An input
+    value that several dequantizes read is packed once, into the widest type
+    they need. Every load of a global is packed into the same type, and the
+    identical packings are merged later.
+
+    An input is packed only when constant evaluation folds the packing and no
+    `i8` reader remains. The input must be computed from inline constants or
+    immutable globals with an inline initial value, at the top level of a
+    function, where hoisting reaches. Every read of the input value must be the
+    input of a packed dequantize, in the same shape. This includes reads
+    through reshapes and through other loads of the same global, which must be
+    private, since code outside the module can read a public one.
+    Each packing must also store no more bytes than leaving its input
+    unpacked. Unpacked, hoisting stores a computed input no larger than the
+    constants and globals it reads in a global of its own, which packing
+    shrinks. Reshapes and slices are read in place instead, so their packing,
+    like that of any larger input, must take no more bytes than the constants
+    and globals it frees, which only the computation of packed inputs reads.
+    Either way, hoisting accepts the packing at any size threshold. Other
+    inputs, such as runtime values and parameters, stay `i8`.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+    "IREE::TensorExt::IREETensorExtDialect",
+  ];
 }
 
 def ConvertQDQToIntegerMathPass :
@@ -229,6 +346,41 @@ def RemoveZeroExtentTensorsPass :
 
 def SimplifyPackUnpackPass : Pass<"iree-global-opt-simplify-pack-unpack", ""> {
   let summary = "Simplifies tensor pack and unpack ops.";
+}
+
+def SplitLargeConstantsPass :
+    Pass<"iree-global-opt-split-large-constants", "mlir::ModuleOp"> {
+  let summary = "Splits constants larger than the max allocation size into shards.";
+  let description = [{
+    A constant global whose storage exceeds the max allocation size of its
+    resource config (`--iree-stream-resource-max-allocation-size` unless the
+    target sets one) cannot be packed into a resource within that limit. This
+    pass splits such a private, immutable global with an inline dense value or
+    a named parameter into shards along its outermost non-unit dimension, so
+    each shard is a contiguous byte range of the original that fits into one
+    allocation. A shard of a named parameter refers to its range of the same
+    parameter through the `offset` and `length` config entries. The pass then
+    rewrites the uses of the global's loads to use the shards:
+
+      * an input of a structured op whose split dimension is indexed by a
+        single loop: the op is split along that loop, one op per shard. The
+        results of a parallel loop are inserted into the destination, the ops
+        of a reduction loop accumulate into the result of the previous one.
+        This covers e.g. matmuls with a large weight such as a tied LM head.
+      * a value read with `tensor.extract` in the body of an elementwise
+        `linalg.generic`, e.g. an embedding lookup: one op per shard reads its
+        shard at the rebased, clamped index and keeps the previous op's
+        element unless the index lies in its shard.
+
+    A constant with any other use is left unchanged with a warning.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+    "IREE::Stream::StreamDialect",
+    "IREE::Util::UtilDialect",
+  ];
 }
 
 def GlobalLoopInvariantCodeMotionPass : InterfacePass<"iree-global-opt-loop-invariant-code-motion", "mlir::FunctionOpInterface"> {

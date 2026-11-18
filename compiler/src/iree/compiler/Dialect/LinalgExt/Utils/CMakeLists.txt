@@ -27,12 +27,14 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAnalysis
     MLIRArithDialect
+    MLIRArithUtils
     MLIRComplexDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgInterfacesIncGenLib
     MLIRLinalgTransforms
     MLIRLinalgUtils
+    MLIRMathDialect
     MLIRMemRefDialect
     MLIRSupport
     MLIRTensorDialect
