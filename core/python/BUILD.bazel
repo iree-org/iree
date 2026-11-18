@@ -20,6 +20,7 @@ PY_SRCS = enforce_glob(
         "iree/core/__init__.py",
         "iree/core/_paths.py",
         "iree/core/config.py",
+        "iree/core/result.py",
     ],
     include = ["iree/core/**/*.py"],
 )
@@ -28,6 +29,7 @@ PY_TESTS = enforce_glob(
     [
         "test/config_test.py",
         "test/package_test.py",
+        "test/result_test.py",
     ],
     include = ["test/**/*.py"],
 )
@@ -47,6 +49,15 @@ py_test(
     srcs = ["test/config_test.py"],
     legacy_create_init = False,
     main = "test/config_test.py",
+    deps = [":core"],
+)
+
+py_test(
+    name = "result_test",
+    size = "small",
+    srcs = ["test/result_test.py"],
+    legacy_create_init = False,
+    main = "test/result_test.py",
     deps = [":core"],
 )
 
@@ -81,6 +92,15 @@ if(IREE_BUILD_TESTS)
         config_test
       SRC
         "test/config_test.py"
+      PACKAGE_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+
+    iree_local_py_test(
+      NAME
+        result_test
+      SRC
+        "test/result_test.py"
       PACKAGE_DIRS
         "${CMAKE_CURRENT_SOURCE_DIR}"
     )
