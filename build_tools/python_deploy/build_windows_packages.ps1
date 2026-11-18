@@ -71,14 +71,25 @@ function build_iree_runtime() {
   $env:IREE_HAL_DRIVER_VULKAN = "ON"
   $env:IREE_HAL_DRIVER_HIP = "ON"
   $env:IREE_HAL_DRIVER_CUDA = "ON"
-  & py -${python_version} -m pip wheel --no-deps -v -w $output_dir $repo_root/runtime/
+  build_wheel $python_version $repo_root/runtime/
 }
 
 function build_iree_compiler() {
   param($python_version)
   $env:IREE_TARGET_BACKEND_CUDA = "ON"
   $env:IREE_TARGET_BACKEND_ROCM = "ON"
-  py -${python_version} -m pip wheel --no-deps -v -w $output_dir $repo_root/compiler/
+  build_wheel $python_version $repo_root/compiler/
+}
+
+# PowerShell does not stop when a native command fails, and the CI step only
+# checks the exit code of the last command, so exit on the first failure.
+function build_wheel() {
+  param($python_version, $source_dir)
+  & py -${python_version} -m pip wheel --no-deps -v -w $output_dir $source_dir
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: Building the wheel of ${source_dir} with Python ${python_version} failed."
+    exit $LASTEXITCODE
+  }
 }
 
 function clean_wheels() {
