@@ -1,0 +1,31 @@
+# Python packages that build the release wheels of iree-base-compiler and
+# iree-base-runtime. The release builds install them from
+# build_requirements.txt, which pins them by hash, and build without build
+# isolation, so that every build of a release uses the same packages.
+#
+# Keep this in sync with `build-system.requires` in compiler/pyproject.toml and
+# runtime/pyproject.toml. `pip wheel --check-build-dependencies` fails the
+# build when this file lacks one of them.
+#
+# To update build_requirements.txt, run the command at its top in this
+# directory.
+
+cmake
+ml_dtypes>=0.5.1
+ninja!=1.13.0
+numpy>=2.0.0b1
+packaging
+pip
+setuptools>=42
+sympy
+wheel
+
+# The release builds no Python 3.13 other than the free-threaded 3.13t on
+# Linux x86_64, because 3.12 and later share one stable ABI wheel. These are the
+# last releases with 3.13t wheels.
+ml_dtypes<0.6; python_version == "3.13"
+numpy<2.5; python_version == "3.13"
+
+# The 0.17 series of patchelf can randomly corrupt executables
+# (https://github.com/NixOS/patchelf/issues/446).
+patchelf==0.16.1.0; sys_platform == "linux"

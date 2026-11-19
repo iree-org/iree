@@ -66,8 +66,11 @@ script_name="$(basename $0)"
 repo_root=$(cd "${this_dir}" && find_git_dir_parent)
 manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64:2026.11.01-2@sha256:54b271d9562a3686298880df05367909e949ed317e7b1b79b59c696d75f78676" : "ghcr.io/iree-org/manylinux_x86_64@sha256:2e0246137819cf10ed84240a971f9dd75cc3eb62dc6907dfd2080ee966b3c9f4" }')}"
 # Python versions to build. cp312 is the abi3 build (produces a wheel
-# compatible with 3.12+). Per-version builds are used for <3.12 and 3.13t.
-python_versions="${override_python_versions:-cp311-cp311 cp312-cp312 cp313-cp313t}"
+# compatible with 3.12+). Per-version builds are used for <3.12 and the
+# free-threaded 3.13t and 3.14t. A version that the image lacks is skipped:
+# current manylinux images have 3.14t but no longer 3.13t, while the x86_64
+# image still has 3.13t but not yet 3.14t.
+python_versions="${override_python_versions:-cp311-cp311 cp312-cp312 cp313-cp313t cp314-cp314t}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-base-runtime iree-base-compiler}"
 package_suffix="${package_suffix:-}"
@@ -154,7 +157,11 @@ function run_in_docker() {
 }
 
 function build_wheel() {
-  python -m pip wheel --disable-pip-version-check --no-deps -v -w "${output_dir}" "${repo_root}/$@"
+  # Builds with the packages that prepare_python installed, instead of the
+  # newest ones in an isolated environment.
+  python -m pip wheel --disable-pip-version-check --no-deps \
+    --no-build-isolation --check-build-dependencies \
+    -v -w "${output_dir}" "${repo_root}/$@"
 }
 
 function build_iree_runtime() {
@@ -201,11 +208,11 @@ function clean_wheels() {
 }
 
 function prepare_python() {
-  # The 0.17 series of patchelf can randomly corrupt executables. Fixes
-  # have landed but not yet been released. Consider removing this pin
-  # once 0.19 is released. We just override the system version with
-  # a pip side load.
-  pip install patchelf==0.16.1.0
+  # Installs the packages that build the wheels, pinned by hash. They include
+  # patchelf, whose pinned version overrides the system version.
+  python -m pip install --disable-pip-version-check --require-hashes \
+    --only-binary=:all: \
+    -r "${repo_root}/build_tools/python_deploy/build_requirements.txt"
   hash -r
   echo "patchelf version: $(patchelf --version) (0.17 is bad: https://github.com/NixOS/patchelf/issues/446)"
 }
@@ -220,8 +227,10 @@ function install_deps() {
 
   if [[ "$uname_m" == "aarch64" ]]; then
     echo "The architecture is aarch64 and we use manylinux 2_28 so install deps"
+    # Installs only the pinned clang and lld, and the packages that they
+    # need. Updating every package would replace the toolchain of the pinned
+    # image with whatever is current.
     yum install -y epel-release
-    yum update -y
     yum install -y clang-20.1.8-2.module_el8.10.0+4062+b20d4441 lld-20.1.8-2.module_el8.10.0+4062+b20d4441
   elif [[ "$uname_m" == "x86_64" ]]; then
     echo "The architecture is x86_64 so assume we are on a managed image with deps"
