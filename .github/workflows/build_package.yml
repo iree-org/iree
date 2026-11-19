@@ -6,6 +6,8 @@
 #   * py-runtime-pkg (`iree-base-runtime` Python package)
 #     * Linux, macOS, Windows
 #     * All supported Python versions (e.g. 3.11, 3.12)
+#   * py-core-pkg (`iree-base-core`, pure Python package)
+#     * One wheel for all platforms and Python versions, built on Linux
 #   * py-tf-compiler-tools-pkg (`iree-tools-[tf, tflite]`, pure Python packages)
 
 name: Build Release Packages
@@ -30,6 +32,9 @@ on:
         required: true
       runtime_package_version:
         description: "Version of the iree-base-runtime package"
+        required: true
+      core_package_version:
+        description: "Version of the iree-base-core package"
         required: true
       release_id:
         description: "Release id to upload artifacts to"
@@ -66,6 +71,7 @@ jobs:
           PACKAGE_VERSION: ${{ github.event.inputs.package_version }}
           COMPILER_PACKAGE_VERSION: ${{ github.event.inputs.compiler_package_version }}
           RUNTIME_PACKAGE_VERSION: ${{ github.event.inputs.runtime_package_version }}
+          CORE_PACKAGE_VERSION: ${{ github.event.inputs.core_package_version }}
         run: |
           # Note: `version_info.json` holds the CalVer version and is still used
           # for iree-tools-tf and iree-tools-tflite.
@@ -108,6 +114,16 @@ jobs:
           EOF
           cat ./c/runtime/version_local.json
 
+          echo "iree-base-core"
+          cat << EOF > ./c/core/python/version_local.json
+          {
+            "package-suffix": "${PACKAGE_SUFFIX}",
+            "package-version": "${CORE_PACKAGE_VERSION}",
+            "iree-revision": "$(cd ./c && git rev-parse HEAD)"
+          }
+          EOF
+          cat ./c/core/python/version_local.json
+
       - name: Upload version_local.json
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -117,6 +133,7 @@ jobs:
             ./c/version_local.json
             ./c/compiler/version_local.json
             ./c/runtime/version_local.json
+            ./c/core/python/version_local.json
 
   build_packages:
     name: "${{ matrix.build-family }} :: Build ${{ matrix.build-package }} Package"
@@ -158,6 +175,10 @@ jobs:
             build-family: linux-aarch64
             build-package: py-runtime-pkg
             experimental: true
+          - runs-on: ubuntu-24.04
+            build-family: linux-x86_64
+            build-package: py-core-pkg
+            experimental: false
           - runs-on: ubuntu-24.04
             build-family: linux-x86_64
             build-package: py-tf-compiler-tools-pkg
@@ -259,6 +280,23 @@ jobs:
             -v $PWD:/work \
             "${MANYLINUX_AARCH64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp311-cp311/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
+
+      ##########################################################################
+      # py-core-pkg
+      # Builds the iree-base-core wheel. It is pure Python, so the one wheel
+      # that the Linux x86_64 job builds serves every platform and Python
+      # version.
+      ##########################################################################
+
+      - name: Build core wheel (Linux)
+        if: "matrix.build-package == 'py-core-pkg'"
+        shell: bash
+        env:
+          packages: "iree-base-core"
+          output_dir: "${{ github.workspace }}/bindist"
+        run: |
+          [ -e ./bindist/* ] && rm ./bindist/*
+          ./c/build_tools/python_deploy/build_linux_packages.sh
 
       ##########################################################################
       # py-runtime-pkg
@@ -419,4 +457,4 @@ jobs:
         with:
           workflow: Validate and Publish Release
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          inputs: '{"release_id": "${{ github.event.inputs.release_id }}", "package_version": "${{ github.event.inputs.package_version }}", "compiler_package_version": "${{ github.event.inputs.compiler_package_version }}", "runtime_package_version": "${{ github.event.inputs.runtime_package_version }}", "legacy_package_version": "${{ github.event.inputs.legacy_package_version }}", "build_run_id": "${{ github.run_id }}"}'
+          inputs: '{"release_id": "${{ github.event.inputs.release_id }}", "package_version": "${{ github.event.inputs.package_version }}", "compiler_package_version": "${{ github.event.inputs.compiler_package_version }}", "runtime_package_version": "${{ github.event.inputs.runtime_package_version }}", "core_package_version": "${{ github.event.inputs.core_package_version }}", "legacy_package_version": "${{ github.event.inputs.legacy_package_version }}", "build_run_id": "${{ github.run_id }}"}'

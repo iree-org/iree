@@ -100,6 +100,7 @@ fi
 
 # Packages that every release is expected to contain, as named in wheel files.
 EXPECTED_PACKAGES=(
+  iree_base_core
   iree_base_compiler
   iree_base_runtime
   iree_tools_tf

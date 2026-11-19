@@ -31,6 +31,7 @@ pip install \
   --find-links https://iree.dev/pip-release-links.html \
   iree-base-compiler==X.YY.ZrcYYYYMMDD \
   iree-base-runtime==X.YY.ZrcYYYYMMDD \
+  iree-base-core==X.YY.ZrcYYYYMMDD \
   iree-tools-tf==YYYYMMDD.NNNN \
   iree-tools-tflite==YYYYMMDD.NNNN
 ```

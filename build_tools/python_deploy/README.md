@@ -70,7 +70,7 @@ The release index can be used like so:
 ```bash
 python -m pip install \
   --pre --find-links https://iree.dev/pip-release-links.html \
-  iree-base-compiler iree-base-runtime
+  iree-base-compiler iree-base-runtime iree-base-core
 ```
 
 ## Debugging manylinux builds
