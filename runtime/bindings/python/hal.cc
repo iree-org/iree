@@ -1669,17 +1669,15 @@ void SetupHalBindings(nanobind::module_ m) {
            [](HalDriver& self, iree_hal_device_id_t device_id) {
              iree_string_builder_t builder;
              iree_string_builder_initialize(iree_allocator_system(), &builder);
+             std::unique_ptr<iree_string_builder_t,
+                             decltype(&iree_string_builder_deinitialize)>
+                 builder_guard(&builder, &iree_string_builder_deinitialize);
+
              iree_status_t status = iree_hal_driver_dump_device_info(
                  self.raw_ptr(), device_id, &builder);
-             if (!iree_status_is_ok(status)) {
-               iree_string_builder_deinitialize(&builder);
-               CheckApiStatus(status, "Querying device info");
-             }
+             CheckApiStatus(status, "Querying device info");
              iree_string_view_t view = iree_string_builder_view(&builder);
-             // TODO(#25083): Guard the builder if Python string construction
-             // throws.
              py::str result(view.data, view.size);
-             iree_string_builder_deinitialize(&builder);
              return result;
            });
 
