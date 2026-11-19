@@ -31,6 +31,15 @@ if(IREE_BUILD_TESTS)
 
     iree_local_py_test(
       NAME
+        plugins_test
+      SRC
+        "test/plugins_test.py"
+      PACKAGE_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+
+    iree_local_py_test(
+      NAME
         result_test
       SRC
         "test/result_test.py"
