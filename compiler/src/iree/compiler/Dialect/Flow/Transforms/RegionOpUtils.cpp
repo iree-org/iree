@@ -1099,8 +1099,8 @@ private:
 
 } // namespace
 
-int64_t getDispatchBindingBytes(ArrayRef<Operation *> ops,
-                                ArrayRef<Operation *> clonedOps) {
+int64_t getDispatchBindingSize(ArrayRef<Operation *> ops,
+                               ArrayRef<Operation *> clonedOps) {
   llvm::SmallPtrSet<Operation *, 8> opSet(ops.begin(), ops.end());
   opSet.insert(clonedOps.begin(), clonedOps.end());
 
@@ -1127,22 +1127,21 @@ int64_t getDispatchBindingBytes(ArrayRef<Operation *> ops,
   return bytes;
 }
 
-/// Returns true if a dispatch binding `bytes` exceeds `maxBindingBytes` and
-/// binds more than `baselineBytes`, i.e. the step that led to it made it grow
-/// beyond the limit.
-static bool exceedsBindingBytes(int64_t bytes, int64_t baselineBytes,
-                                int64_t maxBindingBytes) {
-  return maxBindingBytes > 0 && bytes > maxBindingBytes &&
-         bytes > baselineBytes;
+/// Returns true if a dispatch binding `bytes` exceeds `maxDispatchBindingSize`
+/// and binds more than `baselineBytes`, i.e. the step that led to it made it
+/// grow beyond the limit.
+static bool exceedsMaxDispatchBindingSize(int64_t bytes, int64_t baselineBytes,
+                                          int64_t maxDispatchBindingSize) {
+  return bytes > maxDispatchBindingSize && bytes > baselineBytes;
 }
 
 /// Selects the producers to clone into a dispatch made of `ops`, starting from
 /// `inputs`, the values the dispatch uses from outside. Walks the use-def
 /// chains of the inputs and selects each producer that is cloneable, has no
 /// unfusable use (if `hasUnfusableUse` is given), and does not make the
-/// dispatch exceed `options.maxBindingBytes`. Used by getCloneableOps for an
-/// existing dispatch region and by getFormedDispatchBindingBytes to predict
-/// what will be cloned into a dispatch before the region exists.
+/// dispatch exceed `options.maxDispatchBindingSize`. Used by getCloneableOps
+/// for an existing dispatch region and by getFormedDispatchBindingSize to
+/// predict what will be cloned into a dispatch before the region exists.
 static SmallVector<Operation *>
 selectProducersToClone(ArrayRef<Operation *> ops, ArrayRef<Value> inputs,
                        CloneableIntoDispatchOptions options,
@@ -1152,7 +1151,7 @@ selectProducersToClone(ArrayRef<Operation *> ops, ArrayRef<Value> inputs,
   llvm::DenseSet<Value> visited;
   SmallVector<Value> worklist(inputs);
   int64_t bytes =
-      options.maxBindingBytes > 0 ? getDispatchBindingBytes(ops) : 0;
+      options.hasMaxDispatchBindingSize() ? getDispatchBindingSize(ops) : 0;
   while (!worklist.empty()) {
     Value value = worklist.pop_back_val();
     if (!visited.insert(value).second) {
@@ -1165,9 +1164,10 @@ selectProducersToClone(ArrayRef<Operation *> ops, ArrayRef<Value> inputs,
       continue;
     }
     result.push_back(definingOp);
-    if (options.maxBindingBytes > 0) {
-      int64_t newBytes = getDispatchBindingBytes(ops, result);
-      if (exceedsBindingBytes(newBytes, bytes, options.maxBindingBytes)) {
+    if (options.hasMaxDispatchBindingSize()) {
+      int64_t newBytes = getDispatchBindingSize(ops, result);
+      if (exceedsMaxDispatchBindingSize(newBytes, bytes,
+                                        options.maxDispatchBindingSize)) {
         result.pop_back();
         continue;
       }
@@ -1181,8 +1181,8 @@ selectProducersToClone(ArrayRef<Operation *> ops, ArrayRef<Value> inputs,
   return result;
 }
 
-int64_t getFormedDispatchBindingBytes(ArrayRef<Operation *> ops,
-                                      CloneableIntoDispatchOptions options) {
+int64_t getFormedDispatchBindingSize(ArrayRef<Operation *> ops,
+                                     CloneableIntoDispatchOptions options) {
   SmallVector<Value> inputs;
   for (Operation *op : ops) {
     llvm::append_range(inputs, op->getOperands());
@@ -1195,25 +1195,26 @@ int64_t getFormedDispatchBindingBytes(ArrayRef<Operation *> ops,
   // later.
   SmallVector<Operation *> clonedOps =
       selectProducersToClone(ops, inputs, options, /*hasUnfusableUse=*/{});
-  return getDispatchBindingBytes(ops, clonedOps);
+  return getDispatchBindingSize(ops, clonedOps);
 }
 
-bool wouldFusionExceedDispatchBindingBytes(
+bool wouldFusionExceedMaxDispatchBindingSize(
     ArrayRef<Operation *> ops, Operation *newOp,
     CloneableIntoDispatchOptions options) {
-  if (options.maxBindingBytes <= 0) {
+  if (!options.hasMaxDispatchBindingSize()) {
     return false;
   }
   SmallVector<Operation *> fusedOps(ops);
   fusedOps.push_back(newOp);
-  int64_t bytes = getFormedDispatchBindingBytes(fusedOps, options);
-  if (bytes <= options.maxBindingBytes) {
+  int64_t bytes = getFormedDispatchBindingSize(fusedOps, options);
+  if (bytes <= options.maxDispatchBindingSize) {
     return false;
   }
   int64_t baselineBytes =
-      std::max(getFormedDispatchBindingBytes(ops, options),
-               getFormedDispatchBindingBytes(newOp, options));
-  return exceedsBindingBytes(bytes, baselineBytes, options.maxBindingBytes);
+      std::max(getFormedDispatchBindingSize(ops, options),
+               getFormedDispatchBindingSize(newOp, options));
+  return exceedsMaxDispatchBindingSize(bytes, baselineBytes,
+                                       options.maxDispatchBindingSize);
 }
 
 SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,

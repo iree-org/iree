@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-clone-producers-into-dispatch-regions))" %s | FileCheck %s --check-prefix=CLONE
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-clone-producers-into-dispatch-regions{max-binding-bytes=100000}))" %s | FileCheck %s --check-prefix=CLONE-LIMIT
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-clone-producers-into-dispatch-regions{max-dispatch-binding-size=100000}))" %s | FileCheck %s --check-prefix=CLONE-LIMIT
 
 // Each global below is 512x64xf16, 65536 bytes, so a dispatch reading two of
 // them binds more than the 100000 byte limit.

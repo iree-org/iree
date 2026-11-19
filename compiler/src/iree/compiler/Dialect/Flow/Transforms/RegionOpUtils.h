@@ -131,9 +131,16 @@ FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
 /// into a dispatch region.
 struct CloneableIntoDispatchOptions {
   bool aggressive = false;
-  // If > 0, producers are not cloned into a dispatch region if that would make
-  // it bind more than this many bytes (see getDispatchBindingBytes).
-  int64_t maxBindingBytes = 0;
+  // Producers are not cloned into a dispatch region if that would make it bind
+  // more than this many bytes (see getDispatchBindingSize). INT64_MAX means no
+  // limit.
+  int64_t maxDispatchBindingSize = INT64_MAX;
+
+  // Returns true if the bytes a dispatch binds are limited. Lets callers skip
+  // estimating them otherwise.
+  bool hasMaxDispatchBindingSize() const {
+    return maxDispatchBindingSize != INT64_MAX;
+  }
 };
 bool isCloneableIntoDispatchOp(Operation *op,
                                CloneableIntoDispatchOptions options = {});
@@ -161,22 +168,22 @@ FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
 /// splat constants) are not counted.
 /// Loads of the same global are counted once.
 /// Dynamically shaped tensors count as zero bytes.
-int64_t getDispatchBindingBytes(ArrayRef<Operation *> ops,
-                                ArrayRef<Operation *> clonedOps = {});
+int64_t getDispatchBindingSize(ArrayRef<Operation *> ops,
+                               ArrayRef<Operation *> clonedOps = {});
 
 /// Returns the bytes that a dispatch formed from `ops` binds (see
-/// getDispatchBindingBytes) once the producers that getCloneableOps selects
+/// getDispatchBindingSize) once the producers that getCloneableOps selects
 /// with `options` are cloned into it. These producers, e.g. dequantization
 /// ops, count by what they read instead of by their results.
-int64_t getFormedDispatchBindingBytes(ArrayRef<Operation *> ops,
-                                      CloneableIntoDispatchOptions options);
+int64_t getFormedDispatchBindingSize(ArrayRef<Operation *> ops,
+                                     CloneableIntoDispatchOptions options);
 
-/// Returns true if `options.maxBindingBytes` > 0 and a dispatch formed from
-/// `ops` and `newOp` (see getFormedDispatchBindingBytes) would bind more than
-/// `options.maxBindingBytes` and more than dispatches formed from `ops` and
-/// from `newOp` alone. So a fusion that does not grow a dispatch already over
-/// the limit is still allowed.
-bool wouldFusionExceedDispatchBindingBytes(
+/// Returns true if a dispatch formed from `ops` and `newOp` (see
+/// getFormedDispatchBindingSize) would bind more than
+/// `options.maxDispatchBindingSize` and more than dispatches formed from `ops`
+/// and from `newOp` alone. So a fusion that does not grow a dispatch already
+/// over the limit is still allowed.
+bool wouldFusionExceedMaxDispatchBindingSize(
     ArrayRef<Operation *> ops, Operation *newOp,
     CloneableIntoDispatchOptions options);
 

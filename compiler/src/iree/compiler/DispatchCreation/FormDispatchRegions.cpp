@@ -192,13 +192,13 @@ public:
   }
 
   // Check if adding `op` would exceed the operand limit, or make the
-  // dispatch bind more than `cloneOptions.maxBindingBytes`.
+  // dispatch bind more than `cloneOptions.maxDispatchBindingSize`.
   bool wouldExceedOperandLimit(Operation *op) const;
 
 private:
   Operation *rootOp;
-  // How producers are cloned into the dispatch later on. If
-  // `maxBindingBytes` > 0, it is the most bytes the dispatch may bind.
+  // How producers are cloned into the dispatch later on. Its
+  // `maxDispatchBindingSize` is the most bytes the dispatch may bind.
   IREE::Flow::CloneableIntoDispatchOptions cloneOptions;
   // All operations to be fused with the root op. This does not include
   // `rootOp`.
@@ -263,8 +263,8 @@ bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
   if ((dispatchOperands.size() + numResults) > kIreeMaxOperandCount) {
     return true;
   }
-  return IREE::Flow::wouldFusionExceedDispatchBindingBytes(getFusedOperations(),
-                                                           newOp, cloneOptions);
+  return IREE::Flow::wouldFusionExceedMaxDispatchBindingSize(
+      getFusedOperations(), newOp, cloneOptions);
 }
 
 FailureOr<AffineMap>
@@ -1219,7 +1219,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
   // Step 1: Decide fusion groups (heuristic).
   IREE::Flow::CloneableIntoDispatchOptions cloneOptions;
   cloneOptions.aggressive = options.aggressiveFusion;
-  cloneOptions.maxBindingBytes = options.maxBindingBytes;
+  cloneOptions.maxDispatchBindingSize = options.maxDispatchBindingSize;
   FusionTracker tracker(cloneOptions);
   decideFusableLinalgOps(funcOp.getFunctionBody(), dominanceInfo, options,
                          tracker);
@@ -1351,7 +1351,7 @@ void FormDispatchRegionsPass::runOnOperation() {
                                          fusePadWithProducers,
                                          fuseMmt4d,
                                          fuseDataTiledConvolution,
-                                         maxBindingBytes};
+                                         maxDispatchBindingSize};
   // Materialized layouts turn contractions into mmt4d ops and data-tiled
   // convolutions before dispatch formation. Keep their elementwise epilogues
   // and result unpacks in the same dispatch, even if the options are off.

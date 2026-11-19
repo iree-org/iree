@@ -113,9 +113,9 @@ def ElementwiseOpFusionPass :
            "Fuse producer truncate-like operations with consumers">,
     Option<"fuseBroadcastOps", "fuse-broadcast-ops", "bool",
            /*default=*/"false", "Fuse broadcast-like ops with producers">,
-    Option<"maxBindingBytes", "max-binding-bytes", "int64_t",
-           /*default=*/"0",
-           "If > 0, do not fuse operations into a dispatch that would then bind more than this many bytes of statically shaped tensors">,
+    Option<"maxDispatchBindingSize", "max-dispatch-binding-size", "int64_t",
+           /*default=*/"INT64_MAX",
+           "Maximum size in bytes of the statically shaped tensors a dispatch binds; do not fuse operations into a dispatch that would then bind more">,
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
@@ -199,9 +199,9 @@ def FuseHorizontalContractionsPass:
   let options = [
     Option<"fusionLimit", "fusion-limit", "int",
             /*default=*/"3", "Maximum number of contractions fused into one">,
-    Option<"maxBindingBytes", "max-binding-bytes", "int64_t",
-           /*default=*/"0",
-           "If > 0, do not fuse contractions into one that would then bind more than this many bytes of statically shaped tensors">
+    Option<"maxDispatchBindingSize", "max-dispatch-binding-size", "int64_t",
+           /*default=*/"INT64_MAX",
+           "Maximum size in bytes of the statically shaped tensors a dispatch binds; do not fuse contractions into one that would then bind more">
   ];
   let statistics = [
     Statistic<"numFusionGroups", "num-fusion-groups", "Number of fusion groups found">,
@@ -219,9 +219,9 @@ def FuseMultiUseElementwiseProducerPass :
            /*default=*/"false", "Fuse operations within a dispatch only (default is to fuse only operations outside of a dispatch)">,
     Option<"numIterations", "num-iterations", "unsigned",
            /*default=*/"2", "Number of iterations to fuse multiuse ops">,
-    Option<"maxBindingBytes", "max-binding-bytes", "int64_t",
-           /*default=*/"0",
-           "If > 0, do not fuse operations into a dispatch that would then bind more than this many bytes of statically shaped tensors">
+    Option<"maxDispatchBindingSize", "max-dispatch-binding-size", "int64_t",
+           /*default=*/"INT64_MAX",
+           "Maximum size in bytes of the statically shaped tensors a dispatch binds; do not fuse operations into a dispatch that would then bind more">
   ];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
@@ -312,9 +312,9 @@ def CloneProducersIntoDispatchRegionsPass :
     Option<"aggressive", "aggressive", "bool",
     /*default=*/"false",
     "Include operations that are cloned only under aggressive fusion mode">,
-    Option<"maxBindingBytes", "max-binding-bytes", "int64_t",
-           /*default=*/"0",
-           "If > 0, do not clone producers into a dispatch that would then bind more than this many bytes of statically shaped tensors">,
+    Option<"maxDispatchBindingSize", "max-dispatch-binding-size", "int64_t",
+           /*default=*/"INT64_MAX",
+           "Maximum size in bytes of the statically shaped tensors a dispatch binds; do not clone producers into a dispatch that would then bind more">,
   ];
 }
 
@@ -352,9 +352,9 @@ def FormDispatchRegionsPass :
            /*default=*/"false", "Fuse layout-preserving elementwise consumers and the result unpack into mmt4d and batch_mmt4d dispatches. Modules with the iree.encoding.materialized_layout_target attribute always enable it, even if it is set to false">,
     Option<"fuseDataTiledConvolution", "fuse-data-tiled-convolution", "bool",
            /*default=*/"false", "Fuse the result unpack, after layout-preserving elementwise consumers, into data-tiled convolution dispatches. Modules with the iree.encoding.materialized_layout_target attribute always enable it, even if it is set to false">,
-    Option<"maxBindingBytes", "max-binding-bytes", "int64_t",
-           /*default=*/"0",
-           "If > 0, do not fuse operations into a dispatch that would then bind more than this many bytes of statically shaped tensors">
+    Option<"maxDispatchBindingSize", "max-dispatch-binding-size", "int64_t",
+           /*default=*/"INT64_MAX",
+           "Maximum size in bytes of the statically shaped tensors a dispatch binds; do not fuse operations into a dispatch that would then bind more">
   ];
   let description = [{
     Pass to form dispatch.region ops from Linalg on tensor ops. A dispatch region
@@ -612,9 +612,9 @@ def ConvertTensorToFlowPass :
       "IREE::Flow::FlowDialect",
     ];
     let options = [
-      Option<"maxBindingBytes", "max-binding-bytes", "int64_t",
-             /*default=*/"0",
-             "If > 0, do not clone producers into a dispatch created for a slice that would then bind more than this many bytes of statically shaped tensors">
+      Option<"maxDispatchBindingSize", "max-dispatch-binding-size", "int64_t",
+             /*default=*/"INT64_MAX",
+             "Maximum size in bytes of the statically shaped tensors a dispatch binds; do not clone producers into a dispatch created for a slice that would then bind more">
     ];
     let statistics = [
       Statistic<"numSlowCopyDispatches", "num-slow-copy-dispatches",

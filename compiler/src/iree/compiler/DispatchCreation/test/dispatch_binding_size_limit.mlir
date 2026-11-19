@@ -1,11 +1,11 @@
 // RUN: iree-opt --split-input-file --iree-dispatch-creation-elementwise-op-fusion %s | FileCheck %s --check-prefix=FUSE
-// RUN: iree-opt --split-input-file --iree-dispatch-creation-elementwise-op-fusion="max-binding-bytes=100000" %s | FileCheck %s --check-prefix=FUSE-LIMIT
+// RUN: iree-opt --split-input-file --iree-dispatch-creation-elementwise-op-fusion="max-dispatch-binding-size=100000" %s | FileCheck %s --check-prefix=FUSE-LIMIT
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-multi-use-elementwise-producer))" %s | FileCheck %s --check-prefix=MULTI
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-multi-use-elementwise-producer{max-binding-bytes=100000}))" %s | FileCheck %s --check-prefix=MULTI-LIMIT
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-multi-use-elementwise-producer{max-dispatch-binding-size=100000}))" %s | FileCheck %s --check-prefix=MULTI-LIMIT
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions))" %s | FileCheck %s --check-prefix=FORM
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{max-binding-bytes=100000}))" %s | FileCheck %s --check-prefix=FORM-LIMIT
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-form-dispatch-regions{max-dispatch-binding-size=100000}))" %s | FileCheck %s --check-prefix=FORM-LIMIT
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-horizontal-contractions))" %s | FileCheck %s --check-prefix=HORIZ
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-horizontal-contractions{max-binding-bytes=100000}))" %s | FileCheck %s --check-prefix=HORIZ-LIMIT
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-dispatch-creation-fuse-horizontal-contractions{max-dispatch-binding-size=100000}))" %s | FileCheck %s --check-prefix=HORIZ-LIMIT
 
 // Each global below is 512x64xf16, 65536 bytes, so a dispatch reading two of
 // them binds more than the 100000 byte limit.

@@ -275,7 +275,7 @@ static std::optional<SmallVector<Operation *>> getHorizontalFusionGroupMembers(
     MLIRContext *context, linalg::LinalgOp seedOp,
     const llvm::SmallDenseSet<Operation *> &groupedOperations,
     const DominanceInfo &dominanceInfo, int fusionLimit,
-    int64_t maxBindingBytes) {
+    int64_t maxDispatchBindingSize) {
 
   Value lhs = seedOp->getOperand(0);
 
@@ -335,8 +335,8 @@ static std::optional<SmallVector<Operation *>> getHorizontalFusionGroupMembers(
     }
 
     IREE::Flow::CloneableIntoDispatchOptions cloneOptions;
-    cloneOptions.maxBindingBytes = maxBindingBytes;
-    if (IREE::Flow::wouldFusionExceedDispatchBindingBytes(
+    cloneOptions.maxDispatchBindingSize = maxDispatchBindingSize;
+    if (IREE::Flow::wouldFusionExceedMaxDispatchBindingSize(
             contractionOps, linalgUser, cloneOptions)) {
       continue;
     }
@@ -523,7 +523,7 @@ void FuseHorizontalContractionsPass::runOnOperation() {
     std::optional<SmallVector<Operation *>> fusionGroup =
         getHorizontalFusionGroupMembers(context, linalgOp, groupedOperations,
                                         dominanceInfo, fusionLimit,
-                                        maxBindingBytes);
+                                        maxDispatchBindingSize);
 
     if (!fusionGroup) {
       return;

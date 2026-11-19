@@ -232,8 +232,8 @@ void ElementwiseOpFusionPass::runOnOperation() {
         // does not change what the dispatch binds.
         if (!intraDispatch) {
           IREE::Flow::CloneableIntoDispatchOptions cloneOptions;
-          cloneOptions.maxBindingBytes = maxBindingBytes;
-          if (IREE::Flow::wouldFusionExceedDispatchBindingBytes(
+          cloneOptions.maxDispatchBindingSize = maxDispatchBindingSize;
+          if (IREE::Flow::wouldFusionExceedMaxDispatchBindingSize(
                   consumer, producer, cloneOptions)) {
             return false;
           }

@@ -46,12 +46,12 @@ static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
         "Enables horizontal fusion of contractions with one common operand"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<int64_t> clMaxDispatchBindingBytes(
-    "iree-dispatch-creation-max-dispatch-binding-bytes",
-    llvm::cl::desc(
-        "If > 0, operations are not fused into a dispatch if that would make "
-        "it bind more than this many bytes of statically shaped tensors."),
-    llvm::cl::init(0));
+static llvm::cl::opt<int64_t> clMaxDispatchBindingSize(
+    "iree-dispatch-creation-max-dispatch-binding-size",
+    llvm::cl::desc("Maximum size in bytes of the statically shaped tensors a "
+                   "dispatch binds; operations are not fused into a dispatch "
+                   "if that would make it bind more."),
+    llvm::cl::init(INT64_MAX));
 
 static llvm::cl::opt<bool> clExperimentalMultiUseEncodingFusion(
     "iree-dispatch-creation-experimental-multi-use-encoding-fusion",
@@ -183,7 +183,7 @@ static void addDispatchRegionCreationPreprocessingPasses(
                 /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
                 /*fuseTruncateOps=*/clEnableEarlyTruncFusion,
                 /*fuseBroadcastOps=*/false,
-                /*maxBindingBytes=*/clMaxDispatchBindingBytes});
+                /*maxDispatchBindingSize=*/clMaxDispatchBindingSize});
       })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
@@ -210,7 +210,7 @@ static void addDispatchRegionCreationPreprocessingPasses(
                 /*fuseMultiReduction=*/clEnableElementWiseFuseMultiReduction,
                 /*fuseTruncateOps=*/clEnableEarlyTruncFusion,
                 /*fuseBroadcastOps=*/false,
-                /*maxBindingBytes=*/clMaxDispatchBindingBytes});
+                /*maxDispatchBindingSize=*/clMaxDispatchBindingSize});
       })
       .addPass(IREE::Flow::createCanonicalizePass)
       .addPass(mlir::createCSEPass)
@@ -225,7 +225,7 @@ static void addDispatchRegionCreationPreprocessingPasses(
     FunctionLikeNest(passManager)
         .addPass([]() {
           FuseHorizontalContractionsPassOptions options;
-          options.maxBindingBytes = clMaxDispatchBindingBytes;
+          options.maxDispatchBindingSize = clMaxDispatchBindingSize;
           return createFuseHorizontalContractionsPass(options);
         })
         .addPass(IREE::Flow::createCanonicalizePass)
@@ -239,7 +239,7 @@ static void addDispatchRegionCreationPreprocessingPasses(
           dispatchOptions.enableFuseMultiUse,
           []() {
             FuseMultiUseElementwiseProducerPassOptions options;
-            options.maxBindingBytes = clMaxDispatchBindingBytes;
+            options.maxDispatchBindingSize = clMaxDispatchBindingSize;
             return DispatchCreation::createFuseMultiUseElementwiseProducerPass(
                 options);
           })
@@ -307,7 +307,7 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
             options.enableAggressiveFusion, options.enableFuseMultiUse,
             options.enableFusePaddingIntoLinalgConsumerOps,
             clEnableFusePaddingIntoLinalgProducerOps};
-        formOptions.maxBindingBytes = clMaxDispatchBindingBytes;
+        formOptions.maxDispatchBindingSize = clMaxDispatchBindingSize;
         return DispatchCreation::createFormDispatchRegionsPass(formOptions);
       })
       // Elementwise fuse operations that are iside a dispatch if possible.
@@ -337,7 +337,7 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager,
         return DispatchCreation::createCloneProducersIntoDispatchRegionsPass(
             CloneProducersIntoDispatchRegionsPassOptions{
                 options.enableAggressiveFusion,
-                /*maxBindingBytes=*/clMaxDispatchBindingBytes});
+                /*maxDispatchBindingSize=*/clMaxDispatchBindingSize});
       })
       // Collapse dimensions of linalg Ops.
       .addPass(DispatchCreation::createCollapseDimensionsPass)
@@ -443,7 +443,7 @@ void buildDispatchCreationPassPipeline(
       .addPass([]() {
         return DispatchCreation::createConvertTensorToFlowPass(
             ConvertTensorToFlowPassOptions{
-                /*maxBindingBytes=*/clMaxDispatchBindingBytes});
+                /*maxDispatchBindingSize=*/clMaxDispatchBindingSize});
       })
       .addPass(createCSEPass)
       .addPass(IREE::Flow::createCanonicalizePass)

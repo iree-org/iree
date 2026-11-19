@@ -34,7 +34,7 @@ struct CloneProducersIntoDispatchRegionsPass final
 
     IREE::Flow::CloneableIntoDispatchOptions options;
     options.aggressive = aggressive;
-    options.maxBindingBytes = maxBindingBytes;
+    options.maxDispatchBindingSize = maxDispatchBindingSize;
     funcOp->walk([&](IREE::Flow::DispatchRegionOp regionOp) {
       if (failed(cloneProducersToRegion(rewriter, regionOp, options))) {
         return signalPassFailure();

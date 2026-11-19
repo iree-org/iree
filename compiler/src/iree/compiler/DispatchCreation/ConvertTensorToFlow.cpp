@@ -177,7 +177,7 @@ void ConvertTensorToFlowPass::runOnOperation() {
   });
 
   IREE::Flow::CloneableIntoDispatchOptions cloneOptions;
-  cloneOptions.maxBindingBytes = maxBindingBytes;
+  cloneOptions.maxDispatchBindingSize = maxDispatchBindingSize;
 
   // Rewrite InsertSliceOps to FlowUpdateOps.
   FailureOr<size_t> numSlowInsertSliceDispatches =
