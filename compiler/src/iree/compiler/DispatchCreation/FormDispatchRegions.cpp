@@ -221,40 +221,9 @@ void FusionGroup::insert(Operation *op) {
 }
 
 bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
-  llvm::SmallSetVector<Value, kIreeMaxOperandCount> dispatchOperands;
-  int64_t numResults = 0;
-
-  auto visitOp = [&](Operation *op) {
-    auto visitOperand = [&](OpOperand *operand) {
-      if (!isa<RankedTensorType>(operand->get().getType())) {
-        return;
-      }
-      Operation *definingOp = operand->get().getDefiningOp();
-      if (llvm::isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(definingOp)) {
-        return;
-      }
-      if (!definingOp ||
-          (definingOp != newOp && !loopMaps.contains(definingOp))) {
-        dispatchOperands.insert(operand->get());
-      }
-    };
-    visitUsedValuesDefinedAbove(op->getRegions(), visitOperand);
-    llvm::for_each(llvm::make_pointer_range(op->getOpOperands()), visitOperand);
-
-    for (OpResult result : op->getResults()) {
-      if (llvm::any_of(result.getUsers(), [&](Operation *user) {
-            return user != newOp && !loopMaps.contains(user);
-          })) {
-        ++numResults;
-      }
-    }
-  };
-
-  visitOp(newOp);
-  for (auto [op, map] : this->loopMaps) {
-    visitOp(op);
-  }
-  return (dispatchOperands.size() + numResults) > kIreeMaxOperandCount;
+  SmallVector<Operation *> ops = getFusedOperations();
+  ops.push_back(newOp);
+  return exceedsOperandLimit(ops);
 }
 
 FailureOr<AffineMap>

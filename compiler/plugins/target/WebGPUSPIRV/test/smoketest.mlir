@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-resolve-device-aliases %s | FileCheck %s --check-prefix=LIMITS
 
 #map = affine_map<(d0) -> (d0)>
 module attributes {
@@ -42,3 +43,8 @@ stream.executable public @reduce_dispatch {
 //      CHECK:   hal.executable.binary public @webgpu_wgsl_fb <
 // CHECK-SAME:     format = "webgpu-wgsl-fb"
 // CHECK-SAME:     data = dense
+
+// -----
+
+// LIMITS: max_dispatch_binding_count = 8 : i64
+util.global private @webgpu = #hal.device.alias<"webgpu"> : !hal.device

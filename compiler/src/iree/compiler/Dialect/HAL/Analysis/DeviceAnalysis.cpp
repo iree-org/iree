@@ -161,9 +161,10 @@ static void gatherLegacyDeviceTargetAttrs(
 }
 
 // Recursively resolves the referenced device into targets.
-void DeviceAnalysis::gatherDeviceTargets(
-    Attribute rootAttr, Operation *fromOp,
-    SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
+static void
+gatherDeviceTargetsImpl(Attribute rootAttr, Operation *fromOp,
+                        SetVector<IREE::HAL::DeviceTargetAttr> &resultSet,
+                        SymbolTableCollection &symbolTables) {
   SetVector<Attribute> worklist;
   worklist.insert(rootAttr);
   do {
@@ -171,7 +172,7 @@ void DeviceAnalysis::gatherDeviceTargets(
     if (!TypeSwitch<Attribute, bool>(attr)
              .Case([&](SymbolRefAttr symRefAttr) {
                auto globalOp =
-                   explorer.getSymbolTables()
+                   symbolTables
                        .lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
                            fromOp, symRefAttr);
                assert(globalOp && "global reference must be valid");
@@ -205,6 +206,13 @@ void DeviceAnalysis::gatherDeviceTargets(
   } while (!worklist.empty());
 }
 
+void DeviceAnalysis::gatherDeviceTargets(
+    Attribute rootAttr, Operation *fromOp,
+    SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
+  gatherDeviceTargetsImpl(rootAttr, fromOp, resultSet,
+                          explorer.getSymbolTables());
+}
+
 void DeviceAnalysis::gatherAllDeviceTargets(
     SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
   for (auto globalOp : deviceGlobals) {
@@ -213,9 +221,10 @@ void DeviceAnalysis::gatherAllDeviceTargets(
   }
 }
 
-void DeviceAnalysis::gatherDeviceAffinityTargets(
+static void gatherDeviceAffinityTargetsImpl(
     IREE::Stream::AffinityAttr affinityAttr, Operation *fromOp,
-    SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
+    SetVector<IREE::HAL::DeviceTargetAttr> &resultSet,
+    SymbolTableCollection &symbolTables) {
   // We currently only know how to handle HAL device affinities.
   // We could support other ones via an interface but instead we just fall back
   // to default logic if no affinity or an unknown one is found.
@@ -227,7 +236,15 @@ void DeviceAnalysis::gatherDeviceAffinityTargets(
   }
 
   // Recursively resolve the referenced device into targets.
-  gatherDeviceTargets(deviceAffinityAttr.getDevice(), fromOp, resultSet);
+  gatherDeviceTargetsImpl(deviceAffinityAttr.getDevice(), fromOp, resultSet,
+                          symbolTables);
+}
+
+void DeviceAnalysis::gatherDeviceAffinityTargets(
+    IREE::Stream::AffinityAttr affinityAttr, Operation *fromOp,
+    SetVector<IREE::HAL::DeviceTargetAttr> &resultSet) {
+  gatherDeviceAffinityTargetsImpl(affinityAttr, fromOp, resultSet,
+                                  explorer.getSymbolTables());
 }
 
 void DeviceAnalysis::gatherAllExecutableTargets(
@@ -239,21 +256,29 @@ void DeviceAnalysis::gatherAllExecutableTargets(
   }
 }
 
-void DeviceAnalysis::gatherRequiredExecutableTargets(
-    Operation *forOp, SetVector<IREE::HAL::ExecutableTargetAttr> &resultSet) {
+void gatherRequiredExecutableTargets(
+    Operation *forOp, SetVector<IREE::HAL::ExecutableTargetAttr> &resultSet,
+    SymbolTableCollection &symbolTables) {
   // Get the affinity from the op or an ancestor. Note that there may be no
   // affinity specified at all.
   auto affinityAttr = IREE::Stream::AffinityAttr::lookupOrDefault(forOp);
 
   // Gather the device targets that are referenced by the affinity.
   SetVector<IREE::HAL::DeviceTargetAttr> deviceTargetSet;
-  gatherDeviceAffinityTargets(affinityAttr, forOp, deviceTargetSet);
+  gatherDeviceAffinityTargetsImpl(affinityAttr, forOp, deviceTargetSet,
+                                  symbolTables);
 
   // Add all executable targets on the device targets.
   for (auto deviceTargetAttr : deviceTargetSet) {
     resultSet.insert(deviceTargetAttr.getExecutableTargets().begin(),
                      deviceTargetAttr.getExecutableTargets().end());
   }
+}
+
+void DeviceAnalysis::gatherRequiredExecutableTargets(
+    Operation *forOp, SetVector<IREE::HAL::ExecutableTargetAttr> &resultSet) {
+  IREE::HAL::gatherRequiredExecutableTargets(forOp, resultSet,
+                                             explorer.getSymbolTables());
 }
 
 void DeviceAnalysis::gatherRequiredExecutableTargets(

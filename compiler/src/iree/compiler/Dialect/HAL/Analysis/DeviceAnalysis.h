@@ -15,9 +15,16 @@
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "llvm/ADT/DenseSet.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
+
+// Gathers executable targets from static device affinities and configurations
+// without constructing whole-program analysis.
+void gatherRequiredExecutableTargets(
+    Operation *forOp, SetVector<IREE::HAL::ExecutableTargetAttr> &resultSet,
+    SymbolTableCollection &symbolTables);
 
 //===----------------------------------------------------------------------===//
 // DeviceAnalysis

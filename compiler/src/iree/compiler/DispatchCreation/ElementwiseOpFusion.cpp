@@ -217,15 +217,7 @@ void ElementwiseOpFusionPass::runOnOperation() {
 
         // Limit the number of operands to avoid exceeding backend binding
         // limits.
-        DenseSet<Value> operands;
-        operands.insert(producer->operand_begin(), producer->operand_end());
-        operands.insert(consumer->operand_begin(),
-                        std::next(consumer->operand_begin(),
-                                  fusedOperand->getOperandNumber()));
-        operands.insert(std::next(consumer->operand_begin(),
-                                  fusedOperand->getOperandNumber() + 1),
-                        consumer->operand_end());
-        if (operands.size() >= kIreeMaxOperandCount) {
+        if (exceedsOperandLimit({producer, consumer})) {
           return false;
         }
 

@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/DispatchCreation/FusionUtils.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -117,6 +118,9 @@ static LogicalResult doMultiUseFusion(Operation *rootOp,
     // before that all uses are fusable.
     while (OpOperand *fusedOperand =
                getFirstUseInConsumer(producerOp, consumerOp)) {
+      if (exceedsOperandLimit({producerOp, consumerOp})) {
+        break;
+      }
       rewriter.setInsertionPoint(consumerOp);
       FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
           linalg::fuseElementwiseOps(rewriter, fusedOperand);

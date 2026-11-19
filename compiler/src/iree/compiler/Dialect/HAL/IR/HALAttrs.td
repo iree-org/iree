@@ -621,6 +621,10 @@ def HAL_ExecutableTargetAttr : HAL_AttrDef<"ExecutableTarget"> {
     deployed artifact. An optionally provided configuration dictionary overrides
     backend-specific defaults.
 
+    A positive integer `max_dispatch_binding_count` configuration entry caps the
+    binding budget used for dispatch fusion. Fusion uses the smallest applicable
+    target limit, capped by its default limit.
+
     Example:
     ```mlir
       // Produce a system-native ELF for x86-64 systems using the LLVM backend:

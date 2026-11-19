@@ -81,7 +81,10 @@ public:
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
-    SmallVector<NamedAttribute, 1> configItems;
+    SmallVector<NamedAttribute, 2> configItems;
+    // WebGPU guarantees eight storage buffers per shader stage.
+    configItems.emplace_back(b.getStringAttr("max_dispatch_binding_count"),
+                             b.getI64IntegerAttr(8));
     if (auto target = GPU::getWebGPUTargetDetails(context)) {
       addConfigGPUTarget(context, target, configItems);
     }

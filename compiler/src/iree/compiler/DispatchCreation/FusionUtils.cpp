@@ -10,11 +10,68 @@
 #include "compiler/src/iree/compiler/DispatchCreation/FusionUtils.h"
 #include "compiler/src/iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir::iree_compiler::DispatchCreation {
+
+static int64_t getMaxOperandCount(Operation *op) {
+  SetVector<IREE::HAL::ExecutableTargetAttr> targets;
+  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
+    targets.insert(target);
+  } else {
+    SymbolTableCollection symbolTables;
+    IREE::HAL::gatherRequiredExecutableTargets(op, targets, symbolTables);
+  }
+  int64_t limit = kIreeMaxOperandCount;
+  for (auto target : targets) {
+    if (auto config = target.getConfiguration()) {
+      if (auto attr = config.getAs<IntegerAttr>("max_dispatch_binding_count")) {
+        if (attr.getValue().isStrictlyPositive()) {
+          limit =
+              std::min<int64_t>(limit, attr.getValue().getLimitedValue(limit));
+        }
+      }
+    }
+  }
+  return limit;
+}
+
+bool exceedsOperandLimit(ArrayRef<Operation *> ops) {
+  llvm::SmallPtrSet<Operation *, 16> group(ops.begin(), ops.end());
+  DenseSet<Value> operands;
+  int64_t limit = kIreeMaxOperandCount;
+  for (Operation *op : group) {
+    limit = std::min(limit, getMaxOperandCount(op));
+    auto visitOperand = [&](OpOperand *operand) {
+      Value value = operand->get();
+      if (!isa<RankedTensorType>(value.getType())) {
+        return;
+      }
+      Operation *definingOp = value.getDefiningOp();
+      if (llvm::isa_and_nonnull<linalg::FillOp, tensor::EmptyOp>(definingOp)) {
+        return;
+      }
+      if (!group.contains(definingOp)) {
+        operands.insert(value);
+      }
+    };
+    visitUsedValuesDefinedAbove(op->getRegions(), visitOperand);
+    llvm::for_each(llvm::make_pointer_range(op->getOpOperands()), visitOperand);
+    for (OpResult result : op->getResults()) {
+      if (llvm::any_of(result.getUsers(), [&](Operation *user) {
+            return !group.contains(user);
+          })) {
+        operands.insert(result);
+      }
+    }
+  }
+  return operands.size() > limit;
+}
 
 bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
                                 ElementwiseOpsFusabilityOptions options) {
