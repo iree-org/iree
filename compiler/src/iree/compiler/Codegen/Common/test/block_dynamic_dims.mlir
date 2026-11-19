@@ -450,3 +450,90 @@ func.func @reshape_propagation_before_blocking_test(%arg0: index, %arg1: index, 
 //   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty{{.*}} tensor<?x128x4096xf8E4M3FNUZ>
 //       CHECK:   %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:     outs(%[[EMPTY]] : tensor<?x128x4096xf8E4M3FNUZ>)
+
+// -----
+
+// Recover independent facts from binding-backed buffers, skipping static
+// dimensions. The init sizes deliberately carry no divisibility assumptions.
+#layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+func.func @binding_buffer_independent_dims(%m: index, %n: index, %init_m: index, %init_n: index) -> tensor<?x4x?xf32> {
+  %bm = util.assume.int %m<udiv = 8> : index
+  %bn = util.assume.int %n<udiv = 32> : index
+  %buffer = hal.interface.binding.subspan layout(#layout) binding(0) : memref<?x4x?xf32>{%bm, %bn}
+  %input = iree_codegen.load_from_buffer %buffer : memref<?x4x?xf32> -> tensor<?x4x?xf32>
+  %init = tensor.empty(%init_m, %init_n) : tensor<?x4x?xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%input : tensor<?x4x?xf32>) outs(%init : tensor<?x4x?xf32>) {
+    ^bb0(%x: f32, %unused: f32):
+      linalg.yield %x : f32
+    } -> tensor<?x4x?xf32>
+  return %result : tensor<?x4x?xf32>
+}
+// CHECK-LABEL: func @binding_buffer_independent_dims(
+// CHECK: iree_codegen.load_from_buffer
+// CHECK-SAME: -> tensor<?x8x4x?x32xf32>
+// CHECK: linalg.generic
+// CHECK: ins(%{{.*}} : tensor<?x8x4x?x32xf32>)
+
+// -----
+
+// Shape-refining loads stay conservative: otherwise blocking the last
+// dimension folds an invalid expand_shape into the less-specific buffer type.
+#layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+func.func @binding_buffer_static_tensor_dim(%m: index, %n: index, %init_n: index) -> tensor<1x4x?xf32> {
+  %bn = util.assume.int %n<udiv = 32> : index
+  %buffer = hal.interface.binding.subspan layout(#layout) binding(0) : memref<?x4x?xf32>{%m, %bn}
+  %input = iree_codegen.load_from_buffer %buffer : memref<?x4x?xf32> -> tensor<1x4x?xf32>
+  %init = tensor.empty(%init_n) : tensor<1x4x?xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%input : tensor<1x4x?xf32>) outs(%init : tensor<1x4x?xf32>) {
+    ^bb0(%x: f32, %unused: f32):
+      linalg.yield %x : f32
+    } -> tensor<1x4x?xf32>
+  return %result : tensor<1x4x?xf32>
+}
+// CHECK-LABEL: func @binding_buffer_static_tensor_dim(
+// CHECK-NOT: expand_shape
+// CHECK: iree_codegen.load_from_buffer
+// CHECK-SAME: -> tensor<1x4x?xf32>
+// CHECK-NOT: expand_shape
+// CHECK: linalg.generic
+// CHECK: ins(%{{.*}} : tensor<1x4x?xf32>)
+// CHECK-NOT: expand_shape
+// CHECK: return
+
+// -----
+
+// A subview's size need not preserve the binding's divisibility. In particular,
+// %inner may be 17 even when %outer is a multiple of 32.
+#layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+func.func @binding_buffer_subview(%outer: index, %inner: index) -> tensor<16x?xf32> {
+  %bounded = util.assume.int %outer<udiv = 32> : index
+  %buffer = hal.interface.binding.subspan layout(#layout) binding(0) : memref<16x?xf32>{%bounded}
+  %view = memref.subview %buffer[0, 0] [16, %inner] [1, 1] : memref<16x?xf32> to memref<16x?xf32, strided<[?, 1]>>
+  %input = iree_codegen.load_from_buffer %view : memref<16x?xf32, strided<[?, 1]>> -> tensor<16x?xf32>
+  %init = tensor.empty(%inner) : tensor<16x?xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%input : tensor<16x?xf32>) outs(%init : tensor<16x?xf32>) {
+    ^bb0(%x: f32, %unused: f32):
+      linalg.yield %x : f32
+    } -> tensor<16x?xf32>
+  return %result : tensor<16x?xf32>
+}
+// CHECK-LABEL: func @binding_buffer_subview(
+// CHECK-NOT: expand_shape
+// CHECK: %[[VIEW:.*]] = memref.subview
+// CHECK-NOT: expand_shape
+// CHECK: %[[INPUT:.*]] = iree_codegen.load_from_buffer %[[VIEW]]
+// CHECK-SAME: -> tensor<16x?xf32>
+// CHECK-NOT: expand_shape
+// CHECK: linalg.generic
+// CHECK: ins(%[[INPUT]] : tensor<16x?xf32>)
+// CHECK-NOT: expand_shape
+// CHECK: return
