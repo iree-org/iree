@@ -181,6 +181,37 @@ iree-compile --iree-llvmcpu-list-targets
     x86-64     - 64-bit X86: EM64T and AMD64
 ```
 
+A target triple alone does not enable architecture features such as `+avx2`
+or `+dotprod`. Select a CPU model or an explicit feature set with
+`--iree-llvmcpu-target-cpu` and `--iree-llvmcpu-target-cpu-features`:
+
+```shell
+iree-compile \
+    --iree-hal-target-device=local \
+    --iree-hal-local-target-device-backends=llvm-cpu \
+    --iree-llvmcpu-target-cpu=host \
+    --iree-llvmcpu-target-cpu-features=host \
+    mobilenetv2.mlir -o mobilenet_cpu.vmfb
+```
+
+The `host` value is resolved on the machine running `iree-compile`. To see what
+it resolves to, stop after the input phase and inspect the
+`#hal.executable.target` attribute in the printed IR:
+
+```shell
+iree-compile \
+    --iree-hal-target-device=local \
+    --iree-hal-local-target-device-backends=llvm-cpu \
+    --iree-llvmcpu-target-cpu=host \
+    --iree-llvmcpu-target-cpu-features=host \
+    mobilenetv2.mlir \
+    --compile-to=input
+```
+
+That attribute lists the resolved `cpu`, `cpu_features`, and `target_triple`.
+For ahead-of-time builds, pin these values rather than using `host`: the build
+machine and the target machine may differ.
+
 ### :octicons-terminal-16: Run a compiled program
 
 To run the compiled program:
