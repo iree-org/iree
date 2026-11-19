@@ -26,10 +26,10 @@ iree_cc_test(
     MLIRPass
     MLIRSCFDialect
     gmock
+    gmock_main
     gtest
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
-    iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
