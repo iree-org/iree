@@ -45,19 +45,20 @@ static inline bool iree_uk_cpu_riscv_64_xsmtvdot(
   return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_XSMTVDOT);
 }
 
-// IME tile shapes require a full vmadot operand panel in one vector register:
-// 12x16x8 needs VLEN>=256, 24x32x16 needs VLEN>=1024, 48x64x32 needs
-// VLEN>=4096.
+// zvl*b bits are minimums, but the vmadot atom size is fixed by VLEN, so an
+// IME tile is only correct when the next zvl*b bit is clear too.
 static inline bool iree_uk_cpu_riscv_64_xsmtvdot_zvl256b(
     const iree_uk_uint64_t* cpu_data) {
   return iree_uk_cpu_riscv_64_xsmtvdot(cpu_data) &&
-         iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVL256B);
+         iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVL256B) &&
+         !iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVL1024B);
 }
 
 static inline bool iree_uk_cpu_riscv_64_xsmtvdot_zvl1024b(
     const iree_uk_uint64_t* cpu_data) {
   return iree_uk_cpu_riscv_64_xsmtvdot(cpu_data) &&
-         iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVL1024B);
+         iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVL1024B) &&
+         !iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_RISCV_64_ZVL4096B);
 }
 
 static inline bool iree_uk_cpu_riscv_64_xsmtvdot_zvl4096b(
