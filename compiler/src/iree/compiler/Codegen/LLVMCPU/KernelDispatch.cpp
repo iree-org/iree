@@ -2968,19 +2968,11 @@ getNhwcConvVectorSizes(mlir::FunctionOpInterface entryPointFn,
       }
       llvm_unreachable("unsupported conv");
     }
-    if (isMIPS(targetConfig) && hasFeature(targetConfig, "+msa")) {
-      // MSA is fixed-width 128-bit like NEON; reuse the AArch64 conv tiles.
-      if (is2DConvOp(op)) {
-        return {1, 1, 32, 64, 1, 1, 16};
-      }
-      if (is2DDepthConvOp(op)) {
-        return {1, 1, 4, 4, 1, 4};
-      }
-      if (is2DPoolingOp(op)) {
-        return {1, 1, 32, 64, 1, 16};
-      }
-      llvm_unreachable("unsupported conv");
-    }
+    // MIPS deliberately has no conv branch here: the AArch64 conv tiles
+    // vectorize the reduction (input-channel) dimension, which the MSA backend
+    // lowers far less efficiently than NEON (measured ~7x more executed
+    // instructions, worse than scalar). The default tiling below is a better
+    // fit on MSA. The matmul tiling above is unaffected and stays.
   }
 
   // Get default hard-coded tile sizes if we couldn't compute anything
