@@ -192,6 +192,24 @@ util.func public @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>,
 
 // -----
 
+// A reused transfer result still aliases the source when it has one SSA use.
+// Preserve the original value for the second consumer of the shared storage.
+// CHECK-LABEL: @reuseTransferNeedsCopyOnWrite
+util.func public @reuseTransferNeedsCopyOnWrite(%size: index, %value: i32) -> (!stream.resource<transient>, !stream.resource<transient>) {
+  %c0 = arith.constant 0 : index
+  %source = stream.async.splat %value : i32 -> !stream.resource<transient>{%size}
+  // CHECK: %[[TRANSFER:[^ ]+]] = stream.async.transfer %[[SOURCE:[^ ]+]]
+  // CHECK-SAME: storage = reuse
+  %shared = stream.async.transfer %source : !stream.resource<transient>{%size} -> !stream.resource<transient>{%size} storage = reuse
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[TRANSFER]]
+  // CHECK: stream.async.fill %{{.+}}, %[[CLONE]]
+  %updated = stream.async.fill %value, %shared[%c0 to %size for %size] : i32 -> %shared as !stream.resource<transient>{%size}
+  // CHECK: util.return %[[SOURCE]],
+  util.return %source, %updated : !stream.resource<transient>, !stream.resource<transient>
+}
+
+// -----
+
 // Tests that a resource stored into more than one mutable global is copied for
 // each store: mutable globals are updated in place, so each must own its
 // storage. Stores of a single-use value and stores into immutable globals are

@@ -39,6 +39,18 @@ namespace {
 // --iree-stream-elide-async-copies pass will do a whole-program analysis and
 // remove the copies we insert here when possible.
 static bool isSafeToElideCOW(Value operand, IREE::Stream::ResourceType type) {
+  // The transfer result is a separate SSA value but reuse keeps the source
+  // backing storage alive. A write through it must not change other consumers
+  // of the source, even when this result has only one use.
+  Value baseValue = IREE::Util::TiedOpInterface::findTiedBaseValue(operand);
+  if (auto transferOp =
+          baseValue.getDefiningOp<IREE::Stream::AsyncTransferOp>()) {
+    if (transferOp.getEffectiveStorage() ==
+        IREE::Stream::TransferStorage::Reuse) {
+      return false;
+    }
+  }
+
   // Can't do anything with block args without analysis - we don't know if the
   // value they carry is the last user (move semantics).
   if (isa<BlockArgument>(operand)) {
