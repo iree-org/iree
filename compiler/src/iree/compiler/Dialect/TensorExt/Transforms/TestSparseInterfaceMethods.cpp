@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::TensorExt {
 
@@ -358,6 +359,15 @@ void TestSparseOpInterfaceMethodsPass::runOnOperation() {
   // resolveRange and getDistributionInfo use their own marker ops, not forall.
   if (testResolveRange) {
     if (failed(testResolveRangeImpl(op))) {
+      return signalPassFailure();
+    }
+    return;
+  }
+  if (testResolveRangeRewriters) {
+    // Test resolveRange by applying sparse interface rewriter patterns.
+    RewritePatternSet patterns(&getContext());
+    populateSparseInterfaceRewritePatterns(patterns);
+    if (failed(applyPatternsGreedily(op, std::move(patterns)))) {
       return signalPassFailure();
     }
     return;
