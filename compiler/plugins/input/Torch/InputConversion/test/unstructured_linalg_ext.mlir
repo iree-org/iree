@@ -121,17 +121,18 @@ func.func @flex_attn_with_scoremod_and_maskmod(%arg0: !torch.vtensor<[2,4,8,16],
   %output, %logsumexp, %maxscore = torch.hop_flex_attention %arg0, %arg1, %arg2, %float1.0, %false, %false {score_mod_fn = @sdpa_score0, mask_mod_fn = @sdpa_mask0} : !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,4,8,16],f32>, !torch.float, !torch.bool, !torch.bool -> !torch.vtensor<[2,4,8,16],f32>, !torch.none, !torch.none
   return %output : !torch.vtensor<[2,4,8,16],f32>
 }
+// mask_mod is materialized before OnlineAttention and passed as the mask input.
+// CHECK:           torch.aten.ge.Tensor
+// CHECK:           torch.aten.broadcast_to
+// CHECK:           %[[MASK0:.*]] = torch_c.to_builtin_tensor {{.*}} : !torch.vtensor<[2,4,8,8],i1> -> tensor<2x4x8x8xi1>
 // Fills for acc, max, sum.
 // CHECK:           linalg.fill
 // CHECK:           linalg.fill
 // CHECK:           linalg.fill
-// OnlineAttention with inlined mask_mod and score_mod in region.
+// OnlineAttention with mask operand and score_mod in the region.
 // CHECK:           iree_linalg_ext.online_attention
-// CHECK-SAME:        ins({{.*}} : tensor<2x4x8x16xf32>, tensor<2x4x8x16xf32>, tensor<2x4x8x16xf32>, f32)
+// CHECK-SAME:        ins({{.*}}, %[[MASK0]] : tensor<2x4x8x16xf32>, tensor<2x4x8x16xf32>, tensor<2x4x8x16xf32>, f32, tensor<2x4x8x8xi1>)
 // CHECK-SAME:        outs({{.*}} : tensor<2x4x8x16xf32>, tensor<2x4x8xf32>, tensor<2x4x8xf32>)
-// Inlined mask_mod: ge + select.
-// CHECK:             torch.aten.ge.Tensor
-// CHECK:             arith.select
 // Inlined score_mod: tanh.
 // CHECK:             torch.aten.tanh
 // CHECK:             iree_linalg_ext.yield
@@ -176,14 +177,42 @@ func.func @flex_attn_with_maskmod_only(%arg0: !torch.vtensor<[2,4,8,16],f32>, %a
   %output, %logsumexp, %maxscore = torch.hop_flex_attention %arg0, %arg1, %arg2, %float1.0, %false, %false {mask_mod_fn = @sdpa_mask1} : !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,4,8,16],f32>, !torch.float, !torch.bool, !torch.bool -> !torch.vtensor<[2,4,8,16],f32>, !torch.none, !torch.none
   return %output : !torch.vtensor<[2,4,8,16],f32>
 }
-// OnlineAttention with inlined mask_mod, no score_mod.
+// mask_mod is materialized before OnlineAttention and passed as the mask input.
+// CHECK:           torch.aten.ge.Tensor
+// CHECK:           torch.aten.broadcast_to
+// CHECK:           %[[MASK1:.*]] = torch_c.to_builtin_tensor {{.*}} : !torch.vtensor<[2,4,8,8],i1> -> tensor<2x4x8x8xi1>
+// OnlineAttention with mask operand, no score_mod.
 // CHECK:           iree_linalg_ext.online_attention
-// Inlined mask_mod: ge + select.
-// CHECK:             torch.aten.ge.Tensor
-// CHECK:             arith.select
+// CHECK-SAME:        ins({{.*}}, %[[MASK1]] : tensor<2x4x8x16xf32>, tensor<2x4x8x16xf32>, tensor<2x4x8x16xf32>, f32, tensor<2x4x8x8xi1>)
 // No score_mod.
 // CHECK-NOT:         torch.aten.tanh
 // CHECK:             iree_linalg_ext.yield
+
+// -----
+
+// Test mask_mod with multiple broadcasted intermediate results. This exercises
+// remapping scalar callback result types to the shapes implied by tensor index
+// operands.
+func.func private @sdpa_mask_all_indices(%arg0: !torch.vtensor<[],si32>, %arg1: !torch.vtensor<[],si32>, %arg2: !torch.vtensor<[],si32>, %arg3: !torch.vtensor<[],si32>) -> !torch.vtensor<[],i1> {
+  %0 = torch.aten.ge.Tensor %arg0, %arg1 : !torch.vtensor<[],si32>, !torch.vtensor<[],si32> -> !torch.vtensor<[],i1>
+  %1 = torch.aten.ge.Tensor %arg2, %arg3 : !torch.vtensor<[],si32>, !torch.vtensor<[],si32> -> !torch.vtensor<[],i1>
+  %2 = torch.aten.logical_and %0, %1 : !torch.vtensor<[],i1>, !torch.vtensor<[],i1> -> !torch.vtensor<[],i1>
+  return %2 : !torch.vtensor<[],i1>
+}
+// CHECK-LABEL: func.func @flex_attn_maskmod_uses_all_indices
+func.func @flex_attn_maskmod_uses_all_indices(%arg0: !torch.vtensor<[2,4,8,16],f32>, %arg1: !torch.vtensor<[2,4,8,16],f32>, %arg2: !torch.vtensor<[2,4,8,16],f32>) -> !torch.vtensor<[2,4,8,16],f32> {
+  %float1.0 = torch.constant.float 1.000000e+00
+  %false = torch.constant.bool false
+  %output, %logsumexp, %maxscore = torch.hop_flex_attention %arg0, %arg1, %arg2, %float1.0, %false, %false {mask_mod_fn = @sdpa_mask_all_indices} : !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,4,8,16],f32>, !torch.float, !torch.bool, !torch.bool -> !torch.vtensor<[2,4,8,16],f32>, !torch.none, !torch.none
+  return %output : !torch.vtensor<[2,4,8,16],f32>
+}
+// CHECK:           %[[BH_MASK:.*]] = torch.aten.ge.Tensor {{.*}} : !torch.vtensor<[2,1,1,1],si32>, !torch.vtensor<[1,4,1,1],si32> -> !torch.vtensor<[2,4,1,1],i1>
+// CHECK:           %[[QKV_MASK:.*]] = torch.aten.ge.Tensor {{.*}} : !torch.vtensor<[1,1,8,1],si32>, !torch.vtensor<[1,1,1,8],si32> -> !torch.vtensor<[1,1,8,8],i1>
+// CHECK:           %[[MASK:.*]] = torch.aten.logical_and %[[BH_MASK]], %[[QKV_MASK]] : !torch.vtensor<[2,4,1,1],i1>, !torch.vtensor<[1,1,8,8],i1> -> !torch.vtensor<[2,4,8,8],i1>
+// CHECK-NOT:       torch.aten.broadcast_to
+// CHECK:           %[[MASK_TENSOR:.*]] = torch_c.to_builtin_tensor %[[MASK]] : !torch.vtensor<[2,4,8,8],i1> -> tensor<2x4x8x8xi1>
+// CHECK:           iree_linalg_ext.online_attention
+// CHECK-SAME:        %[[MASK_TENSOR]] : tensor<2x4x8x16xf32>, tensor<2x4x8x16xf32>, tensor<2x4x8x16xf32>, f32, tensor<2x4x8x8xi1>
 
 // -----
 
@@ -258,6 +287,30 @@ func.func @flex_attn_gqa_enabled_independent_kv_heads(%arg0: !torch.vtensor<[2,8
 // CHECK:           torch.prims.collapse {{.*}} -> !torch.vtensor<[2,8,8,16],f32>
 // CHECK:           iree_linalg_ext.online_attention
 // CHECK-SAME:        ins({{.*}} : tensor<2x8x8x16xf32>, tensor<2x8x8x16xf32>, tensor<2x8x8x16xf32>, f32)
+
+// -----
+
+// Test flex_attention with GQA and mask_mod. The mask is built after key/value
+// heads are expanded, so it must match the query head count.
+func.func private @sdpa_mask_gqa(%arg0: !torch.vtensor<[],si32>, %arg1: !torch.vtensor<[],si32>, %arg2: !torch.vtensor<[],si32>, %arg3: !torch.vtensor<[],si32>) -> !torch.vtensor<[],i1> {
+  %0 = torch.aten.ge.Tensor %arg2, %arg3 : !torch.vtensor<[],si32>, !torch.vtensor<[],si32> -> !torch.vtensor<[],i1>
+  return %0 : !torch.vtensor<[],i1>
+}
+// CHECK-LABEL: func.func @flex_attn_gqa_enabled_with_maskmod
+func.func @flex_attn_gqa_enabled_with_maskmod(%arg0: !torch.vtensor<[2,8,8,16],f32>, %arg1: !torch.vtensor<[2,4,8,16],f32>, %arg2: !torch.vtensor<[2,2,8,16],f32>) -> !torch.vtensor<[2,8,8,16],f32> {
+  %none = torch.constant.none
+  %false = torch.constant.bool false
+  %output, %logsumexp, %maxscore = torch.hop_flex_attention %arg0, %arg1, %arg2, %none, %false, %false {enable_gqa = true, mask_mod_fn = @sdpa_mask_gqa} : !torch.vtensor<[2,8,8,16],f32>, !torch.vtensor<[2,4,8,16],f32>, !torch.vtensor<[2,2,8,16],f32>, !torch.none, !torch.bool, !torch.bool -> !torch.vtensor<[2,8,8,16],f32>, !torch.none, !torch.none
+  return %output : !torch.vtensor<[2,8,8,16],f32>
+}
+// CHECK:           torch.aten.broadcast_to {{.*}} -> !torch.vtensor<[2,4,2,8,16],f32>
+// CHECK:           torch.prims.collapse {{.*}} -> !torch.vtensor<[2,8,8,16],f32>
+// CHECK:           torch.aten.broadcast_to {{.*}} -> !torch.vtensor<[2,2,4,8,16],f32>
+// CHECK:           torch.prims.collapse {{.*}} -> !torch.vtensor<[2,8,8,16],f32>
+// CHECK:           torch.aten.ge.Tensor {{.*}} -> !torch.vtensor<[1,1,8,8],i1>
+// CHECK:           %[[GQA_MASK:.*]] = torch_c.to_builtin_tensor {{.*}} : !torch.vtensor<[2,8,8,8],i1> -> tensor<2x8x8x8xi1>
+// CHECK:           iree_linalg_ext.online_attention
+// CHECK-SAME:        %[[GQA_MASK]] : tensor<2x8x8x16xf32>, tensor<2x8x8x16xf32>, tensor<2x8x8x16xf32>, f32, tensor<2x8x8x8xi1>
 
 // -----
 
