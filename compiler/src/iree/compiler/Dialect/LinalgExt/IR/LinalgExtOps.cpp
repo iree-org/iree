@@ -2648,11 +2648,12 @@ LogicalResult ExpReductionOp::verify() {
 /// iteration dimensions the parameter varies over, so they fix both its rank
 /// and its extents: `()` is per-tensor, `(d0)` is per-channel over `d0`.
 /// `iterationDimToInputDim` gives the input dimension that bounds each
-/// iteration dimension.
+/// iteration dimension. `valueName` names the input in diagnostics.
 static LogicalResult
 verifyQuantizationParameter(Operation *op, StringRef name, Value qparam,
                             AffineMap qparamMap, ShapedType inputType,
-                            ArrayRef<int64_t> iterationDimToInputDim) {
+                            ArrayRef<int64_t> iterationDimToInputDim,
+                            StringRef valueName = "quantized value") {
   auto qparamType = dyn_cast<ShapedType>(qparam.getType());
   if (!qparamType) {
     if (qparamMap.getNumResults() != 0) {
@@ -2678,11 +2679,50 @@ verifyQuantizationParameter(Operation *op, StringRef name, Value qparam,
     if (qparamSize != valueSize) {
       return op->emitOpError("expected ")
              << name << " dimension " << qparamDim << " to have size "
-             << valueSize << " to match dimension " << valueDim
-             << " of the quantized value, got " << qparamSize;
+             << valueSize << " to match dimension " << valueDim << " of the "
+             << valueName << ", got " << qparamSize;
     }
   }
   return success();
+}
+
+/// Verifies that each of `maps` is a projected permutation of `rank`
+/// dimensions without symbols, as the affine quantization ops require.
+/// `valueName` names the value whose rank is `rank` in diagnostics.
+static LogicalResult
+verifyQuantizationIndexingMaps(Operation *op, ArrayRef<AffineMap> maps,
+                               int64_t rank,
+                               StringRef valueName = "quantized value") {
+  for (auto [index, map] : llvm::enumerate(maps)) {
+    if (static_cast<int64_t>(map.getNumDims()) != rank) {
+      return op->emitOpError("expected indexing map ")
+             << index << " to have " << rank
+             << " dimensions to match the rank of the " << valueName << ", got "
+             << map.getNumDims();
+    }
+    if (map.getNumSymbols() != 0) {
+      return op->emitOpError("expected indexing map ")
+             << index << " to have no symbols";
+    }
+    // Non-projected maps, such as `d1 floordiv 32` for block quantization, are
+    // not supported; blocked quantization is expressed on an expanded shape.
+    if (!map.isProjectedPermutation()) {
+      return op->emitOpError("expected indexing map ")
+             << index << " to be a projected permutation, got "
+             << AffineMapAttr::get(map);
+    }
+  }
+  return success();
+}
+
+/// Returns, for each iteration dimension, the input dimension that the
+/// permutation `inputMap` reads along it.
+static SmallVector<int64_t> getIterationDimToInputDim(AffineMap inputMap) {
+  SmallVector<int64_t> iterationDimToInputDim(inputMap.getNumDims());
+  for (auto [position, expr] : llvm::enumerate(inputMap.getResults())) {
+    iterationDimToInputDim[cast<AffineDimExpr>(expr).getPosition()] = position;
+  }
+  return iterationDimToInputDim;
 }
 
 /// Verifies the operand structure shared by `quantize_affine` and
@@ -2702,24 +2742,8 @@ static LogicalResult verifyAffineQuantizationOp(OpTy op) {
            << maps.size();
   }
 
-  for (auto [index, map] : llvm::enumerate(maps)) {
-    if (static_cast<int64_t>(map.getNumDims()) != rank) {
-      return op.emitOpError("expected indexing map ")
-             << index << " to have " << rank
-             << " dimensions to match the rank of the quantized value, got "
-             << map.getNumDims();
-    }
-    if (map.getNumSymbols() != 0) {
-      return op.emitOpError("expected indexing map ")
-             << index << " to have no symbols";
-    }
-    // Non-projected maps, such as `d1 floordiv 32` for block quantization, are
-    // not supported; blocked quantization is expressed on an expanded shape.
-    if (!map.isProjectedPermutation()) {
-      return op.emitOpError("expected indexing map ")
-             << index << " to be a projected permutation, got "
-             << AffineMapAttr::get(map);
-    }
+  if (failed(verifyQuantizationIndexingMaps(op, maps, rank))) {
+    return failure();
   }
 
   // The op is elementwise over the value, so every value element is read and
@@ -2739,10 +2763,8 @@ static LogicalResult verifyAffineQuantizationOp(OpTy op) {
   // The input map names the input dimension each iteration dim reads, which is
   // what gives the iteration space its extents. The output has to have those
   // same extents, reordered by its own map.
-  SmallVector<int64_t> iterationDimToInputDim(rank);
-  for (auto [position, expr] : llvm::enumerate(inputMap.getResults())) {
-    iterationDimToInputDim[cast<AffineDimExpr>(expr).getPosition()] = position;
-  }
+  SmallVector<int64_t> iterationDimToInputDim =
+      getIterationDimToInputDim(inputMap);
   SmallVector<int64_t> expectedOutputShape =
       llvm::map_to_vector(outputMap.getResults(), [&](AffineExpr expr) {
         return inputType.getDimSize(
@@ -2978,6 +3000,120 @@ DEFINE_AFFINE_QUANTIZATION_OP_METHODS(QuantizeAffineOp)
 DEFINE_AFFINE_QUANTIZATION_OP_METHODS(DequantizeAffineOp)
 
 #undef DEFINE_AFFINE_QUANTIZATION_OP_METHODS
+
+//===----------------------------------------------------------------------===//
+// ChooseQParamsAffineOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult ChooseQParamsAffineOp::verify() {
+  ShapedType inputType = getInputType();
+  int64_t rank = inputType.getRank();
+  Value zeroPoint = getZeroPoint();
+
+  SmallVector<AffineMap> maps = getIndexingMapsArray();
+  size_t expectedMaps = zeroPoint ? 3 : 2;
+  if (maps.size() != expectedMaps) {
+    return emitOpError("expected ")
+           << expectedMaps << " indexing maps, one per operand, got "
+           << maps.size();
+  }
+  if (failed(verifyQuantizationIndexingMaps(getOperation(), maps, rank,
+                                            "input"))) {
+    return failure();
+  }
+  AffineMap inputMap = maps.front();
+  if (static_cast<int64_t>(inputMap.getNumResults()) != rank) {
+    return emitOpError("expected the input indexing map to be a permutation "
+                       "with ")
+           << rank << " results, got " << AffineMapAttr::get(inputMap);
+  }
+  // The scale and the zero point describe the same blocks.
+  if (zeroPoint && maps[1] != maps[2]) {
+    return emitOpError("expected scale and zero_point to have the same "
+                       "indexing map");
+  }
+
+  auto realType = dyn_cast<FloatType>(inputType.getElementType());
+  if (!realType) {
+    return emitOpError("expected input to have a floating point element type, "
+                       "got ")
+           << inputType.getElementType();
+  }
+  Type scaleElementType = getScaleElementType();
+  if (!isa<FloatType>(scaleElementType)) {
+    return emitOpError("expected scale to have a floating point element type, "
+                       "got ")
+           << scaleElementType;
+  }
+
+  SmallVector<int64_t> iterationDimToInputDim =
+      getIterationDimToInputDim(inputMap);
+  if (failed(verifyQuantizationParameter(getOperation(), "scale", getScale(),
+                                         maps[1], inputType,
+                                         iterationDimToInputDim, "input"))) {
+    return failure();
+  }
+  if (zeroPoint) {
+    if (failed(verifyQuantizationParameter(getOperation(), "zero_point",
+                                           zeroPoint, maps[2], inputType,
+                                           iterationDimToInputDim, "input"))) {
+      return failure();
+    }
+    Type zeroPointElementType = getElementTypeOrSelf(zeroPoint.getType());
+    if (!zeroPointElementType.isSignlessInteger()) {
+      return emitOpError("expected zero_point to have a signless integer "
+                         "element type, got ")
+             << zeroPointElementType;
+    }
+  } else if (getZpUnsigned()) {
+    return emitOpError(
+        "zp_unsigned is only allowed when a zero_point operand is present");
+  }
+
+  // The scales divide by the quantized range, so it has to be non-empty, and
+  // a zero point outside the range would not be a point on the grid.
+  if (!isValidQuantizationRange(getQuantMin(), getQuantMax())) {
+    return emitOpError("expected a non-empty quantization range that includes "
+                       "0, got [")
+           << getQuantMin() << ", " << getQuantMax() << "]";
+  }
+  if (zeroPoint &&
+      failed(verifyQuantizationRange(
+          getOperation(), getElementTypeOrSelf(zeroPoint.getType()),
+          getQuantMin(), getQuantMax(), getZpUnsigned()))) {
+    return failure();
+  }
+  if (getMapping() == QuantizationMapping::SymmetricQmax &&
+      getQuantMax() <= 0) {
+    return emitOpError("expected a positive quant_max for the symmetric_qmax "
+                       "mapping");
+  }
+  if (!(getEps().convertToDouble() >= 0.0)) {
+    return emitOpError("expected a non-negative eps, got ")
+           << getEps().convertToDouble();
+  }
+  return success();
+}
+
+SmallVector<AffineMap> ChooseQParamsAffineOp::getIndexingMapsArray() {
+  return llvm::to_vector(getIndexingMaps().getAsValueRange<AffineMapAttr>());
+}
+
+SmallVector<utils::IteratorType> ChooseQParamsAffineOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(
+      getRank(), utils::IteratorType::reduction);
+  for (AffineExpr expr : getScaleMap().getResults()) {
+    iteratorTypes[cast<AffineDimExpr>(expr).getPosition()] =
+        utils::IteratorType::parallel;
+  }
+  return iteratorTypes;
+}
+
+LogicalResult ChooseQParamsAffineOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
 
 //===----------------------------------------------------------------------===//
 // Im2colOp
@@ -4050,6 +4186,7 @@ DEFINE_OP_GET_EFFECTS(OnlineAttentionOp)
 DEFINE_OP_GET_EFFECTS(ExpReductionOp)
 DEFINE_OP_GET_EFFECTS(QuantizeAffineOp)
 DEFINE_OP_GET_EFFECTS(DequantizeAffineOp)
+DEFINE_OP_GET_EFFECTS(ChooseQParamsAffineOp)
 DEFINE_OP_GET_EFFECTS(Im2colOp)
 DEFINE_OP_GET_EFFECTS(CustomOp)
 

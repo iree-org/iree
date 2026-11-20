@@ -14,6 +14,7 @@ package(
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = [
+        "choose_qparams.mlir",
         "contraction_scaling.mlir",
     ],
     compiler_flags = [
@@ -29,6 +30,7 @@ iree_check_single_backend_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_reference_llvm-cpu_local-task",
     srcs = [
+        "choose_qparams.mlir",
         "contraction_scaling.mlir",
     ],
     compiler_flags = [

@@ -102,6 +102,48 @@ func.func @torchao_dequantize(
 
 // -----
 
+// The pipeline converts the PT2E parameter computation to LinalgExt before
+// Torch-to-Linalg would expand it into generic arithmetic.
+// CHECK-LABEL: util.func public @choose_qparams_per_token_asymmetric$async(
+// CHECK: iree_linalg_ext.choose_qparams_affine
+func.func @choose_qparams_per_token_asymmetric(
+    %input: !torch.vtensor<[4,8],f32>)
+    -> (!torch.vtensor<[4,1],f64>, !torch.vtensor<[4,1],si64>) {
+  %dtype = torch.constant.int 1
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams_per_token_asymmetric
+      %input, %dtype
+      : !torch.vtensor<[4,8],f32>, !torch.int
+        -> !torch.vtensor<[4,1],f64>, !torch.vtensor<[4,1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[4,1],f64>, !torch.vtensor<[4,1],si64>
+}
+
+// -----
+
+// Inputs for which LinalgExt would not reproduce the PT2E arithmetic are
+// lowered by Torch-to-Linalg instead, leaving no Torch op behind.
+// CHECK-LABEL: util.func public @choose_qparams_tensor_f16$async(
+// CHECK-NOT: iree_linalg_ext.choose_qparams_affine
+// CHECK-NOT: torch.quantized_decomposed
+// CHECK: linalg.generic
+// CHECK-NOT: torch.quantized_decomposed
+// CHECK: util.return
+func.func @choose_qparams_tensor_f16(%input: !torch.vtensor<[4,8],f16>)
+    -> (!torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>) {
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %eps = torch.constant.float 1.000000e-08
+  %dtype = torch.constant.int 1
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams.tensor
+      %input, %minimum, %maximum, %eps, %dtype
+      : !torch.vtensor<[4,8],f16>, !torch.int, !torch.int, !torch.float,
+        !torch.int -> !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+}
+
+// -----
+
 // CHECK-LABEL: util.func public @amax$async(
 // NONFINITE: arith.constant 0xFF800000 : f32
 // FINITE: arith.constant -3.40282347E+38 : f32

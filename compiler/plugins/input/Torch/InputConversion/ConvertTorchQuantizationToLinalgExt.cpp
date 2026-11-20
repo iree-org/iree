@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -27,6 +28,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <optional>
 
 namespace mlir::iree_compiler::TorchInput {
@@ -881,6 +883,251 @@ struct ConvertDequantize final : OpConversionPattern<OpTy> {
   }
 };
 
+// Returns the type of a constant Torch dtype.
+static FailureOr<Type> matchConstantDtype(Operation *op, Value dtype,
+                                          ConversionPatternRewriter &rewriter) {
+  int64_t dtypeValue;
+  if (!matchPattern(dtype, Torch::m_TorchConstantInt(&dtypeValue))) {
+    return rewriter.notifyMatchFailure(op, "expected a constant dtype");
+  }
+  FailureOr<Type> type = Torch::getTypeForScalarType(
+      op->getContext(),
+      static_cast<torch::torch_upstream::ScalarType>(dtypeValue));
+  if (failed(type)) {
+    return rewriter.notifyMatchFailure(op, "expected a known dtype");
+  }
+  return type;
+}
+
+// Returns whether a constant dtype is int8, the only dtype that PT2E supports
+// for `choose_qparams_per_token` and `choose_qparams_per_token_asymmetric`.
+static LogicalResult matchPerTokenDtype(Operation *op, Value dtype,
+                                        ConversionPatternRewriter &rewriter) {
+  FailureOr<Type> type = matchConstantDtype(op, dtype, rewriter);
+  if (failed(type)) {
+    return failure();
+  }
+  if (!type->isSignedInteger(8)) {
+    return rewriter.notifyMatchFailure(op, "expected an int8 dtype");
+  }
+  return success();
+}
+
+// The parameter computation of a PT2E `choose_qparams` op. `parameterDims` are
+// the input dimensions that index the parameters; the others are reduced.
+struct PT2EChooseQParams {
+  IREE::LinalgExt::QuantizationMapping mapping;
+  int64_t quantMin;
+  int64_t quantMax;
+  double eps;
+  SmallVector<unsigned> parameterDims;
+};
+
+// Reads the bounds and eps of `choose_qparams.tensor` or
+// `choose_qparams_symmetric.tensor`, which LinalgExt takes as attributes.
+// Per-tensor parameters are indexed by no dimension.
+template <typename OpTy>
+static FailureOr<PT2EChooseQParams>
+readPerTensorChooseQParams(OpTy op,
+                           IREE::LinalgExt::QuantizationMapping mapping,
+                           ConversionPatternRewriter &rewriter) {
+  PT2EChooseQParams params{mapping, 0, 0, 0.0, {}};
+  if (!matchPattern(op.getQuantMin(),
+                    Torch::m_TorchConstantInt(&params.quantMin)) ||
+      !matchPattern(op.getQuantMax(),
+                    Torch::m_TorchConstantInt(&params.quantMax)) ||
+      !matchPattern(op.getEps(), Torch::m_TorchConstantFloat(&params.eps))) {
+    return rewriter.notifyMatchFailure(
+        op, "expected constant quantization bounds and eps");
+  }
+  return params;
+}
+
+// Reads `choose_qparams_per_token` or `choose_qparams_per_token_asymmetric`,
+// whose int8 dtype gives the bounds and whose eps is fixed. Per-token
+// parameters are indexed by every dimension but the last.
+template <typename OpTy>
+static FailureOr<PT2EChooseQParams>
+readPerTokenChooseQParams(OpTy op, IREE::LinalgExt::QuantizationMapping mapping,
+                          double eps, int64_t rank,
+                          ConversionPatternRewriter &rewriter) {
+  if (rank < 1) {
+    return rewriter.notifyMatchFailure(op, "expected a token dimension");
+  }
+  if (failed(matchPerTokenDtype(op, op.getDtype(), rewriter))) {
+    return failure();
+  }
+  return PT2EChooseQParams{mapping, -128, 127, eps,
+                           llvm::to_vector(llvm::seq<unsigned>(rank - 1))};
+}
+
+static FailureOr<PT2EChooseQParams>
+readPT2EChooseQParams(Torch::QuantizedDecomposedChooseQparamsTensorOp op,
+                      int64_t rank, ConversionPatternRewriter &rewriter) {
+  return readPerTensorChooseQParams(
+      op, IREE::LinalgExt::QuantizationMapping::Asymmetric, rewriter);
+}
+
+static FailureOr<PT2EChooseQParams> readPT2EChooseQParams(
+    Torch::QuantizedDecomposedChooseQparamsSymmetricTensorOp op, int64_t rank,
+    ConversionPatternRewriter &rewriter) {
+  FailureOr<PT2EChooseQParams> params = readPerTensorChooseQParams(
+      op, IREE::LinalgExt::QuantizationMapping::Symmetric, rewriter);
+  if (failed(params)) {
+    return failure();
+  }
+  // PT2E uses a zero point of 128 for uint8 and of 0 otherwise. The symmetric
+  // mapping uses the middle of the range, which agrees for the bounds of those
+  // dtypes.
+  FailureOr<Type> type = matchConstantDtype(op, op.getDtype(), rewriter);
+  if (failed(type)) {
+    return failure();
+  }
+  int64_t pt2eZeroPoint = type->isUnsignedInteger(8) ? 128 : 0;
+  if (IREE::LinalgExt::ChooseQParamsAffineOp::getSymmetricZeroPoint(
+          params->quantMin, params->quantMax) != pt2eZeroPoint) {
+    return rewriter.notifyMatchFailure(
+        op, "expected the PT2E zero point at the middle of the range");
+  }
+  return params;
+}
+
+static FailureOr<PT2EChooseQParams> readPT2EChooseQParams(
+    Torch::QuantizedDecomposedChooseQparamsPerTokenAsymmetricOp op,
+    int64_t rank, ConversionPatternRewriter &rewriter) {
+  return readPerTokenChooseQParams(
+      op, IREE::LinalgExt::QuantizationMapping::AsymmetricMinError,
+      static_cast<double>(std::numeric_limits<float>::epsilon()), rank,
+      rewriter);
+}
+
+static FailureOr<PT2EChooseQParams>
+readPT2EChooseQParams(Torch::QuantizedDecomposedChooseQparamsPerTokenOp op,
+                      int64_t rank, ConversionPatternRewriter &rewriter) {
+  // PyTorch and torch-mlir fix the eps of this op to 1e-5.
+  return readPerTokenChooseQParams(
+      op, IREE::LinalgExt::QuantizationMapping::SymmetricQmax, /*eps=*/1e-5,
+      rank, rewriter);
+}
+
+// Returns whether LinalgExt, which computes in the input type, reproduces the
+// arithmetic of the PT2E reference for `inputType`. The per-tensor references
+// promote 16-bit inputs to f32 for the eps clamp and the zero point, and
+// `choose_qparams_per_token` promotes f16 inputs to f32. Such inputs are left
+// for the Torch-to-Linalg lowering.
+template <typename OpTy>
+static bool computesInInputType(Type inputType) {
+  using PerTokenAsymmetricOp =
+      Torch::QuantizedDecomposedChooseQparamsPerTokenAsymmetricOp;
+  using PerTokenOp = Torch::QuantizedDecomposedChooseQparamsPerTokenOp;
+  if constexpr (std::is_same_v<OpTy, PerTokenAsymmetricOp>) {
+    return true;
+  } else if constexpr (std::is_same_v<OpTy, PerTokenOp>) {
+    return !inputType.isF16();
+  } else {
+    return inputType.getIntOrFloatBitWidth() >= 32;
+  }
+}
+
+// Converts `choose_qparams.tensor`, `choose_qparams_symmetric.tensor`,
+// `choose_qparams_per_token_asymmetric` or `choose_qparams_per_token`. The
+// parameters of the LinalgExt op are indexed by the input dimensions that are
+// not reduced. PT2E keeps unit dimensions in its results, into which they are
+// expanded.
+template <typename OpTy>
+struct ConvertChooseQParams final : OpConversionPattern<OpTy> {
+  using OpConversionPattern<OpTy>::OpConversionPattern;
+  using OpAdaptor = typename OpTy::Adaptor;
+
+  LogicalResult
+  matchAndRewrite(OpTy op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Value input = adaptor.getInput();
+    auto inputType = dyn_cast<RankedTensorType>(input.getType());
+    const TypeConverter *typeConverter = this->getTypeConverter();
+    auto scaleType = typeConverter->template convertType<RankedTensorType>(
+        op.getScale().getType());
+    auto zeroPointType = typeConverter->template convertType<RankedTensorType>(
+        op.getZeroPoint().getType());
+    if (!inputType || !scaleType || !zeroPointType) {
+      return rewriter.notifyMatchFailure(op,
+                                         "expected tensors with known dtypes");
+    }
+    if (!isa<FloatType>(inputType.getElementType()) ||
+        !isa<FloatType>(scaleType.getElementType()) ||
+        !isa<IntegerType>(zeroPointType.getElementType())) {
+      return rewriter.notifyMatchFailure(
+          op, "expected float input and scale and integer zero point");
+    }
+    if (!computesInInputType<OpTy>(inputType.getElementType())) {
+      return rewriter.notifyMatchFailure(
+          op, "expected an input dtype in which PT2E computes the parameters");
+    }
+
+    int64_t rank = inputType.getRank();
+    FailureOr<PT2EChooseQParams> params =
+        readPT2EChooseQParams(op, rank, rewriter);
+    if (failed(params)) {
+      return failure();
+    }
+    if (!IREE::LinalgExt::ChooseQParamsAffineOp::isValidQuantizationRange(
+            params->quantMin, params->quantMax)) {
+      return rewriter.notifyMatchFailure(
+          op, "expected an ordered quantization range including 0");
+    }
+
+    ArrayRef<unsigned> parameterDims = params->parameterDims;
+    SmallVector<int64_t> parameterShape = llvm::map_to_vector(
+        parameterDims, [&](unsigned dim) { return inputType.getDimSize(dim); });
+    Type scaleElementType = scaleType.getElementType();
+    Type zeroPointElementType = zeroPointType.getElementType();
+    auto parameterScaleType =
+        RankedTensorType::get(parameterShape, scaleElementType);
+    auto parameterZeroPointType =
+        RankedTensorType::get(parameterShape, zeroPointElementType);
+    std::optional<SmallVector<ReassociationIndices>> reassociation =
+        getReassociationIndicesForReshape(parameterScaleType, scaleType);
+    if (!reassociation || scaleType.getRank() < parameterScaleType.getRank() ||
+        scaleType.getShape() != zeroPointType.getShape()) {
+      return rewriter.notifyMatchFailure(
+          op, "expected parameters that only add unit dimensions");
+    }
+
+    Location location = op.getLoc();
+    SmallVector<OpFoldResult> inputSizes =
+        tensor::getMixedSizes(rewriter, location, input);
+    SmallVector<OpFoldResult> parameterSizes = llvm::map_to_vector(
+        parameterDims, [&](unsigned dim) { return inputSizes[dim]; });
+    Value scaleInit = tensor::EmptyOp::create(rewriter, location,
+                                              parameterSizes, scaleElementType);
+    Value zeroPointInit = tensor::EmptyOp::create(
+        rewriter, location, parameterSizes, zeroPointElementType);
+    AffineMap parameterMap = AffineMap::getMultiDimMapWithTargets(
+        rank, parameterDims, rewriter.getContext());
+    auto choose = IREE::LinalgExt::ChooseQParamsAffineOp::create(
+        rewriter, location,
+        TypeRange{parameterScaleType, parameterZeroPointType}, input, scaleInit,
+        zeroPointInit,
+        rewriter.getAffineMapArrayAttr({rewriter.getMultiDimIdentityMap(rank),
+                                        parameterMap, parameterMap}),
+        IREE::LinalgExt::QuantizationMappingAttr::get(rewriter.getContext(),
+                                                      params->mapping),
+        rewriter.getI64IntegerAttr(params->quantMin),
+        rewriter.getI64IntegerAttr(params->quantMax),
+        rewriter.getF64FloatAttr(params->eps), /*zp_unsigned=*/nullptr);
+
+    SmallVector<Value> results;
+    SmallVector<RankedTensorType> resultTypes = {scaleType, zeroPointType};
+    for (auto [result, type] :
+         llvm::zip_equal(choose->getResults(), resultTypes)) {
+      results.push_back(tensor::ExpandShapeOp::create(rewriter, location, type,
+                                                      result, *reassociation));
+    }
+    rewriter.replaceOp(op, results);
+    return success();
+  }
+};
+
 class ConvertTorchQuantizationToLinalgExtPass final
     : public impl::ConvertTorchQuantizationToLinalgExtPassBase<
           ConvertTorchQuantizationToLinalgExtPass> {
@@ -914,8 +1161,15 @@ class ConvertTorchQuantizationToLinalgExtPass final
         ConvertDequantize<
             Torch::QuantizedDecomposedDequantizePerChannelGroupOp>,
         ConvertDequantize<Torch::QuantizedDecomposedDequantizePerTokenOp>,
-        ConvertDequantize<Torch::TorchaoDequantizeAffineOp>>(typeConverter,
-                                                             context);
+        ConvertDequantize<Torch::TorchaoDequantizeAffineOp>,
+        ConvertChooseQParams<Torch::QuantizedDecomposedChooseQparamsTensorOp>,
+        ConvertChooseQParams<
+            Torch::QuantizedDecomposedChooseQparamsSymmetricTensorOp>,
+        ConvertChooseQParams<
+            Torch::QuantizedDecomposedChooseQparamsPerTokenAsymmetricOp>,
+        ConvertChooseQParams<
+            Torch::QuantizedDecomposedChooseQparamsPerTokenOp>>(typeConverter,
+                                                                context);
     // These ops are deliberately not marked illegal: ops whose metadata
     // LinalgExt cannot represent remain for the Torch-to-Linalg lowering.
     if (failed(applyPartialConversion(getOperation(), target,
