@@ -103,3 +103,80 @@ stream.executable private @convert_store_i4 {
     }
   }
 }
+
+// -----
+
+// CHECK-LABEL: @unpacked_load_i5
+// CHECK: stream.binding.subspan {{.*}}tensor<4xi8>
+// CHECK: %[[LOAD:.*]] = iree_tensor_ext.dispatch.tensor.load {{.*}} -> tensor<4xi8
+// CHECK: arith.trunci %[[LOAD]] : tensor<4xi8{{.*}}> to tensor<4xi5, #iree_encoding.unpacked_storage>
+stream.executable private @unpacked_load_i5 {
+  stream.executable.export public @dispatch
+  builtin.module {
+    util.func public @dispatch(%binding: !stream.binding) {
+      %c0 = arith.constant 0 : index
+      %buffer = stream.binding.subspan %binding[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi5, #iree_encoding.unpacked_storage>>
+      %value = iree_tensor_ext.dispatch.tensor.load %buffer, offsets = [0], sizes = [4], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xi5, #iree_encoding.unpacked_storage>> -> tensor<4xi5, #iree_encoding.unpacked_storage>
+      util.optimization_barrier %value : tensor<4xi5, #iree_encoding.unpacked_storage>
+      util.return
+    }
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @unpacked_store_i5
+// CHECK: stream.binding.subspan {{.*}}tensor<4xi8>
+// CHECK: %[[EXT:.*]] = arith.extui {{.*}} : tensor<4xi5, #iree_encoding.unpacked_storage> to tensor<4xi8
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[EXT]]
+stream.executable private @unpacked_store_i5 {
+  stream.executable.export public @dispatch
+  builtin.module {
+    util.func public @dispatch(%binding: !stream.binding, %value: tensor<4xi5, #iree_encoding.unpacked_storage>) {
+      %c0 = arith.constant 0 : index
+      %buffer = stream.binding.subspan %binding[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xi5, #iree_encoding.unpacked_storage>>
+      iree_tensor_ext.dispatch.tensor.store %value, %buffer, offsets = [0], sizes = [4], strides = [1] : tensor<4xi5, #iree_encoding.unpacked_storage> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xi5, #iree_encoding.unpacked_storage>>
+      util.return
+    }
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @unpacked_load_fp4
+// CHECK: stream.binding.subspan {{.*}}tensor<4xi8>
+// CHECK: %[[LOAD:.*]] = iree_tensor_ext.dispatch.tensor.load {{.*}} -> tensor<4xi8
+// CHECK: %[[BITS:.*]] = arith.trunci %[[LOAD]] : tensor<4xi8{{.*}}> to tensor<4xi4, #iree_encoding.unpacked_storage>
+// CHECK: %[[VALUE:.*]] = arith.bitcast %[[BITS]] : tensor<4xi4, #iree_encoding.unpacked_storage> to tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>
+// CHECK: util.optimization_barrier %[[VALUE]]
+stream.executable private @unpacked_load_fp4 {
+  stream.executable.export public @dispatch
+  builtin.module {
+    util.func public @dispatch(%binding: !stream.binding) {
+      %c0 = arith.constant 0 : index
+      %buffer = stream.binding.subspan %binding[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>>
+      %value = iree_tensor_ext.dispatch.tensor.load %buffer, offsets = [0], sizes = [4], strides = [1] : !iree_tensor_ext.dispatch.tensor<readonly:tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>> -> tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>
+      util.optimization_barrier %value : tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>
+      util.return
+    }
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @unpacked_store_fp4
+// CHECK: stream.binding.subspan {{.*}}tensor<4xi8>
+// CHECK: %[[BITS:.*]] = arith.bitcast {{.*}} : tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage> to tensor<4xi4, #iree_encoding.unpacked_storage>
+// CHECK: %[[EXT:.*]] = arith.extui %[[BITS]] : tensor<4xi4, #iree_encoding.unpacked_storage> to tensor<4xi8
+// CHECK: iree_tensor_ext.dispatch.tensor.store %[[EXT]]
+stream.executable private @unpacked_store_fp4 {
+  stream.executable.export public @dispatch
+  builtin.module {
+    util.func public @dispatch(%binding: !stream.binding, %value: tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>) {
+      %c0 = arith.constant 0 : index
+      %buffer = stream.binding.subspan %binding[%c0] : !stream.binding -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>>
+      iree_tensor_ext.dispatch.tensor.store %value, %buffer, offsets = [0], sizes = [4], strides = [1] : tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage> -> !iree_tensor_ext.dispatch.tensor<writeonly:tensor<4xf4E2M1FN, #iree_encoding.unpacked_storage>>
+      util.return
+    }
+  }
+}

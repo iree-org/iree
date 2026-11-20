@@ -132,6 +132,9 @@ struct ConvertTensorImportOp
     if (encoding && encoding.canSkipBufferViewAssertions()) {
       return success();
     }
+    if (!IREE::HAL::EncodingTypeOp::getTypeValue(tensorType.getEncoding())) {
+      return failure();
+    }
 
     auto expectedElementType = IREE::HAL::ElementTypeOp::create(
         builder, loc, tensorType.getElementType());
@@ -177,6 +180,14 @@ struct ConvertTensorExportOp
     if (!isa<IREE::HAL::BufferType>(targetType) &&
         !isa<IREE::HAL::BufferViewType>(targetType)) {
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
+    }
+    if (isa<IREE::HAL::BufferViewType>(targetType)) {
+      auto tensorType = dyn_cast<RankedTensorType>(sourceType);
+      if (tensorType &&
+          !IREE::HAL::EncodingTypeOp::getTypeValue(tensorType.getEncoding())) {
+        return rewriter.notifyMatchFailure(
+            op, "encoding has no HAL buffer-view representation");
+      }
     }
 
     auto source =

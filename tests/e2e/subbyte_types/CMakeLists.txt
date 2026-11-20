@@ -15,6 +15,7 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_subbyte_emulation
   SRCS
     "subbyte_types.mlir"
+    "unpacked_storage.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER

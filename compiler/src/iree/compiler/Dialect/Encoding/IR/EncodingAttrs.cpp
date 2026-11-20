@@ -107,6 +107,30 @@ bool LayoutAttr::isIdentityLayout() const {
                       [](auto attr) { return attr.isIdentityLayout(); });
 }
 
+Type LayoutAttr::getStorageElementType(Type elementType) const {
+  Type result;
+  for (auto layout : getLayouts().getAsRange<SerializableAttr>()) {
+    Type candidate = layout.getStorageElementType(elementType);
+    if (!candidate || (result && result != candidate)) {
+      return {};
+    }
+    result = candidate;
+  }
+  return result;
+}
+
+AffineMap LayoutAttr::getStorageElementOffsetMap(RankedTensorType type) const {
+  AffineMap result;
+  for (auto layout : getLayouts().getAsRange<SerializableAttr>()) {
+    AffineMap candidate = layout.getStorageElementOffsetMap(type);
+    if (!candidate || (result && result != candidate)) {
+      return {};
+    }
+    result = candidate;
+  }
+  return result;
+}
+
 Value LayoutAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
                                               RankedTensorType type,
                                               ValueRange dynamicDims) const {
@@ -137,11 +161,39 @@ LogicalResult LayoutAttr::verifyEncoding(
   return success();
 }
 
+// Arithmetic lowering uses signless integers; signedness belongs to the
+// consuming operation. Both encodings use containers of at most 64 bits.
+static LogicalResult
+verifyStorageElementType(Type elementType, StringRef encodingName,
+                         function_ref<InFlightDiagnostic()> emitError) {
+  if (!elementType.isSignlessInteger() && !isa<FloatType>(elementType)) {
+    return emitError()
+           << encodingName
+           << " requires signless integer or floating-point elements";
+  }
+  unsigned widthInBits = elementType.getIntOrFloatBitWidth();
+  if (widthInBits == 0 || widthInBits > 64) {
+    return emitError() << encodingName
+                       << " requires an element bit-width between 1 and 64";
+  }
+  return success();
+}
+
 //===---------------------------------------------------------------------===//
 // iree_encoding.packed_storage
 //===---------------------------------------------------------------------===//
 
 bool PackedStorageAttr::isSerialized() const { return true; }
+
+Type PackedStorageAttr::getStorageElementType(Type elementType) const {
+  return elementType;
+}
+
+AffineMap
+PackedStorageAttr::getStorageElementOffsetMap(RankedTensorType type) const {
+  return getRowMajorStorageElementOffsetMap(
+      type, getTypeBitWidth(type.getElementType()));
+}
 
 bool PackedStorageAttr::canDropWithoutTensorMaterialization() const {
   return true;
@@ -166,9 +218,6 @@ Value PackedStorageAttr::calculateStorageSizeInBytes(
     Location loc, OpBuilder &builder, RankedTensorType type,
     ValueRange dynamicDims) const {
   unsigned elementBits = getTypeBitWidth(type.getElementType());
-  assert(elementBits <= 8 && "packed_storage only allowed for sub-byte types");
-  assert(llvm::isPowerOf2_32(elementBits) &&
-         "packed_storage only allowed for power-of-two types");
 
   // Calculate static dimensions if there are any.
   int64_t staticCount = 1;
@@ -186,8 +235,13 @@ Value PackedStorageAttr::calculateStorageSizeInBytes(
         loc, value, dim, arith::IntegerOverflowFlags::nsw);
   }
 
-  // For sub-byte element types we need to divide by the number of elements that
-  // can be packed into one byte.
+  if (elementBits >= 8) {
+    auto bytesPerElement =
+        arith::ConstantIndexOp::create(builder, loc, elementBits / 8);
+    return builder.createOrFold<arith::MulIOp>(loc, value, bytesPerElement);
+  }
+
+  // Round up the final partial byte for sub-byte elements.
   unsigned elementsPerByte = 8 / elementBits;
   auto divisor = arith::ConstantIndexOp::create(builder, loc, elementsPerByte);
   value = builder.createOrFold<arith::CeilDivUIOp>(loc, value, divisor);
@@ -197,17 +251,13 @@ Value PackedStorageAttr::calculateStorageSizeInBytes(
 LogicalResult PackedStorageAttr::verifyEncoding(
     llvm::ArrayRef<int64_t> shape, mlir::Type elementType,
     llvm::function_ref<mlir::InFlightDiagnostic()> emitError) const {
-  unsigned elementBitWidth = getTypeBitWidth(elementType);
-  if (elementBitWidth > 7) {
-    return emitError() << "bit-width of the element type is " << elementBitWidth
-                       << " but packed_storage is currently only supported for "
-                       << "sub-byte types";
+  if (failed(
+          verifyStorageElementType(elementType, "packed_storage", emitError))) {
+    return failure();
   }
-  if (!llvm::isPowerOf2_32(elementBitWidth)) {
+  if (!llvm::isPowerOf2_32(elementType.getIntOrFloatBitWidth())) {
     return emitError()
-           << "bit-width of the element type is " << elementBitWidth
-           << " but packed_storage currently only supports types with "
-           << "power-of-two bitwidth";
+           << "packed_storage requires a power-of-two element bit-width";
   }
   return success();
 }
@@ -215,6 +265,60 @@ LogicalResult PackedStorageAttr::verifyEncoding(
 Attribute PackedStorageAttr::getCollapsedEncoding(ArrayRef<int64_t>,
                                                   ArrayRef<int64_t>) const {
   return *this;
+}
+
+//===---------------------------------------------------------------------===//
+// iree_encoding.unpacked_storage
+//===---------------------------------------------------------------------===//
+
+bool UnpackedStorageAttr::isSerialized() const { return true; }
+
+Type UnpackedStorageAttr::getStorageElementType(Type elementType) const {
+  int64_t storageWidthInBits = getRoundedElementByteWidth(elementType) * 8;
+  if (elementType.getIntOrFloatBitWidth() == storageWidthInBits) {
+    return elementType;
+  }
+  return IntegerType::get(getContext(), storageWidthInBits);
+}
+
+AffineMap
+UnpackedStorageAttr::getStorageElementOffsetMap(RankedTensorType type) const {
+  return getRowMajorStorageElementOffsetMap(
+      type, getRoundedElementByteWidth(type.getElementType()) * 8);
+}
+
+Value UnpackedStorageAttr::calculateStorageSizeInBytes(
+    Location loc, OpBuilder &builder, RankedTensorType type,
+    ValueRange dynamicDims) const {
+  return IdentityAttr::get(getContext())
+      .calculateStorageSizeInBytes(loc, builder, type, dynamicDims);
+}
+
+bool UnpackedStorageAttr::canDropWithoutTensorMaterialization() const {
+  return true;
+}
+
+bool UnpackedStorageAttr::isInvariantUnderDimCollapse() const { return true; }
+
+Attribute UnpackedStorageAttr::getCollapsedEncoding(ArrayRef<int64_t>,
+                                                    ArrayRef<int64_t>) const {
+  return *this;
+}
+
+FailureOr<BitcastEncodingInfo>
+UnpackedStorageAttr::convertForBitcast(ArrayRef<int64_t> shape,
+                                       Type originalElementType,
+                                       Type newElementType) const {
+  if (originalElementType != newElementType) {
+    return failure();
+  }
+  return BitcastEncodingInfo{llvm::to_vector(shape), *this};
+}
+
+LogicalResult UnpackedStorageAttr::verifyEncoding(
+    ArrayRef<int64_t>, Type elementType,
+    function_ref<InFlightDiagnostic()> emitError) const {
+  return verifyStorageElementType(elementType, "unpacked_storage", emitError);
 }
 
 //===---------------------------------------------------------------------===//
@@ -536,6 +640,21 @@ bool PaddingAttr::isIdentityLayout() const {
   return llvm::all_of(padding, [](int64_t val) { return val == 0; });
 }
 
+Type PaddingAttr::getStorageElementType(Type elementType) const {
+  if (auto integerType = dyn_cast<IntegerType>(elementType)) {
+    return IntegerType::get(getContext(),
+                            getRoundedElementByteWidth(elementType) * 8,
+                            integerType.getSignedness());
+  }
+  return elementType;
+}
+
+AffineMap PaddingAttr::getStorageElementOffsetMap(RankedTensorType type) const {
+  return getRowMajorStorageElementOffsetMap(
+      type, getRoundedElementByteWidth(type.getElementType()) * 8,
+      getPadding().asArrayRef());
+}
+
 Value PaddingAttr::calculateStorageSizeInBytes(Location loc, OpBuilder &builder,
                                                RankedTensorType type,
                                                ValueRange dynamicDims) const {
@@ -619,6 +738,21 @@ bool IdentityAttr::isIdentityLayout() const { return true; }
 
 bool IdentityAttr::isSerialized() const { return true; }
 
+Type IdentityAttr::getStorageElementType(Type elementType) const {
+  if (auto integerType = dyn_cast<IntegerType>(elementType)) {
+    return IntegerType::get(getContext(),
+                            getRoundedElementByteWidth(elementType) * 8,
+                            integerType.getSignedness());
+  }
+  return elementType;
+}
+
+AffineMap
+IdentityAttr::getStorageElementOffsetMap(RankedTensorType type) const {
+  return getRowMajorStorageElementOffsetMap(
+      type, getRoundedElementByteWidth(type.getElementType()) * 8);
+}
+
 //===---------------------------------------------------------------------===//
 // iree_encoding.identity_resolver
 //===---------------------------------------------------------------------===//
@@ -694,6 +828,22 @@ Attribute UnsupportedResolverAttr::getLayout(RankedTensorType) const {
 //===---------------------------------------------------------------------===//
 
 bool TestingAttr::isSerialized() const { return getLayouts() ? true : false; }
+
+Type TestingAttr::getStorageElementType(Type elementType) const {
+  if (!getLayouts() || getLayouts().empty()) {
+    return {};
+  }
+  return LayoutAttr::get(getContext(), getLayouts())
+      .getStorageElementType(elementType);
+}
+
+AffineMap TestingAttr::getStorageElementOffsetMap(RankedTensorType type) const {
+  if (!getLayouts() || getLayouts().empty()) {
+    return {};
+  }
+  return LayoutAttr::get(getContext(), getLayouts())
+      .getStorageElementOffsetMap(type);
+}
 
 Attribute TestingAttr::cloneWithLayouts(ArrayRef<Attribute> layouts) const {
   MLIRContext *ctx = getContext();

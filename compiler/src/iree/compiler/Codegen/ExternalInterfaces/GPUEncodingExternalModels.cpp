@@ -642,6 +642,15 @@ struct GPUSerializableAttr final
     return configuration && configuration.contains(kEncodingInfoAttrName);
   }
 
+  AffineMap getStorageElementOffsetMap(Attribute attr,
+                                       RankedTensorType type) const {
+    return getPackedStorageElementOffsetMap(attr, type);
+  }
+
+  Type getStorageElementType(Attribute, Type elementType) const {
+    return elementType;
+  }
+
   Value calculateStorageSizeInBytes(Attribute attr, Location loc,
                                     OpBuilder &builder, RankedTensorType type,
                                     ValueRange dynamicDims) const {

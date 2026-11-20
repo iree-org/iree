@@ -106,16 +106,35 @@ static Value calculateElementOffset(Location loc, RankedTensorType tensorType,
   return offset;
 }
 
-// Returns an element offset within a dense tensor based on indices, in bytes.
-static Value calculateElementByteOffset(Location loc,
-                                        RankedTensorType tensorType,
-                                        ValueRange dynamicDims,
-                                        ValueRange indices,
-                                        PatternRewriter &rewriter) {
-  Value linearizedIndex =
-      calculateElementOffset(loc, tensorType, dynamicDims, indices, rewriter);
-  return calculateStorageElementOffsetInBytes(loc, tensorType, linearizedIndex,
-                                              rewriter);
+// Byte-range operations require dense storage. Element offsets alone do not
+// establish that a logical slice is contiguous.
+static bool supportsDenseByteRanges(RankedTensorType type) {
+  if (!type.getEncoding()) {
+    return true;
+  }
+  auto encoding = IREE::Encoding::getSerializableAttr(type);
+  return encoding &&
+         (encoding.isIdentityLayout() ||
+          encoding.canDropWithoutTensorMaterialization()) &&
+         getStorageElementOffsetMap(type);
+}
+
+// Range boundaries may lie one past the end, outside the element-offset map
+// contract. Compute dense displacements directly.
+static Value calculateDenseByteDisplacement(Location loc, RankedTensorType type,
+                                            ValueRange dynamicDims,
+                                            ValueRange coordinates,
+                                            PatternRewriter &rewriter) {
+  Value count =
+      calculateElementOffset(loc, type, dynamicDims, coordinates, rewriter);
+  int64_t bits = IREE::Util::getTypeBitWidth(legalizeStorageElementType(type));
+  if (bits < 8) {
+    Value elementsPerByte =
+        arith::ConstantIndexOp::create(rewriter, loc, 8 / bits);
+    return rewriter.createOrFold<arith::DivUIOp>(loc, count, elementsPerByte);
+  }
+  Value bytes = arith::ConstantIndexOp::create(rewriter, loc, bits / 8);
+  return rewriter.createOrFold<arith::MulIOp>(loc, count, bytes);
 }
 
 // Canonicalizes a fill pattern into a power of 2 byte-aligned integer type.
@@ -179,12 +198,15 @@ static Value canonicalizeFillPattern(Value pattern, RankedTensorType resultType,
     return i8Val;
   }
 
-  // HACK: For unpacked i1, extend i1 to i8. This is really not something we
-  // should be doing here in optimized programs as this is a super shady
-  // operation.
-  if (elementBitWidth == 1) {
-    return builder.createOrFold<arith::ExtUIOp>(loc, builder.getI8Type(),
-                                                pattern);
+  // Zero-extend unpacked logical elements to their storage width. A pattern
+  // narrower than the logical element was narrowed by fill canonicalization
+  // and is byte-replicated, so it must pass through unchanged.
+  Type storageType = legalizeStorageElementType(resultType);
+  if (isa<IntegerType>(pattern.getType()) && isa<IntegerType>(storageType) &&
+      elementBitWidth ==
+          IREE::Util::getTypeBitWidth(resultType.getElementType()) &&
+      storageType.getIntOrFloatBitWidth() > elementBitWidth) {
+    return builder.createOrFold<arith::ExtUIOp>(loc, storageType, pattern);
   }
 
   if ((elementBitWidth % 8) != 0) {
@@ -293,7 +315,7 @@ struct EncodeTensorEmptyOp : OpRewritePattern<IREE::Stream::TensorEmptyOp> {
 // stream.tensor.constant
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorConstantOp
+struct EncodeTensorConstantOp final
     : OpRewritePattern<IREE::Stream::TensorConstantOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorConstantOp op,
@@ -323,7 +345,13 @@ struct EncodeTensorConstantOp
     RankedTensorType alignedType = alignTensorType(resultType);
     Attribute encodedAttr = op.getValue();
     if (alignedType != resultType) {
-      if (auto sourceAttr = dyn_cast<DenseIntElementsAttr>(encodedAttr)) {
+      if (auto sourceAttr = dyn_cast<DenseElementsAttr>(encodedAttr);
+          sourceAttr &&
+          isa<IntegerType, FloatType>(sourceAttr.getElementType())) {
+        if (isa<FloatType>(sourceAttr.getElementType())) {
+          sourceAttr = sourceAttr.bitcast(rewriter.getIntegerType(
+              sourceAttr.getType().getElementTypeBitWidth()));
+        }
         auto alignedBitWidth = alignedType.getElementTypeBitWidth();
         encodedAttr = sourceAttr.mapValues(
             alignedType.getElementType(), [=](APInt sourceValue) {
@@ -332,6 +360,9 @@ struct EncodeTensorConstantOp
               // elements.
               return sourceValue.zext(alignedBitWidth);
             });
+      } else {
+        return rewriter.notifyMatchFailure(
+            op, "storage widening requires dense integer or float elements");
       }
     }
 
@@ -414,7 +445,8 @@ struct EncodeTensorCloneOp : OpRewritePattern<IREE::Stream::TensorCloneOp> {
 // stream.tensor.slice
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorSliceOp : OpRewritePattern<IREE::Stream::TensorSliceOp> {
+struct EncodeTensorSliceOp final
+    : OpRewritePattern<IREE::Stream::TensorSliceOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorSliceOp op,
                                 PatternRewriter &rewriter) const override {
@@ -429,8 +461,15 @@ struct EncodeTensorSliceOp : OpRewritePattern<IREE::Stream::TensorSliceOp> {
       return failure();
     }
 
+    if (!supportsDenseByteRanges(sourceType) ||
+        !supportsDenseByteRanges(resultType) ||
+        legalizeStorageElementType(sourceType) !=
+            legalizeStorageElementType(resultType)) {
+      return rewriter.notifyMatchFailure(op, "unsupported encoded byte range");
+    }
+
     // Dense:
-    auto sourceOffset = calculateElementByteOffset(
+    auto sourceOffset = calculateDenseByteDisplacement(
         op.getLoc(), sourceType, sourceDims, op.getStartIndices(), rewriter);
     auto sourceEnd = rewriter.createOrFold<arith::AddIOp>(
         op.getLoc(), sourceOffset, op.getResultSize());
@@ -446,7 +485,7 @@ struct EncodeTensorSliceOp : OpRewritePattern<IREE::Stream::TensorSliceOp> {
 // stream.tensor.fill
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorFillOp : OpRewritePattern<IREE::Stream::TensorFillOp> {
+struct EncodeTensorFillOp final : OpRewritePattern<IREE::Stream::TensorFillOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorFillOp op,
                                 PatternRewriter &rewriter) const override {
@@ -454,6 +493,10 @@ struct EncodeTensorFillOp : OpRewritePattern<IREE::Stream::TensorFillOp> {
     auto targetDims = op.getTargetEncodingDims();
     if (failed(checkEncoding(op, targetType, targetDims, rewriter))) {
       return failure();
+    }
+
+    if (!supportsDenseByteRanges(targetType)) {
+      return rewriter.notifyMatchFailure(op, "unsupported encoded byte range");
     }
 
     // Canonicalize the fill pattern into an integer type [i8, i16, i32, i64].
@@ -466,9 +509,9 @@ struct EncodeTensorFillOp : OpRewritePattern<IREE::Stream::TensorFillOp> {
     }
 
     // Dense:
-    auto targetOffset = calculateElementByteOffset(
+    auto targetOffset = calculateDenseByteDisplacement(
         op.getLoc(), targetType, targetDims, op.getStartIndices(), rewriter);
-    auto targetLength = calculateElementByteOffset(
+    auto targetLength = calculateDenseByteDisplacement(
         op.getLoc(), targetType, targetDims, op.getLengths(), rewriter);
     auto targetEnd = rewriter.createOrFold<arith::AddIOp>(
         op.getLoc(), targetOffset, targetLength);
@@ -484,7 +527,8 @@ struct EncodeTensorFillOp : OpRewritePattern<IREE::Stream::TensorFillOp> {
 // stream.tensor.update
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorUpdateOp : OpRewritePattern<IREE::Stream::TensorUpdateOp> {
+struct EncodeTensorUpdateOp final
+    : OpRewritePattern<IREE::Stream::TensorUpdateOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorUpdateOp op,
                                 PatternRewriter &rewriter) const override {
@@ -499,8 +543,15 @@ struct EncodeTensorUpdateOp : OpRewritePattern<IREE::Stream::TensorUpdateOp> {
       return failure();
     }
 
+    if (!supportsDenseByteRanges(targetType) ||
+        !supportsDenseByteRanges(updateType) ||
+        legalizeStorageElementType(targetType) !=
+            legalizeStorageElementType(updateType)) {
+      return rewriter.notifyMatchFailure(op, "unsupported encoded byte range");
+    }
+
     // Dense:
-    auto targetOffset = calculateElementByteOffset(
+    auto targetOffset = calculateDenseByteDisplacement(
         op.getLoc(), targetType, targetDims, op.getStartIndices(), rewriter);
     auto targetEnd = rewriter.createOrFold<arith::AddIOp>(
         op.getLoc(), targetOffset, op.getUpdateSize());
@@ -517,7 +568,7 @@ struct EncodeTensorUpdateOp : OpRewritePattern<IREE::Stream::TensorUpdateOp> {
 // stream.tensor.load
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorLoadOp : OpRewritePattern<IREE::Stream::TensorLoadOp> {
+struct EncodeTensorLoadOp final : OpRewritePattern<IREE::Stream::TensorLoadOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorLoadOp op,
                                 PatternRewriter &rewriter) const override {
@@ -538,16 +589,29 @@ struct EncodeTensorLoadOp : OpRewritePattern<IREE::Stream::TensorLoadOp> {
           op, "unsupported load with sub-byte elements");
     }
 
+    if (!getStorageElementOffsetMap(sourceType)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "unsupported storage element offset");
+    }
+    if (isa<IntegerType, FloatType>(op.getType())) {
+      loadType = legalizeStorageElementType(sourceType);
+    }
+
     // Dense:
-    auto sourceOffset = calculateElementByteOffset(
+    auto sourceOffset = calculateStorageElementOffsetInBytes(
         op.getLoc(), sourceType, sourceDims, op.getIndices(), rewriter);
     Value load = IREE::Stream::AsyncLoadOp::create(
         rewriter, op.getLoc(), loadType, op.getSource(), op.getSourceSize(),
         sourceOffset);
 
     if (loadType != op.getType()) {
-      load =
-          complex::BitcastOp::create(rewriter, op.getLoc(), op.getType(), load);
+      if (isa<IntegerType, FloatType>(op.getType())) {
+        load = convertStorageElementType(op.getLoc(), load, op.getType(),
+                                         rewriter);
+      } else {
+        load = complex::BitcastOp::create(rewriter, op.getLoc(), op.getType(),
+                                          load);
+      }
     }
 
     rewriter.replaceOp(op, load);
@@ -559,7 +623,8 @@ struct EncodeTensorLoadOp : OpRewritePattern<IREE::Stream::TensorLoadOp> {
 // stream.tensor.store
 //===----------------------------------------------------------------------===//
 
-struct EncodeTensorStoreOp : OpRewritePattern<IREE::Stream::TensorStoreOp> {
+struct EncodeTensorStoreOp final
+    : OpRewritePattern<IREE::Stream::TensorStoreOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(IREE::Stream::TensorStoreOp op,
                                 PatternRewriter &rewriter) const override {
@@ -574,11 +639,23 @@ struct EncodeTensorStoreOp : OpRewritePattern<IREE::Stream::TensorStoreOp> {
           op, "unsupported store with sub-byte elements");
     }
 
+    if (!getStorageElementOffsetMap(targetType)) {
+      return rewriter.notifyMatchFailure(op,
+                                         "unsupported storage element offset");
+    }
+
     // Dense:
-    auto targetOffset = calculateElementByteOffset(
+    auto targetOffset = calculateStorageElementOffsetInBytes(
         op.getLoc(), targetType, targetDims, op.getIndices(), rewriter);
+    Value value = op.getValue();
+    Type storageType = legalizeStorageElementType(targetType);
+    if (isa<IntegerType, FloatType>(value.getType()) &&
+        storageType != value.getType()) {
+      value =
+          convertStorageElementType(op.getLoc(), value, storageType, rewriter);
+    }
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncStoreOp>(
-        op, op.getTarget(), op.getTargetSize(), targetOffset, op.getValue());
+        op, op.getTarget(), op.getTargetSize(), targetOffset, value);
 
     return success();
   }
@@ -793,15 +870,14 @@ struct EncodeDispatchTensorLoadOp
                alignedType.getElementTypeBitWidth() &&
            "loads must truncate");
 
-    // Truncate the byte -> sub-byte type; e.g. i8 -> i1.
-    auto loadedValue = op.getResult();
-    rewriter.setInsertionPointAfterValue(loadedValue);
-    auto truncOp =
-        arith::TruncIOp::create(rewriter, op.getLoc(), targetType, loadedValue);
-    rewriter.modifyOpInPlace(op, [&]() {
-      loadedValue.replaceAllUsesExcept(truncOp, truncOp);
-      loadedValue.setType(alignedType);
-    });
+    // Load containers, then restore the logical element bit patterns.
+    auto loadOp =
+        cast<IREE::TensorExt::DispatchTensorLoadOp>(rewriter.clone(*op));
+    rewriter.modifyOpInPlace(
+        loadOp, [&]() { loadOp.getResult().setType(alignedType); });
+    Value value = convertStorageElementType(op.getLoc(), loadOp.getResult(),
+                                            targetType, rewriter);
+    rewriter.replaceOp(op, value);
     return success();
   }
 };
@@ -828,11 +904,10 @@ struct EncodeDispatchTensorStoreOp
                alignedType.getElementTypeBitWidth() &&
            "stores must extend");
 
-    // Extend the sub-byte -> byte type; e.g. i1 -> i8.
-    auto extOp = arith::ExtUIOp::create(rewriter, op.getLoc(), alignedType,
-                                        op.getValue());
-    rewriter.modifyOpInPlace(
-        op, [&]() { op.getValueMutable().assign(extOp.getResult()); });
+    // Zero-extend the logical element bit patterns into containers.
+    Value value = convertStorageElementType(op.getLoc(), op.getValue(),
+                                            alignedType, rewriter);
+    rewriter.modifyOpInPlace(op, [&]() { op.getValueMutable().assign(value); });
     return success();
   }
 };

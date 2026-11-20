@@ -1,5 +1,14 @@
 // RUN: iree-opt --split-input-file %s | FileCheck %s
 
+// CHECK-LABEL: func.func @unpacked_i64
+// CHECK-SAME: %[[ARG:.+]]: tensor<4xi64, #iree_encoding.unpacked_storage>
+// CHECK: return %[[ARG]] : tensor<4xi64, #iree_encoding.unpacked_storage>
+func.func @unpacked_i64(%arg0: tensor<4xi64, #iree_encoding.unpacked_storage>) -> tensor<4xi64, #iree_encoding.unpacked_storage> {
+  return %arg0 : tensor<4xi64, #iree_encoding.unpacked_storage>
+}
+
+// -----
+
 #encoding = #iree_encoding.testing<>
 func.func @set_encoding_ops(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32, #encoding> {
   %0 = iree_encoding.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #encoding>

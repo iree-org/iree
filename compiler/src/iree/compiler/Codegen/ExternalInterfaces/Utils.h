@@ -30,6 +30,12 @@ static const char kEncodingInfoAttrName[] = "encoding_info";
 void adjustTileSizesForBitcast(RankedTensorType type,
                                IREE::Codegen::MaterializeEncodingInfo &info);
 
+/// Maps logical element indices to byte offsets in a resolved packed layout.
+/// Returns null for unsupported layouts, including runtime-dependent tile
+/// sizes.
+AffineMap getPackedStorageElementOffsetMap(Attribute attr,
+                                           RankedTensorType type);
+
 // This class is the base class for the external model of different packed
 // encoding layout attributes. It provides a public method, `getEncodingInfo` to
 // reduce the duplicated implementations before. To inherit it, it requires the
