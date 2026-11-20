@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <utility>
@@ -25,6 +26,7 @@
 #include "iree/async/util/proactor_pool.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/path.h"
+#include "iree/base/status_cc.h"
 #include "iree/base/threading/numa.h"
 #include "iree/hal/api.h"
 #include "iree/hal/utils/allocators.h"
@@ -183,17 +185,18 @@ py::str HalAllocator::FormattedStatistics() {
   // Perform all allocating string manipulation without early exit.
   iree_string_builder_t builder;
   iree_string_builder_initialize(iree_allocator_system(), &builder);
+  std::unique_ptr<iree_string_builder_t,
+                  decltype(&iree_string_builder_deinitialize)>
+      builder_guard(&builder, &iree_string_builder_deinitialize);
   iree_hal_allocator_statistics_t stats;
   iree_hal_allocator_query_statistics(raw_ptr(), &stats);
-  auto status = iree_hal_allocator_statistics_format(&stats, &builder);
+  iree::Status status(iree_hal_allocator_statistics_format(&stats, &builder));
   iree_string_view_t view = iree_string_builder_view(&builder);
-  // TODO(#25083): Guard the builder and status if Python string construction
-  // throws.
-  py::str result = py::str(view.data, view.size);
-  iree_string_builder_deinitialize(&builder);
 
+  py::str result = py::str(view.data, view.size);
   // Check/raise after all memory alloc/dealloc.
-  CheckApiStatus(status, "unable to format statistics");
+  CheckApiStatus(static_cast<iree_status_t>(std::move(status)),
+                 "unable to format statistics");
   return result;
 }
 
