@@ -1,0 +1,247 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Builds a stable release and publishes its Python packages to PyPI with
+# trusted publishing (https://docs.pypi.org/trusted-publishers/). No PyPI
+# credentials are stored in GitHub: PyPI exchanges the job's OIDC token for a
+# short-lived upload token and attaches a PEP 740 attestation to every uploaded
+# file.
+#
+# Pushing a stable tag `vX.Y.Z` starts this workflow. It builds the packages at
+# the tag's commit with the stable version in the same way as a candidate
+# release (build_package.yml), runs the same package tests
+# (validate_and_publish_release.yml), and attests the wheels and the
+# `iree-dist-*.tar.xz` files. Nothing is taken from a candidate release.
+#
+# The workflow runs as it is at the tagged commit, so only commits that contain
+# this file can be released this way. For older commits,
+# build_tools/python_deploy/pypi_deploy.sh promotes a candidate release.
+#
+# Setup outside this file:
+#   * Each PyPI project in the publish matrix lists this repository, this
+#     workflow (publish_pypi.yml) and the `pypi` environment as a trusted
+#     publisher.
+#   * The `pypi` environment only allows deployments from `v*` tags, and
+#     requires approval by a release maintainer other than the one who pushed
+#     the tag.
+#   * A tag ruleset lets only release maintainers create `v*` tags, so that
+#     nobody else can start this workflow.
+#   * A tag ruleset blocks updates and deletions of release tags (`iree-*` and
+#     `v*`), so that the tag that a release and its attestations name cannot be
+#     moved to another commit.
+
+name: Publish to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    name: Compute versions
+    runs-on: ubuntu-24.04
+    outputs:
+      commit: ${{ steps.versions.outputs.commit }}
+      version: ${{ steps.versions.outputs.version }}
+      compiler-version: ${{ steps.versions.outputs.compiler-version }}
+      runtime-version: ${{ steps.versions.outputs.runtime-version }}
+      legacy-version: ${{ steps.versions.outputs.legacy-version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: false
+
+      # The versions come from compiler/version.json and runtime/version.json,
+      # as for a candidate release, but without the `rcYYYYMMDD` suffix. The tag
+      # must match them, so that a tag at the wrong commit fails here.
+      - name: Compute versions
+        id: versions
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "'${TAG}' is not a stable release tag like v3.14.0."
+            exit 1
+          fi
+          version="${TAG#v}"
+          common_version="$(python3 build_tools/python_deploy/compute_common_version.py --stable-release)"
+          if [[ "${common_version}" != "${version}" ]]; then
+            echo "The version files at ${TAG} give version ${common_version}, not ${version}."
+            exit 1
+          fi
+          compiler_version="$(python3 build_tools/python_deploy/compute_local_version.py compiler --stable-release)"
+          runtime_version="$(python3 build_tools/python_deploy/compute_local_version.py runtime --stable-release)"
+          # iree-tools-tf and iree-tools-tflite have a CalVer version, as in
+          # schedule_candidate_release.yml.
+          legacy_version="$(date -u +%Y%m%d).${GITHUB_RUN_NUMBER}"
+          echo "iree-base-compiler ${compiler_version}"
+          echo "iree-base-runtime ${runtime_version}"
+          echo "iree-tools-tf and iree-tools-tflite ${legacy_version}"
+          {
+            echo "commit=$(git rev-parse HEAD)"
+            echo "version=${version}"
+            echo "compiler-version=${compiler_version}"
+            echo "runtime-version=${runtime_version}"
+            echo "legacy-version=${legacy_version}"
+          } >> "${GITHUB_OUTPUT}"
+
+  build:
+    name: Build
+    needs: setup
+    permissions:
+      contents: read
+      # Requested by build_package.yml, which attests the assets of candidate
+      # releases. It attests nothing here, and PyPI only accepts this
+      # workflow's OIDC tokens from jobs in the `pypi` environment.
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    uses: $/.github/workflows/build_package.yml
+    with:
+      legacy_package_version: ${{ needs.setup.outputs.legacy-version }}
+      package_version: ${{ needs.setup.outputs.version }}
+      compiler_package_version: ${{ needs.setup.outputs.compiler-version }}
+      runtime_package_version: ${{ needs.setup.outputs.runtime-version }}
+      commit: ${{ needs.setup.outputs.commit }}
+      # A release must not lose a platform because its build failed.
+      require_all_builds: true
+
+  validate:
+    name: Validate
+    needs: [setup, build]
+    permissions:
+      contents: read
+    uses: $/.github/workflows/validate_and_publish_release.yml
+    with:
+      package_version: ${{ needs.setup.outputs.version }}
+      compiler_package_version: ${{ needs.setup.outputs.compiler-version }}
+      runtime_package_version: ${{ needs.setup.outputs.runtime-version }}
+      legacy_package_version: ${{ needs.setup.outputs.legacy-version }}
+
+  attest:
+    name: Attest release assets
+    needs: [setup, validate]
+    runs-on: ubuntu-24.04
+    permissions:
+      # Required by actions/attest to sign and store build provenance.
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    env:
+      VERSION: ${{ needs.setup.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: wheels-*
+          path: build
+          merge-multiple: true
+
+      # Every release builds all packages, but a patch release only releases
+      # the packages at the patch version. The others are on PyPI already. The
+      # iree-tools-* packages have a CalVer version and are only released with
+      # a new minor version.
+      - name: Select release assets
+        run: |
+          shopt -s nullglob
+          mkdir release
+          for wheel in build/*.whl; do
+            name="$(basename "${wheel}")"
+            wheel_version="$(cut -d- -f2 <<< "${name}")"
+            if [[ "${wheel_version}" == "${VERSION}" ]] ||
+               [[ "${name}" == iree_tools_* && "${VERSION##*.}" == 0 ]]; then
+              mv "${wheel}" release/
+            else
+              echo "Skipping ${name}, which is not at version ${VERSION}."
+            fi
+          done
+          if ! compgen -G "release/*.whl" > /dev/null; then
+            echo "No package is at version ${VERSION}."
+            exit 1
+          fi
+          mv build/iree-dist-*.tar.xz release/
+          ls -l release
+
+      # Lets users verify the published wheels with `gh attestation verify`,
+      # including the copies uploaded to the stable GitHub release.
+      - name: Attest release assets
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: release/*
+
+      # Saves the attestation as a Sigstore bundle, so that the stable GitHub
+      # release can carry it next to the files that it covers.
+      - name: Save attestation bundle
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          cp "${BUNDLE_PATH}" "release/iree-${VERSION}.sigstore.json"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets
+          path: release/*
+          if-no-files-found: error
+
+  # Publishes each package in its own job, so that a package whose PyPI project
+  # rejects the upload does not block the others.
+  publish:
+    name: "Publish ${{ matrix.package }}"
+    needs: attest
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/project/${{ matrix.project }}/
+    permissions:
+      # Required for trusted publishing and PEP 740 attestations.
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: iree_base_compiler
+            project: iree-base-compiler
+          - package: iree_base_runtime
+            project: iree-base-runtime
+          - package: iree_tools_tf
+            project: iree-tools-tf
+          - package: iree_tools_tflite
+            project: iree-tools-tflite
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-assets
+          path: release
+
+      # A patch release only has wheels for the packages that changed.
+      - name: Select ${{ matrix.package }} wheels
+        id: select
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          shopt -s nullglob
+          wheels=( release/"${PACKAGE}"-*.whl )
+          if (( ${#wheels[@]} == 0 )); then
+            echo "This release has no ${PACKAGE} wheels to publish."
+            echo "found=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          mkdir dist
+          mv "${wheels[@]}" dist/
+          ls dist
+          echo "found=true" >> "${GITHUB_OUTPUT}"
+
+      - name: Publish to PyPI
+        if: ${{ steps.select.outputs.found == 'true' }}
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist/
