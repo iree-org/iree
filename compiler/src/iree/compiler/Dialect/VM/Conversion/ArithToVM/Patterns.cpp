@@ -105,46 +105,89 @@ struct CmpI32OpConversion : OpConversionPattern<arith::CmpIOp> {
       return failure();
     }
     auto returnType = rewriter.getIntegerType(32);
+    Value lhs = adaptor.getLhs();
+    Value rhs = adaptor.getRhs();
+    if (auto sourceType = dyn_cast<IntegerType>(srcOp.getLhs().getType());
+        sourceType && sourceType.getWidth() < 32) {
+      // Promoted narrow values may have different upper bits depending on their
+      // producer. Interpret only the original bits, with the signedness of the
+      // comparison, before comparing the i32 representations.
+      unsigned bitWidth = sourceType.getWidth();
+      auto predicate = srcOp.getPredicate();
+      bool isSigned = predicate == arith::CmpIPredicate::slt ||
+                      predicate == arith::CmpIPredicate::sle ||
+                      predicate == arith::CmpIPredicate::sgt ||
+                      predicate == arith::CmpIPredicate::sge;
+      auto loc = srcOp.getLoc();
+      auto extend = [&](Value value) -> Value {
+        if (bitWidth == 8) {
+          return isSigned ? rewriter.createOrFold<IREE::VM::ExtI8I32SOp>(
+                                loc, returnType, value)
+                          : rewriter.createOrFold<IREE::VM::ExtI8I32UOp>(
+                                loc, returnType, value);
+        }
+        if (bitWidth == 16) {
+          return isSigned ? rewriter.createOrFold<IREE::VM::ExtI16I32SOp>(
+                                loc, returnType, value)
+                          : rewriter.createOrFold<IREE::VM::ExtI16I32UOp>(
+                                loc, returnType, value);
+        }
+        if (!isSigned) {
+          auto mask = rewriter.createOrFold<IREE::VM::ConstI32Op>(
+              loc, (1u << bitWidth) - 1);
+          return rewriter.createOrFold<IREE::VM::AndI32Op>(loc, returnType,
+                                                           value, mask);
+        }
+        auto shift =
+            rewriter.createOrFold<IREE::VM::ConstI32Op>(loc, 32 - bitWidth);
+        auto shifted = rewriter.createOrFold<IREE::VM::ShlI32Op>(
+            loc, returnType, value, shift);
+        return rewriter.createOrFold<IREE::VM::ShrI32SOp>(loc, returnType,
+                                                          shifted, shift);
+      };
+      lhs = extend(lhs);
+      rhs = extend(rhs);
+    }
     switch (srcOp.getPredicate()) {
     case arith::CmpIPredicate::eq:
-      rewriter.replaceOpWithNewOp<IREE::VM::CmpEQI32Op>(
-          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpEQI32Op>(srcOp, returnType, lhs,
+                                                        rhs);
       return success();
     case arith::CmpIPredicate::ne:
-      rewriter.replaceOpWithNewOp<IREE::VM::CmpNEI32Op>(
-          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpNEI32Op>(srcOp, returnType, lhs,
+                                                        rhs);
       return success();
     case arith::CmpIPredicate::slt:
-      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI32SOp>(
-          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI32SOp>(srcOp, returnType, lhs,
+                                                         rhs);
       return success();
     case arith::CmpIPredicate::sle:
-      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI32SOp>(
-          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI32SOp>(srcOp, returnType,
+                                                          lhs, rhs);
       return success();
     case arith::CmpIPredicate::sgt:
-      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI32SOp>(
-          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI32SOp>(srcOp, returnType, lhs,
+                                                         rhs);
       return success();
     case arith::CmpIPredicate::sge:
-      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32SOp>(
-          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32SOp>(srcOp, returnType,
+                                                          lhs, rhs);
       return success();
     case arith::CmpIPredicate::ult:
-      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI32UOp>(
-          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI32UOp>(srcOp, returnType, lhs,
+                                                         rhs);
       return success();
     case arith::CmpIPredicate::ule:
-      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI32UOp>(
-          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI32UOp>(srcOp, returnType,
+                                                          lhs, rhs);
       return success();
     case arith::CmpIPredicate::ugt:
-      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI32UOp>(
-          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI32UOp>(srcOp, returnType, lhs,
+                                                         rhs);
       return success();
     case arith::CmpIPredicate::uge:
-      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32UOp>(
-          srcOp, returnType, adaptor.getLhs(), adaptor.getRhs());
+      rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32UOp>(srcOp, returnType,
+                                                          lhs, rhs);
       return success();
     default:
       return failure();
