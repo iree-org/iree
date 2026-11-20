@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/RegionOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -34,6 +35,7 @@
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
@@ -1035,6 +1037,186 @@ hasUnfusableUseInDispatch(Value v, Operation *dispatchOp,
   return false;
 }
 
+static int64_t getStaticTensorBytes(Type type) {
+  auto tensorType = dyn_cast<RankedTensorType>(type);
+  if (!tensorType || !tensorType.hasStaticShape()) {
+    return 0;
+  }
+  return IREE::Util::getRoundedPhysicalStorageSize(tensorType);
+}
+
+/// Returns true if `op` is in `opSet` or nested in an op of `opSet`.
+static bool isOpInside(Operation *op,
+                       const llvm::SmallPtrSetImpl<Operation *> &opSet) {
+  for (; op; op = op->getParentOp()) {
+    if (opSet.contains(op)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+namespace {
+
+/// Sums the bytes of the inputs a dispatch made of `opSet` binds, counting
+/// each bound storage once.
+class EstimateDispatchSize {
+public:
+  explicit EstimateDispatchSize(const llvm::SmallPtrSetImpl<Operation *> &opSet)
+      : opSet(opSet) {}
+
+  /// Adds `value` as an input of the dispatch. Values defined inside the
+  /// dispatch, or that the dispatch materializes itself, bind nothing.
+  void add(Value value) {
+    Operation *definingOp = value.getDefiningOp();
+    if (definingOp && isOpInside(definingOp, opSet)) {
+      return;
+    }
+    SplatElementsAttr splatAttr;
+    if (isa_and_nonnull<tensor::EmptyOp, linalg::FillOp>(definingOp) ||
+        matchPattern(value, m_Constant(&splatAttr))) {
+      return;
+    }
+    const void *key = value.getAsOpaquePointer();
+    if (auto loadOp = dyn_cast_if_present<IREE::Util::GlobalLoadOpInterface>(
+            definingOp)) {
+      key = loadOp.getGlobalAttr().getAsOpaquePointer();
+    }
+    if (includedValues.insert(key).second) {
+      bytes += getStaticTensorBytes(value.getType());
+    }
+  }
+
+  int64_t getBytes() const { return bytes; }
+
+private:
+  const llvm::SmallPtrSetImpl<Operation *> &opSet;
+  // Loads of the same global bind the same storage, so they are keyed by the
+  // global instead of the loaded value.
+  llvm::DenseSet<const void *> includedValues;
+  int64_t bytes = 0;
+};
+
+} // namespace
+
+int64_t getDispatchBindingSize(ArrayRef<Operation *> ops,
+                               ArrayRef<Operation *> clonedOps) {
+  llvm::SmallPtrSet<Operation *, 8> opSet(ops.begin(), ops.end());
+  opSet.insert(clonedOps.begin(), clonedOps.end());
+
+  EstimateDispatchSize estimate(opSet);
+  for (Operation *op : llvm::concat<Operation *const>(ops, clonedOps)) {
+    for (Value operand : op->getOperands()) {
+      estimate.add(operand);
+    }
+    mlir::visitUsedValuesDefinedAbove(
+        op->getRegions(), [&](OpOperand *use) { estimate.add(use->get()); });
+  }
+  int64_t bytes = estimate.getBytes();
+  // Cloned ops stay in place for their other users, so only the results of
+  // `ops` are written by the dispatch.
+  for (Operation *op : ops) {
+    for (OpResult result : op->getResults()) {
+      if (llvm::any_of(result.getUsers(), [&](Operation *user) {
+            return !isOpInside(user, opSet);
+          })) {
+        bytes += getStaticTensorBytes(result.getType());
+      }
+    }
+  }
+  return bytes;
+}
+
+/// Returns true if a dispatch binding `bytes` exceeds `maxDispatchBindingSize`
+/// and binds more than `baselineBytes`, i.e. the step that led to it made it
+/// grow beyond the limit.
+static bool exceedsMaxDispatchBindingSize(int64_t bytes, int64_t baselineBytes,
+                                          int64_t maxDispatchBindingSize) {
+  return bytes > maxDispatchBindingSize && bytes > baselineBytes;
+}
+
+/// Selects the producers to clone into a dispatch made of `ops`, starting from
+/// `inputs`, the values the dispatch uses from outside. Walks the use-def
+/// chains of the inputs and selects each producer that is cloneable, has no
+/// unfusable use (if `hasUnfusableUse` is given), and does not make the
+/// dispatch exceed `options.maxDispatchBindingSize`. Used by getCloneableOps
+/// for an existing dispatch region and by getFormedDispatchBindingSize to
+/// predict what will be cloned into a dispatch before the region exists.
+static SmallVector<Operation *>
+selectProducersToClone(ArrayRef<Operation *> ops, ArrayRef<Value> inputs,
+                       CloneableIntoDispatchOptions options,
+                       llvm::function_ref<bool(Value)> hasUnfusableUse) {
+  llvm::SmallPtrSet<Operation *, 8> opSet(ops.begin(), ops.end());
+  SmallVector<Operation *> result;
+  llvm::DenseSet<Value> visited;
+  SmallVector<Value> worklist(inputs);
+  int64_t bytes =
+      options.hasMaxDispatchBindingSize() ? getDispatchBindingSize(ops) : 0;
+  while (!worklist.empty()) {
+    Value value = worklist.pop_back_val();
+    if (!visited.insert(value).second) {
+      continue;
+    }
+    Operation *definingOp = value.getDefiningOp();
+    if (!definingOp || isOpInside(definingOp, opSet) ||
+        !isCloneableIntoDispatchOp(definingOp, options) ||
+        (hasUnfusableUse && hasUnfusableUse(value))) {
+      continue;
+    }
+    result.push_back(definingOp);
+    if (options.hasMaxDispatchBindingSize()) {
+      int64_t newBytes = getDispatchBindingSize(ops, result);
+      if (exceedsMaxDispatchBindingSize(newBytes, bytes,
+                                        options.maxDispatchBindingSize)) {
+        result.pop_back();
+        continue;
+      }
+      bytes = newBytes;
+    }
+    worklist.append(definingOp->operand_begin(), definingOp->operand_end());
+    llvm::SetVector<Value> nestedValues;
+    mlir::getUsedValuesDefinedAbove(definingOp->getRegions(), nestedValues);
+    worklist.append(nestedValues.begin(), nestedValues.end());
+  }
+  return result;
+}
+
+int64_t getFormedDispatchBindingSize(ArrayRef<Operation *> ops,
+                                     CloneableIntoDispatchOptions options) {
+  SmallVector<Value> inputs;
+  for (Operation *op : ops) {
+    llvm::append_range(inputs, op->getOperands());
+    llvm::SetVector<Value> nestedValues;
+    mlir::getUsedValuesDefinedAbove(op->getRegions(), nestedValues);
+    llvm::append_range(inputs, nestedValues);
+  }
+  // There is no dispatch region yet, so unfusable uses within it cannot be
+  // checked. The estimate may assume a clone that getCloneableOps refuses
+  // later.
+  SmallVector<Operation *> clonedOps =
+      selectProducersToClone(ops, inputs, options, /*hasUnfusableUse=*/{});
+  return getDispatchBindingSize(ops, clonedOps);
+}
+
+bool wouldFusionExceedMaxDispatchBindingSize(
+    ArrayRef<Operation *> ops, Operation *newOp,
+    CloneableIntoDispatchOptions options) {
+  if (!options.hasMaxDispatchBindingSize()) {
+    return false;
+  }
+  SmallVector<Operation *> fusedOps(ops);
+  fusedOps.push_back(newOp);
+  int64_t bytes = getFormedDispatchBindingSize(fusedOps, options);
+  if (bytes <= options.maxDispatchBindingSize) {
+    return false;
+  }
+  int64_t baselineBytes =
+      std::max(getFormedDispatchBindingSize(ops, options),
+               getFormedDispatchBindingSize(newOp, options));
+  return exceedsMaxDispatchBindingSize(bytes, baselineBytes,
+                                       options.maxDispatchBindingSize);
+}
+
 SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
                                          CloneableIntoDispatchOptions options) {
   // Find values that are used inside of the dispatch region but defined outside
@@ -1050,34 +1232,11 @@ SmallVector<Operation *> getCloneableOps(IREE::Flow::DispatchRegionOp regionOp,
 
   // Traverse the defining ops of these values (and the ops on their reverse
   // SSA use-def chain).
-  SmallVector<Operation *> result;
-  llvm::SetVector<Value> visited;
-  SmallVector<Value> worklist;
-  worklist.assign(valuesDefinedAbove.begin(), valuesDefinedAbove.end());
-  while (!worklist.empty()) {
-    Value outsideValue = worklist.pop_back_val();
-    // Skip values that were already visited.
-    if (visited.contains(outsideValue)) {
-      continue;
-    }
-    visited.insert(outsideValue);
-
-    Operation *definingOp = outsideValue.getDefiningOp();
-    if (!definingOp ||
-        !IREE::Flow::isCloneableIntoDispatchOp(definingOp, options) ||
-        hasUnfusableUseInDispatch(outsideValue, regionOp,
-                                  unfusableInitSources)) {
-      valuesDefinedAbove.insert(outsideValue);
-      continue;
-    }
-    result.push_back(definingOp);
-    worklist.append(definingOp->operand_begin(), definingOp->operand_end());
-    llvm::SetVector<Value> nestedValues;
-    mlir::getUsedValuesDefinedAbove(definingOp->getRegions(), nestedValues);
-    worklist.append(nestedValues.begin(), nestedValues.end());
-  }
-
-  return result;
+  return selectProducersToClone(
+      regionOp.getOperation(), valuesDefinedAbove.getArrayRef(), options,
+      [&](Value value) {
+        return hasUnfusableUseInDispatch(value, regionOp, unfusableInitSources);
+      });
 }
 
 /// Clone producers into the dispatch region.

@@ -82,7 +82,9 @@ namespace {
 // has no mapping to the root's outer parallel dimensions.
 class FusionGroup {
 public:
-  FusionGroup(Operation *op) : rootOp(op) {
+  FusionGroup(Operation *op,
+              IREE::Flow::CloneableIntoDispatchOptions cloneOptions = {})
+      : rootOp(op), cloneOptions(cloneOptions) {
     llvm::SmallBitVector loops = getOuterParallelLoops(op);
     auto map = AffineMap::getFilteredIdentityMap(
         op->getContext(), loops.size(), [&](AffineDimExpr dimExpr) {
@@ -189,11 +191,15 @@ public:
                         });
   }
 
-  // Check if adding `op` would exceed the operand limit.
+  // Check if adding `op` would exceed the operand limit, or make the
+  // dispatch bind more than `cloneOptions.maxDispatchBindingSize`.
   bool wouldExceedOperandLimit(Operation *op) const;
 
 private:
   Operation *rootOp;
+  // How producers are cloned into the dispatch later on. Its
+  // `maxDispatchBindingSize` is the most bytes the dispatch may bind.
+  IREE::Flow::CloneableIntoDispatchOptions cloneOptions;
   // All operations to be fused with the root op. This does not include
   // `rootOp`.
   llvm::MapVector<Operation *, AffineMap> loopMaps;
@@ -254,7 +260,11 @@ bool FusionGroup::wouldExceedOperandLimit(Operation *newOp) const {
   for (auto [op, map] : this->loopMaps) {
     visitOp(op);
   }
-  return (dispatchOperands.size() + numResults) > kIreeMaxOperandCount;
+  if ((dispatchOperands.size() + numResults) > kIreeMaxOperandCount) {
+    return true;
+  }
+  return IREE::Flow::wouldFusionExceedMaxDispatchBindingSize(
+      getFusedOperations(), newOp, cloneOptions);
 }
 
 FailureOr<AffineMap>
@@ -268,9 +278,13 @@ namespace {
 /// Tracks all the FusionGroups for the program.
 class FusionTracker {
 public:
+  explicit FusionTracker(
+      IREE::Flow::CloneableIntoDispatchOptions cloneOptions = {})
+      : cloneOptions(cloneOptions) {}
+
   /// Create a new fusion group with `op` as the root.
   FusionGroup &createFusionGroup(MLIRContext *ctx, Operation *op) {
-    fusionGroups.push_back(std::make_unique<FusionGroup>(op));
+    fusionGroups.push_back(std::make_unique<FusionGroup>(op, cloneOptions));
     opToGroup[op] = fusionGroups.back().get();
     return *fusionGroups.back();
   }
@@ -302,6 +316,7 @@ public:
   }
 
 private:
+  IREE::Flow::CloneableIntoDispatchOptions cloneOptions;
   SmallVector<std::unique_ptr<FusionGroup>> fusionGroups;
   DenseMap<Operation *, FusionGroup *> opToGroup;
 };
@@ -1202,7 +1217,10 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
                    DominanceInfo &dominanceInfo,
                    FormDispatchRegionsPassOptions const &options) {
   // Step 1: Decide fusion groups (heuristic).
-  FusionTracker tracker;
+  IREE::Flow::CloneableIntoDispatchOptions cloneOptions;
+  cloneOptions.aggressive = options.aggressiveFusion;
+  cloneOptions.maxDispatchBindingSize = options.maxDispatchBindingSize;
+  FusionTracker tracker(cloneOptions);
   decideFusableLinalgOps(funcOp.getFunctionBody(), dominanceInfo, options,
                          tracker);
 
@@ -1332,7 +1350,8 @@ void FormDispatchRegionsPass::runOnOperation() {
                                          fusePadWithConsumers,
                                          fusePadWithProducers,
                                          fuseMmt4d,
-                                         fuseDataTiledConvolution};
+                                         fuseDataTiledConvolution,
+                                         maxDispatchBindingSize};
   // Materialized layouts turn contractions into mmt4d ops and data-tiled
   // convolutions before dispatch formation. Keep their elementwise epilogues
   // and result unpacks in the same dispatch, even if the options are off.

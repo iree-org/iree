@@ -131,6 +131,16 @@ FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
 /// into a dispatch region.
 struct CloneableIntoDispatchOptions {
   bool aggressive = false;
+  // Producers are not cloned into a dispatch region if that would make it bind
+  // more than this many bytes (see getDispatchBindingSize). INT64_MAX means no
+  // limit.
+  int64_t maxDispatchBindingSize = INT64_MAX;
+
+  // Returns true if the bytes a dispatch binds are limited. Lets callers skip
+  // estimating them otherwise.
+  bool hasMaxDispatchBindingSize() const {
+    return maxDispatchBindingSize != INT64_MAX;
+  }
 };
 bool isCloneableIntoDispatchOp(Operation *op,
                                CloneableIntoDispatchOptions options = {});
@@ -146,6 +156,36 @@ bool isCloneableIntoDispatchOp(Operation *op,
 /// will be added to the yielded values of the dispatch region op.
 FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
                                           Operation *op);
+
+/// Returns the bytes of the statically shaped tensors that a dispatch formed
+/// from `ops`, with `clonedOps` cloned into it, binds. Accounts for:
+///  - The tensors that these ops use, either as operands or in their regions,
+///    and that are defined outside of these ops.
+///  - The results of `ops` that are used outside of these ops.
+/// Cloned ops remain for their other users, so their results are never written
+/// by the dispatch and not included in the estimate.
+/// Tensors that do not become bindings (`tensor.empty`, `linalg.fill` and
+/// splat constants) are not counted.
+/// Loads of the same global are counted once.
+/// Dynamically shaped tensors count as zero bytes.
+int64_t getDispatchBindingSize(ArrayRef<Operation *> ops,
+                               ArrayRef<Operation *> clonedOps = {});
+
+/// Returns the bytes that a dispatch formed from `ops` binds (see
+/// getDispatchBindingSize) once the producers that getCloneableOps selects
+/// with `options` are cloned into it. These producers, e.g. dequantization
+/// ops, count by what they read instead of by their results.
+int64_t getFormedDispatchBindingSize(ArrayRef<Operation *> ops,
+                                     CloneableIntoDispatchOptions options);
+
+/// Returns true if a dispatch formed from `ops` and `newOp` (see
+/// getFormedDispatchBindingSize) would bind more than
+/// `options.maxDispatchBindingSize` and more than dispatches formed from `ops`
+/// and from `newOp` alone. So a fusion that does not grow a dispatch already
+/// over the limit is still allowed.
+bool wouldFusionExceedMaxDispatchBindingSize(
+    ArrayRef<Operation *> ops, Operation *newOp,
+    CloneableIntoDispatchOptions options);
 
 /// Collect all ops that should be cloned into the given dispatch region op.
 SmallVector<Operation *>
