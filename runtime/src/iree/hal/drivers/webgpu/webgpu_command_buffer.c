@@ -373,7 +373,7 @@ static iree_status_t iree_hal_webgpu_command_buffer_dispatch(
 
   return iree_hal_webgpu_builder_dispatch(
       &command_buffer->builder, pipeline_handle, bind_group_layout_handle,
-      config.workgroup_count, bindings);
+      config.workgroup_count, constants, bindings);
 }
 
 static const iree_hal_command_buffer_vtable_t

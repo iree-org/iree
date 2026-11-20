@@ -426,6 +426,7 @@ typedef struct iree_hal_webgpu_queue_state_t {
       iree_hal_webgpu_handle_t pipeline_handle;
       iree_hal_webgpu_handle_t bind_group_layout_handle;
       uint32_t workgroup_count[3];
+      iree_const_byte_span_t constants;   // Points into trailing slab.
       iree_hal_executable_t* executable;  // Retained.
       iree_hal_buffer_ref_t* bindings;    // Points into trailing slab.
       uint32_t binding_count;
@@ -758,7 +759,8 @@ static void iree_hal_webgpu_queue_op_wait_completion(
         work_status = iree_hal_webgpu_builder_dispatch(
             &queue->scratch_builder, state->dispatch.pipeline_handle,
             state->dispatch.bind_group_layout_handle,
-            state->dispatch.workgroup_count, binding_list);
+            state->dispatch.workgroup_count, state->dispatch.constants,
+            binding_list);
       }
       if (iree_hal_webgpu_queue_op_finalize_and_submit(state, work_status))
         return;
@@ -1991,7 +1993,7 @@ iree_status_t iree_hal_webgpu_queue_dispatch(
     if (iree_status_is_ok(status)) {
       status = iree_hal_webgpu_builder_dispatch(
           &queue->scratch_builder, pipeline_handle, bind_group_layout_handle,
-          config.workgroup_count, bindings);
+          config.workgroup_count, constants, bindings);
     }
     return iree_hal_webgpu_queue_submit_scratch_and_signal(
         queue, signal_semaphore_list, status);
@@ -1999,17 +2001,32 @@ iree_status_t iree_hal_webgpu_queue_dispatch(
 
   // Async path: capture params, retain executable + per-binding buffers,
   // snapshot bindings into trailing slab.
+  iree_host_size_t binding_bytes = 0;
+  iree_host_size_t captured_bytes = 0;
+  if (!iree_host_size_checked_mul(bindings.count, sizeof(iree_hal_buffer_ref_t),
+                                  &binding_bytes) ||
+      !iree_host_size_checked_add(binding_bytes, constants.data_length,
+                                  &captured_bytes)) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "dispatch capture size overflow");
+  }
   iree_host_size_t bindings_offset = 0;
   iree_hal_webgpu_queue_state_t* state = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_webgpu_queue_state_allocate(
       queue, IREE_HAL_WEBGPU_QUEUE_OP_DISPATCH, wait_semaphore_list,
-      signal_semaphore_list, bindings.count, sizeof(iree_hal_buffer_ref_t),
-      &bindings_offset, &state));
+      signal_semaphore_list, captured_bytes, 1, &bindings_offset, &state));
 
   state->dispatch.pipeline_handle = pipeline_handle;
   state->dispatch.bind_group_layout_handle = bind_group_layout_handle;
   memcpy(state->dispatch.workgroup_count, config.workgroup_count,
          sizeof(state->dispatch.workgroup_count));
+  if (constants.data_length) {
+    uint8_t* captured_constants =
+        (uint8_t*)state + bindings_offset + binding_bytes;
+    memcpy(captured_constants, constants.data, constants.data_length);
+    state->dispatch.constants =
+        iree_make_const_byte_span(captured_constants, constants.data_length);
+  }
 
   iree_hal_executable_retain(executable);
   state->dispatch.executable = executable;

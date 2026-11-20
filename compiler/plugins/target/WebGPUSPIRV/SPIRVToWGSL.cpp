@@ -15,6 +15,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "src/tint/lang/core/ir/disassembler.h"
+#include "src/tint/lang/core/ir/transform/change_immediate_to_uniform.h"
 #include "src/tint/lang/spirv/reader/reader.h"
 #include "src/tint/lang/wgsl/program/program.h"
 #include "src/tint/lang/wgsl/writer/writer.h"
@@ -80,7 +81,18 @@ compileSPIRVToWGSL(llvm::ArrayRef<uint32_t> spvBinary) {
   }
 
   tint::core::ir::Module irModule = irResult.Move();
+  tint::core::ir::transform::ChangeImmediateToUniformConfig uniformConfig;
+  uniformConfig.immediate_binding_point = tint::BindingPoint{1, 0};
+  auto uniformResult = tint::core::ir::transform::ChangeImmediateToUniform(
+      irModule, uniformConfig);
+  if (uniformResult != tint::Success) {
+    printTintFailure("lower push constants to a uniform buffer",
+                     uniformResult.Failure().reason);
+    return std::nullopt;
+  }
   tint::wgsl::writer::Options writerOptions;
+  writerOptions.allowed_features.features.insert(
+      tint::wgsl::LanguageFeature::kUniformBufferStandardLayout);
   auto programResult =
       tint::wgsl::writer::ProgramFromIR(irModule, writerOptions);
   if (programResult != tint::Success) {

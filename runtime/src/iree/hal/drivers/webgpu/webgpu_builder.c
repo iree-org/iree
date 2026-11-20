@@ -414,26 +414,38 @@ iree_status_t iree_hal_webgpu_builder_dispatch(
     iree_hal_webgpu_builder_t* builder,
     iree_hal_webgpu_handle_t pipeline_handle,
     iree_hal_webgpu_handle_t bind_group_layout_handle,
-    const uint32_t workgroup_count[3], iree_hal_buffer_ref_list_t bindings) {
+    const uint32_t workgroup_count[3], iree_const_byte_span_t constants,
+    iree_hal_buffer_ref_list_t bindings) {
+  if (constants.data_length % sizeof(uint32_t)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "dispatch constants must be 32-bit aligned");
+  }
+  uint32_t binding_count = (uint32_t)bindings.count;
+  uint32_t constant_count = constants.data_length / sizeof(uint32_t);
+  uint32_t header_size = constant_count ? 7 : 6;
+  uint64_t size_words =
+      header_size + (uint64_t)binding_count * 3 + constant_count;
+  if (size_words > builder->block_word_capacity || size_words > UINT16_MAX) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "dispatch instruction exceeds block capacity");
+  }
   // DISPATCH is an encoder command.
   IREE_RETURN_IF_ERROR(iree_hal_webgpu_builder_ensure_encoder_open(builder));
 
-  uint32_t binding_count = (uint32_t)bindings.count;
-  uint32_t size_words = 6 + binding_count * 3;
-
-  // Reserve the header. Bindings are resolved individually below and may grow
-  // the slot map, so we can't reserve the full instruction upfront (the slot
-  // map growth path allocates, and we need reserve to have completed first).
+  // Each dispatch must remain contiguous within one instruction block.
   uint32_t* header_words;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_webgpu_builder_reserve(builder, 6, &header_words));
+  IREE_RETURN_IF_ERROR(iree_hal_webgpu_builder_reserve(
+      builder, (uint32_t)size_words, &header_words));
   header_words[0] = iree_hal_webgpu_isa_header_encode(
-      IREE_HAL_WEBGPU_ISA_OP_DISPATCH, /*flags=*/0, size_words);
+      IREE_HAL_WEBGPU_ISA_OP_DISPATCH,
+      constant_count ? IREE_HAL_WEBGPU_ISA_DISPATCH_FLAG_CONSTANTS : 0,
+      (uint32_t)size_words);
   header_words[1] = pipeline_handle;
   header_words[2] = bind_group_layout_handle;
   header_words[3] = workgroup_count[0];
   header_words[4] = workgroup_count[1];
   header_words[5] = workgroup_count[2];
+  if (constant_count) header_words[6] = binding_count;
 
   // Emit per-binding entries.
   for (uint32_t i = 0; i < binding_count; ++i) {
@@ -455,12 +467,14 @@ iree_status_t iree_hal_webgpu_builder_dispatch(
       slot = binding.buffer_slot;
       offset = (uint32_t)binding.offset;
     }
-    uint32_t* binding_words;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_webgpu_builder_reserve(builder, 3, &binding_words));
+    uint32_t* binding_words = header_words + header_size + i * 3;
     binding_words[0] = slot;
     binding_words[1] = offset;
     binding_words[2] = (uint32_t)binding.length;
+  }
+  if (constant_count) {
+    memcpy(header_words + header_size + binding_count * 3, constants.data,
+           constants.data_length);
   }
 
   return iree_ok_status();
