@@ -96,17 +96,18 @@ func.func @batched_relu(%lhs: tensor<2x64x128xf32>, %rhs: tensor<2x128x64xf32>) 
   return %result : tensor<2x64x64xf32>
 }
 
-// The widening producer receives the packed input layout. The normal dispatch
-// fusion policy keeps this producer separate; the contraction still owns its
-// epilogue and unpack.
+// The input is packed before widening. The widening producer fuses into the
+// contraction dispatch, which also owns its epilogue and unpack.
 // CHECK-LABEL: util.func public @extend_producer
+// CHECK: linalg.pack
+// CHECK-SAME: tensor<64x128xf16> -> tensor<8x128x8x1xf16>
+// CHECK: flow.return
 // CHECK: %[[WIDE:.*]] = linalg.generic
-// CHECK-SAME: ins(%{{.*}} : tensor<8192xf16>)
+// CHECK-SAME: ins(%{{.*}} : tensor<8x128x8x1xf16>)
 // CHECK: arith.extf
 // CHECK: arith.mulf
-// CHECK: iree_tensor_ext.dispatch.tensor.store %[[WIDE]]
-// CHECK: flow.return
-// CHECK: %[[MM:.*]] = linalg.mmt4d
+// CHECK-NOT: flow.return
+// CHECK: %[[MM:.*]] = linalg.mmt4d ins(%[[WIDE]],
 // CHECK-NOT: flow.return
 // CHECK: linalg.generic
 // CHECK-SAME: ins(%[[MM]]
