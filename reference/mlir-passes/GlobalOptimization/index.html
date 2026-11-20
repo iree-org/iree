@@ -6976,6 +6976,8 @@ rewrites the uses of the global's loads to use the shards:</p>
     element unless the index lies in its shard.</li>
 </ul>
 <p>A constant with any other use is left unchanged with a warning.</p>
+<p>To keep fusion from binding all shards in one dispatch, see
+<code>--iree-dispatch-creation-max-dispatch-binding-size</code>.</p>
 <h3 id="-iree-global-opt-warn-on-uninitialized-values"><code>-iree-global-opt-warn-on-uninitialized-values</code><a class="headerlink" href="#-iree-global-opt-warn-on-uninitialized-values" title="Permanent link">link</a></h3>
 <p><em>Catch some uses of uninitialized values</em></p>
 
