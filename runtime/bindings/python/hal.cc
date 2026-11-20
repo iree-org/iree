@@ -1662,9 +1662,9 @@ void SetupHalBindings(nanobind::module_ m) {
                  builder_guard(&builder, &iree_string_builder_deinitialize);
 
              iree_status_t status = iree_hal_driver_dump_device_info(
-                 self.raw_ptr(), device_id, &builder);
+                 self.raw_ptr(), device_id, builder_guard.get());
              CheckApiStatus(status, "Querying device info");
-             iree_string_view_t view = iree_string_builder_view(&builder);
+             iree_string_view_t view = iree_string_builder_view(builder_guard.get());
              py::str result(view.data, view.size);
              return result;
            });
