@@ -21,6 +21,32 @@
 // CHECK: EXEC @multi_device_mul
 // CHECK-NEXT: result[0]: hal.buffer_view
 // CHECK-NEXT: 4xf32=0 55 144 273
+
+// Test that device profiling covers every device (device_a + device_b).
+
+// RUN: (iree-compile %s \
+// RUN:      --iree-execution-model=async-external \
+// RUN:      --iree-hal-target-device=device_a=local[0] \
+// RUN:      --iree-hal-target-device=device_b=local[1] \
+// RUN:      --iree-hal-local-target-device-backends=vmvx | \
+// RUN:  iree-run-module \
+// RUN:      --module=- \
+// RUN:      --function=multi_device_mul \
+// RUN:      --input=4xf32=10,11,12,13 \
+// RUN:      --device=local-task \
+// RUN:      --device=local-task \
+// RUN:      --task_topology_group_count=1 \
+// RUN:      --print_device_statistics) 2>&1 | \
+// RUN: FileCheck %s --check-prefix=STATS
+
+// STATS: IREE HAL device statistics (device[0] local-task):
+// STATS-NOT: dispatch_1_
+// STATS: host_execute multi_device_mul_dispatch_0_
+// STATS-NOT: dispatch_1_
+// STATS: IREE HAL device statistics (device[1] local-task):
+// STATS-NOT: dispatch_0_
+// STATS: host_execute multi_device_mul_dispatch_1_
+// STATS-NOT: dispatch_0_
 func.func public @multi_device_mul(
   // Input argument is resident on device_a (tooling default to first device).
   %input_a: tensor<4xf32> {iree.abi.affinity = #hal.device.promise<@device_a>}

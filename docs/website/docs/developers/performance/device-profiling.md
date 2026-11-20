@@ -144,8 +144,9 @@ For a quick aggregate report without writing a `.ireeprof`, use:
 ```
 
 This starts the backend's lightweight statistics mode and prints aggregate
-device statistics at shutdown. It cannot be combined with
-`--device_profiling_output`.
+device statistics at shutdown. With several `--device` flags each device is
+reported in its own block, labeled with its index and name. It cannot be
+combined with `--device_profiling_output`.
 
 External profiler/tool capture flags are separate from HAL-native `.ireeprof`
 output:

@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "failure.mlir"
+    "multi_device.mlir"
     "success.mlir"
     "unavailable.mlir"
   TOOLS

@@ -575,9 +575,6 @@ iree_status_t iree_test_utils_load_and_run_e2e_tests(
         &replay_recorder);
   }
 
-  iree_hal_device_t* device =
-      device_list ? iree_hal_device_list_at(device_list, 0) : NULL;
-
   // Ensure the test module is possible to run.
   if (iree_status_is_ok(status)) {
     status = iree_test_utils_check_module_requirements(test_module);
@@ -586,9 +583,9 @@ iree_status_t iree_test_utils_load_and_run_e2e_tests(
 
   // Begin profiling (if enabled).
   iree_hal_profiling_session_t* profiling = NULL;
-  if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_begin_profiling_from_flags(device, host_allocator, &profiling);
+  if (iree_status_is_ok(status) && device_list) {
+    status = iree_hal_begin_device_list_profiling_from_flags(
+        device_list->count, device_list->devices, host_allocator, &profiling);
   }
 
   // Run all of the tests in the test module.
