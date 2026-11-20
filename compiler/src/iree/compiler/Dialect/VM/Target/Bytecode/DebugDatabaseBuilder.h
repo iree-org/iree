@@ -27,9 +27,8 @@ struct FunctionSourceMap {
 
 class DebugDatabaseBuilder {
 public:
-  // Appends a function source map entry to the debug database.
-  void addFunctionSourceMap(IREE::VM::FuncOp funcOp,
-                            FunctionSourceMap sourceMap);
+  // Sets the source map of the internal function with the given ordinal.
+  void addFunctionSourceMap(int64_t ordinal, FunctionSourceMap sourceMap);
 
   // Finishes construction of the debug database and emits it to the FlatBuffer.
   iree_vm_DebugDatabaseDef_ref_t build(FlatbufferBuilder &fbb);

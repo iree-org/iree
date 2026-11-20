@@ -10,10 +10,9 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
-void DebugDatabaseBuilder::addFunctionSourceMap(IREE::VM::FuncOp funcOp,
+void DebugDatabaseBuilder::addFunctionSourceMap(int64_t ordinal,
                                                 FunctionSourceMap sourceMap) {
-  uint64_t ordinal = funcOp.getOrdinal().value_or(APInt(64, 0)).getZExtValue();
-  if (functionSourceMaps.size() <= ordinal) {
+  if (static_cast<int64_t>(functionSourceMaps.size()) <= ordinal) {
     functionSourceMaps.resize(ordinal + 1);
   }
   functionSourceMaps[ordinal] = std::move(sourceMap);
