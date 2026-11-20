@@ -160,3 +160,62 @@ func.func @no_emulation() attributes {hal.executable.target = #executable_target
 //       CHECK:   {{%.+}}           = arith.addi {{%.+}} : i64
 //       CHECK:   memref.store {{%.+}}, [[REF_I64_1]][{{%.+}}] : memref<8xi64, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   return
+
+// -----
+
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
+    subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
+}>
+func.func @extract_i64_slices(%condition: i1, %out: memref<4xvector<2xi32>>) attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %a = arith.constant dense<[4294967297, 8589934594, -12884901885, -17179869180]> : vector<4xi64>
+  %b = arith.constant dense<[21474836485, 25769803782, -30064771065, -34359738360]> : vector<4xi64>
+  %selected = arith.select %condition, %a, %b : vector<4xi64>
+  %first = vector.extract_strided_slice %selected {offsets = [0], sizes = [2], strides = [1]} : vector<4xi64> to vector<2xi64>
+  %last = vector.extract_strided_slice %selected {offsets = [2], sizes = [2], strides = [1]} : vector<4xi64> to vector<2xi64>
+  %lo_first = arith.trunci %first : vector<2xi64> to vector<2xi32>
+  %lo_last = arith.trunci %last : vector<2xi64> to vector<2xi32>
+  %shift = arith.constant dense<32> : vector<2xi64>
+  %hi_first_i64 = arith.shrsi %first, %shift : vector<2xi64>
+  %hi_last_i64 = arith.shrsi %last, %shift : vector<2xi64>
+  %hi_first = arith.trunci %hi_first_i64 : vector<2xi64> to vector<2xi32>
+  %hi_last = arith.trunci %hi_last_i64 : vector<2xi64> to vector<2xi32>
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  memref.store %hi_first, %out[%c2] : memref<4xvector<2xi32>>
+  memref.store %hi_last, %out[%c3] : memref<4xvector<2xi32>>
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  memref.store %lo_first, %out[%c0] : memref<4xvector<2xi32>>
+  memref.store %lo_last, %out[%c1] : memref<4xvector<2xi32>>
+  return
+}
+
+// Check both word selections and that scalar select conditions are preserved.
+// CHECK-LABEL: func.func @extract_i64_slices
+// CHECK-DAG: %[[LOW_A:.+]] = arith.constant dense<[1, 2, 3, 4]> : vector<4xi32>
+// CHECK-DAG: %[[HIGH_A:.+]] = arith.constant dense<[1, 2, -3, -4]> : vector<4xi32>
+// CHECK-DAG: %[[LOW_B:.+]] = arith.constant dense<[5, 6, 7, 8]> : vector<4xi32>
+// CHECK-DAG: %[[HIGH_B:.+]] = arith.constant dense<[5, 6, -7, -8]> : vector<4xi32>
+// CHECK: %[[LOW:.+]] = arith.select %{{.+}}, %[[LOW_A]], %[[LOW_B]] : vector<4xi32>
+// CHECK: %[[HIGH:.+]] = arith.select %{{.+}}, %[[HIGH_A]], %[[HIGH_B]] : vector<4xi32>
+// CHECK: %[[LOW_0:.+]] = vector.extract %[[LOW]][0] : i32 from vector<4xi32>
+// CHECK: %[[LOW_1:.+]] = vector.extract %[[LOW]][1] : i32 from vector<4xi32>
+// CHECK: %[[LOW_FIRST:.+]] = vector.from_elements %[[LOW_0]], %[[LOW_1]] : vector<2xi32>
+// CHECK: %[[LOW_2:.+]] = vector.extract %[[LOW]][2] : i32 from vector<4xi32>
+// CHECK: %[[LOW_3:.+]] = vector.extract %[[LOW]][3] : i32 from vector<4xi32>
+// CHECK: %[[LOW_LAST:.+]] = vector.from_elements %[[LOW_2]], %[[LOW_3]] : vector<2xi32>
+// CHECK: %[[HIGH_0:.+]] = vector.extract %[[HIGH]][0] : i32 from vector<4xi32>
+// CHECK: %[[HIGH_1:.+]] = vector.extract %[[HIGH]][1] : i32 from vector<4xi32>
+// CHECK: %[[HIGH_2:.+]] = vector.extract %[[HIGH]][2] : i32 from vector<4xi32>
+// CHECK: %[[HIGH_3:.+]] = vector.extract %[[HIGH]][3] : i32 from vector<4xi32>
+// CHECK: %[[HIGH_FIRST:.+]] = vector.from_elements %[[HIGH_0]], %[[HIGH_1]] : vector<2xi32>
+// CHECK: %[[HIGH_LAST:.+]] = vector.from_elements %[[HIGH_2]], %[[HIGH_3]] : vector<2xi32>
+// CHECK: memref.store %[[HIGH_FIRST]],
+// CHECK: memref.store %[[HIGH_LAST]],
+// CHECK: memref.store %[[LOW_FIRST]],
+// CHECK: memref.store %[[LOW_LAST]],
+// CHECK: return
