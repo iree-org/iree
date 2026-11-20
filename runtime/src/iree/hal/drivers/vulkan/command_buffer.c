@@ -96,6 +96,22 @@ typedef struct iree_hal_vulkan_command_dispatch_t {
   iree_hal_dispatch_flags_t flags;
 } iree_hal_vulkan_command_dispatch_t;
 
+// Cache maintenance request carried by a recorded execution barrier for replay.
+// For execution-time maintenance requests, replay resolves the target buffer
+// and rejects non-coherent memory.
+typedef enum iree_hal_vulkan_cache_maintenance_kind_e {
+  // Ordinary execution barrier with no cache maintenance request.
+  IREE_HAL_VULKAN_CACHE_MAINTENANCE_NONE = 0,
+
+  // Invalidate request for host writes before device reads. Replay needs no
+  // cache operation for host-coherent memory.
+  IREE_HAL_VULKAN_CACHE_MAINTENANCE_INVALIDATE = 1,
+
+  // Flush request for device writes before host reads. Replay records a native
+  // memory barrier establishing device-write to host-read visibility.
+  IREE_HAL_VULKAN_CACHE_MAINTENANCE_FLUSH = 2,
+} iree_hal_vulkan_cache_maintenance_kind_t;
+
 typedef struct iree_hal_vulkan_command_execution_barrier_t {
   // Source HAL execution stages captured during recording.
   iree_hal_execution_stage_t source_stage_mask;
@@ -108,6 +124,11 @@ typedef struct iree_hal_vulkan_command_execution_barrier_t {
 
   // Number of buffer barriers represented by the native barrier.
   iree_host_size_t buffer_barrier_count;
+
+  // Cache maintenance is checked against the submitted binding at replay.
+  // Zero denotes an ordinary execution barrier.
+  iree_hal_vulkan_cache_maintenance_kind_t cache_maintenance_kind;
+  iree_hal_buffer_ref_t cache_maintenance_ref;
 } iree_hal_vulkan_command_execution_barrier_t;
 
 typedef struct iree_hal_vulkan_command_begin_debug_group_t {
@@ -1796,17 +1817,49 @@ iree_hal_vulkan_pipeline_stage_mask_from_hal_execution_stage(
   return VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
 }
 
-static void iree_hal_vulkan_command_buffer_record_execution_barrier_native(
+static iree_status_t iree_hal_vulkan_command_buffer_record_execution_barrier_native(
     const iree_hal_vulkan_device_syms_t* syms,
     VkCommandBuffer native_command_buffer,
+    iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_vulkan_command_t* command) {
   const iree_hal_vulkan_command_execution_barrier_t* execution_barrier =
       iree_hal_vulkan_command_execution_barrier_payload(command);
+  if (execution_barrier->cache_maintenance_kind !=
+      IREE_HAL_VULKAN_CACHE_MAINTENANCE_NONE) {
+    iree_hal_buffer_ref_t resolved_ref;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_resolve_buffer_ref(
+        binding_table, execution_barrier->cache_maintenance_ref,
+        IREE_SV("cache maintenance"), &resolved_ref));
+    if (!iree_all_bits_set(iree_hal_buffer_memory_type(resolved_ref.buffer),
+                           IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+      return iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "Vulkan execution-time cache maintenance for non-coherent memory "
+          "is unsupported");
+    }
+    // HOST_COHERENT memory needs no explicit host cache invalidation. Ordering
+    // host writes before device reads is a separate synchronization requirement.
+    if (execution_barrier->cache_maintenance_kind ==
+        IREE_HAL_VULKAN_CACHE_MAINTENANCE_INVALIDATE) {
+      return iree_ok_status();
+    }
+  }
   // HAL barriers without memory or buffer payload are execution dependencies
   // only. Memory visibility is requested by the barrier payloads.
   const bool has_memory_visibility =
       execution_barrier->memory_barrier_count != 0 ||
       execution_barrier->buffer_barrier_count != 0;
+  VkAccessFlags2 dst_access_mask = 0;
+  if (execution_barrier->cache_maintenance_kind ==
+      IREE_HAL_VULKAN_CACHE_MAINTENANCE_FLUSH) {
+    // The barrier makes preceding device writes available to a later host
+    // read. Queue completion orders that read but does not establish
+    // device-to-host memory visibility.
+    dst_access_mask = VK_ACCESS_2_HOST_READ_BIT;
+  } else if (has_memory_visibility) {
+    dst_access_mask =
+        VK_ACCESS_2_MEMORY_READ_BIT | VK_ACCESS_2_MEMORY_WRITE_BIT;
+  }
   VkMemoryBarrier2 memory_barrier = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2,
       .srcStageMask =
@@ -1816,9 +1869,7 @@ static void iree_hal_vulkan_command_buffer_record_execution_barrier_native(
       .dstStageMask =
           iree_hal_vulkan_pipeline_stage_mask_from_hal_execution_stage(
               execution_barrier->target_stage_mask, has_memory_visibility),
-      .dstAccessMask = has_memory_visibility ? VK_ACCESS_2_MEMORY_READ_BIT |
-                                                   VK_ACCESS_2_MEMORY_WRITE_BIT
-                                             : 0,
+      .dstAccessMask = dst_access_mask,
   };
   VkDependencyInfo dependency_info = {
       .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
@@ -1827,6 +1878,7 @@ static void iree_hal_vulkan_command_buffer_record_execution_barrier_native(
   };
   iree_vkCmdPipelineBarrier2(IREE_VULKAN_DEVICE(syms), native_command_buffer,
                              &dependency_info);
+  return iree_ok_status();
 }
 
 static iree_status_t
@@ -2421,8 +2473,8 @@ iree_status_t iree_hal_vulkan_command_buffer_record_native(
         break;
       }
       case IREE_HAL_VULKAN_COMMAND_TYPE_EXECUTION_BARRIER:
-        iree_hal_vulkan_command_buffer_record_execution_barrier_native(
-            syms, native_command_buffer, command);
+        status = iree_hal_vulkan_command_buffer_record_execution_barrier_native(
+            syms, native_command_buffer, binding_table, command);
         break;
       case IREE_HAL_VULKAN_COMMAND_TYPE_BEGIN_DEBUG_GROUP: {
         const iree_hal_vulkan_command_begin_debug_group_t* begin_debug_group =
@@ -2606,6 +2658,8 @@ static iree_status_t iree_hal_vulkan_command_buffer_execution_barrier(
   execution_barrier->target_stage_mask = target_stage_mask;
   execution_barrier->memory_barrier_count = memory_barrier_count;
   execution_barrier->buffer_barrier_count = buffer_barrier_count;
+  execution_barrier->cache_maintenance_kind =
+      IREE_HAL_VULKAN_CACHE_MAINTENANCE_NONE;
   return iree_ok_status();
 }
 
@@ -2663,6 +2717,65 @@ static iree_status_t iree_hal_vulkan_command_buffer_advise_buffer(
   (void)arg1;
   return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                           "Vulkan command buffer memory advice is unsupported");
+}
+
+static iree_status_t iree_hal_vulkan_command_buffer_cache_maintenance(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref,
+    iree_hal_vulkan_cache_maintenance_kind_t kind) {
+  iree_hal_vulkan_command_buffer_t* command_buffer =
+      iree_hal_vulkan_command_buffer_cast(base_command_buffer);
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_validate_recording_state(
+      command_buffer, IREE_SV("cache maintenance")));
+  if (target_ref.buffer &&
+      !iree_all_bits_set(iree_hal_buffer_memory_type(target_ref.buffer),
+                         IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+    return iree_make_status(
+        IREE_STATUS_UNIMPLEMENTED,
+        "Vulkan execution-time cache maintenance for non-coherent memory "
+        "is unsupported");
+  }
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_track_buffer_ref(
+      command_buffer, target_ref));
+
+  iree_host_size_t record_length = 0;
+  iree_host_size_t payload_offset = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_command_buffer_ensure_command_capacity(
+      command_buffer, sizeof(iree_hal_vulkan_command_execution_barrier_t),
+      &record_length, &payload_offset));
+  void* payload = NULL;
+  iree_hal_vulkan_command_buffer_append_command(
+      command_buffer, IREE_HAL_VULKAN_COMMAND_TYPE_EXECUTION_BARRIER,
+      record_length, payload_offset, /*out_command=*/NULL, &payload);
+  iree_hal_vulkan_command_execution_barrier_t* execution_barrier =
+      (iree_hal_vulkan_command_execution_barrier_t*)payload;
+  // With a memory payload, COMMAND_RETIRE maps to ALL_COMMANDS. A flush
+  // makes preceding device writes visible to host reads.
+  execution_barrier->source_stage_mask = IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE;
+  execution_barrier->target_stage_mask = IREE_HAL_EXECUTION_STAGE_HOST;
+  execution_barrier->memory_barrier_count =
+      kind == IREE_HAL_VULKAN_CACHE_MAINTENANCE_FLUSH ? 1 : 0;
+  execution_barrier->buffer_barrier_count = 0;
+  execution_barrier->cache_maintenance_kind = kind;
+  execution_barrier->cache_maintenance_ref = target_ref;
+  iree_hal_vulkan_command_buffer_note_binding_table_dependency(command_buffer,
+                                                               target_ref);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_vulkan_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  return iree_hal_vulkan_command_buffer_cache_maintenance(
+      base_command_buffer, target_ref, IREE_HAL_VULKAN_CACHE_MAINTENANCE_FLUSH);
+}
+
+static iree_status_t iree_hal_vulkan_command_buffer_invalidate_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  return iree_hal_vulkan_command_buffer_cache_maintenance(
+      base_command_buffer, target_ref,
+      IREE_HAL_VULKAN_CACHE_MAINTENANCE_INVALIDATE);
 }
 
 static iree_status_t iree_hal_vulkan_command_buffer_fill_buffer(
@@ -3069,6 +3182,8 @@ static const iree_hal_command_buffer_vtable_t
         .reset_event = iree_hal_vulkan_command_buffer_reset_event,
         .wait_events = iree_hal_vulkan_command_buffer_wait_events,
         .advise_buffer = iree_hal_vulkan_command_buffer_advise_buffer,
+        .flush_buffer = iree_hal_vulkan_command_buffer_flush_buffer,
+        .invalidate_buffer = iree_hal_vulkan_command_buffer_invalidate_buffer,
         .fill_buffer = iree_hal_vulkan_command_buffer_fill_buffer,
         .update_buffer = iree_hal_vulkan_command_buffer_update_buffer,
         .copy_buffer = iree_hal_vulkan_command_buffer_copy_buffer,

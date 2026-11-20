@@ -54,6 +54,34 @@ class CommandBufferCopyBufferTest : public CtsTestBase<> {
     return SubmitCommandBufferAndWait(command_buffer);
   }
 
+  iree_hal_buffer_params_t CoherentBufferParams() {
+    iree_hal_buffer_params_t params = {0};
+    params.type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
+                  IREE_HAL_MEMORY_TYPE_HOST_COHERENT |
+                  IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+    params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+    params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED;
+    return params;
+  }
+
+  bool SupportsCoherentBuffers(iree_device_size_t size) {
+    iree_hal_buffer_params_t params = CoherentBufferParams();
+    iree_device_size_t allocation_size = 0;
+    return iree_all_bits_set(
+        iree_hal_allocator_query_buffer_compatibility(
+            device_allocator_, params, size, &params, &allocation_size),
+        IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE |
+            IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER);
+  }
+
+  iree_status_t AllocateCoherentBuffer(iree_device_size_t size,
+                                       iree_hal_buffer_t** out_buffer) {
+    iree_hal_buffer_params_t params = CoherentBufferParams();
+    return iree_hal_allocator_allocate_buffer(device_allocator_, params, size,
+                                              out_buffer);
+  }
+
   void RunCopyBufferTest(iree_device_size_t source_offset,
                          iree_device_size_t target_offset,
                          iree_device_size_t length) {
@@ -93,6 +121,109 @@ class CommandBufferCopyBufferTest : public CtsTestBase<> {
     EXPECT_THAT(actual_data, ContainerEq(expected));
   }
 };
+
+TEST_P(CommandBufferCopyBufferTest, InvalidateCoherentSource) {
+  constexpr iree_device_size_t kSize = 32;
+  constexpr iree_device_size_t kOffset = 4;
+  constexpr iree_device_size_t kLength = 16;
+  if (!SupportsCoherentBuffers(kSize)) {
+    GTEST_SKIP() << "No coherent host-visible device buffer supports transfer "
+                    "and mapping";
+  }
+
+  const uint32_t source_data[4] = {11, 22, 33, 44};
+  Ref<iree_hal_buffer_t> source;
+  Ref<iree_hal_buffer_t> target;
+  IREE_ASSERT_OK(AllocateCoherentBuffer(kSize, source.out()));
+  IREE_ASSERT_OK(AllocateCoherentBuffer(kSize, target.out()));
+  ASSERT_TRUE(iree_all_bits_set(iree_hal_buffer_memory_type(source),
+                                IREE_HAL_MEMORY_TYPE_HOST_COHERENT |
+                                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE));
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(source, kOffset, source_data,
+                                          sizeof(source_data)));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(target, 0, kSize));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      binding_capacity(), command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  iree_hal_buffer_ref_t source_ref =
+      MakeRef(source, kSourceBufferSlot, kOffset, kLength);
+  iree_status_t invalidate_status =
+      iree_hal_command_buffer_invalidate_buffer(command_buffer, source_ref);
+  if (iree_status_is_unimplemented(invalidate_status)) {
+    iree_status_ignore(invalidate_status);
+    GTEST_SKIP() << "Command-buffer invalidate is unsupported by backend";
+  }
+  IREE_ASSERT_OK(invalidate_status);
+  IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
+      command_buffer, source_ref,
+      MakeRef(target, kTargetBufferSlot, kOffset, kLength),
+      IREE_HAL_COPY_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  IREE_ASSERT_OK(SubmitWithBindings(command_buffer, source, target));
+
+  std::vector<uint8_t> expected(kSize, 0);
+  std::memcpy(expected.data() + kOffset, source_data, sizeof(source_data));
+  EXPECT_THAT(ReadBufferBytes(target, 0, kSize), ContainerEq(expected));
+}
+
+TEST_P(CommandBufferCopyBufferTest, FlushCoherentTarget) {
+  constexpr iree_device_size_t kSize = 32;
+  constexpr iree_device_size_t kOffset = 4;
+  constexpr iree_device_size_t kLength = 16;
+  if (!SupportsCoherentBuffers(kSize)) {
+    GTEST_SKIP() << "No coherent host-visible device buffer supports transfer "
+                    "and mapping";
+  }
+
+  const uint32_t source_data[4] = {11, 22, 33, 44};
+  Ref<iree_hal_buffer_t> source;
+  Ref<iree_hal_buffer_t> target;
+  IREE_ASSERT_OK(AllocateCoherentBuffer(kSize, source.out()));
+  IREE_ASSERT_OK(AllocateCoherentBuffer(kSize, target.out()));
+  ASSERT_TRUE(iree_all_bits_set(iree_hal_buffer_memory_type(target),
+                                IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
+                                    IREE_HAL_MEMORY_TYPE_HOST_COHERENT));
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(source, kOffset, source_data,
+                                          sizeof(source_data)));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(target, 0, kSize));
+
+  Ref<iree_hal_command_buffer_t> command_buffer;
+  IREE_ASSERT_OK(iree_hal_command_buffer_create(
+      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+      binding_capacity(), command_buffer.out()));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
+      command_buffer, MakeRef(source, kSourceBufferSlot, kOffset, kLength),
+      MakeRef(target, kTargetBufferSlot, kOffset, kLength),
+      IREE_HAL_COPY_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
+      command_buffer,
+      IREE_HAL_EXECUTION_STAGE_TRANSFER |
+          IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE,
+      IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE |
+          IREE_HAL_EXECUTION_STAGE_TRANSFER,
+      IREE_HAL_EXECUTION_BARRIER_FLAG_NONE,
+      /*memory_barrier_count=*/0, /*memory_barriers=*/nullptr,
+      /*buffer_barrier_count=*/0, /*buffer_barriers=*/nullptr));
+  iree_status_t flush_status = iree_hal_command_buffer_flush_buffer(
+      command_buffer, MakeRef(target, kTargetBufferSlot, kOffset, kLength));
+  if (iree_status_is_unimplemented(flush_status)) {
+    iree_status_ignore(flush_status);
+    GTEST_SKIP() << "Command-buffer flush is unsupported by backend";
+  }
+  IREE_ASSERT_OK(flush_status);
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  IREE_ASSERT_OK(SubmitWithBindings(command_buffer, source, target));
+
+  std::vector<uint8_t> expected(kSize, 0);
+  std::memcpy(expected.data() + kOffset, source_data, sizeof(source_data));
+  EXPECT_THAT(ReadBufferBytes(target, 0, kSize), ContainerEq(expected));
+}
 
 TEST_P(CommandBufferCopyBufferTest, CopyWholeBuffer) {
   uint8_t i8_val = 0x54;

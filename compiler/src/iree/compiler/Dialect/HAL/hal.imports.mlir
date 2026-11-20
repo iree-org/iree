@@ -277,6 +277,7 @@ vm.import private @command_buffer.flush_buffer(
   %target_offset : i64,
   %length : i64
 )
+attributes {minimum_version = 8 : i32}
 
 // Makes external writes visible to subsequent consumers.
 vm.import private @command_buffer.invalidate_buffer(
@@ -286,6 +287,7 @@ vm.import private @command_buffer.invalidate_buffer(
   %target_offset : i64,
   %length : i64
 )
+attributes {minimum_version = 8 : i32}
 
 // Fills the target buffer with the given repeating value.
 // NOTE: order slightly differs from op in order to get better arg alignment.

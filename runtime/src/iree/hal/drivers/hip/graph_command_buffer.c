@@ -527,8 +527,9 @@ iree_hal_hip_graph_command_buffer_execution_barrier_internal(
       iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
 
   iree_hal_hip_graph_node_list_t* graph_nodes = &command_buffer->graph_nodes;
-  IREE_ASSERT_GT(graph_nodes->count, 0,
-                 "expected at least one node before a barrier");
+  // Cache maintenance can be a no-op and leave no nodes to join. Retain the
+  // previous barrier node so subsequent commands still depend on it.
+  if (graph_nodes->count == 0) return iree_ok_status();
 
   // Use the last node as a barrier to avoid creating redundant empty nodes.
   if (IREE_LIKELY(graph_nodes->count == 1)) {
@@ -600,6 +601,37 @@ static iree_status_t iree_hal_hip_graph_command_buffer_advise_buffer(
   // We could mark the memory as invalidated so that if this is a managed buffer
   // HIP does not try to copy it back to the host.
   return iree_ok_status();
+}
+
+static iree_status_t iree_hal_hip_graph_command_buffer_cache_maintenance(
+    iree_hal_buffer_ref_t target_ref) {
+  if (!target_ref.buffer) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "HIP graph cache maintenance requires a direct "
+                            "buffer reference");
+  }
+  // Direct graph bindings are concrete at recording time. Host-coherent
+  // memory needs no cache operation. Graph and submission dependencies handle
+  // execution ordering separately.
+  if (iree_all_bits_set(iree_hal_buffer_memory_type(target_ref.buffer),
+                        IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+    return iree_ok_status();
+  }
+  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                          "HIP graph cache maintenance for non-coherent "
+                          "memory is unsupported");
+}
+
+static iree_status_t iree_hal_hip_graph_command_buffer_flush_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  return iree_hal_hip_graph_command_buffer_cache_maintenance(target_ref);
+}
+
+static iree_status_t iree_hal_hip_graph_command_buffer_invalidate_buffer(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_buffer_ref_t target_ref) {
+  return iree_hal_hip_graph_command_buffer_cache_maintenance(target_ref);
 }
 
 // Splats a pattern value of 1, 2, or 4 bytes out to a 4 byte value.
@@ -993,6 +1025,9 @@ static const iree_hal_command_buffer_vtable_t
         .reset_event = iree_hal_hip_graph_command_buffer_reset_event,
         .wait_events = iree_hal_hip_graph_command_buffer_wait_events,
         .advise_buffer = iree_hal_hip_graph_command_buffer_advise_buffer,
+        .flush_buffer = iree_hal_hip_graph_command_buffer_flush_buffer,
+        .invalidate_buffer =
+            iree_hal_hip_graph_command_buffer_invalidate_buffer,
         .fill_buffer = iree_hal_hip_graph_command_buffer_fill_buffer,
         .update_buffer = iree_hal_hip_graph_command_buffer_update_buffer,
         .copy_buffer = iree_hal_hip_graph_command_buffer_copy_buffer,
