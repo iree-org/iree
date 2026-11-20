@@ -23,6 +23,13 @@ iree_py_test(
 
 iree_py_test(
  NAME
+   entrypoint_test
+ SRCS
+   "entrypoint_test.py"
+)
+
+iree_py_test(
+ NAME
    net_test
  SRCS
    "net_test.py"
