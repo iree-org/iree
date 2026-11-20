@@ -343,7 +343,9 @@ static iree_status_t iree_hal_hip_nccl_submit_batch_entry(
     case IREE_HAL_COLLECTIVE_KIND_ALL_GATHER: {
       iree_device_size_t sendbuff =
           iree_hal_hip_device_ptr_to_device_size(
-              iree_hal_buffer_allocated_buffer(entry->send_binding.buffer)) +
+              iree_hal_hip_buffer_device_pointer(
+                  iree_hal_buffer_allocated_buffer(
+                      entry->send_binding.buffer))) +
           iree_hal_buffer_byte_offset(entry->send_binding.buffer) +
           entry->send_binding.offset;
       iree_device_size_t recvbuff =
