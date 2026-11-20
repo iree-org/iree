@@ -99,7 +99,7 @@ Returns whether the wait succeeded (True) or timed out (False). If the fence was
 asynchronously failed, an exception is raised.
 )";
 
-struct AllocatorDeleter {
+struct FreeDeleter {
   iree_allocator_t allocator;
 
   void operator()(void* ptr) const noexcept {
@@ -1017,13 +1017,13 @@ std::vector<std::string> HalDriver::Query() {
                                          &driver_info_count, &driver_infos),
       "Error enumerating HAL drivers");
 
-  std::unique_ptr<iree_hal_driver_info_t[], AllocatorDeleter> infos(
-      driver_infos, AllocatorDeleter{driver_info_host_allocator});
+  std::unique_ptr<iree_hal_driver_info_t[], FreeDeleter> driver_infos_guard(
+      driver_infos, FreeDeleter{driver_info_host_allocator});
 
   std::vector<std::string> driver_names(driver_info_count);
   for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
-    driver_names[i] = std::string(driver_infos[i].driver_name.data,
-                                  driver_infos[i].driver_name.size);
+    driver_names[i] = std::string(driver_infos_guard[i].driver_name.data,
+                                  driver_infos_guard[i].driver_name.size);
   }
   return driver_names;
 }
