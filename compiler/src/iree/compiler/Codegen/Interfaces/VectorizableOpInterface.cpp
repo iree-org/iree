@@ -1098,6 +1098,8 @@ struct LinalgStructuredOpVectorizationModel
         getBoolOption(options, "flatten1DDepthwiseConv");
     bool createNamedContraction =
         getBoolOption(options, "createNamedContraction");
+    bool assumeDynamicDimsMatchVecSizes =
+        getBoolOption(options, "assumeDynamicDimsMatchVecSizes");
 
     // Handle gather-like generic vectorization via TransferGather.
     if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
@@ -1122,7 +1124,7 @@ struct LinalgStructuredOpVectorizationModel
 
     FailureOr<linalg::VectorizationResult> result = linalg::vectorize(
         rewriter, op, vectorSizes, scalableDims, vectorizeNDExtract,
-        flatten1DDepthwiseConv, /*assumeDynamicDimsMatchVecSizes=*/false,
+        flatten1DDepthwiseConv, assumeDynamicDimsMatchVecSizes,
         createNamedContraction);
 
     if (failed(result)) {
