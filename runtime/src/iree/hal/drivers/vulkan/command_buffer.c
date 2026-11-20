@@ -96,9 +96,19 @@ typedef struct iree_hal_vulkan_command_dispatch_t {
   iree_hal_dispatch_flags_t flags;
 } iree_hal_vulkan_command_dispatch_t;
 
+// Cache maintenance request carried by a recorded execution barrier for replay.
+// For execution-time maintenance requests, replay resolves the target buffer
+// and rejects non-coherent memory.
 typedef enum iree_hal_vulkan_cache_maintenance_kind_e {
+  // Ordinary execution barrier with no cache maintenance request.
   IREE_HAL_VULKAN_CACHE_MAINTENANCE_NONE = 0,
+
+  // Invalidate request for host writes before device reads. Replay needs no
+  // cache operation for host-coherent memory.
   IREE_HAL_VULKAN_CACHE_MAINTENANCE_INVALIDATE = 1,
+
+  // Flush request for device writes before host reads. Replay records a native
+  // memory barrier establishing device-write to host-read visibility.
   IREE_HAL_VULKAN_CACHE_MAINTENANCE_FLUSH = 2,
 } iree_hal_vulkan_cache_maintenance_kind_t;
 
@@ -1827,8 +1837,8 @@ static iree_status_t iree_hal_vulkan_command_buffer_record_execution_barrier_nat
           "Vulkan execution-time cache maintenance for non-coherent memory "
           "is unsupported");
     }
-    // Coherent host writes need no cache operation. Submission waits order the
-    // producer before later device reads.
+    // HOST_COHERENT memory needs no explicit host cache invalidation. Ordering
+    // host writes before device reads is a separate synchronization requirement.
     if (execution_barrier->cache_maintenance_kind ==
         IREE_HAL_VULKAN_CACHE_MAINTENANCE_INVALIDATE) {
       return iree_ok_status();

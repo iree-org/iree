@@ -818,7 +818,6 @@ iree_cc_test(
     iree::hal
     iree::hal::cts::util::registry
     iree::hal::cts::util::test_base
-    iree::hal::drivers::vulkan::vulkan
     iree::hal::local::transient_buffer
     iree::testing::gtest
   LABELS

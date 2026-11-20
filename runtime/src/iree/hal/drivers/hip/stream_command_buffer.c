@@ -321,7 +321,7 @@ static iree_status_t iree_hal_hip_stream_command_buffer_cache_maintenance(
                             "HIP %s buffer reference is NULL", operation);
   }
   // Host-coherent memory needs no cache maintenance. Stream and submission
-  // synchronization still order accesses to the buffer.
+  // synchronization handle execution ordering separately.
   if (iree_all_bits_set(iree_hal_buffer_memory_type(target_ref.buffer),
                         IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
     return iree_ok_status();

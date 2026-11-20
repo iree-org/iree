@@ -610,8 +610,9 @@ static iree_status_t iree_hal_hip_graph_command_buffer_cache_maintenance(
                             "HIP graph cache maintenance requires a direct "
                             "buffer reference");
   }
-  // Direct graph bindings are concrete at recording time. Coherent memory
-  // needs no cache operation; graph and submission dependencies order accesses.
+  // Direct graph bindings are concrete at recording time. Host-coherent
+  // memory needs no cache operation. Graph and submission dependencies handle
+  // execution ordering separately.
   if (iree_all_bits_set(iree_hal_buffer_memory_type(target_ref.buffer),
                         IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
     return iree_ok_status();

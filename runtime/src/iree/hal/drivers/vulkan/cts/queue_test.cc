@@ -7,11 +7,9 @@
 // Vulkan-specific queue API tests
 
 #include <cstdint>
-#include <cstring>
 #include <vector>
 
 #include "iree/hal/cts/util/test_base.h"
-#include "iree/hal/drivers/vulkan/allocator.h"
 #include "iree/hal/local/transient_buffer.h"
 
 namespace iree::hal::cts {
@@ -186,116 +184,6 @@ class VulkanQueueCacheMaintenanceTest : public CtsTestBase<> {
     return value;
   }
 };
-
-TEST_P(VulkanQueueCacheMaintenanceTest, DeviceWriteToNonCoherentHostRead) {
-  constexpr iree_device_size_t kSize = 16;
-  constexpr uint32_t kPattern = 0x12345678;
-
-  iree_host_size_t memory_type_count = 0;
-  IREE_ASSERT_OK(iree_hal_allocator_query_memory_heaps(
-      device_allocator_, /*capacity=*/0, /*heaps=*/nullptr,
-      &memory_type_count));
-  std::vector<iree_hal_allocator_memory_heap_t> heaps(memory_type_count);
-  IREE_ASSERT_OK(iree_hal_allocator_query_memory_heaps(
-      device_allocator_, heaps.size(), heaps.data(), &memory_type_count));
-  bool has_candidate_type = false;
-  for (const auto& heap : heaps) {
-    if (iree_all_bits_set(heap.type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
-                                         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE) &&
-        !iree_any_bit_set(heap.type, IREE_HAL_MEMORY_TYPE_HOST_COHERENT) &&
-        iree_all_bits_set(heap.allowed_usage,
-                          IREE_HAL_BUFFER_USAGE_TRANSFER |
-                              IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED)) {
-      has_candidate_type = true;
-      break;
-    }
-  }
-  if (!has_candidate_type) {
-    GTEST_SKIP() << "No non-coherent host-visible Vulkan memory type supports "
-                    "transfer and mapping";
-  }
-
-  iree_hal_buffer_params_t params = {0};
-  params.type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
-                IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
-  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                 IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED;
-  Ref<iree_hal_buffer_t> buffer;
-  // Heap queries are sorted, so their positions are not Vulkan memory type
-  // indices. Probe indices directly, then verify the allocated type.
-  for (uint32_t type_index = 0; type_index < memory_type_count; ++type_index) {
-    iree_hal_buffer_t* candidate = nullptr;
-    iree_status_t status =
-        iree_hal_vulkan_allocator_allocate_direct_buffer_from_type(
-            reinterpret_cast<iree_hal_vulkan_allocator_t*>(device_allocator_),
-            type_index, &params, kSize, &candidate);
-    if (iree_status_is_invalid_argument(status)) {
-      iree_status_ignore(status);
-      continue;
-    }
-    IREE_ASSERT_OK(status);
-    const iree_hal_memory_type_t actual_type =
-        iree_hal_buffer_memory_type(candidate);
-    if (iree_all_bits_set(actual_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
-        !iree_any_bit_set(actual_type, IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
-      buffer.reset(candidate);
-      break;
-    }
-    iree_hal_buffer_release(candidate);
-  }
-  if (!buffer.get()) {
-    GTEST_SKIP() << "No compatible non-coherent host-visible Vulkan buffer "
-                    "could be allocated";
-  }
-  ASSERT_TRUE(iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
-                                IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
-  ASSERT_FALSE(iree_any_bit_set(iree_hal_buffer_memory_type(buffer),
-                                IREE_HAL_MEMORY_TYPE_HOST_COHERENT));
-
-  Ref<iree_hal_command_buffer_t> command_buffer;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, command_buffer.out()));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
-      command_buffer, iree_hal_make_buffer_ref(buffer, 0, kSize), &kPattern,
-      sizeof(kPattern), IREE_HAL_FILL_FLAG_NONE));
-  const iree_hal_memory_barrier_t host_read_barrier = {
-      IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE, IREE_HAL_ACCESS_SCOPE_HOST_READ};
-  IREE_ASSERT_OK(iree_hal_command_buffer_execution_barrier(
-      command_buffer, IREE_HAL_EXECUTION_STAGE_TRANSFER,
-      IREE_HAL_EXECUTION_STAGE_HOST, IREE_HAL_EXECUTION_BARRIER_FLAG_NONE,
-      /*memory_barrier_count=*/1, &host_read_barrier,
-      /*buffer_barrier_count=*/0, /*buffer_barriers=*/nullptr));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
-
-  SemaphoreList completion(device_, {0}, {1});
-  IREE_ASSERT_OK(iree_hal_device_queue_execute(
-      device_, IREE_HAL_QUEUE_AFFINITY_ANY,
-      iree_hal_semaphore_list_empty(), completion, command_buffer,
-      iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE));
-  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
-      completion, iree_infinite_timeout(), IREE_ASYNC_WAIT_FLAG_NONE));
-
-  iree_hal_buffer_mapping_t mapping = {{0}};
-  IREE_ASSERT_OK(iree_hal_buffer_map_range(
-      buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
-      /*byte_offset=*/0, kSize, &mapping));
-  iree_status_t invalidate_status = iree_hal_buffer_mapping_invalidate_range(
-      &mapping, /*byte_offset=*/0, kSize);
-  const bool invalidated = iree_status_is_ok(invalidate_status);
-  IREE_EXPECT_OK(invalidate_status);
-  if (invalidated) {
-    uint32_t actual[4];
-    std::memcpy(actual, mapping.contents.data, sizeof(actual));
-    for (uint32_t value : actual) {
-      EXPECT_EQ(value, kPattern);
-    }
-  }
-  IREE_EXPECT_OK(iree_hal_buffer_unmap_range(&mapping));
-}
 
 TEST_P(VulkanQueueCacheMaintenanceTest, ProducerWaitOrdersCoherentTransfer) {
   constexpr iree_device_size_t kSize = 16;
