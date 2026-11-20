@@ -202,8 +202,6 @@ py::str HalAllocator::FormattedStatistics() {
   iree_string_view_t view = iree_string_builder_view(&builder);
 
   py::str result = py::str(view.data, view.size);
-  builder_guard.reset();
-
   // Check/raise after all memory alloc/dealloc.
   CheckApiStatus(static_cast<iree_status_t>(std::move(status)),
                  "unable to format statistics");
