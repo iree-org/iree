@@ -378,9 +378,7 @@ static iree_status_t iree_hal_webgpu_device_import_file(
       iree_io_file_handle_primitive(handle);
   switch (primitive.type) {
     case IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION:
-      // Use generic memory_file — storage_buffer() returns a HOST_LOCAL heap
-      // buffer via the heap_buffer_wrap fallback (since WebGPU cannot import
-      // host allocations as GPU buffers).
+      // Host-only memory files use the queue's explicit staging path.
       return iree_hal_memory_file_wrap(
           iree_hal_device_allocator(base_device), queue_affinity, access,
           handle, iree_hal_device_host_allocator(base_device), out_file);
