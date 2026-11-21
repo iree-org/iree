@@ -66,6 +66,24 @@ class DeviceSetupTest(unittest.TestCase):
             infos[0]["device_id"], allocators=["caching", "debug"]
         )
 
+    def testCreateDeviceWithProactorCapacity(self):
+        driver = ss.get_driver("local-sync")
+        info = driver.query_available_devices()[0]
+        constructors = [
+            lambda **kwargs: driver.create_default_device(**kwargs),
+            lambda **kwargs: driver.create_device(info["device_id"], **kwargs),
+            lambda **kwargs: driver.create_device(info, **kwargs),
+            lambda **kwargs: driver.create_device_by_uri("local-sync", **kwargs),
+        ]
+        for index, create in enumerate(constructors):
+            for capacity in (0, 8, 1024):
+                with self.subTest(constructor=index, capacity=capacity):
+                    self.assertIsNotNone(create(max_concurrent_operations=capacity))
+            for capacity in (-1, 1 << 128, 1.5):
+                with self.subTest(constructor=index, capacity=capacity):
+                    with self.assertRaises((TypeError, OverflowError)):
+                        create(max_concurrent_operations=capacity)
+
     def testDriverCacheInternals(self):
         # Two drivers created with the same URI using the caching get_driver
         # should return the same driver
