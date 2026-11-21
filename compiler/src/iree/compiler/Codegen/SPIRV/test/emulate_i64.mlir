@@ -160,3 +160,84 @@ func.func @no_emulation() attributes {hal.executable.target = #executable_target
 //       CHECK:   {{%.+}}           = arith.addi {{%.+}} : i64
 //       CHECK:   memref.store {{%.+}}, [[REF_I64_1]][{{%.+}}] : memref<8xi64, #spirv.storage_class<StorageBuffer>>
 //       CHECK:   return
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<bindings = [
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>,
+  #hal.pipeline.binding<storage_buffer>
+]>
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = none,
+    subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
+}>
+
+// CHECK-LABEL: func.func @packed_i64_single
+// CHECK: %[[SRC_single:.*]] = hal.interface.binding.subspan {{.*}} binding(0) : memref<4xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
+// CHECK: %[[DST_single:.*]] = hal.interface.binding.subspan {{.*}} binding(1) : memref<4xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
+// CHECK: %[[VALUE_single:.*]] = memref.load %[[SRC_single]][{{.*}}] : memref<4xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
+// CHECK: memref.store %[[VALUE_single]], %[[DST_single]][{{.*}}] : memref<4xvector<2xi32>, #spirv.storage_class<StorageBuffer>>
+func.func @packed_i64_single() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %c0 = arith.constant 0 : index
+  %src = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4xvector<1xi64>, #spirv.storage_class<StorageBuffer>>
+  %dst = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<4xvector<1xi64>, #spirv.storage_class<StorageBuffer>>
+  %value = memref.load %src[%c0] : memref<4xvector<1xi64>, #spirv.storage_class<StorageBuffer>>
+  memref.store %value, %dst[%c0] : memref<4xvector<1xi64>, #spirv.storage_class<StorageBuffer>>
+  return
+}
+
+// CHECK-LABEL: func.func @packed_i64_pair
+// CHECK: %[[SRC_pair:.*]] = hal.interface.binding.subspan {{.*}} binding(0) : memref<4xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
+// CHECK: %[[DST_pair:.*]] = hal.interface.binding.subspan {{.*}} binding(1) : memref<4xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
+// CHECK: %[[VALUE_pair:.*]] = memref.load %[[SRC_pair]][{{.*}}] : memref<4xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
+// CHECK: memref.store %[[VALUE_pair]], %[[DST_pair]][{{.*}}] : memref<4xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
+func.func @packed_i64_pair() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %c0 = arith.constant 0 : index
+  %src = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4xvector<2xi64>, #spirv.storage_class<StorageBuffer>>
+  %dst = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<4xvector<2xi64>, #spirv.storage_class<StorageBuffer>>
+  %value = memref.load %src[%c0] : memref<4xvector<2xi64>, #spirv.storage_class<StorageBuffer>>
+  memref.store %value, %dst[%c0] : memref<4xvector<2xi64>, #spirv.storage_class<StorageBuffer>>
+  return
+}
+
+// CHECK-LABEL: func.func @packed_i64_multidimensional
+// CHECK: %[[SRC_multidimensional:.*]] = hal.interface.binding.subspan {{.*}} binding(0) : memref<4xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
+// CHECK: %[[DST_multidimensional:.*]] = hal.interface.binding.subspan {{.*}} binding(1) : memref<4xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
+// CHECK: %[[VALUE_multidimensional:.*]] = memref.load %[[SRC_multidimensional]][{{.*}}] : memref<4xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
+// CHECK: memref.store %[[VALUE_multidimensional]], %[[DST_multidimensional]][{{.*}}] : memref<4xvector<4xi32>, #spirv.storage_class<StorageBuffer>>
+func.func @packed_i64_multidimensional() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %c0 = arith.constant 0 : index
+  %src = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4xvector<2x1xi64>, #spirv.storage_class<StorageBuffer>>
+  %dst = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<4xvector<2x1xi64>, #spirv.storage_class<StorageBuffer>>
+  %value = memref.load %src[%c0] : memref<4xvector<2x1xi64>, #spirv.storage_class<StorageBuffer>>
+  memref.store %value, %dst[%c0] : memref<4xvector<2x1xi64>, #spirv.storage_class<StorageBuffer>>
+  return
+}
+
+// CHECK-LABEL: func.func @packed_i64_access_properties
+// CHECK: %[[SRC_access_properties:.*]] = hal.interface.binding.subspan {{.*}} binding(0) : memref<4xvector<4xi32>, strided<[2], offset: 1>, #spirv.storage_class<StorageBuffer>>
+// CHECK: %[[DST_access_properties:.*]] = hal.interface.binding.subspan {{.*}} binding(1) : memref<4xvector<4xi32>, strided<[2], offset: 1>, #spirv.storage_class<StorageBuffer>>
+// CHECK: %[[VALUE_access_properties:.*]] = memref.load %[[SRC_access_properties]][{{[^]]+}}]
+// CHECK-SAME: alignment{{[^0-9]*}}16
+// CHECK-SAME: {{(invariant.*true.*nontemporal.*true|nontemporal.*true.*invariant.*true)}}
+// CHECK-SAME: : memref<4xvector<4xi32>, strided<[2], offset: 1>, #spirv.storage_class<StorageBuffer>>
+// CHECK: memref.store %[[VALUE_access_properties]], %[[DST_access_properties]][{{[^]]+}}]
+// CHECK-SAME: alignment{{[^0-9]*}}16
+// CHECK-SAME: nontemporal{{.*}}true
+// CHECK-SAME: : memref<4xvector<4xi32>, strided<[2], offset: 1>, #spirv.storage_class<StorageBuffer>>
+func.func @packed_i64_access_properties() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %c0 = arith.constant 0 : index
+  %src = hal.interface.binding.subspan layout(#pipeline_layout) binding(0) : memref<4xvector<2xi64>, strided<[2], offset: 1>, #spirv.storage_class<StorageBuffer>>
+  %dst = hal.interface.binding.subspan layout(#pipeline_layout) binding(1) : memref<4xvector<2xi64>, strided<[2], offset: 1>, #spirv.storage_class<StorageBuffer>>
+  %value = "memref.load"(%src, %c0)
+      <{alignment = 16 : i64, nontemporal = true, invariant = true}>
+      : (memref<4xvector<2xi64>, strided<[2], offset: 1>, #spirv.storage_class<StorageBuffer>>, index) -> vector<2xi64>
+  "memref.store"(%value, %dst, %c0)
+      <{alignment = 16 : i64, nontemporal = true}>
+      : (vector<2xi64>, memref<4xvector<2xi64>, strided<[2], offset: 1>, #spirv.storage_class<StorageBuffer>>, index) -> ()
+  return
+}
