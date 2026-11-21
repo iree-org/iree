@@ -53,6 +53,11 @@ void createTorchToIREEPipeline(
   if (options.enableShapeRefinement) {
     torch::Torch::createTorchShapeRefinementPipeline(pm, /*options=*/{});
   }
+  // Keep selection structured instead of decomposing it to a full sort.
+  ConvertTorchUnstructuredToLinalgExtPassOptions topkOptions;
+  topkOptions.topkOnly = true;
+  pm.addNestedPass<func::FuncOp>(
+      createConvertTorchUnstructuredToLinalgExtPass(topkOptions));
   if (options.decompose) {
     pm.addNestedPass<func::FuncOp>(
         torch::Torch::createDecomposeComplexOpsPass(BackendLegalOps::get()));
