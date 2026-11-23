@@ -431,7 +431,7 @@ void LLVMTarget::populateDefaultsFromTargetMachine() {
     // would yield native_vector_size=4. Force 128-bit (16-byte) MSA vectors
     // when the MSA ASE is enabled, mirroring the RISCV +v / avx512
     // special-cases.
-    if (llvm::Triple(getTriple()).isMIPS() && targetFeatures.contains("msa")) {
+    if (llvm::Triple(getTriple()).isMIPS() && targetFeatures.contains("+msa")) {
       vectorWidthInBytes = 16;
       return;
     }
