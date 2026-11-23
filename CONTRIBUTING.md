@@ -405,6 +405,9 @@ a member of the TSC. When both maintainers agree:
   below, and closes the contribution if the author does not make it
   reviewable.
 
+The comment names the second maintainer and, if one was consulted, the TSC
+member, so that the author knows who made the decision.
+
 It is up to the author to show that the contribution is not extractive. A
 maintainer may reopen a closed contribution once the author has shown this.
 
@@ -414,6 +417,8 @@ Closing comment:
 This contribution appears to be extractive or not to follow the IREE
 contribution policies, so we are closing it:
 https://iree.dev/developers/general/contributing/#extractive-contributions
+
+Confirmed by @<second maintainer>[, after consulting @<TSC member>].
 
 If you think that it does follow them, reply here and explain what the change
 is for and how you reviewed it yourself. A maintainer can then reopen it.
@@ -425,6 +430,8 @@ Change request comment:
 This contribution appears to be extractive or not to follow the IREE
 contribution policies:
 https://iree.dev/developers/general/contributing/#extractive-contributions
+
+Confirmed by @<second maintainer>[, after consulting @<TSC member>].
 
 Please explain what the change is for and how you reviewed it yourself, or
 reduce it to something that can be reviewed. Otherwise we will close it.
