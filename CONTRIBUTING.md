@@ -346,13 +346,18 @@ Contributors:
    descriptions, but must read and correct them themselves before submitting.
    A description must state the purpose and motivation of the change and
    avoid noise.
-3. Must respond to reviews and questions themselves. There must always be a
+3. Must write every contribution for its human readers: maintainers,
+   reviewers, and people reading the history later. AI clutter does not
+   belong in code, comments, commit messages, descriptions, issues, or
+   review replies, for example boilerplate, comments that narrate obvious
+   code, restatements of the diff, agent logs, or filler text.
+4. Must respond to reviews and questions themselves. There must always be a
    human in the loop.
-4. Are responsible for ensuring that they have the right to contribute code
+5. Are responsible for ensuring that they have the right to contribute code
    under the terms of our license. Using AI tools to regenerate copyrighted
    material does not remove the copyright, and contributors are responsible
    for ensuring that such material does not appear in their contributions.
-5. Own their changes after merge: they fix or revert them when problems come
+6. Own their changes after merge: they fix or revert them when problems come
    up. The [DCO](#developer-certificate-of-origin) requirements apply.
 
 Noting AI assistance is optional. If you note it, use an
