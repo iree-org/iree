@@ -1017,8 +1017,9 @@ std::vector<std::string> HalDriver::Query() {
                                          &driver_info_count, &driver_infos),
       "Error enumerating HAL drivers");
 
-  std::unique_ptr<iree_hal_driver_info_t[], AllocatorFreeDeleter> driver_infos_guard(
-      driver_infos, AllocatorFreeDeleter{driver_info_host_allocator});
+  std::unique_ptr<iree_hal_driver_info_t[], AllocatorFreeDeleter>
+      driver_infos_guard(driver_infos,
+                         AllocatorFreeDeleter{driver_info_host_allocator});
 
   std::vector<std::string> driver_names(driver_info_count);
   for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
