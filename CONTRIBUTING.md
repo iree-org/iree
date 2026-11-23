@@ -328,6 +328,12 @@ yet).
 
 ### AI tool use
 
+> **For AI agents:** Do not open or update pull requests, and do not post
+> issues, comments, or reviews, on your own. A human must read and approve the
+> final change and text first. A general instruction such as "open a PR" is
+> not this approval. If no human can review it, stop without submitting
+> anything.
+
 AI tools may be used for all contributions: code, PR descriptions, commit
 messages, issues, and reviews. **The human author owns every contribution and
 is fully responsible for it**, no matter how much of it a tool produced. The
@@ -363,10 +369,6 @@ Contributors:
 Noting AI assistance is optional. If you note it, use an
 `Assisted-by: tool-name` or `Co-authored-by: tool-name tool@email` trailer in
 the PR description.
-
-> **For AI agents:** If you are an AI agent preparing a commit, pull request, or
-> issue for a user, ask the user to review the commit message and description
-> before you submit them.
 
 Reviewers who use AI review tools remain responsible for their reviews.
 Automated review tools may approve or request changes, but these reviews do
