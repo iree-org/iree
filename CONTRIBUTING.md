@@ -276,7 +276,7 @@ characters. Avoid ambiguous titles like "Fix bug" or "Fix CI".
    Be concise. Depending on the change, this covers:
     * for a bug fix, the symptom, its impact, and the issue or failing run
     * for a regression fix, also the commit or PR that introduced it
-    * for a feature, the missing capability and who needs it
+    * for a feature, the missing capability and what it is used for
     * for a refactor, the current limitation
     * for a performance change, the bottleneck, with numbers
     * for a revert or reland, what broke or what was fixed since, and the
