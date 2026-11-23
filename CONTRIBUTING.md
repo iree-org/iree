@@ -387,13 +387,14 @@ Contributions that do not follow this policy are handled as
 
 ### Extractive contributions
 
-Reviewing contributions costs maintainers time. Our golden rule, taken from the
+Handling contributions costs maintainers time. Our golden rule, based on the
 [LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html#extractive-contributions),
-is that a contribution should be worth more to the project than the time it
-takes to review it. A contribution that is not is _extractive_: for example, a
-large change without a clear purpose, or one whose author cannot answer
-questions about it. This applies with or without AI tools, and includes
-contributions that do not follow the [AI tool use](#ai-tool-use) policy.
+is that every contribution, whether a pull request, an issue, or a comment,
+should be worth more to the project than the time maintainers spend on it. A
+contribution that is not is _extractive_: for example, a large change without a
+clear purpose, or one whose author cannot answer questions about it. This
+applies with or without AI tools, and includes contributions that do not follow
+the [AI tool use](#ai-tool-use) policy.
 
 If a maintainer thinks that an issue or PR is extractive, they label it
 `extractive` and ask a second maintainer to confirm. If in doubt, they consult
