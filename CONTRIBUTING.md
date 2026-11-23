@@ -288,7 +288,7 @@ characters. Avoid ambiguous titles like "Fix bug" or "Fix CI".
     * results: before/after numbers for performance, memory, or size
       changes, and how they were measured
     * trade-offs: known shortcomings, costs, or side effects
-    * testing: the tests that were run in addition to CI
+    * testing: only tests that CI does not cover
     * review notes: where reviewers should start in large PRs
 4. **Trailers** at the end: `Fixes #1234` for issues that the PR resolves,
    `Depends on #1234` for PRs that it builds on,
