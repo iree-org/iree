@@ -57,9 +57,8 @@ IREE is a Linux Foundation project. All participants are expected to follow the 
 
 All contributions to IREE must follow our [IREE AI Tool Use Policy](https://iree.dev/developers/general/contributing/#ai-tool-use). In particular:
 - Contributors must fully understand, and vouch for, **all** submitted changes and the intent behind them.
-- Substantial use of LLM/generative AI tools must be noted in the PR description, e.g. via `Assisted-by: tool-name` or `Co-authored-by: tool-name tool@email` trailers.
-- Contributors must write PR descriptions themselves. There must always be a human in the loop: contributors must respond to reviews and questions by themselves.
-  If a response includes LLM-assisted segments (e.g. reproducers, LLM agent analysis excerpts), the segment should be clearly marked as "assisted", same as for PR contents.
+- PR descriptions may be AI-assisted, but contributors must review them, and they must state the purpose and motivation of the change.
+- There must always be a human in the loop: contributors must respond to reviews and questions by themselves.
 - GitHub issues labeled as "Good first issue" are explicitly designated as learning opportunities for newcomers to the project. With exceptions for boilerplate edits, AI tool usage for resolutions to such issues is **forbidden**.
 
 We kindly ask you to **reply to this message** and confirm that you understand and accept the cited policies, particularly the AI Tool Use Policy.
@@ -98,9 +97,8 @@ Please note that all contributions to IREE, **including GitHub issues**, must fo
 - Issue reporters must fully understand the primary issue and the impact of the problem.
   For bug reports, specifics of the use-case, workflow and/or crash scenario usually suffice.
   For improvement suggestions, this usually implies deeper understanding of suboptimal code, IR design choices, assumed performance tradeoffs, etc.
-- Contributors must write the summary of the issue themselves, so that the exact impact and scenario is clear to other participants.
+- The issue description may be AI-assisted, but its author must review it, and it must make the exact impact and scenario clear to other participants.
 - Issue authors are expected to review and understand all LLM/AI-assisted segments of the report, if any. E.g.: CLI commands and IR reproducers, model/framework details, lowering pipeline details, assumptions about problematic behaviors of IREE components.
-- Substantial use of LLM/generative AI tools must be disclaimed in the header or footer of the issue description.
 
 Before the issue can be triaged, we kindly ask you to **reply to this message** and confirm that you understand and accept the proposed policy. As required, please adjust your initial issue description.
 
