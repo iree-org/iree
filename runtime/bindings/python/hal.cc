@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <utility>
@@ -97,6 +98,14 @@ Three wait cases are supported:
 Returns whether the wait succeeded (True) or timed out (False). If the fence was
 asynchronously failed, an exception is raised.
 )";
+
+struct AllocatorFreeDeleter {
+  iree_allocator_t allocator;
+
+  void operator()(void* ptr) const noexcept {
+    iree_allocator_free(allocator, ptr);
+  }
+};
 
 // RAII wrapper for a Py_buffer which calls PyBuffer_Release when it goes
 // out of scope.
@@ -1001,18 +1010,22 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule,
 std::vector<std::string> HalDriver::Query() {
   iree_host_size_t driver_info_count = 0;
   iree_hal_driver_info_t* driver_infos = NULL;
+  iree_allocator_t driver_info_host_allocator = iree_allocator_system();
   CheckApiStatus(
       iree_hal_driver_registry_enumerate(iree_hal_driver_registry_default(),
-                                         iree_allocator_system(),
+                                         driver_info_host_allocator,
                                          &driver_info_count, &driver_infos),
       "Error enumerating HAL drivers");
-  // TODO(#25083): Guard driver_infos if constructing the result throws.
+
+  std::unique_ptr<iree_hal_driver_info_t[], AllocatorFreeDeleter>
+      driver_infos_guard(driver_infos,
+                         AllocatorFreeDeleter{driver_info_host_allocator});
+
   std::vector<std::string> driver_names(driver_info_count);
   for (iree_host_size_t i = 0; i < driver_info_count; ++i) {
-    driver_names[i] = std::string(driver_infos[i].driver_name.data,
-                                  driver_infos[i].driver_name.size);
+    driver_names[i] = std::string(driver_infos_guard[i].driver_name.data,
+                                  driver_infos_guard[i].driver_name.size);
   }
-  iree_allocator_free(iree_allocator_system(), driver_infos);
   return driver_names;
 }
 
