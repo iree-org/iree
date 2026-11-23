@@ -337,10 +337,9 @@ yet).
 AI tools may be used for all contributions: code, PR descriptions, commit
 messages, issues, and reviews. **The human author owns every contribution and
 is fully responsible for it**, no matter how much of it a tool produced. The
-same holds for reviewers who use AI review tools. This policy keeps the
-principles of the
-[LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html), ownership
-and a human in the loop, but its rules differ.
+same holds for reviewers who use AI review tools. This policy is based on the
+[LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html) and keeps
+its principles: ownership and a human in the loop.
 
 Contributors:
 
