@@ -358,7 +358,9 @@ Contributors:
    review replies, for example boilerplate, comments that narrate obvious
    code, restatements of the diff, agent logs, or filler text.
 4. Must respond to reviews and questions themselves. There must always be a
-   human in the loop.
+   human in the loop. A lack of understanding makes a contribution
+   [extractive](#extractive-contributions): it puts the burden on the
+   reviewers instead of the author.
 5. Are responsible for ensuring that they have the right to contribute code
    under the terms of our license. Using AI tools to regenerate copyrighted
    material does not remove the copyright, and contributors are responsible
