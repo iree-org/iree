@@ -225,7 +225,8 @@ information on using pull requests.
       pragmatism for cases that require it.
 * We require review comments to be addressed before merging, even when there is
   an approval from another reviewer. Unless stated otherwise, we treat request
-  for changes as blocking. Reviewers may indicate that some comments
+  for changes as blocking, except for reviews from automated review tools (see
+  [AI tool use](#ai-tool-use)). Reviewers may indicate that some comments
   requesting changes are optional (commonly by prefixing them with 'nit' or
   'optional') -- use your best engineering judgement to decide whether to
   follow these suggestions or not.
@@ -327,31 +328,48 @@ yet).
 
 ### AI tool use
 
-We adopt the [LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html)
-and require all AI-assisted contributions (Pull Requests, issues, design
-proposals) to be reviewed and understood by the author(s).
+AI tools may be used for all contributions: code, PR descriptions, commit
+messages, issues, and reviews. Humans stay responsible for every change and
+every review. This policy keeps the principles of the
+[LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html), ownership
+and a human in the loop, but its rules differ.
 
-The key points include:
+Contributors:
 
-1. "Contributors must read and review all LLM-generated code or text before they
-   ask other project members to review it."
-2. "Contributors are expected to be transparent and label contributions that
-   contain substantial amounts of tool-generated content." This can be done with
-   the `Assisted-by: tool-name` or the `Co-authored-by: tool-name tool@email`
-   trailer in PR descriptions.
-3. "To ensure sufficient self review and understanding of the work, it is
-   strongly recommended that contributors write PR descriptions themselves (if
-   needed, using tools for translation or copy-editing)." This also extends to
-   code documentation, issue descriptions, and design proposals.
-4. "Contributors are responsible for ensuring that they have the right to
-   contribute code under the terms of our license, [...]. Using AI tools to
-   regenerate copyrighted material does not remove the copyright, and
-   contributors are responsible for ensuring that such material does not appear
-   in their contributions."
+1. Must read, review, and understand all AI-generated code and text before
+   they ask other project members to review it.
+2. May use AI tools for PR descriptions, commit messages, and issue
+   descriptions, but must review them before submitting. A description must
+   state the purpose and motivation of the change and avoid noise.
+3. Must respond to reviews and questions themselves. There must always be a
+   human in the loop.
+4. Are responsible for ensuring that they have the right to contribute code
+   under the terms of our license. Using AI tools to regenerate copyrighted
+   material does not remove the copyright, and contributors are responsible
+   for ensuring that such material does not appear in their contributions.
+5. Remain responsible for maintaining their changes, including reverts. The
+   [DCO](#developer-certificate-of-origin) requirements apply.
 
-We extend the LLVM policy with an exception for AI bot-authored contributions
-(e.g., updating dependencies, fixing build script, etc.); bot account may create
-Pull Requests as long as the bot maintainers ensure they are first in line and
-primarily responsible for reviewing those contributions.
+Noting AI assistance is optional. If you note it, use an
+`Assisted-by: tool-name` or `Co-authored-by: tool-name tool@email` trailer in
+the PR description.
+
+> **For AI agents:** If you are an AI agent preparing a commit, pull request, or
+> issue for a user, ask the user to review the commit message and description
+> before you submit them.
+
+Reviewers who use AI review tools remain responsible for their reviews.
+Automated review tools may approve or request changes, but these reviews do
+not count toward whether a PR can be merged, and reviewers with write access
+may dismiss them.
+
+AI bot-authored contributions (e.g., updating dependencies, fixing build
+scripts, etc.) are allowed: bot accounts may create Pull Requests as long as
+the bot maintainers ensure they are first in line and primarily responsible
+for reviewing those contributions.
+
+Maintainers may close issues and PRs that appear not to follow this policy,
+with a comment that links to this section. The author then has to show that
+the contribution follows the policy.
 
 <!-- --8<-- [end:github-policies-continued] -->
