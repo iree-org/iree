@@ -413,8 +413,11 @@ TEST_P(SocketTest, StickyFailure_ReleaseAfterError) {
                        CompletionTracker::Callback, &tracker);
 
   IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &connect_op.base));
-  PollUntil(/*min_completions=*/1,
-            /*total_budget=*/iree_make_duration_ms(5000));
+  PollUntil(/*min_completions=*/1, /*total_budget=*/kRefusedConnectBudget);
+  // If the refusal still hasn't arrived (budget exhausted; the test has
+  // already failed), cancel and reap the connect so the proactor is not
+  // destroyed with the operation in flight, which would abort the process.
+  ReapIfPending(&connect_op.base, &tracker);
 
   // Retain and release multiple times - should not crash even in failed state.
   iree_async_socket_retain(client);
@@ -615,9 +618,11 @@ TEST_P(SocketTest, ConnectRefused) {
 
   IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &connect_op.base));
 
-  // Poll until connect completes (should fail).
-  PollUntil(/*min_completions=*/1,
-            /*total_budget=*/iree_make_duration_ms(5000));
+  // Poll until connect completes (should fail). Windows needs a generous
+  // budget: it retries the SYN after each RST before reporting the refusal
+  // (see kRefusedConnectBudget).
+  PollUntil(/*min_completions=*/1, /*total_budget=*/kRefusedConnectBudget);
+  ReapIfPending(&connect_op.base, &connect_tracker);
 
   EXPECT_EQ(connect_tracker.call_count, 1);
   // Should be UNAVAILABLE (ECONNREFUSED).
