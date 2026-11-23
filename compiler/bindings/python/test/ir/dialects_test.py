@@ -30,6 +30,7 @@ from iree.compiler.dialects import (
     tensor,
     tosa,
     transform,
+    ub,
     vector,
 )
 
