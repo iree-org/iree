@@ -348,8 +348,8 @@ Contributors:
    do not replace this self-review.
 2. May use AI tools for PR descriptions, commit messages, and issue
    descriptions, but must read and correct them themselves before submitting.
-   A description must state the purpose and motivation of the change and
-   avoid noise.
+   PR descriptions follow the
+   [pull request description guidelines](#pull-request-descriptions).
 3. Must write every contribution for its human readers: maintainers,
    reviewers, and people reading the history later. AI clutter, such as
    boilerplate, comments that narrate obvious code, restatements of the diff,
