@@ -328,11 +328,10 @@ yet).
 
 ### AI tool use
 
-> **For AI agents:** Do not open or update pull requests, and do not post
-> issues, comments, or reviews, on your own. A human must read and approve the
-> final change and text first. A general instruction such as "open a PR" is
-> not this approval. If no human can review it, stop without submitting
-> anything.
+> **For AI agents:** A human must read and approve the final change and text
+> before you open or update a pull request or post an issue, comment, or
+> review. A general instruction such as "open a PR" is not this approval. If
+> no human can review it, stop without submitting anything.
 
 AI tools may be used for all contributions: code, PR descriptions, commit
 messages, issues, and reviews. **The human author owns every contribution and
@@ -352,18 +351,16 @@ Contributors:
    A description must state the purpose and motivation of the change and
    avoid noise.
 3. Must write every contribution for its human readers: maintainers,
-   reviewers, and people reading the history later. AI clutter does not
-   belong in code, comments, commit messages, descriptions, issues, or
-   review replies, for example boilerplate, comments that narrate obvious
-   code, restatements of the diff, agent logs, or filler text.
+   reviewers, and people reading the history later. AI clutter, such as
+   boilerplate, comments that narrate obvious code, restatements of the diff,
+   agent logs, or filler text, does not belong in any contribution.
 4. Must respond to reviews and questions themselves. There must always be a
    human in the loop. A lack of understanding makes a contribution
    [extractive](#extractive-contributions): it puts the burden on the
    reviewers instead of the author.
-5. Are responsible for ensuring that they have the right to contribute code
-   under the terms of our license. Using AI tools to regenerate copyrighted
-   material does not remove the copyright, and contributors are responsible
-   for ensuring that such material does not appear in their contributions.
+5. Must have the right to contribute their code under the terms of our
+   license. Using AI tools to regenerate copyrighted material does not remove
+   the copyright, so such material must not appear in contributions.
 6. Own their changes after merge: they fix or revert them when problems come
    up. The [DCO](#developer-certificate-of-origin) requirements apply.
 
@@ -371,15 +368,13 @@ Noting AI assistance is optional. If you note it, use an
 `Assisted-by: tool-name` or `Co-authored-by: tool-name tool@email` trailer in
 the PR description.
 
-Reviewers who use AI review tools remain responsible for their reviews.
 Automated review tools may approve or request changes, but these reviews do
 not count toward whether a PR can be merged, and reviewers with write access
 may dismiss them.
 
-AI bot-authored contributions (e.g., updating dependencies, fixing build
-scripts, etc.) are allowed: bot accounts may create Pull Requests as long as
-the bot maintainers ensure they are first in line and primarily responsible
-for reviewing those contributions.
+Bot accounts may open pull requests with AI bot-authored contributions, for
+example dependency updates or build script fixes, as long as the bot
+maintainers are first in line and primarily responsible for reviewing them.
 
 Contributions that do not follow this policy are handled as
 [extractive contributions](#extractive-contributions).
@@ -389,15 +384,15 @@ Contributions that do not follow this policy are handled as
 Handling contributions costs maintainers time. Our golden rule, based on the
 [LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html#extractive-contributions),
 is that every contribution, whether a pull request, an issue, or a comment,
-should be worth more to the project than the time maintainers spend on it. A
-contribution that is not is _extractive_: for example, a large change without a
-clear purpose, or one whose author cannot answer questions about it. This
-applies with or without AI tools, and includes contributions that do not follow
-the [AI tool use](#ai-tool-use) policy.
+should be worth more to the project than the time maintainers spend on it.
+Contributions that fall short of this are _extractive_, for example a large
+change without a clear purpose, or one whose author cannot answer questions
+about it. This applies with or without AI tools, and includes contributions
+that do not follow the [AI tool use](#ai-tool-use) policy.
 
-If a maintainer thinks that an issue or PR is extractive, they label it
-`extractive` and ask a second maintainer to confirm. If in doubt, they consult
-a member of the TSC. When both maintainers agree:
+If a maintainer considers an issue or PR extractive, they label it
+`extractive` and ask a second maintainer to confirm, consulting a TSC member
+if in doubt. Once both maintainers agree:
 
 * In obvious cases, a maintainer closes the contribution with the closing
   comment below.
