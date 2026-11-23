@@ -262,32 +262,46 @@ to learn how to customize this behavior.
 PRs are [squash-merged](#merging-approved-changes), so the PR title and
 description become the commit message, and the commit messages on the PR
 branch are discarded. Write them for someone reading `git log` or bisecting
-a regression later.
+a regression later, and update them when the PR changes during review.
 
 **Title**: a short, imperative summary of what changes and, if it fits, why,
 prefixed with the affected area, for example
-`[CI] Bump iree-test-suites to fix sharktank test failure`.
-Avoid ambiguous titles like "Fix bug" or "Fix CI".
+`[CI] Bump iree-test-suites to fix sharktank test failure`. Keep it under 72
+characters. Avoid ambiguous titles like "Fix bug" or "Fix CI".
 
 **Description**: start with _why_, then _what_.
 
 1. **Why**: The most important part of a PR description.
    Explain the underlying motivation of the PR. Why did you create it and what is the use-case this enables or fixes.
-   Be concise.
-3. **Change**: what the PR does and why this approach. The diff shows the
-   details. For refactors, state "No functional change intended".
-4. **If relevant**: before/after numbers for performance changes and how
-   they were measured, trade-offs or known shortcomings, the tests that were
-   run, and where reviewers should start in large PRs.
-5. **Trailers** at the end: `Fixes #1234`,
-   [CI trailers](https://iree.dev/developers/general/contributing/#ci-behavior-manipulation) such as `ci-extra:`, and
-   `Assisted-by:` for [AI tools](#ai-tool-use).
+   Be concise. Depending on the change, this covers:
+    * for a bug fix, the symptom, its impact, and the issue or failing run;
+    * for a regression fix, also the commit or PR that introduced it;
+    * for a feature, the missing capability and who needs it;
+    * for a refactor, the current limitation;
+    * for a performance change, the bottleneck, with numbers;
+    * for a revert or reland, what broke or what was fixed since, and the
+      original PR.
+2. **Change**: what the PR does and why this approach. The diff shows the
+   details. For refactors, state "No functional change intended". For small
+   PRs, one sentence is enough.
+3. **If relevant**:
+    * results: before/after numbers for performance, memory, or size
+      changes, and how they were measured;
+    * trade-offs: known shortcomings, costs, or side effects;
+    * testing: the tests that were run in addition to CI;
+    * review notes: where reviewers should start in large PRs.
+4. **Trailers** at the end: `Fixes #1234` for issues that the PR resolves,
+   `Depends on #1234` for PRs that it builds on,
+   [CI trailers](https://iree.dev/developers/general/contributing/#ci-behavior-manipulation)
+   such as `ci-extra:`, and `Assisted-by:` for [AI tools](#ai-tool-use).
 
 Keep the description concise and self-contained: links add context but do
-not replace an explanation. Leave out review history and `@`-mentions,
-which notify people again on every cherry-pick. Update the description when
-the PR changes during review. Small changes need one or two sentences;
-longer descriptions can use headings such as `## Why` and `## Change`.
+not replace an explanation, and they must be public. Leave out restatements
+of the diff, implementation details that belong in code comments, review
+history, and `@`-mentions, which notify people again on every cherry-pick.
+A description that keeps growing is a sign that the PR should be split.
+Small changes need one or two sentences; longer descriptions can use
+headings such as `## Why`, `## Change`, and `## Results`.
 
 See also:
 
