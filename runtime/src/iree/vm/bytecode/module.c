@@ -950,6 +950,19 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
       iree_vm_BytecodeModuleDef_function_descriptors(module_def);
   module->function_descriptor_count =
       iree_vm_FunctionDescriptor_vec_len(function_descriptors);
+  // Function ordinals throughout the VM (dispatch tables, verifier, etc.) are
+  // uint16_t; a module declaring more than 65535 function descriptors cannot
+  // be addressed, and the verification loop below would spin forever comparing
+  // a uint16_t counter against the larger count.
+  if (module->function_descriptor_count > UINT16_MAX) {
+    iree_allocator_free(allocator, module);
+    IREE_TRACE_ZONE_END(z0);
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "module declares %" PRIhsz
+        " function descriptors; maximum supported is %u",
+        module->function_descriptor_count, (uint32_t)UINT16_MAX);
+  }
   module->function_descriptor_table = function_descriptors;
 
   flatbuffers_uint8_vec_t bytecode_data =
