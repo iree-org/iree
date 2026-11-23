@@ -267,19 +267,19 @@ a regression later.
 **Title**: a short, imperative summary of what changes and, if it fits, why,
 prefixed with the affected area, for example
 `[CI] Bump iree-test-suites to fix sharktank test failure`.
-Avoid titles like "Fix bug" or "Fix CI".
+Avoid ambiguous titles like "Fix bug" or "Fix CI".
 
 **Description**: start with _why_, then _what_.
 
-1. **Why**: the problem or motivation, including what is broken or missing,
-   who is affected, and a link to the issue or failing run. For a refactor,
-   the current limitation; for a revert, what broke.
-2. **Change**: what the PR does and why this approach. The diff shows the
+1. **Why**: The most important part of a PR description.
+   Explain the underlying motivation of the PR. Why did you create it and what is the use-case this enables or fixes.
+   Be concise.
+3. **Change**: what the PR does and why this approach. The diff shows the
    details. For refactors, state "No functional change intended".
-3. **If relevant**: before/after numbers for performance changes and how
+4. **If relevant**: before/after numbers for performance changes and how
    they were measured, trade-offs or known shortcomings, the tests that were
    run, and where reviewers should start in large PRs.
-4. **Trailers** at the end: `Fixes #1234`,
+5. **Trailers** at the end: `Fixes #1234`,
    [CI trailers](https://iree.dev/developers/general/contributing/#ci-behavior-manipulation) such as `ci-extra:`, and
    `Assisted-by:` for [AI tools](#ai-tool-use).
 
