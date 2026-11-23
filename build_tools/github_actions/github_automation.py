@@ -57,7 +57,7 @@ IREE is a Linux Foundation project. All participants are expected to follow the 
 
 All contributions to IREE must follow our [IREE AI Tool Use Policy](https://iree.dev/developers/general/contributing/#ai-tool-use). In particular:
 - Contributors own their changes: Contributors must fully understand, review, and vouch for, **all** submitted contributions and the intent behind them. AI review tools do not replace this review.
-- PR descriptions may be AI-assisted, but contributors must review them, and they must state the purpose and motivation of the change.
+- PR descriptions may be AI-assisted, but contributors must review them and follow the [pull request description guidelines](https://iree.dev/developers/general/contributing/#pull-request-descriptions).
 - Contributions are written for human readers: keep AI clutter such as boilerplate, comments that narrate obvious code, restated diffs, agent logs, or filler text out of code, descriptions, and comments.
 - There must always be a human in the loop: contributors must respond to reviews and questions by themselves. A lack of understanding makes a contribution [extractive](https://iree.dev/developers/general/contributing/#extractive-contributions), because it puts the burden on the reviewers instead of the author.
 - Every contribution, whether a pull request, an issue, or a comment, should be worth more to the project than the time maintainers spend on it. Maintainers may close [extractive contributions](https://iree.dev/developers/general/contributing/#extractive-contributions); it is then up to the author to show that the contribution is not extractive.
