@@ -9,16 +9,12 @@
 
 // Microkernel for `iree_codegen.inner_tiled` with
 // `#iree_cpu.data_tiled_mma_layout<intrinsic =
-//     MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16>`. Function name matches the
-// intrinsic name verbatim (lowercased, with the `iree_uk_` prefix), in line
-// with the AMDGPU C ukernel convention.
+//     MMA_X86_AVX512VNNI_16x16x2_I32_I8_CASTI16>`. See README.md for the
+// framework design (naming, specialization-after-inlining, inner K loop).
 //
-// Structurally identical to `iree_uk_mma_x86_avx512bf16_1x16x2_f32_bf16`:
-// accumulators held in registers, an outer loop over the K *tiles*
-// (`k_outer`), and inside it the `(intrinsics_m, intrinsics_n, intrinsics_k)`
-// unroll. This is NOT a restriction to `intrinsics_{m,n,k} = 1`: the ukernel
-// handles arbitrary positive `intrinsics_{m,n,k}` via the `for` loops below,
-// which fully unroll once inlined into the constant-`intrinsics_*` caller.
+// Structure: accumulators stay in registers; an outer loop over the K *tiles*
+// (`k_outer`) wraps the unrolled `(intrinsics_m, intrinsics_n, intrinsics_k)`
+// grid (arbitrary positive values, fully unrolled at the inlined call site).
 //
 // The "CASTI16" in the intrinsic name reflects that the s8 inputs are
 // sign-extended to i16 lanes before being fed to the 16-bit VNNI instruction
