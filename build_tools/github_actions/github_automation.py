@@ -60,7 +60,7 @@ All contributions to IREE must follow our [IREE AI Tool Use Policy](https://iree
 - PR descriptions may be AI-assisted, but contributors must review them, and they must state the purpose and motivation of the change.
 - Contributions are written for human readers: keep AI clutter such as boilerplate, comments that narrate obvious code, restated diffs, agent logs, or filler text out of code, descriptions, and comments.
 - There must always be a human in the loop: contributors must respond to reviews and questions by themselves. A lack of understanding makes a contribution [extractive](https://iree.dev/developers/general/contributing/#extractive-contributions), because it puts the burden on the reviewers instead of the author.
-- A contribution should be worth more to the project than the time it takes to review it. Maintainers may close [extractive contributions](https://iree.dev/developers/general/contributing/#extractive-contributions); it is then up to the author to show that the PR is not extractive.
+- Every contribution, whether a pull request, an issue, or a comment, should be worth more to the project than the time maintainers spend on it. Maintainers may close [extractive contributions](https://iree.dev/developers/general/contributing/#extractive-contributions); it is then up to the author to show that the contribution is not extractive.
 - GitHub issues labeled as "Good first issue" are explicitly designated as learning opportunities for newcomers to the project. With exceptions for boilerplate edits, AI tool usage for resolutions to such issues is **forbidden**.
 
 We kindly ask you to **reply to this message** and confirm that you understand and accept the cited policies, particularly the AI Tool Use Policy.
@@ -102,7 +102,7 @@ Please note that all contributions to IREE, **including GitHub issues**, must fo
 - The issue description may be AI-assisted, but its author must review it, and it must make the exact impact and scenario clear to other participants.
 - Issues are written for human readers: keep AI clutter such as boilerplate, agent logs, or filler text out of the report.
 - Issue authors are expected to review and understand all LLM/AI-assisted segments of the report, if any. E.g.: CLI commands and IR reproducers, model/framework details, lowering pipeline details, assumptions about problematic behaviors of IREE components.
-- An issue should be worth more to the project than the time it takes to triage it. Maintainers may close [extractive issues](https://iree.dev/developers/general/contributing/#extractive-contributions); it is then up to the author to show that the issue is not extractive.
+- Every contribution, whether a pull request, an issue, or a comment, should be worth more to the project than the time maintainers spend on it. Maintainers may close [extractive contributions](https://iree.dev/developers/general/contributing/#extractive-contributions); it is then up to the author to show that the contribution is not extractive.
 
 Before the issue can be triaged, we kindly ask you to **reply to this message** and confirm that you understand and accept the proposed policy. As required, please adjust your initial issue description.
 
