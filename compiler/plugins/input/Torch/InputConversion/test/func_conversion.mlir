@@ -354,3 +354,177 @@ module @builtin_float_return {
     return %0 : f32
   }
 }
+
+// -----
+
+// CHECK-LABEL: @shape_query_static_only
+//   CHECK-NOT: $shape_query
+//   CHECK-NOT: iree.abi.output_shape_query
+//       CHECK: util.func public @main$async
+//       CHECK: util.func public @main(
+//   CHECK-NOT: $shape_query
+//   CHECK-NOT: iree.abi.output_shape_query
+module @shape_query_static_only {
+  func.func @main(%arg0: !torch.vtensor<[4,5],f32>)
+      -> !torch.vtensor<[4,5],f32> {
+    %0 = torch.operator "foobar"(%arg0) : (!torch.vtensor<[4,5],f32>) -> !torch.vtensor<[4,5],f32>
+    return %0 : !torch.vtensor<[4,5],f32>
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @shape_query_dynamic_out
+//       CHECK: util.func public @main$shape_query$async(
+//  CHECK-SAME:     %[[A0:.*arg0]]: !hal.buffer_view, %[[A1:.*arg1]]: !hal.buffer_view,
+//  CHECK-SAME:     %[[A2:.*arg2]]: !hal.fence, %arg3: !hal.fence)
+//   CHECK-NOT:   util.return {{.*}} : i64
+//       CHECK:   %[[SHAPE_IMP:.+]] = hal.tensor.import wait(%[[A2]]) => %[[A1]] : !hal.buffer_view -> tensor<2xi64>
+//       CHECK:   %[[SHAPE_VT:.+]] = torch_c.from_builtin_tensor %[[SHAPE_IMP]] : tensor<2xi64> -> !torch.vtensor<[2],si64>
+//       CHECK:   %[[SHAPE_BT:.+]] = torch_c.to_builtin_tensor %[[SHAPE_VT]]
+//       CHECK:   %[[D0:.+]] = tensor.dim %{{.+}}, %c0 : tensor<?x16xf32>
+//       CHECK:   %[[D0_I64:.+]] = arith.index_cast %[[D0]] : index to i64
+//       CHECK:   %[[INS:.+]] = tensor.insert %[[D0_I64]] into %[[SHAPE_BT]][%c0] : tensor<2xi64>
+//       CHECK:   hal.tensor.alias wait(%[[A2]]) => %[[INS]] : tensor<2xi64> to %[[A1]] : !hal.buffer_view
+//       CHECK: util.func public @main$shape_query(
+//  CHECK-SAME:     %arg0: !hal.buffer_view, %arg1: !hal.buffer_view)
+//   CHECK-NOT: -> i64
+//       CHECK: util.func public @main$async(
+//  CHECK-SAME:     %arg0: !hal.buffer_view, %arg1: !hal.buffer_view,
+//  CHECK-SAME:     %arg2: !hal.fence, %arg3: !hal.fence) -> !hal.buffer_view
+//  CHECK-SAME:     iree.reflection = {iree.abi.output_shape_query = "main$shape_query"}
+//       CHECK: util.func public @main(
+//  CHECK-SAME:     %arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view
+//  CHECK-SAME:     iree.reflection = {iree.abi.output_shape_query = "main$shape_query"}
+module @shape_query_dynamic_out {
+  func.func @main(
+    %arg0: !torch.vtensor<[?,16],f32>,
+    %store0: !torch.tensor<[?,16],f32>
+  ) -> !torch.vtensor<[?,16],f32> {
+    %0 = torch.operator "foobar"(%arg0)
+        : (!torch.vtensor<[?,16],f32>) -> !torch.vtensor<[?,16],f32>
+    torch.overwrite.tensor.contents %0 overwrites %store0
+        : !torch.vtensor<[?,16],f32>, !torch.tensor<[?,16],f32>
+    %1 = torch.copy.to_vtensor %store0 : !torch.vtensor<[?,16],f32>
+    return %1 : !torch.vtensor<[?,16],f32>
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @shape_query_mixed_outputs
+//       CHECK: util.func public @main$shape_query$async(
+//  CHECK-SAME:     %[[A0:.*arg0]]: !hal.buffer_view, %[[A1:.*arg1]]: !hal.buffer_view,
+//  CHECK-SAME:     %[[A2:.*arg2]]: !hal.buffer_view, %[[A3:.*arg3]]: !hal.fence,
+//  CHECK-SAME:     %[[A4:.*arg4]]: !hal.fence)
+//   CHECK-NOT:   util.return {{.*}} : i64
+//
+// r0 (fully dynamic) -> shape buffer at arg1, every index written.
+//       CHECK:   %[[SBUF0:.+]] = hal.tensor.import wait(%[[A3]]) => %[[A1]] : !hal.buffer_view -> tensor<3xi64>
+//       CHECK:   %[[SBT0:.+]] = torch_c.to_builtin_tensor %{{.+}} : !torch.vtensor<[3],si64> -> tensor<3xi64>
+//       CHECK:   tensor.dim %{{.+}}, %c0 : tensor<?x?x?xf32>
+//       CHECK:   tensor.insert %{{.+}} into %[[SBT0]][%c0] : tensor<3xi64>
+//       CHECK:   tensor.dim %{{.+}}, %c1 : tensor<?x?x?xf32>
+//       CHECK:   tensor.insert %{{.+}} into %{{.+}}[%c1] : tensor<3xi64>
+//       CHECK:   tensor.dim %{{.+}}, %c2 : tensor<?x?x?xf32>
+//       CHECK:   %[[INS0_LAST:.+]] = tensor.insert %{{.+}} into %{{.+}}[%c2] : tensor<3xi64>
+//
+// r1 (fully static) contributes nothing; we proceed straight to r2.
+//
+// r2 (mixed, middle dim static at 8) -> shape buffer at arg2, only indices 0 and 2 are written.
+//       CHECK:   %[[SBUF2:.+]] = hal.tensor.import wait(%[[A3]]) => %[[A2]] : !hal.buffer_view -> tensor<3xi64>
+//       CHECK:   %[[SBT2:.+]] = torch_c.to_builtin_tensor %{{.+}} : !torch.vtensor<[3],si64> -> tensor<3xi64>
+//       CHECK:   tensor.dim %{{.+}}, %{{c0[_0-9]*}} : tensor<?x8x?xf32>
+//       CHECK:   tensor.insert %{{.+}} into %[[SBT2]][%{{c0[_0-9]*}}] : tensor<3xi64>
+//   CHECK-NOT:   tensor.insert %{{.+}} into %{{.+}}[%{{c1[_0-9]*}}
+//       CHECK:   tensor.dim %{{.+}}, %{{c2[_0-9]*}} : tensor<?x8x?xf32>
+//       CHECK:   %[[INS2_LAST:.+]] = tensor.insert %{{.+}} into %{{.+}}[%{{c2[_0-9]*}}] : tensor<3xi64>
+//
+// Both shape buffers are aliased back to their respective shape-buffer args
+// after all per-result inserts.
+//       CHECK:   hal.tensor.alias wait(%[[A3]]) => %[[INS0_LAST]] : tensor<3xi64> to %[[A1]] : !hal.buffer_view
+//       CHECK:   hal.tensor.alias wait(%[[A3]]) => %[[INS2_LAST]] : tensor<3xi64> to %[[A2]] : !hal.buffer_view
+//
+//       CHECK: util.func public @main$shape_query(
+//  CHECK-SAME:     %arg0: !hal.buffer_view, %arg1: !hal.buffer_view,
+//  CHECK-SAME:     %arg2: !hal.buffer_view)
+//   CHECK-NOT: -> (i64
+//       CHECK: util.func public @main$async(
+//  CHECK-SAME:     iree.reflection = {iree.abi.output_shape_query = "main$shape_query"}
+//       CHECK: util.func public @main(
+//  CHECK-SAME:     iree.reflection = {iree.abi.output_shape_query = "main$shape_query"}
+module @shape_query_mixed_outputs {
+  func.func @main(
+    %arg0: !torch.vtensor<[?,8,?],f32>,
+    %store_dyn: !torch.tensor<[?,?,?],f32>,
+    %store_static: !torch.tensor<[3,5],f32>,
+    %store_mid: !torch.tensor<[?,8,?],f32>
+  ) -> (
+    !torch.vtensor<[?,?,?],f32>,
+    !torch.vtensor<[3,5],f32>,
+    !torch.vtensor<[?,8,?],f32>
+  ) {
+    %r0 = torch.operator "produce_full_dyn"(%arg0)
+        : (!torch.vtensor<[?,8,?],f32>) -> !torch.vtensor<[?,?,?],f32>
+    %r1 = torch.operator "produce_static"(%arg0)
+        : (!torch.vtensor<[?,8,?],f32>) -> !torch.vtensor<[3,5],f32>
+    %r2 = torch.operator "produce_mid"(%arg0)
+        : (!torch.vtensor<[?,8,?],f32>) -> !torch.vtensor<[?,8,?],f32>
+    torch.overwrite.tensor.contents %r0 overwrites %store_dyn
+        : !torch.vtensor<[?,?,?],f32>, !torch.tensor<[?,?,?],f32>
+    torch.overwrite.tensor.contents %r1 overwrites %store_static
+        : !torch.vtensor<[3,5],f32>, !torch.tensor<[3,5],f32>
+    torch.overwrite.tensor.contents %r2 overwrites %store_mid
+        : !torch.vtensor<[?,8,?],f32>, !torch.tensor<[?,8,?],f32>
+    %d0 = torch.copy.to_vtensor %store_dyn    : !torch.vtensor<[?,?,?],f32>
+    %d1 = torch.copy.to_vtensor %store_static : !torch.vtensor<[3,5],f32>
+    %d2 = torch.copy.to_vtensor %store_mid    : !torch.vtensor<[?,8,?],f32>
+    return %d0, %d1, %d2
+        : !torch.vtensor<[?,?,?],f32>,
+          !torch.vtensor<[3,5],f32>,
+          !torch.vtensor<[?,8,?],f32>
+  }
+}
+
+// -----
+
+// The storage arg `%store0` is read BEFORE being overwritten so the storage arg
+// must be kept in the companion's signature.
+//
+// CHECK-LABEL: @shape_query_kv_cache
+//
+// The async companion takes the data input and the kept storage arg, plus
+// one shape buffer for the dynamic-shape result.
+//       CHECK: util.func public @main$shape_query$async(
+//  CHECK-SAME:     %[[A0:.*arg0]]: !hal.buffer_view, %[[A1:.*arg1]]: !hal.buffer_view,
+//  CHECK-SAME:     %[[A2:.*arg2]]: !hal.buffer_view, %[[A3:.*arg3]]: !hal.fence,
+//  CHECK-SAME:     %[[A4:.*arg4]]: !hal.fence)
+//   CHECK-NOT:   util.return {{.*}} : i64
+//       CHECK:   hal.tensor.import wait(%[[A3]]) => %[[A1]] : !hal.buffer_view -> tensor<?x4xf32>
+//       CHECK:   %[[SBUF:.+]] = hal.tensor.import wait(%[[A3]]) => %[[A2]] : !hal.buffer_view -> tensor<2xi64>
+//       CHECK:   tensor.dim %{{.+}}, %c0 : tensor<?x4xf32>
+//       CHECK:   %[[INS:.+]] = tensor.insert %{{.+}} into %{{.+}}[%c0] : tensor<2xi64>
+//       CHECK:   hal.tensor.alias wait(%[[A3]]) => %[[INS]] : tensor<2xi64> to %[[A2]] : !hal.buffer_view
+//
+//       CHECK: util.func public @main$shape_query(
+//  CHECK-SAME:     %arg0: !hal.buffer_view, %arg1: !hal.buffer_view,
+//  CHECK-SAME:     %arg2: !hal.buffer_view)
+//   CHECK-NOT: -> i64
+//       CHECK: util.func public @main$async(
+//  CHECK-SAME:     iree.reflection = {iree.abi.output_shape_query = "main$shape_query"}
+//       CHECK: util.func public @main(
+//  CHECK-SAME:     iree.reflection = {iree.abi.output_shape_query = "main$shape_query"}
+module @shape_query_kv_cache {
+  func.func @main(
+    %arg0: !torch.vtensor<[?,4],f32>,
+    %store0: !torch.tensor<[?,4],f32>
+  ) -> !torch.vtensor<[?,4],f32> {
+    %0 = torch.copy.to_vtensor %store0 : !torch.vtensor<[?,4],f32>
+    %1 = torch.operator "foobar"(%arg0, %0)
+        : (!torch.vtensor<[?,4],f32>, !torch.vtensor<[?,4],f32>)
+       -> !torch.vtensor<[?,4],f32>
+    torch.overwrite.tensor.contents %1 overwrites %store0
+        : !torch.vtensor<[?,4],f32>, !torch.tensor<[?,4],f32>
+    return %1 : !torch.vtensor<[?,4],f32>
+  }
+}
