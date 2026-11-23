@@ -274,22 +274,22 @@ characters. Avoid ambiguous titles like "Fix bug" or "Fix CI".
 1. **Why**: The most important part of a PR description.
    Explain the underlying motivation of the PR. Why did you create it and what is the use-case this enables or fixes.
    Be concise. Depending on the change, this covers:
-    * for a bug fix, the symptom, its impact, and the issue or failing run;
-    * for a regression fix, also the commit or PR that introduced it;
-    * for a feature, the missing capability and who needs it;
-    * for a refactor, the current limitation;
-    * for a performance change, the bottleneck, with numbers;
+    * for a bug fix, the symptom, its impact, and the issue or failing run
+    * for a regression fix, also the commit or PR that introduced it
+    * for a feature, the missing capability and who needs it
+    * for a refactor, the current limitation
+    * for a performance change, the bottleneck, with numbers
     * for a revert or reland, what broke or what was fixed since, and the
-      original PR.
+      original PR
 2. **Change**: what the PR does and why this approach. The diff shows the
    details. For refactors, state "No functional change intended". For small
    PRs, one sentence is enough.
 3. **If relevant**:
     * results: before/after numbers for performance, memory, or size
-      changes, and how they were measured;
-    * trade-offs: known shortcomings, costs, or side effects;
-    * testing: the tests that were run in addition to CI;
-    * review notes: where reviewers should start in large PRs.
+      changes, and how they were measured
+    * trade-offs: known shortcomings, costs, or side effects
+    * testing: the tests that were run in addition to CI
+    * review notes: where reviewers should start in large PRs
 4. **Trailers** at the end: `Fixes #1234` for issues that the PR resolves,
    `Depends on #1234` for PRs that it builds on,
    [CI trailers](https://iree.dev/developers/general/contributing/#ci-behavior-manipulation)
