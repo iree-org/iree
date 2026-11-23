@@ -1075,8 +1075,8 @@ py::list HalDriver::QueryAvailableDevices() {
                      raw_ptr(), host_allocator, &count, &device_infos),
                  "Error querying devices");
 
-  std::unique_ptr<iree_hal_device_info_t[], AllocatorDeleter> infos(
-      device_infos, AllocatorDeleter{host_allocator});
+  std::unique_ptr<iree_hal_device_info_t[], AllocatorFreeDeleter>
+      device_infos_guard(device_infos, AllocatorFreeDeleter{host_allocator});
 
   py::list results;
   for (iree_host_size_t i = 0; i < count; ++i) {
