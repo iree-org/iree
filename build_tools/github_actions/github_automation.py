@@ -56,10 +56,10 @@ Thank you for submitting a Pull Request to IREE! It looks like this is your firs
 IREE is a Linux Foundation project. All participants are expected to follow the [LF Projects Code of Conduct](https://lfprojects.org/policies/code-of-conduct/).
 
 All contributions to IREE must follow our [IREE AI Tool Use Policy](https://iree.dev/developers/general/contributing/#ai-tool-use). In particular:
-- Contributors own their changes: they must review **all** submitted changes themselves, understand them and the intent behind them, and vouch for them. AI review tools do not replace this review.
+- Contributors own their changes: Contributors must fully understand, review, and vouch for, **all** submitted contributions and the intent behind them. AI review tools do not replace this review.
 - PR descriptions may be AI-assisted, but contributors must review them, and they must state the purpose and motivation of the change.
 - Contributions are written for human readers: keep AI clutter such as boilerplate, comments that narrate obvious code, restated diffs, agent logs, or filler text out of code, descriptions, and comments.
-- There must always be a human in the loop: contributors must respond to reviews and questions by themselves.
+- There must always be a human in the loop: contributors must respond to reviews and questions by themselves. A lack of understanding makes a contribution [extractive](https://iree.dev/developers/general/contributing/#extractive-contributions), because it puts the burden on the reviewers instead of the author.
 - A contribution should be worth more to the project than the time it takes to review it. Maintainers may close [extractive contributions](https://iree.dev/developers/general/contributing/#extractive-contributions); it is then up to the author to show that the PR is not extractive.
 - GitHub issues labeled as "Good first issue" are explicitly designated as learning opportunities for newcomers to the project. With exceptions for boilerplate edits, AI tool usage for resolutions to such issues is **forbidden**.
 
