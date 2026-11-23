@@ -339,3 +339,18 @@ util.func public @read_initialized() -> i32 {
   %value = util.global.load @initialized : i32
   util.return %value : i32
 }
+
+// -----
+
+// Non-typed packed constants must remain in the initializer.
+// CHECK: util.global public mutable @packed_buffer : !util.buffer
+util.global public mutable @packed_buffer : !util.buffer
+// CHECK: util.initializer {
+util.initializer {
+  // CHECK: %[[VALUE:.+]] = util.buffer.constant
+  %value = util.buffer.constant : !util.buffer = #util.composite<4xi8, [dense<[1, 2, 3, 4]> : tensor<4xi8>]>
+  // CHECK: util.global.store %[[VALUE]], @packed_buffer : !util.buffer
+  util.global.store %value, @packed_buffer : !util.buffer
+  // CHECK: util.return
+  util.return
+}

@@ -1,73 +1,21 @@
 ---
 icon: octicons/code-review-16
+custom_edit_url: https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md
 ---
 
 # Contributing to IREE
 
-We'd love to accept your patches and contributions to this project.
+<!-- Most of this page is included from CONTRIBUTING.md in the repository
+     root, which GitHub shows to contributors. Only sections that are not
+     relevant to every contributor belong in this file. markdownlint does not
+     see the headings of the included sections, hence MD001 is disabled. -->
+<!-- markdownlint-disable MD001 -->
 
-!!! note "Note - coordinating efforts"
+--8<-- "CONTRIBUTING.md:intro"
 
-    Please [file issues](https://github.com/iree-org/iree/issues/new/choose) or
-    reach out on any of our other
-    [communication channels](../../index.md#communication-channels) before doing
-    substantial work; this will ensure that others don't duplicate the work and
-    that there's a chance to discuss any design issues.
+--8<-- "CONTRIBUTING.md:getting-in-touch"
 
-## Developer policies
-
-### :octicons-code-of-conduct-16: Code of conduct
-
-This project follows the
-[LF Projects code of conduct](https://lfprojects.org/policies/code-of-conduct/).
-
-### :octicons-organization-16: Project governance
-
-IREE is a sandbox-stage project of the
-[LF AI & Data Foundation](https://lfaidata.foundation/). Technical
-oversight of the project is the responsibility of its Technical
-Steering Committee (TSC), as set out in the
-[IREE Technical Charter](https://github.com/lfai/foundation/blob/main/technical%20project%20charters/IREE%20Technical%20Charter%20Final%205-14-2024.docx.pdf).
-The voting members of the TSC are listed in
-[CONTRIBUTING.md](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md);
-see
-[MAINTAINERS.md](https://github.com/iree-org/iree/blob/main/MAINTAINERS.md)
-for how the TSC operates. TSC meetings are open to everyone.
-
-### :octicons-law-16: Developer Certificate of Origin
-
-Contributors must certify that they wrote or otherwise have the right to submit
-the code they are contributing to the project.
-
-??? quote "Expand to read the full DCO agreement text"
-
-    By making a contribution to this project, I certify that:
-
-    1. The contribution was created in whole or in part by me and I have the
-      right to submit it under the open source license indicated in the file; or
-
-    2. The contribution is based upon previous work that, to the best of my
-      knowledge, is covered under an appropriate open source license and I have
-      the right under that license to submit that work with modifications, whether
-      created in whole or in part by me, under the same open source license
-      (unless I am permitted to submit under a different license), as indicated
-      in the file; or
-
-    3. The contribution was provided directly to me by some other person who
-      certified 1., 2. or 3. and I have not modified it.
-
-    4. I understand and agree that this project and the contribution are public
-      and that a record of the contribution (including all personal information
-      I submit with it, including my sign-off) is maintained indefinitely and
-      may be redistributed consistent with this project or the open source
-      license(s) involved.
-
-Signing is enforced by the [DCO GitHub App](https://github.com/apps/dco) (see
-also the [dcoapp/app](https://github.com/dcoapp/app) repository).
-
-The DCO check requires that all commits included in pull requests _either_
-are cryptographically signed by a member of the repository's organization _or_
-include a `Signed-off-by` message as a git trailer.
+--8<-- "CONTRIBUTING.md:developer-policies"
 
 #### Cryptographically signing commits
 
@@ -115,31 +63,6 @@ signed do not require the `Signed-off-by` text. See these references:
     git config --global tag.gpgsign true
     ```
 
-#### Adding `Signed-off-by` to commits
-
-_This requires less setup and is suitable for first time contributors._
-
-Contributors _sign-off_ their agreement by adding a `Signed-off-by` line to
-commit messages:
-
-```text
-This is my commit message
-
-Signed-off-by: Random J Developer <random@developer.example.org>
-```
-
-* Git will automatically append this message if you use the `-s` option:
-
-    ```bash
-    git commit -s -m 'This is my commit message'
-    ```
-
-* Users of [Visual Studio Code](https://code.visualstudio.com/) can add
-  `"git.alwaysSignOff": true,` in their settings
-
-* See `.git/hooks/prepare-commit-msg.sample` for how to automatically
-  add this using a [git hook](https://git-scm.com/docs/githooks)
-
 ### :octicons-people-16: AUTHORS, CODEOWNERS, and MAINTAINERS
 
 The [`AUTHORS` file](https://github.com/iree-org/iree/blob/main/AUTHORS) keeps
@@ -175,250 +98,11 @@ project members to review. In such cases, preceding the change with a RFC and
 aligning with code owners/maintainers on the design is also a recommended
 practice - this allows to minimize time spent in the final PR review stage.
 
-## :octicons-code-16: Coding policies
+--8<-- "CONTRIBUTING.md:coding-policies"
 
-### :octicons-pencil-16: Coding style guidelines
+--8<-- "CONTRIBUTING.md:github-policies"
 
-Our formatting rules are enforced by language-specific formatters like
-`clang-format` for C++ and `black` for Python. In addition to formatting, we
-follow these coding standards:
-
-#### Compiler
-
-The C++ compiler portion of the project follows the
-[MLIR style guide](https://mlir.llvm.org/getting_started/DeveloperGuide/#style-guide)
-based on the [LLVM coding standards](https://llvm.org/docs/CodingStandards.html).
-We also follow the recommendations of the
-[LLVM Programmer's Manual](https://llvm.org/docs/ProgrammersManual.html).
-
-IREE deviates from the MLIR style guide in the following ways:
-
-* We use braces with single-line `if` statements and loops.
-* We allow for `static` functions in anonymous namespaces to avoid repeatedly
-  reopening/closing namespaces.
-* Pass _declarations_ in TableGen (`.td`) files should use a `Pass` suffix
-  (e.g., `def FooBarPass`), while the corresponding _implementation_ file
-  should not include the `Pass` suffix (e.g., `FooBar.cpp`, not
-  `FooBarPass.cpp`).
-
-#### Runtime
-
-Most of the code style is derived from the
-[Google Style Guides](http://google.github.io/styleguide/) for the appropriate
-language.
-
-#### Other
-
-For code outside of the `compiler/` and `runtime/` subdirectories, follow the
-style used in existing files.
-
-#### Formatting and Linting
-
-We use [pre-commit](https://pre-commit.com/) to run assorted formatters and lint
-checks. The configuration file at
-[`.pre-commit-config.yaml`](https://github.com/iree-org/iree/blob/main/.pre-commit-config.yaml)
-defines which "hooks" run.
-
-* To run these hooks on your local commits, follow the
-  [pre-commit installation instructions](https://pre-commit.com/#installation).
-* Individual formatters like
-  [`clang-format`](https://clang.llvm.org/docs/ClangFormat.html) (C/C++) and
-  [_Black_](https://black.readthedocs.io/en/stable/) (Python) can also be set to
-  run automatically in your editor of choice.
-
-!!! note
-
-    Improvements to code structure and clarity are welcome but please file
-    issues to track such work first. Pure style changes are unlikely to be
-    accepted unless they are applied consistently across the project.
-
-### :material-test-tube: Testing policy
-
-With few exceptions, features should be accompanied by automated tests.
-
-We use a mix of in-tree and out-of-tree unit and integration tests. For more
-information about the types of tests used across the project, refer to the
-[testing guide](./testing-guide.md).
-
-## :simple-github: GitHub policies
-
-### :octicons-code-review-16: Code reviews
-
-All submissions, including submissions by maintainers, require review. We
-use GitHub pull requests (PRs) for this purpose. Consult
-[GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
-information on using pull requests.
-
-* Please keep PRs small (focused on a single issue or feature) to make reviews
-  and later culprit-finding easier.
-    - You may see trusted core contributors bending above rule for project
-      maintenance and major subsystem renovation. If you feel like the rules
-      aren't working for a certain situation, please ask as we bias towards
-      pragmatism for cases that require it.
-* We require review comments to be addressed before merging, even when there is
-  an approval from another reviewer. Unless stated otherwise, we treat request
-  for changes as blocking. Reviewers may indicate that some comments
-  requesting changes are optional (commonly by prefixing them with 'nit' or
-  'optional') -- use your best engineering judgement to decide whether to
-  follow these suggestions or not.
-* If there are new comments requesting changes after a PR was merged, these
-  comments should be addressed as well, either through follow-up discussion
-  or code changes. Small issues may be fixed forward, but reviewers may also
-  ask for your PR to be reverted. This is not a sign that your PR was faulty
-  -- we prefer to err on the side of caution and reverting allows more time
-  for design discussion.
-
-### :material-check-all: GitHub Actions workflows
-
-We use [GitHub Actions](https://docs.github.com/en/actions) to automatically
-build and test various parts of the project.
-
-* Most presubmit workflows will only run automatically on PRs if you are a
-  project collaborator. Otherwise a maintainer must
-  [approve workflow runs](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks).
-  If you are sending code changes to the project, please
-  [request commit access](#obtaining-commit-access), so that these can run
-  automatically.
-* It is generally expected that PRs will only be merged when all checks are
-  passing. In some cases, pre-existing failures may be bypassed by a maintainer.
-
-??? tip - "Tip - adjusting workflow behavior"
-
-    Some workflows only run on commits after they are merged. See the
-    [CI behavior manipulation](#ci-behavior-manipulation) section below to
-    learn how to customize this behavior.
-
-### :octicons-git-pull-request-16: Merging approved changes
-
-After review and presubmit checks, PRs should typically be merged using
-"squash and merge".
-
-* The squashed commit summary should match the PR title and the commit
-  description should match the PR body (this is the default behavior).
-  Accordingly, please write these as you would a helpful commit message.
-
-It is assumed that the PR author will merge their change unless they ask
-someone else to merge it for them (e.g. because they don't have write access
-yet).
-
-### :octicons-git-merge-16: Obtaining commit access
-
-Access to repositories is divided into tiers following the
-[GitHub organization permissions model](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/repository-roles-for-an-organization):
-
-| Tier | Description | Team links |
-| ---- | ----------- | --------- |
-Triage | **New project members should typically start here**<br>:material-check: Can be [assigned issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/assigning-issues-and-pull-requests-to-other-github-users)<br>:material-check: Can apply labels to issues / PRs<br>:material-check: Can run workflows [without approval](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks) | <ul><li>[iree-triage](https://github.com/orgs/iree-org/teams/iree-triage)<br>(access to most repositories)</li></ul>
-Write | **Established contributors can request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches<br>:material-check: Can [re-run workflows](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/re-running-workflows-and-jobs) | <ul><li>[iree-write](https://github.com/orgs/iree-org/teams/iree-write)<br>(access to most repositories)</li><li>[iree-turbine-write](https://github.com/orgs/iree-org/teams/iree-turbine-write)<br>(access to <a href="https://github.com/iree-org/iree-turbine">iree-turbine</a>)</li><li>[iree-fusilli-write](https://github.com/orgs/iree-org/teams/iree-fusilli-write)<br>(access to <a href="https://github.com/iree-org/fusilli">fusilli</a>)</li></ul>
-Maintain/Admin | :material-check: Can [edit repository settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features)<br>:material-check: Can push to [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) | Added case-by-case by the TSC
-
-All access tiers first require joining the
-[iree-org GitHub organization](https://github.com/iree-org/). To request
-membership in iree-org, send an email to
-<iree-github-requests@lists.lfaidata.foundation> with this template:
-
-```text
-GitHub username:
-
-Company/organization you are associated with:
-
-Reason for requesting access:
-```
-
-<!-- markdownlint-disable-next-line -->
-[Send this email template to request access :fontawesome-solid-paper-plane:](mailto:iree-github-requests@lists.lfaidata.foundation?&subject=Requesting%20membership%20in%20iree-org&body=GitHub%20username:%0D%0A%0D%0ACompany/organization%20you%20are%20associated%20with:%0D%0A%0D%0AReason%20for%20requesting access:){ .md-button .md-button--primary }
-
-If approved, an invitation will be sent to your GitHub account. You can also
-view the [invitation link](https://github.com/orgs/iree-org/invitation)
-directly. Then, once you are a member of the organization, you can request to
-join any of the teams on <https://github.com/orgs/iree-org/teams> (note that
-some teams are nested under iree-triage, so click the caret to expand the list).
-
-Write access is reserved for "established contributors" who have a track record
-of multiple high quality pull requests or reviews and have demonstrated
-familiarity with the contributing guidelines.
-
-!!! question "Questions about access"
-
-    For questions about access policies, feel free to reach out on the
-    [`#github` channel](https://discord.com/channels/689900678990135345/1166024193599615006)
-    on IREE's Discord server, the <iree-github-requests@lists.lfaidata.foundation>
-    email list, or another of our
-    [communication channels](../../index.md#communication-channels) to discuss.
-
-### :octicons-git-branch-16: Branch naming
-
-Most work should be done on
-[repository forks](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks).
-For developers with write access, when creating a branch in the common
-[iree-org/iree repository](https://github.com/iree-org/iree), please follow
-these naming guidelines:
-
-Branch type | Naming scheme | Example
--- | -- | --
-Single user | `users/[username]/*` | `users/cooldeveloper/my-awesome-feature`
-Shared feature branch | `shared/*` | `shared/pytorch-performance-sprint`
-Dependency updates | `integrates/*` | `integrates/llvm-20240501`
-
-Branches that do not meet these guidelines may be deleted, especially if
-they [appear to be stale](https://github.com/iree-org/iree/branches/stale).
-
-### :octicons-hubot-16: AI tool use
-
-We adopt the [LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html)
-and require all AI-assisted contributions (Pull Requests, issues, design
-proposals) to be reviewed and understood by the author(s).
-
-The key points include:
-
-1. "Contributors must read and review all LLM-generated code or text before they
-   ask other project members to review it."
-2. "Contributors are expected to be transparent and label contributions that
-   contain substantial amounts of tool-generated content." This can be done with
-   the `Assisted-by: tool-name` or the `Co-authored-by: tool-name tool@email`
-   trailer in PR descriptions.
-3. "To ensure sufficient self review and understanding of the work, it is
-   strongly recommended that contributors write PR descriptions themselves (if
-   needed, using tools for translation or copy-editing)." This also extends to
-   code documentation, issue descriptions, and design proposals.
-4. "Contributors are responsible for ensuring that they have the right to
-   contribute code under the terms of our license, [...]. Using AI tools to
-   regenerate copyrighted material does not remove the copyright, and
-   contributors are responsible for ensuring that such material does not appear
-   in their contributions."
-
-We extend the LLVM policy with an exception for AI bot-authored contributions
-(e.g., updating dependencies, fixing build script, etc.); bot account may create
-Pull Requests as long as the bot maintainers ensure they are first in line and
-primarily responsible for reviewing those contributions.
-
-## Tips for contributors
-
-### Tool recommendations
-
-| Program or tool | Description |
-| -- | -- |
-[:material-microsoft-visual-studio-code: Visual Studio Code (VSCode)](<https://code.visualstudio.com/>) | The most commonly used editor amongst IREE developers
-[:simple-cmake: Ccache](<https://ccache.dev/>) | A fast C/C++ compiler cache. See the [CMake with `ccache`](../building/cmake-with-ccache.md) page
-[:simple-github: GitHub CLI](<https://github.com/cli/cli>) | A CLI for interacting with GitHub
-[:simple-github: "Refined GitHub" browser extensions](<https://github.com/sindresorhus/refined-github>) | Extension that add features to the GitHub UI
-
-### :material-hammer-wrench: Build systems
-
-IREE supports building from source with both Bazel and CMake.
-
-* CMake is the preferred build system and offers the most flexible
-  configuration options
-* Bazel is a stricter build system and helps with usage in Google's downstream
-  source repository
-* Certain dependencies (think large/complex projects like CUDA, TensorFlow,
-  PyTorch, etc.) may be difficult to support with one build system or the
-  other, so the project may configure these as optional
-
-### :octicons-server-16: Continuous integration (CI)
-
-IREE uses [GitHub Actions](https://docs.github.com/en/actions) for CI. See
-our [GitHub Actions documentation](./github-actions.md) for full details.
+See our [GitHub Actions documentation](./github-actions.md) for full details.
 
 #### CI behavior manipulation
 
@@ -533,3 +217,90 @@ For example, this PR opted in to running the `build_test_all_windows` job
 The enabled jobs can be viewed from the Summary page of an action run:
 
 ![ci_enabled_jobs](./contributing-ci-enabled-jobs.png)
+
+--8<-- "CONTRIBUTING.md:github-policies-continued"
+
+### :octicons-git-merge-16: Obtaining commit access
+
+Access to repositories is divided into tiers following the
+[GitHub organization permissions model](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/repository-roles-for-an-organization):
+
+| Tier | Description | Team links |
+| ---- | ----------- | --------- |
+Triage | **New project members should typically start here**<br>:material-check: Can be [assigned issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/assigning-issues-and-pull-requests-to-other-github-users)<br>:material-check: Can apply labels to issues / PRs<br>:material-check: Can run workflows [without approval](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks) | <ul><li>[iree-triage](https://github.com/orgs/iree-org/teams/iree-triage)<br>(access to most repositories)</li></ul>
+Write | **Established contributors can request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches<br>:material-check: Can [re-run workflows](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/re-running-workflows-and-jobs) | <ul><li>[iree-write](https://github.com/orgs/iree-org/teams/iree-write)<br>(access to most repositories)</li><li>[iree-turbine-write](https://github.com/orgs/iree-org/teams/iree-turbine-write)<br>(access to <a href="https://github.com/iree-org/iree-turbine">iree-turbine</a>)</li><li>[iree-fusilli-write](https://github.com/orgs/iree-org/teams/iree-fusilli-write)<br>(access to <a href="https://github.com/iree-org/fusilli">fusilli</a>)</li></ul>
+Maintain/Admin | :material-check: Can [edit repository settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features)<br>:material-check: Can push to [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) | Added case-by-case by the TSC
+
+All access tiers first require joining the
+[iree-org GitHub organization](https://github.com/iree-org/). To request
+membership in iree-org, send an email to
+<iree-github-requests@lists.lfaidata.foundation> with this template:
+
+```text
+GitHub username:
+
+Company/organization you are associated with:
+
+Reason for requesting access:
+```
+
+<!-- markdownlint-disable-next-line -->
+[Send this email template to request access :fontawesome-solid-paper-plane:](mailto:iree-github-requests@lists.lfaidata.foundation?&subject=Requesting%20membership%20in%20iree-org&body=GitHub%20username:%0D%0A%0D%0ACompany/organization%20you%20are%20associated%20with:%0D%0A%0D%0AReason%20for%20requesting access:){ .md-button .md-button--primary }
+
+If approved, an invitation will be sent to your GitHub account. You can also
+view the [invitation link](https://github.com/orgs/iree-org/invitation)
+directly. Then, once you are a member of the organization, you can request to
+join any of the teams on <https://github.com/orgs/iree-org/teams> (note that
+some teams are nested under iree-triage, so click the caret to expand the list).
+
+Write access is reserved for "established contributors" who have a track record
+of multiple high quality pull requests or reviews and have demonstrated
+familiarity with the contributing guidelines.
+
+!!! question "Questions about access"
+
+    For questions about access policies, feel free to reach out on the
+    [`#github` channel](https://discord.com/channels/689900678990135345/1166024193599615006)
+    on IREE's Discord server, the <iree-github-requests@lists.lfaidata.foundation>
+    email list, or another of our
+    [communication channels](../../index.md#communication-channels) to discuss.
+
+### :octicons-git-branch-16: Branch naming
+
+Most work should be done on
+[repository forks](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks).
+For developers with write access, when creating a branch in the common
+[iree-org/iree repository](https://github.com/iree-org/iree), please follow
+these naming guidelines:
+
+Branch type | Naming scheme | Example
+-- | -- | --
+Single user | `users/[username]/*` | `users/cooldeveloper/my-awesome-feature`
+Shared feature branch | `shared/*` | `shared/pytorch-performance-sprint`
+Dependency updates | `integrates/*` | `integrates/llvm-20240501`
+
+Branches that do not meet these guidelines may be deleted, especially if
+they [appear to be stale](https://github.com/iree-org/iree/branches/stale).
+
+## Tips for contributors
+
+### Tool recommendations
+
+| Program or tool | Description |
+| -- | -- |
+[:material-microsoft-visual-studio-code: Visual Studio Code (VSCode)](<https://code.visualstudio.com/>) | The most commonly used editor amongst IREE developers
+[:simple-cmake: Ccache](<https://ccache.dev/>) | A fast C/C++ compiler cache. See the [CMake with `ccache`](../building/cmake-with-ccache.md) page
+[:simple-github: GitHub CLI](<https://github.com/cli/cli>) | A CLI for interacting with GitHub
+[:simple-github: "Refined GitHub" browser extensions](<https://github.com/sindresorhus/refined-github>) | Extension that add features to the GitHub UI
+
+### :material-hammer-wrench: Build systems
+
+IREE supports building from source with both Bazel and CMake.
+
+* CMake is the preferred build system and offers the most flexible
+  configuration options
+* Bazel is a stricter build system and helps with usage in Google's downstream
+  source repository
+* Certain dependencies (think large/complex projects like CUDA, TensorFlow,
+  PyTorch, etc.) may be difficult to support with one build system or the
+  other, so the project may configure these as optional

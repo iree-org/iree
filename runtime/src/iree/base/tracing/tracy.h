@@ -169,9 +169,21 @@ void iree_tracing_gpu_zone_begin_external(
     uint8_t context_id, uint16_t query_id, const char* file_name,
     size_t file_name_length, uint32_t line, const char* function_name,
     size_t function_name_length, const char* name, size_t name_length);
+void iree_tracing_gpu_zone_begin_external_colored(
+    uint8_t context_id, uint16_t query_id, const char* file_name,
+    size_t file_name_length, uint32_t line, const char* function_name,
+    size_t function_name_length, const char* name, size_t name_length,
+    uint32_t color_xbgr);
 void iree_tracing_gpu_zone_end(uint8_t context_id, uint16_t query_id);
 void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
                                   int64_t gpu_timestamp);
+
+void iree_tracing_gpu_context_annotation_name(uint8_t context_id,
+                                              int64_t annotation_id,
+                                              const char* name,
+                                              size_t name_length);
+void iree_tracing_gpu_zone_annotation(uint8_t context_id, uint16_t query_id,
+                                      int64_t annotation_id, double value);
 
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
