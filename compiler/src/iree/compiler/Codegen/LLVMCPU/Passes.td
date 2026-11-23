@@ -242,7 +242,13 @@ def LLVMCPUTileAndFuseProducerConsumerPass
               "anchor-on-root-op", "bool",
               /*default=*/"true",
               "Anchor on the root op to start the tiling. Otherwise, find the "
-              "last operation after the root op that contains the `tilingLevel` config.">];
+              "last operation after the root op that contains the `tilingLevel` config.">,
+       Option<"skipRootFusedAnchors",
+              "skip-root-fused-anchors", "bool",
+              /*default=*/"false",
+              "Skips anchor ops in the root op's block when the root op has the "
+              "`tilingLevel` config, because tiling the root op at that level "
+              "already fused them.">];
 }
 
 def LLVMCPUVerifyVectorSizeLegalityPass :

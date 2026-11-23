@@ -51,7 +51,7 @@ createLLVMCPUTileRootAndFuseInputOperandsPass(
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
-    IREE::CPU::TilingLevel tilingLevel);
+    IREE::CPU::TilingLevel tilingLevel, bool skipRootFusedAnchors = false);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVerifyVectorSizeLegalityPass(

@@ -451,9 +451,11 @@ void addCPULinalgExtTileAndVectorizePipeline(
   funcPassManager.addPass(createLLVMCPUTileAndFuseProducerConsumerPass(
       IREE::CPU::TilingLevel::VectorCommonParallelTiles));
   // A consumer the root's tiles cannot fuse, such as a pack whose inner tile
-  // spans several root rows, takes its own vector tile sizes.
+  // spans several root rows, takes its own vector tile sizes. Consumers the
+  // root's tiles already fused are left alone.
   funcPassManager.addPass(createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
-      IREE::CPU::TilingLevel::VectorCommonParallelTiles));
+      IREE::CPU::TilingLevel::VectorCommonParallelTiles,
+      /*skipRootFusedAnchors=*/true));
   funcPassManager.addPass(createLLVMCPUTileRootAndFuseInputOperandsPass(
       IREE::CPU::TilingLevel::VectorReductionTiles));
   funcPassManager.addPass(
