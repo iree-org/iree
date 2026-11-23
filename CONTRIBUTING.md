@@ -271,9 +271,9 @@ Avoid titles like "Fix bug" or "Fix CI".
 
 **Description**: start with _why_, then _what_.
 
-1. **Why**: the problem or motivation. Say what is broken or missing, who is
-   affected, and link the issue or failing run. For a refactor, say what is
-   hard today; for a revert, what broke.
+1. **Why**: the problem or motivation, including what is broken or missing,
+   who is affected, and a link to the issue or failing run. For a refactor,
+   the current limitation; for a revert, what broke.
 2. **Change**: what the PR does and why this approach. The diff shows the
    details. For refactors, state "No functional change intended".
 3. **If relevant**: before/after numbers for performance changes and how
