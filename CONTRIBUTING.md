@@ -373,8 +373,56 @@ scripts, etc.) are allowed: bot accounts may create Pull Requests as long as
 the bot maintainers ensure they are first in line and primarily responsible
 for reviewing those contributions.
 
-Maintainers may close issues and PRs that appear not to follow this policy,
-with a comment that links to this section. The author then has to show that
-the contribution follows the policy.
+Contributions that do not follow this policy are handled as
+[extractive contributions](#extractive-contributions).
+
+### Extractive contributions
+
+Reviewing contributions costs maintainers time. Our golden rule, taken from the
+[LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html#extractive-contributions),
+is that a contribution should be worth more to the project than the time it
+takes to review it. A contribution that is not is _extractive_: for example, a
+large change without a clear purpose, or one whose author cannot answer
+questions about it. This applies with or without AI tools, and includes
+contributions that do not follow the [AI tool use](#ai-tool-use) policy.
+
+If a maintainer thinks that an issue or PR is extractive, they label it
+`extractive` and ask a second maintainer to confirm. If in doubt, they consult
+a member of the TSC. When both maintainers agree:
+
+* In obvious cases, a maintainer closes the contribution with the closing
+  comment below.
+* Otherwise, a maintainer requests changes with the change request comment
+  below, and closes the contribution if the author does not make it
+  reviewable.
+
+It is up to the author to show that the contribution is not extractive. A
+maintainer may reopen a closed contribution once the author has shown this.
+
+Closing comment:
+
+```text
+This contribution appears to be extractive or not to follow the IREE
+contribution policies, so we are closing it:
+https://iree.dev/developers/general/contributing/#extractive-contributions
+
+If you think that it does follow them, reply here and explain what the change
+is for and how you reviewed it yourself. A maintainer can then reopen it.
+```
+
+Change request comment:
+
+```text
+This contribution appears to be extractive or not to follow the IREE
+contribution policies:
+https://iree.dev/developers/general/contributing/#extractive-contributions
+
+Please explain what the change is for and how you reviewed it yourself, or
+reduce it to something that can be reviewed. Otherwise we will close it.
+```
+
+If an author keeps sending extractive contributions, maintainers escalate to
+the TSC, which may lock conversations or block the account under the
+[LF Projects Code of Conduct](https://lfprojects.org/policies/code-of-conduct/).
 
 <!-- --8<-- [end:github-policies-continued] -->
