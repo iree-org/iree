@@ -295,18 +295,14 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK-LABEL: func @masked_read_write_contract
 
-// CHECK-DAG: %[[RED_IDENTITY_LHS:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x2xf16>
-// CHECK-DAG: %[[RED_IDENTITY_RHS:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x1x1x2x2xf16>
+// Identities for predicated local logical operands (flat ranks match indexing maps).
+// CHECK-DAG: %[[RED_IDENTITY_LHS:.+]] = arith.constant dense<0.000000e+00> : vector<2xf16>
+// CHECK-DAG: %[[RED_IDENTITY_RHS:.+]] = arith.constant dense<0.000000e+00> : vector<2x2xf16>
 
-// Note this this transposed to match the second indexing map
 // CHECK-DAG: %[[MASK_LHS:.+]] = vector.create_mask %[[LHSUB:.+]] : vector<2xi1>
 // CHECK-DAG: %[[MASK_OP:.+]] = vector.create_mask %[[OPUB0:.+]], %[[LHSUB]] : vector<2x2xi1>
 
-// Note MASK_OP_1D is equivalent to MASK_LHS.
-// Currently, it does not fold away.
 // CHECK-DAG: %[[MASK_OP_1D:.+]] = vector.extract %[[MASK_OP]][0] : vector<2xi1> from vector<2x2xi1>
-// CHECK-DAG: %[[MASK_OP_1D_PACKED:.+]] = vector.shape_cast %[[MASK_OP_1D]] : vector<2xi1> to vector<1x1x2xi1>
-// CHECK-DAG: %[[MASK_OP_PACKED:.+]] = vector.shape_cast %[[MASK_OP]] : vector<2x2xi1> to vector<1x1x1x1x2x2xi1>
 // CHECK-DAG: %[[MASK_OUT:.+]] = vector.create_mask {{.*}} : vector<2xi1>
 
 // CHECK-DAG: %[[LHS_READ:.+]] = vector.transfer_read %arg0{{.*}} %[[MASK_LHS]] {in_bounds = [true]} : memref<?xf16>, vector<2xf16>
@@ -314,10 +310,13 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[RHS_READ:.+]] = vector.transfer_read %arg1{{.*}} %[[MASK_OP]] {in_bounds = [true, true]} : memref<?x?xf16>, vector<2x2xf16>
 // CHECK-DAG: %[[RHS:.+]] = vector.insert_strided_slice %[[RHS_READ]]
 
-// CHECK-DAG: %[[LHS_SELECT:.+]] = arith.select %[[MASK_OP_1D_PACKED]], %[[LHS]], %[[RED_IDENTITY_LHS]] : vector<1x1x2xi1>, vector<1x1x2xf16>
-// CHECK-DAG: %[[RHS_SELECT:.+]] = arith.select %[[MASK_OP_PACKED]], %[[RHS]], %[[RED_IDENTITY_RHS]] : vector<1x1x1x1x2x2xi1>, vector<1x1x1x1x2x2xf16>
+// CHECK-DAG: %[[LHS_FLAT:.+]] = vector.shape_cast %[[LHS]] : vector<1x1x2xf16> to vector<2xf16>
+// CHECK-DAG: %[[RHS_FLAT:.+]] = vector.shape_cast %[[RHS]] : vector<1x1x1x1x2x2xf16> to vector<2x2xf16>
 
-// CHECK: vector.contract {{.*}} %[[LHS_SELECT]], %[[RHS_SELECT]]
+// CHECK-DAG: %[[LHS_SELECT:.+]] = arith.select %[[MASK_OP_1D]], %[[LHS_FLAT]], %[[RED_IDENTITY_LHS]] : vector<2xi1>, vector<2xf16>
+// CHECK-DAG: %[[RHS_SELECT:.+]] = arith.select %[[MASK_OP]], %[[RHS_FLAT]], %[[RED_IDENTITY_RHS]] : vector<2x2xi1>, vector<2x2xf16>
+
+// CHECK: vector.contract {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1)>], iterator_types = ["reduction", "parallel"], kind = #vector.kind<add>} %[[LHS_SELECT]], %[[RHS_SELECT]]
 
 // -----
 
