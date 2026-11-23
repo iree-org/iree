@@ -257,6 +257,45 @@ to learn how to customize this behavior.
 <!-- --8<-- [end:github-policies] -->
 
 <!-- --8<-- [start:github-policies-continued] -->
+### Pull request descriptions
+
+PRs are [squash-merged](#merging-approved-changes), so the PR title and
+description become the commit message. Write them for someone reading
+`git log` or bisecting a regression later.
+
+**Title**: a short, imperative summary of what changes, prefixed with the
+affected area, for example
+`[Codegen] Make the padding loops of foldPadIntoMapStore disjoint`.
+Avoid titles like "Fix bug" or "Fix CI".
+
+**Description**: start with _why_, then _what_.
+
+1. **Why**: the problem or motivation. Say what is broken or missing, who is
+   affected, and link the issue or failing run. For a refactor, say what is
+   hard today; for a revert, what broke.
+2. **Change**: what the PR does and why this approach. The diff shows the
+   details. For refactors, state "No functional change intended".
+3. **If relevant**: before/after numbers for performance changes and how
+   they were measured, trade-offs or known shortcomings, the tests that were
+   run, and where reviewers should start in large PRs.
+4. **Trailers** at the end: `Fixes #1234`,
+   [CI trailers](https://iree.dev/developers/general/contributing/#ci-behavior-manipulation) such as `ci-extra:`, and
+   `Assisted-by:` for [AI tools](#ai-tool-use).
+
+Keep the description concise and self-contained: links add context but do
+not replace an explanation. Leave out review history and `@`-mentions,
+which notify people again on every cherry-pick. Update the description when
+the PR changes during review. Small changes need one or two sentences;
+longer descriptions can use headings such as `## Why` and `## Change`.
+
+See also:
+
+* [LLVM: Commit messages](https://llvm.org/docs/DeveloperPolicy.html#commit-messages)
+* [Google Engineering Practices: Writing good CL descriptions](https://google.github.io/eng-practices/review/developer/cl-descriptions.html)
+* [Linux kernel: Describe your changes](https://docs.kernel.org/process/submitting-patches.html#describe-your-changes)
+* [GitHub: Helping others review your changes](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/helping-others-review-your-changes)
+* [How to write a Git commit message](https://cbea.ms/git-commit/)
+
 ### Merging approved changes
 
 After review and presubmit checks, PRs should typically be merged using
@@ -264,7 +303,8 @@ After review and presubmit checks, PRs should typically be merged using
 
 * The squashed commit summary should match the PR title and the commit
   description should match the PR body (this is the default behavior).
-  Accordingly, please write these as you would a helpful commit message.
+  Accordingly, please write these as you would a helpful commit message
+  (see [Pull request descriptions](#pull-request-descriptions)).
 
 It is assumed that the PR author will merge their change unless they ask
 someone else to merge it for them (e.g. because they don't have write access
