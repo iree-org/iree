@@ -177,6 +177,38 @@ func.func @dynamic_pad_i32_amounts(%a: tensor<4x7xf32>, %v: tensor<f32>, %lo: te
 
 // -----
 
+// Index amounts are signed and reach the i64 geometry through index_cast.
+// CHECK-LABEL: @dynamic_pad_index_amounts
+// CHECK-SAME: %[[LO:[a-zA-Z0-9]+]]: tensor<2xindex>
+// CHECK: %[[LOW:.+]] = tensor.extract %[[LO]]
+// CHECK: arith.index_cast %[[LOW]] : index to i64
+// CHECK: linalg.generic
+// CHECK: tensor.extract %{{.+}}[%{{.+}}, %{{.+}}] : tensor<4x7xf32>
+func.func @dynamic_pad_index_amounts(%a: tensor<4x7xf32>, %v: tensor<f32>, %lo: tensor<2xindex>, %hi: tensor<2xindex>, %in: tensor<2xindex>) -> tensor<?x?xf32> {
+  %r = "stablehlo.dynamic_pad"(%a, %v, %lo, %hi, %in) : (tensor<4x7xf32>, tensor<f32>, tensor<2xindex>, tensor<2xindex>, tensor<2xindex>) -> tensor<?x?xf32>
+  return %r : tensor<?x?xf32>
+}
+
+// -----
+
+// Each crop of the slice-and-pad form is bounded by the operand extent before
+// the edge is negated, so INT64_MIN cannot wrap to a negative crop.
+// CHECK-LABEL: @dynamic_pad_sliced_crop_bound
+// CHECK-DAG: %[[NEG_IN:.+]] = arith.constant -3 : index
+// CHECK-DAG: %[[LOW:.+]] = arith.index_cast %{{.+}} : i64 to index
+// CHECK-DAG: %[[HIGH:.+]] = arith.index_cast %{{.+}} : i64 to index
+// CHECK-DAG: arith.maxsi %[[LOW]], %[[NEG_IN]] : index
+// CHECK-DAG: arith.maxsi %[[HIGH]], %[[NEG_IN]] : index
+// CHECK: tensor.extract_slice
+// CHECK: tensor.pad
+func.func @dynamic_pad_sliced_crop_bound(%a: tensor<3xf32>, %v: tensor<f32>, %lo: tensor<1xi64>, %hi: tensor<1xi64>) -> tensor<?xf32> {
+  %in = stablehlo.constant dense<0> : tensor<1xi64>
+  %r = "stablehlo.dynamic_pad"(%a, %v, %lo, %hi, %in) : (tensor<3xf32>, tensor<f32>, tensor<1xi64>, tensor<1xi64>, tensor<1xi64>) -> tensor<?xf32>
+  return %r : tensor<?xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @dynamic_conv
 // CHECK: tensor.extract_slice
 // CHECK: tensor.pad

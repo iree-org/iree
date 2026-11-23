@@ -63,3 +63,21 @@ func.func @dynamic_pad_unsigned_maximum_interior() {
   check.expect_eq(%fixed, %input) : tensor<1xi32>
   return
 }
+
+// Edges at INT64_MIN and INT64_MAX that cancel to a two-element result. Zero
+// interior padding selects the slice-and-pad form, which must clamp each crop
+// to the operand before negating the edge.
+func.func @dynamic_pad_cancelling_extreme_edges() {
+  %input = util.unfoldable_constant dense<[1, 2, 3]> : tensor<3xi32>
+  %pad = stablehlo.constant dense<7> : tensor<i32>
+  %min = util.unfoldable_constant dense<-9223372036854775808> : tensor<1xi64>
+  %max = util.unfoldable_constant dense<9223372036854775807> : tensor<1xi64>
+  %in = stablehlo.constant dense<0> : tensor<1xi64>
+  %low_min = stablehlo.dynamic_pad %input, %pad, %min, %max, %in : (tensor<3xi32>, tensor<i32>, tensor<1xi64>, tensor<1xi64>, tensor<1xi64>) -> tensor<?xi32>
+  %low_min_fixed = tensor.cast %low_min : tensor<?xi32> to tensor<2xi32>
+  check.expect_eq_const(%low_min_fixed, dense<7> : tensor<2xi32>) : tensor<2xi32>
+  %high_min = stablehlo.dynamic_pad %input, %pad, %max, %min, %in : (tensor<3xi32>, tensor<i32>, tensor<1xi64>, tensor<1xi64>, tensor<1xi64>) -> tensor<?xi32>
+  %high_min_fixed = tensor.cast %high_min : tensor<?xi32> to tensor<2xi32>
+  check.expect_eq_const(%high_min_fixed, dense<7> : tensor<2xi32>) : tensor<2xi32>
+  return
+}

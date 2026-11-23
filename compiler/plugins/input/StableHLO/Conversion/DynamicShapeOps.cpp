@@ -1381,13 +1381,15 @@ static bool canUseSlicedPad(Value operand, const DynamicPadGeometry &geometry,
 // Pads without interior padding as the kept window of the operand, padded on
 // both sides. Negative edges crop, and a crop may pass the whole operand and
 // remove padding from the other edge. Per dimension, with input size `in`:
-//   cropLow = max(-low, 0), cropHigh = max(-high, 0)
+//   cropLow = min(max(-low, 0), in), cropHigh = min(max(-high, 0), in)
 //   kept = max(in - cropLow - cropHigh, 0)
 //   offset = kept == 0 ? 0 : cropLow, which keeps an empty slice in bounds
 //   result = in + low + high
 //   padLow = min(max(low, 0), result), padHigh = result - padLow - kept
 // For example, [a, b, c] with low = 5 and high = -6 keeps no element and pads
 // two elements. The input is trusted to have a nonnegative result size.
+// Each edge is clamped to -in before it is negated, so that an edge of
+// INT64_MIN cannot wrap to a negative crop.
 static Value createSlicedPad(OpBuilder &builder, Location loc, Value operand,
                              Value paddingValue, RankedTensorType resultType,
                              const DynamicPadGeometry &geometry) {
@@ -1399,10 +1401,14 @@ static Value createSlicedPad(OpBuilder &builder, Location loc, Value operand,
     Value in = getValueOrCreateConstantIndexOp(b, loc, size);
     Value low = b.createOrFold<arith::IndexCastOp>(b.getIndexType(), lowI64);
     Value high = b.createOrFold<arith::IndexCastOp>(b.getIndexType(), highI64);
-    Value cropLow = b.createOrFold<arith::MaxSIOp>(
-        b.createOrFold<arith::SubIOp>(zero, low), zero);
-    Value cropHigh = b.createOrFold<arith::MaxSIOp>(
-        b.createOrFold<arith::SubIOp>(zero, high), zero);
+    Value negatedIn = b.createOrFold<arith::SubIOp>(zero, in);
+    auto cropOf = [&b, zero, negatedIn](Value edge) {
+      Value bounded = b.createOrFold<arith::MaxSIOp>(edge, negatedIn);
+      return b.createOrFold<arith::MaxSIOp>(
+          b.createOrFold<arith::SubIOp>(zero, bounded), zero);
+    };
+    Value cropLow = cropOf(low);
+    Value cropHigh = cropOf(high);
     Value kept = b.createOrFold<arith::SubIOp>(
         b.createOrFold<arith::SubIOp>(in, cropLow), cropHigh);
     kept = b.createOrFold<arith::MaxSIOp>(kept, zero);
@@ -1499,7 +1505,7 @@ static Value createCroppedPad(OpBuilder &builder, Location loc, Value operand,
 }
 
 // Keep padding integers in i64 storage until the exact output extent and
-// guarded source coordinates have been computed.
+// guarded source coordinates have been computed. Index elements are signed.
 static SmallVector<Value> extractPaddingElements(OpBuilder &builder,
                                                  Location loc, Value padding,
                                                  bool isUnsignedPadding,
@@ -1509,7 +1515,10 @@ static SmallVector<Value> extractPaddingElements(OpBuilder &builder,
     Value index = arith::ConstantIndexOp::create(builder, loc, d);
     Value element =
         builder.createOrFold<tensor::ExtractOp>(loc, padding, index);
-    if (element.getType().getIntOrFloatBitWidth() < 64) {
+    if (element.getType().isIndex()) {
+      element = builder.createOrFold<arith::IndexCastOp>(
+          loc, builder.getI64Type(), element);
+    } else if (element.getType().getIntOrFloatBitWidth() < 64) {
       if (isUnsignedPadding) {
         element = builder.createOrFold<arith::ExtUIOp>(
             loc, builder.getI64Type(), element);
