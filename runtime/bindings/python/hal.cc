@@ -1070,13 +1070,15 @@ py::object HalDriver::Create(const std::string& device_uri,
 py::list HalDriver::QueryAvailableDevices() {
   iree_hal_device_info_t* device_infos;
   iree_host_size_t count;
-  iree_allocator_t host_allocator = iree_allocator_system();
-  CheckApiStatus(iree_hal_driver_query_available_devices(
-                     raw_ptr(), host_allocator, &count, &device_infos),
-                 "Error querying devices");
+  iree_allocator_t device_info_host_allocator = iree_allocator_system();
+  CheckApiStatus(
+      iree_hal_driver_query_available_devices(
+          raw_ptr(), device_info_host_allocator, &count, &device_infos),
+      "Error querying devices");
 
   std::unique_ptr<iree_hal_device_info_t[], AllocatorFreeDeleter>
-      device_infos_guard(device_infos, AllocatorFreeDeleter{host_allocator});
+      device_infos_guard(device_infos,
+                         AllocatorFreeDeleter{device_info_host_allocator});
 
   py::list results;
   for (iree_host_size_t i = 0; i < count; ++i) {
