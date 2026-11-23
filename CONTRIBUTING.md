@@ -260,12 +260,13 @@ to learn how to customize this behavior.
 ### Pull request descriptions
 
 PRs are [squash-merged](#merging-approved-changes), so the PR title and
-description become the commit message. Write them for someone reading
-`git log` or bisecting a regression later.
+description become the commit message, and the commit messages on the PR
+branch are discarded. Write them for someone reading `git log` or bisecting
+a regression later.
 
-**Title**: a short, imperative summary of what changes, prefixed with the
-affected area, for example
-`[Codegen] Make the padding loops of foldPadIntoMapStore disjoint`.
+**Title**: a short, imperative summary of what changes and, if it fits, why,
+prefixed with the affected area, for example
+`[CI] Bump iree-test-suites to fix sharktank test failure`.
 Avoid titles like "Fix bug" or "Fix CI".
 
 **Description**: start with _why_, then _what_.
