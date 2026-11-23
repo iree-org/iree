@@ -88,7 +88,6 @@ Hello @{author} :wave:
 Thank you for submitting an issue to IREE! It looks like it's your first one.
 
 The volume of issues is huge, and triage times may vary. If you need quicker assistance on the issue, consider posting it on [IREE Discord](https://discord.gg/e4F4NzX99) and providing short context there.
-Feel free to identify the most frequent contributors to the corresponding part of the codebase via Git history/[CODEOWNERS](.github/CODEOWNERS) and (gently!) tag them below.
 
 ---
 
