@@ -73,7 +73,7 @@ jobs:
         with:
           persist-credentials: false
           repository: iree-org/iree-test-suites
-          ref: 612f93663b32ea86ea442e87be549f1056a5de1c
+          ref: eed3830561555ae265479da1ee250b61f1686f87
           path: iree-test-suites
           lfs: false
 
