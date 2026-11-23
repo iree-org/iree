@@ -257,6 +257,60 @@ to learn how to customize this behavior.
 <!-- --8<-- [end:github-policies] -->
 
 <!-- --8<-- [start:github-policies-continued] -->
+### Pull request descriptions
+
+PRs are [squash-merged](#merging-approved-changes), so the PR title and
+description become the commit message, and the commit messages on the PR
+branch are discarded. Write them for someone reading `git log` or bisecting
+a regression later, and update them when the PR changes during review.
+
+**Title**: a short, imperative summary of what changes and, if it fits, why,
+prefixed with the affected area, for example
+`[CI] Bump iree-test-suites to fix sharktank test failure`. Keep it under 72
+characters. Avoid ambiguous titles like "Fix bug" or "Fix CI".
+
+**Description**: start with _why_, then _what_.
+
+1. **Why**: The most important part of a PR description.
+   Explain the underlying motivation of the PR. Why did you create it and what is the use-case this enables or fixes.
+   Be concise. Depending on the change, this covers:
+    * for a bug fix, the symptom, its impact, and the issue or failing run
+    * for a regression fix, also the commit or PR that introduced it
+    * for a feature, the missing capability and what it is used for
+    * for a refactor, the current limitation
+    * for a performance change, the bottleneck, with numbers
+    * for a revert or reland, what broke or what was fixed since, and the
+      original PR
+2. **Change**: what the PR does and why this approach. The diff shows the
+   details. For refactors, state "No functional change intended". For small
+   PRs, one sentence is enough.
+3. **If relevant**:
+    * results: before/after numbers for performance, memory, or size
+      changes, and how they were measured
+    * trade-offs: known shortcomings, costs, or side effects
+    * testing: only tests that CI does not cover
+    * review notes: where reviewers should start in large PRs
+4. **Trailers** at the end: `Fixes #1234` for issues that the PR resolves,
+   `Depends on #1234` for PRs that it builds on,
+   [CI trailers](https://iree.dev/developers/general/contributing/#ci-behavior-manipulation)
+   such as `ci-extra:`, and `Assisted-by:` for [AI tools](#ai-tool-use).
+
+Keep the description concise and self-contained: links add context but do
+not replace an explanation, and they must be public. Leave out restatements
+of the diff, implementation details that belong in code comments, review
+history, and `@`-mentions, which notify people again on every cherry-pick.
+A description that keeps growing is a sign that the PR should be split.
+Small changes need one or two sentences; longer descriptions can use
+headings such as `## Why`, `## Change`, and `## Results`.
+
+See also:
+
+* [LLVM: Commit messages](https://llvm.org/docs/DeveloperPolicy.html#commit-messages)
+* [Google Engineering Practices: Writing good CL descriptions](https://google.github.io/eng-practices/review/developer/cl-descriptions.html)
+* [Linux kernel: Describe your changes](https://docs.kernel.org/process/submitting-patches.html#describe-your-changes)
+* [GitHub: Helping others review your changes](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/helping-others-review-your-changes)
+* [How to write a Git commit message](https://cbea.ms/git-commit/)
+
 ### Merging approved changes
 
 After review and presubmit checks, PRs should typically be merged using
@@ -264,7 +318,8 @@ After review and presubmit checks, PRs should typically be merged using
 
 * The squashed commit summary should match the PR title and the commit
   description should match the PR body (this is the default behavior).
-  Accordingly, please write these as you would a helpful commit message.
+  Accordingly, please write these as you would a helpful commit message
+  (see [Pull request descriptions](#pull-request-descriptions)).
 
 It is assumed that the PR author will merge their change unless they ask
 someone else to merge it for them (e.g. because they don't have write access
