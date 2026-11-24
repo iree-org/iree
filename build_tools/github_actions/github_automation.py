@@ -59,12 +59,12 @@ All contributions to IREE must follow our [contribution guidelines](https://gith
 - Contributors own their changes: they must review **all** of them themselves and understand them well enough to explain and defend them. AI review tools do not replace this review.
 - Contributors also own their changes after merge: they fix or revert them when problems come up.
 - PR descriptions may be AI-assisted, but contributors must review them and follow the [pull request description guidelines](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#pull-request-descriptions).
-- Contributions are written for human readers: maintainers, reviewers, and people reading the history later. AI clutter, such as boilerplate, comments that narrate obvious code, restated diffs, agent logs, or filler text, does not belong in any contribution.
+- Contributions are written for human readers: the people who review and maintain them, and who read the history later. AI clutter, such as boilerplate, comments that narrate obvious code, restated diffs, agent logs, or filler text, does not belong in any contribution.
 - There must always be a human in the loop: contributors must respond to reviews and questions by themselves. A lack of understanding makes a contribution [extractive](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#extractive-contributions), because it puts the burden on the reviewers instead of the author.
-- Every contribution, whether a pull request, an issue, or a comment, should be worth more to the project than the time maintainers spend on it. Otherwise it is [extractive](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#extractive-contributions), and it is up to the author to show that it is not.
+- Every contribution, whether a pull request, an issue, or a comment, should be worth more to the project than the time maintainers spend on it. Otherwise it is [extractive](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#extractive-contributions) and may be closed. It is then up to the author to show that it is not.
 - GitHub issues labeled as "Good first issue" are explicitly designated as learning opportunities for newcomers to the project. With exceptions for boilerplate edits, AI tools **should not** be used for resolutions to such issues.
 
-If this pull request does not follow these guidelines yet, for example because an AI agent opened it without your review, please close it and open a new one once you have reworked the change.
+If this pull request does not follow these guidelines yet, for example because an AI agent opened it without your review, please close it and reopen it once you have reworked the change.
 
 We kindly ask you to **reply to this message** and confirm that you understand and accept the policies and contribution guidelines.
 
@@ -102,7 +102,7 @@ Please note that all contributions to IREE, **including GitHub issues**, must fo
 - The description may be AI-assisted, but it must make the scenario and impact clear to others. For a bug, this is the use case, workflow, or crash. For an improvement, it is the affected code and the expected benefit.
 - Issues are written for human readers: the maintainers and contributors who triage and fix them. AI clutter, such as boilerplate, agent logs, or filler text, does not belong in the report.
 - There must always be a human in the loop: issue authors answer follow-up questions themselves.
-- Every contribution, whether a pull request, an issue, or a comment, should be worth more to the project than the time maintainers spend on it. Otherwise it is [extractive](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#extractive-contributions), and it is up to the author to show that it is not.
+- Every contribution, whether a pull request, an issue, or a comment, should be worth more to the project than the time maintainers spend on it. Otherwise it is [extractive](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#extractive-contributions) and may be closed. It is then up to the author to show that it is not.
 
 Before the issue can be triaged, we kindly ask you to **reply to this message** and confirm that you understand and accept the policies and contribution guidelines. If needed, update the issue description accordingly.
 
