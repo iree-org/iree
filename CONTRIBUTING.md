@@ -350,8 +350,8 @@ Contributors:
    descriptions, but must read and correct them themselves before submitting.
    PR descriptions follow the
    [pull request description guidelines](#pull-request-descriptions).
-3. Must write every contribution for its human readers: maintainers,
-   reviewers, and people reading the history later. AI clutter, such as
+3. Must write every contribution for its human readers: the people who review
+   and maintain it, and who read the history later. AI clutter, such as
    boilerplate, comments that narrate obvious code, restatements of the diff,
    agent logs, or filler text, does not belong in any contribution.
 4. Must respond to reviews and questions themselves. There must always be a
