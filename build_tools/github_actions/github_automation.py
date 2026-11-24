@@ -55,7 +55,7 @@ Thank you for submitting a Pull Request to IREE! It looks like this is your firs
 ### Action required: acknowledge IREE project policies
 IREE is a Linux Foundation project. All participants are expected to follow the [LF Projects Code of Conduct](https://lfprojects.org/policies/code-of-conduct/).
 
-All contributions to IREE must follow our [IREE AI Tool Use Policy](https://iree.dev/developers/general/contributing/#ai-tool-use). In particular:
+All contributions to IREE must follow our [contribution guidelines](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md). In particular:
 - Contributors own their changes: Contributors must fully understand, review, and vouch for, **all** submitted contributions and the intent behind them. AI review tools do not replace this review.
 - PR descriptions may be AI-assisted, but contributors must review them and follow the [pull request description guidelines](https://iree.dev/developers/general/contributing/#pull-request-descriptions).
 - Contributions are written for human readers: keep AI clutter such as boilerplate, comments that narrate obvious code, restated diffs, agent logs, or filler text out of code, descriptions, and comments.
@@ -63,7 +63,7 @@ All contributions to IREE must follow our [IREE AI Tool Use Policy](https://iree
 - Every contribution, whether a pull request, an issue, or a comment, should be worth more to the project than the time maintainers spend on it. Maintainers may close [extractive contributions](https://iree.dev/developers/general/contributing/#extractive-contributions); it is then up to the author to show that the contribution is not extractive.
 - GitHub issues labeled as "Good first issue" are explicitly designated as learning opportunities for newcomers to the project. With exceptions for boilerplate edits, AI tool usage for resolutions to such issues is **forbidden**.
 
-We kindly ask you to **reply to this message** and confirm that you understand and accept the cited policies, particularly the AI Tool Use Policy.
+We kindly ask you to **reply to this message** and confirm that you understand and accept the contribution guidelines.
 
 ---
 
@@ -94,7 +94,7 @@ The volume of issues is huge, and triage times may vary. If you need quicker ass
 ### Action required: acknowledge IREE project policies
 IREE is a Linux Foundation project. All participants are expected to follow the [LF Projects Code of Conduct](https://lfprojects.org/policies/code-of-conduct/).
 
-Please note that all contributions to IREE, **including GitHub issues**, must follow our [IREE AI Tool Use Policy](https://iree.dev/developers/general/contributing/#ai-tool-use). This means:
+Please note that all contributions to IREE, **including GitHub issues**, must follow our [contribution guidelines](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md). In particular:
 - Issue reporters must fully understand the primary issue and the impact of the problem.
   For bug reports, specifics of the use-case, workflow and/or crash scenario usually suffice.
   For improvement suggestions, this usually implies deeper understanding of suboptimal code, IR design choices, assumed performance tradeoffs, etc.
@@ -103,7 +103,7 @@ Please note that all contributions to IREE, **including GitHub issues**, must fo
 - Issue authors are expected to review and understand all LLM/AI-assisted segments of the report, if any. E.g.: CLI commands and IR reproducers, model/framework details, lowering pipeline details, assumptions about problematic behaviors of IREE components.
 - Every contribution, whether a pull request, an issue, or a comment, should be worth more to the project than the time maintainers spend on it. Maintainers may close [extractive contributions](https://iree.dev/developers/general/contributing/#extractive-contributions); it is then up to the author to show that the contribution is not extractive.
 
-Before the issue can be triaged, we kindly ask you to **reply to this message** and confirm that you understand and accept the proposed policy. As required, please adjust your initial issue description.
+Before the issue can be triaged, we kindly ask you to **reply to this message** and confirm that you understand and accept the contribution guidelines. As required, please adjust your initial issue description.
 
 ---
 
