@@ -1174,11 +1174,17 @@ static iree_status_t iree_hal_hip_device_prepare_async_alloc(
       .flags = IREE_HAL_BUFFER_PLACEMENT_FLAG_ASYNCHRONOUS,
   };
 
+  // HIP returns a NULL pointer for a 0-byte allocation, and readers of an async
+  // buffer wait until it has a pointer. Back an empty buffer with a few bytes,
+  // as the synchronous allocator does, while its view stays empty.
+  const iree_device_size_t backing_size =
+      allocation_size == 0 ? 4 : allocation_size;
+
   iree_hal_buffer_release_callback_t callback = {
       .fn = &iree_hal_hip_async_buffer_release, .user_data = (void*)device};
   iree_hal_buffer_t* buffer = NULL;
   iree_status_t status = iree_hal_hip_buffer_wrap(
-      placement, params.type, params.access, params.usage, allocation_size,
+      placement, params.type, params.access, params.usage, backing_size,
       /*byte_offset=*/0,
       /*byte_length=*/allocation_size, IREE_HAL_HIP_BUFFER_TYPE_ASYNC,
       /*device_ptr=*/NULL, /*host_ptr=*/NULL, callback, device->host_allocator,

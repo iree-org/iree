@@ -783,6 +783,58 @@ TEST_P(QueueAllocaTest, AllocaDeallocaCycle) {
   }
 }
 
+// Verifies a 0-byte alloca and its dealloca complete, and that the queue keeps
+// completing later work. Waits are bounded so that a driver thread blocked on
+// the empty allocation fails the test instead of hanging it.
+TEST_P(QueueAllocaTest, EmptyAllocaDeallocaKeepsQueueProgressing) {
+  IREE_TRACE_SCOPE();
+  const iree_timeout_t timeout = iree_make_timeout_ms(10000);
+  iree_hal_buffer_params_t params = MakeQueueAllocaBufferParams();
+  SemaphoreList empty_wait;
+
+  SemaphoreList alloca_signal(device_, {0}, {1});
+  SemaphoreList dealloca_signal(device_, {0}, {1});
+  iree_hal_buffer_t* empty_buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, alloca_signal,
+      /*pool=*/NULL, params, /*allocation_size=*/0, IREE_HAL_ALLOCA_FLAG_NONE,
+      &empty_buffer));
+  ASSERT_NE(empty_buffer, nullptr);
+  EXPECT_EQ(iree_hal_buffer_byte_length(empty_buffer), 0u);
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(alloca_signal, timeout,
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, alloca_signal, dealloca_signal,
+      empty_buffer, IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(dealloca_signal, timeout,
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+  iree_hal_buffer_release(empty_buffer);
+
+  // Later work on the queue must still complete.
+  const iree_device_size_t allocation_size = 256;
+  SemaphoreList next_alloca_signal(device_, {0}, {1});
+  SemaphoreList next_dealloca_signal(device_, {0}, {1});
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_ASSERT_OK(iree_hal_device_queue_alloca(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, dealloca_signal, next_alloca_signal,
+      /*pool=*/NULL, params, allocation_size, IREE_HAL_ALLOCA_FLAG_NONE,
+      &buffer));
+  ASSERT_NE(buffer, nullptr);
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(next_alloca_signal, timeout,
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+  uint32_t pattern = 0xF00DCAFE;
+  FillBufferAndWait(IREE_HAL_QUEUE_AFFINITY_ANY, buffer, 0, allocation_size,
+                    &pattern, sizeof(pattern));
+  EXPECT_EQ(ReadBufferValue<uint32_t>(IREE_HAL_QUEUE_AFFINITY_ANY, buffer),
+            pattern);
+  IREE_ASSERT_OK(iree_hal_device_queue_dealloca(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, next_alloca_signal,
+      next_dealloca_signal, buffer, IREE_HAL_DEALLOCA_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(next_dealloca_signal, timeout,
+                                              IREE_ASYNC_WAIT_FLAG_NONE));
+  iree_hal_buffer_release(buffer);
+}
+
 // Verifies returned buffer metadata matches the requested parameters.
 TEST_P(QueueAllocaTest, BufferMetadata) {
   IREE_TRACE_SCOPE();

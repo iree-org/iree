@@ -237,10 +237,15 @@ iree_status_t iree_hal_cuda_memory_pools_alloca(
           ? pools->device_local
           : pools->other;
 
+  // A pool cannot return storage for 0 bytes. Back an empty buffer with a few
+  // bytes, as the synchronous allocator does, while its view stays empty.
+  const iree_device_size_t backing_size =
+      allocation_size == 0 ? 4 : allocation_size;
+
   CUdeviceptr device_ptr = 0;
   iree_status_t status = IREE_CURESULT_TO_STATUS(
       pools->cuda_symbols,
-      cuMemAllocFromPoolAsync(&device_ptr, (size_t)allocation_size, memory_pool,
+      cuMemAllocFromPoolAsync(&device_ptr, (size_t)backing_size, memory_pool,
                               stream),
       "cuMemAllocFromPoolAsync");
 
@@ -261,7 +266,7 @@ iree_status_t iree_hal_cuda_memory_pools_alloca(
         .user_data = pools,
     };
     status = iree_hal_cuda_buffer_wrap(
-        placement, params.type, params.access, params.usage, allocation_size,
+        placement, params.type, params.access, params.usage, backing_size,
         /*byte_offset=*/0,
         /*byte_length=*/allocation_size, IREE_HAL_CUDA_BUFFER_TYPE_ASYNC,
         device_ptr, /*host_ptr=*/NULL, release_callback, pools->host_allocator,
