@@ -3,11 +3,6 @@
 <!-- --8<-- [start:intro] -->
 We'd love to accept your patches and contributions to this project.
 
-Each rule in these guidelines has an anchor, such as `cg-ai-4`, so that it can
-be linked directly, for example as `CONTRIBUTING.md#cg-ai-4`. The anchors are in
-the source of this file. An anchor stays the same when the wording of its rule
-changes, and the anchor of a removed rule is not reused.
-
 <!-- --8<-- [end:intro] -->
 
 This file covers the policies that apply to every contributor. The
