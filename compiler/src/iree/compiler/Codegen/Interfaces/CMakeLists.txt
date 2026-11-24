@@ -283,6 +283,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRLinalgTransforms
     MLIRUBDialect
+    iree::compiler::Codegen::Transforms
     iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )
