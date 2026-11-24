@@ -271,12 +271,12 @@ description become the commit message, and the commit messages on the PR
 branch are discarded. Write them for someone reading `git log` or bisecting
 a regression later, and update them when the PR changes during review.
 
-**Title**: a short, imperative summary of what changes and, if it fits, why,
-prefixed with the affected area, for example
+<a id="pr-1"></a>**PR-1 (title):** a short, imperative summary of what changes
+and, if it fits, why, prefixed with the affected area, for example
 `[CI] Bump iree-test-suites to fix sharktank test failure`. Keep it under 72
 characters. Avoid ambiguous titles like "Fix bug" or "Fix CI".
 
-**Description**: start with _why_, then _what_.
+<a id="pr-2"></a>**PR-2 (description):** start with _why_, then _what_.
 
 1. **Why**: The most important part of a PR description.
    Explain the underlying motivation of the PR. Why did you create it and what is the use-case this enables or fixes.
@@ -302,12 +302,12 @@ characters. Avoid ambiguous titles like "Fix bug" or "Fix CI".
    [CI trailers](https://iree.dev/developers/general/contributing/#ci-behavior-manipulation)
    such as `ci-extra:`, and `Assisted-by:` for [AI tools](#ai-tool-use).
 
-Keep the description concise and self-contained: links add context but do
-not replace an explanation, and they must be public. Leave out restatements
-of the diff, implementation details that belong in code comments, review
-history, and `@`-mentions, which notify people again on every cherry-pick.
-A description that keeps growing is a sign that the PR should be split.
-Small changes need one or two sentences; longer descriptions can use
+<a id="pr-3"></a>**PR-3:** Keep the description concise and self-contained:
+links add context but do not replace an explanation, and they must be public.
+Leave out restatements of the diff, implementation details that belong in code
+comments, review history, and `@`-mentions, which notify people again on every
+cherry-pick. A description that keeps growing is a sign that the PR should be
+split. Small changes need one or two sentences; longer descriptions can use
 headings such as `## Why`, `## Change`, and `## Results`.
 
 See also:
