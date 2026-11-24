@@ -69,7 +69,6 @@
     "onnx/node/generated/test_dft_inverse",
     "onnx/node/generated/test_dft_inverse_opset19",
     "onnx/node/generated/test_dft_opset19",
-    "onnx/node/generated/test_div_uint8",
     "onnx/node/generated/test_edge_pad",
     "onnx/node/generated/test_gridsample_bicubic",
     "onnx/node/generated/test_gridsample_bicubic_align_corners_0_additional_1",
