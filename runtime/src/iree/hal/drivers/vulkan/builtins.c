@@ -259,10 +259,93 @@ static iree_status_t iree_hal_vulkan_builtins_create_compute_pipeline(
   return status;
 }
 
+// Returns the first memory type allowed by |memory_type_bits|, preferring
+// device-local memory, or UINT32_MAX when none is allowed.
+static uint32_t iree_hal_vulkan_builtins_select_empty_binding_memory_type(
+    const VkPhysicalDeviceMemoryProperties* memory_properties,
+    uint32_t memory_type_bits) {
+  uint32_t memory_type_index = UINT32_MAX;
+  for (uint32_t i = 0; i < memory_properties->memoryTypeCount; ++i) {
+    if (!(memory_type_bits & (1u << i))) continue;
+    if (memory_properties->memoryTypes[i].propertyFlags &
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
+      return i;
+    }
+    if (memory_type_index == UINT32_MAX) memory_type_index = i;
+  }
+  return memory_type_index;
+}
+
+// Creates the device-local word bound for empty binding ranges. Handles created
+// before a failure stay in |builtins| for deinitialization to release.
+static iree_status_t iree_hal_vulkan_builtins_create_empty_binding_buffer(
+    const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
+    bool device_addresses, iree_hal_vulkan_builtins_t* builtins) {
+  VkBufferCreateInfo buffer_create_info = {
+      .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+      .size = sizeof(uint32_t),
+      .usage =
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+          (device_addresses ? VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT : 0),
+      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+  };
+  IREE_RETURN_IF_ERROR(iree_vkCreateBuffer(
+      IREE_VULKAN_DEVICE(&builtins->syms), builtins->logical_device,
+      &buffer_create_info, /*pAllocator=*/NULL,
+      &builtins->empty_binding_buffer));
+
+  VkMemoryRequirements requirements;
+  iree_vkGetBufferMemoryRequirements(
+      IREE_VULKAN_DEVICE(&builtins->syms), builtins->logical_device,
+      builtins->empty_binding_buffer, &requirements);
+  const uint32_t memory_type_index =
+      iree_hal_vulkan_builtins_select_empty_binding_memory_type(
+          &physical_device->memory_properties2.memoryProperties,
+          requirements.memoryTypeBits);
+  if (memory_type_index == UINT32_MAX) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "no Vulkan memory type can back the empty-binding "
+                            "buffer");
+  }
+  VkMemoryAllocateFlagsInfo allocate_flags_info = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
+      .flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT,
+  };
+  VkMemoryAllocateInfo allocate_info = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+      .pNext = device_addresses ? &allocate_flags_info : NULL,
+      .allocationSize = requirements.size,
+      .memoryTypeIndex = memory_type_index,
+  };
+  IREE_RETURN_IF_ERROR(iree_vkAllocateMemory(
+      IREE_VULKAN_DEVICE(&builtins->syms), builtins->logical_device,
+      &allocate_info, /*pAllocator=*/NULL, &builtins->empty_binding_memory));
+  IREE_RETURN_IF_ERROR(iree_vkBindBufferMemory(
+      IREE_VULKAN_DEVICE(&builtins->syms), builtins->logical_device,
+      builtins->empty_binding_buffer, builtins->empty_binding_memory,
+      /*memoryOffset=*/0));
+  if (!device_addresses) return iree_ok_status();
+
+  VkBufferDeviceAddressInfo address_info = {
+      .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+      .buffer = builtins->empty_binding_buffer,
+  };
+  builtins->empty_binding_address =
+      iree_vkGetBufferDeviceAddress(IREE_VULKAN_DEVICE(&builtins->syms),
+                                    builtins->logical_device, &address_info);
+  if (builtins->empty_binding_address == 0) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "Vulkan empty-binding buffer has no device "
+                            "address");
+  }
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_vulkan_builtins_initialize(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
-    iree_hal_vulkan_builtins_t* out_builtins) {
+    bool device_addresses, iree_hal_vulkan_builtins_t* out_builtins) {
   IREE_ASSERT_ARGUMENT(syms);
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(physical_device);
@@ -335,6 +418,10 @@ iree_status_t iree_hal_vulkan_builtins_initialize(
         sizeof(iree_hal_vulkan_update_unaligned_spirv),
         &out_builtins->update_pipeline);
   }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_vulkan_builtins_create_empty_binding_buffer(
+        physical_device, device_addresses, out_builtins);
+  }
   if (!iree_status_is_ok(status)) {
     iree_hal_vulkan_builtins_deinitialize(out_builtins);
   }
@@ -344,6 +431,16 @@ iree_status_t iree_hal_vulkan_builtins_initialize(
 void iree_hal_vulkan_builtins_deinitialize(
     iree_hal_vulkan_builtins_t* builtins) {
   if (!builtins || !builtins->logical_device) return;
+  if (builtins->empty_binding_buffer) {
+    iree_vkDestroyBuffer(IREE_VULKAN_DEVICE(&builtins->syms),
+                         builtins->logical_device,
+                         builtins->empty_binding_buffer, /*pAllocator=*/NULL);
+  }
+  if (builtins->empty_binding_memory) {
+    iree_vkFreeMemory(IREE_VULKAN_DEVICE(&builtins->syms),
+                      builtins->logical_device, builtins->empty_binding_memory,
+                      /*pAllocator=*/NULL);
+  }
   if (builtins->update_pipeline) {
     iree_vkDestroyPipeline(IREE_VULKAN_DEVICE(&builtins->syms),
                            builtins->logical_device, builtins->update_pipeline,

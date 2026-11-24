@@ -40,13 +40,22 @@ typedef struct iree_hal_vulkan_builtins_t {
 
   // Compute pipeline patching partial dwords for unaligned updates.
   VkPipeline update_pipeline;
+
+  // One device-local word bound in place of an empty binding range. Vulkan
+  // descriptors cannot have a zero range, and a BDA binding table entry needs a
+  // valid address. Shaders never access it because the binding has no elements.
+  VkBuffer empty_binding_buffer;
+  VkDeviceMemory empty_binding_memory;
+  // Device address of the word under the BDA dispatch ABI, or 0 without it.
+  VkDeviceAddress empty_binding_address;
 } iree_hal_vulkan_builtins_t;
 
 // Initializes built-in Vulkan pipelines for |logical_device|.
+// |device_addresses| is true when the device enables the BDA dispatch ABI.
 iree_status_t iree_hal_vulkan_builtins_initialize(
     const iree_hal_vulkan_device_syms_t* syms, VkDevice logical_device,
     const iree_hal_vulkan_physical_device_snapshot_t* physical_device,
-    iree_hal_vulkan_builtins_t* out_builtins);
+    bool device_addresses, iree_hal_vulkan_builtins_t* out_builtins);
 
 // Deinitializes built-in Vulkan pipelines and releases device handles.
 void iree_hal_vulkan_builtins_deinitialize(
