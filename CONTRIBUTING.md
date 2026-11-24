@@ -364,6 +364,10 @@ Contributors:
 6. Own their changes after merge: they fix or revert them when problems come
    up. The [DCO](#developer-certificate-of-origin) requirements apply.
 
+GitHub issues labeled as "Good first issue" are explicitly designated as
+learning opportunities for newcomers to the project. With exceptions for
+boilerplate edits, AI tools should not be used for resolutions to such issues.
+
 Noting AI assistance is optional. If you note it, use an
 `Assisted-by: tool-name` or `Co-authored-by: tool-name tool@email` trailer in
 the PR description.
