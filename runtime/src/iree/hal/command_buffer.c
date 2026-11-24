@@ -662,13 +662,14 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
   const bool has_static_workgroup_count =
       !iree_hal_dispatch_uses_indirect_parameters(flags);
   if (has_static_workgroup_count &&
-      (config.workgroup_count[0] | config.workgroup_count[1] |
-       config.workgroup_count[2]) == 0) {
-    // No-op dispatch. All implementations are expected to do this but we ensure
-    // it happens here to avoid the overhead of going all the way down into the
-    // device layer for something we know should have no (intentional)
-    // side-effects. Note that this does mean that validation is skipped and
-    // the executable/etc could be bogus but that's fine.
+      (config.workgroup_count[0] == 0 || config.workgroup_count[1] == 0 ||
+       config.workgroup_count[2] == 0)) {
+    // No-op dispatch: a grid with any zero dimension has no workgroups, and
+    // device launch APIs reject such grids. All implementations are expected to
+    // skip it but we ensure it happens here to avoid the overhead of going all
+    // the way down into the device layer for something we know should have no
+    // (intentional) side-effects. Note that this does mean that validation is
+    // skipped and the executable/etc could be bogus but that's fine.
     return iree_ok_status();
   }
 

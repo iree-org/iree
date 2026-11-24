@@ -1179,8 +1179,8 @@ static iree_status_t iree_hal_amdgpu_host_queue_update(
 static bool iree_hal_amdgpu_host_queue_is_noop_dispatch(
     const iree_hal_dispatch_config_t config, iree_hal_dispatch_flags_t flags) {
   return !iree_hal_dispatch_uses_indirect_parameters(flags) &&
-         (config.workgroup_count[0] | config.workgroup_count[1] |
-          config.workgroup_count[2]) == 0;
+         (config.workgroup_count[0] == 0 || config.workgroup_count[1] == 0 ||
+          config.workgroup_count[2] == 0);
 }
 
 // Queue dispatch entry point. Empty direct dispatches route through the barrier
