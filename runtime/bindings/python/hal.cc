@@ -1665,23 +1665,21 @@ void SetupHalBindings(nanobind::module_ m) {
           py::keep_alive<0, 1>(), py::arg("device_info"),
           py::arg("params") = py::none(), py::arg("allocators") = py::none())
       .def("query_available_devices", &HalDriver::QueryAvailableDevices)
-      .def("dump_device_info",
-           [](HalDriver& self, iree_hal_device_id_t device_id) {
-             iree_string_builder_t builder;
-             iree_string_builder_initialize(iree_allocator_system(), &builder);
-             iree_status_t status = iree_hal_driver_dump_device_info(
-                 self.raw_ptr(), device_id, &builder);
-             if (!iree_status_is_ok(status)) {
-               iree_string_builder_deinitialize(&builder);
-               CheckApiStatus(status, "Querying device info");
-             }
-             iree_string_view_t view = iree_string_builder_view(&builder);
-             // TODO(#25083): Guard the builder if Python string construction
-             // throws.
-             py::str result(view.data, view.size);
-             iree_string_builder_deinitialize(&builder);
-             return result;
-           });
+      .def("dump_device_info", [](HalDriver& self,
+                                  iree_hal_device_id_t device_id) {
+        iree_string_builder_t builder;
+        iree_string_builder_initialize(iree_allocator_system(), &builder);
+        std::unique_ptr<iree_string_builder_t,
+                        decltype(&iree_string_builder_deinitialize)>
+            builder_guard(&builder, &iree_string_builder_deinitialize);
+
+        iree_status_t status = iree_hal_driver_dump_device_info(
+            self.raw_ptr(), device_id, builder_guard.get());
+        CheckApiStatus(status, "Querying device info");
+        iree_string_view_t view = iree_string_builder_view(builder_guard.get());
+        py::str result(view.data, view.size);
+        return result;
+      });
 
   m.def(
       "get_cached_hal_driver",
