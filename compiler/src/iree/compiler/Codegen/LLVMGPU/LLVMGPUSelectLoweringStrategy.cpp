@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Pass/Pass.h"
@@ -31,7 +32,8 @@ public:
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<IREE::Codegen::IREECodegenDialect, IREE::GPU::IREEGPUDialect>();
+        .insert<IREE::Codegen::IREECodegenDialect, IREE::GPU::IREEGPUDialect,
+                IREE::VectorExt::IREEVectorExtDialect>();
   }
 
   void runOnOperation() override;
