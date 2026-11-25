@@ -10,29 +10,27 @@
 
 iree_add_all_subdirs()
 
-if(NOT IREE_BUILD_TESTS)
-  return()
+if(IREE_BUILD_TESTS)
+  execute_process(
+    COMMAND
+      "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/check_requirements.py"
+    RESULT_VARIABLE _IREE_CORE_REQUIREMENTS_RESULT
+    ERROR_VARIABLE _IREE_CORE_REQUIREMENTS_ERROR
+    OUTPUT_QUIET
+    ERROR_STRIP_TRAILING_WHITESPACE
+  )
+  if(_IREE_CORE_REQUIREMENTS_RESULT EQUAL 0)
+    iree_local_py_test(
+      NAME
+        package_test
+      SRC
+        "test/package_test.py"
+      PACKAGE_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+  else()
+    message(STATUS "Not adding the iree.core tests: ${_IREE_CORE_REQUIREMENTS_ERROR}")
+  endif()
 endif()
-execute_process(
-  COMMAND
-    "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/check_requirements.py"
-  RESULT_VARIABLE _IREE_CORE_REQUIREMENTS_RESULT
-  ERROR_VARIABLE _IREE_CORE_REQUIREMENTS_ERROR
-  OUTPUT_QUIET
-  ERROR_STRIP_TRAILING_WHITESPACE
-)
-if(NOT _IREE_CORE_REQUIREMENTS_RESULT EQUAL 0)
-  message(STATUS "Not adding the iree.core tests: ${_IREE_CORE_REQUIREMENTS_ERROR}")
-  return()
-endif()
-
-iree_local_py_test(
-  NAME
-    package_test
-  SRC
-    "test/package_test.py"
-  PACKAGE_DIRS
-    "${CMAKE_CURRENT_SOURCE_DIR}"
-)
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

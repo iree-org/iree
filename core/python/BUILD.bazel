@@ -50,34 +50,31 @@ py_test(
 
 # bazel_to_cmake does not convert py_test, so each test is mirrored here for
 # CTest. The tests are registered only if the dependencies in pyproject.toml
-# are installed, so that builds that use no Python need not install them. This
-# must stay last in the file: the early return skips whatever follows.
+# are installed, so that builds that use no Python need not install them.
 iree_cmake_extra_content(
     content = """
-if(NOT IREE_BUILD_TESTS)
-  return()
+if(IREE_BUILD_TESTS)
+  execute_process(
+    COMMAND
+      "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/check_requirements.py"
+    RESULT_VARIABLE _IREE_CORE_REQUIREMENTS_RESULT
+    ERROR_VARIABLE _IREE_CORE_REQUIREMENTS_ERROR
+    OUTPUT_QUIET
+    ERROR_STRIP_TRAILING_WHITESPACE
+  )
+  if(_IREE_CORE_REQUIREMENTS_RESULT EQUAL 0)
+    iree_local_py_test(
+      NAME
+        package_test
+      SRC
+        "test/package_test.py"
+      PACKAGE_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+  else()
+    message(STATUS "Not adding the iree.core tests: ${_IREE_CORE_REQUIREMENTS_ERROR}")
+  endif()
 endif()
-execute_process(
-  COMMAND
-    "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/check_requirements.py"
-  RESULT_VARIABLE _IREE_CORE_REQUIREMENTS_RESULT
-  ERROR_VARIABLE _IREE_CORE_REQUIREMENTS_ERROR
-  OUTPUT_QUIET
-  ERROR_STRIP_TRAILING_WHITESPACE
-)
-if(NOT _IREE_CORE_REQUIREMENTS_RESULT EQUAL 0)
-  message(STATUS "Not adding the iree.core tests: ${_IREE_CORE_REQUIREMENTS_ERROR}")
-  return()
-endif()
-
-iree_local_py_test(
-  NAME
-    package_test
-  SRC
-    "test/package_test.py"
-  PACKAGE_DIRS
-    "${CMAKE_CURRENT_SOURCE_DIR}"
-)
 """,
     inline = True,
 )

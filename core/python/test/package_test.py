@@ -15,8 +15,8 @@ class PackageTest(unittest.TestCase):
         importlib.import_module("iree.core")
 
     def test_iree_is_a_namespace_package(self):
-        # The three packages share the `iree` namespace, which only works
-        # while none of them provides an `iree/__init__.py`.
+        # iree.core, iree.compiler and iree.runtime share the `iree` namespace,
+        # which only works while none of them provides an `iree/__init__.py`.
         iree = importlib.import_module("iree")
         self.assertIsNone(getattr(iree, "__file__", None))
 
