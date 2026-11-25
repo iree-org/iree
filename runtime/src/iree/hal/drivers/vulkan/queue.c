@@ -2049,6 +2049,7 @@ static bool iree_hal_vulkan_queue_native_replay_bda_binding_slots_match(
 
 static iree_status_t iree_hal_vulkan_queue_resolve_native_replay_bda_slots(
     iree_hal_buffer_binding_table_t binding_table,
+    VkDeviceAddress empty_binding_address,
     const iree_hal_vulkan_queue_native_replay_t* replay,
     iree_hal_vulkan_command_buffer_bda_binding_cache_t* bda_binding_cache) {
   for (iree_host_size_t i = 0; i < replay->bda_binding_slot_count; ++i) {
@@ -2061,7 +2062,8 @@ static iree_status_t iree_hal_vulkan_queue_resolve_native_replay_bda_slots(
     iree_hal_vulkan_command_buffer_bda_binding_slot_t slot = {0};
     IREE_RETURN_IF_ERROR(
         iree_hal_vulkan_command_buffer_resolve_bda_binding_table_slot(
-            binding_table, (uint32_t)i, bda_binding_cache, &slot));
+            binding_table, (uint32_t)i, empty_binding_address,
+            bda_binding_cache, &slot));
   }
   return iree_ok_status();
 }
@@ -2346,7 +2348,8 @@ static iree_status_t iree_hal_vulkan_queue_acquire_native_replay_under_lock(
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status) && !replay_publication_current) {
     status = iree_hal_vulkan_queue_resolve_native_replay_bda_slots(
-        binding_table, replay, &bda_binding_cache);
+        binding_table, queue->builtins->empty_binding_address, replay,
+        &bda_binding_cache);
   }
   if (iree_status_is_ok(status) && !replay_publication_current) {
     replay_publication_current =
@@ -2361,7 +2364,8 @@ static iree_status_t iree_hal_vulkan_queue_acquire_native_replay_under_lock(
     replay->bda_binding_slots_valid = false;
     status = iree_hal_vulkan_command_buffer_publish_bda_binding_tables(
         submission->execute.command_buffer, binding_table,
-        publication_length != 0 ? &publication : NULL, &bda_binding_cache);
+        publication_length != 0 ? &publication : NULL,
+        queue->builtins->empty_binding_address, &bda_binding_cache);
   }
   if (iree_status_is_ok(status) && !replay_publication_current) {
     status = iree_hal_vulkan_queue_flush_bda_publication_lease(
@@ -8385,7 +8389,11 @@ static iree_status_t iree_hal_vulkan_queue_validate_dispatch_abi(
   }
 }
 
+// Resolves the descriptor for queue_dispatch binding |binding_ordinal|. An
+// empty range binds the empty-binding word of |builtins|, since Vulkan
+// descriptors cannot have a zero range and the dispatch accesses no element.
 static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_descriptor_binding(
+    const iree_hal_vulkan_builtins_t* builtins,
     const iree_hal_vulkan_queue_pending_submission_t* submission,
     const iree_hal_vulkan_descriptor_binding_t* descriptor_binding,
     iree_host_size_t binding_ordinal, VkDescriptorBufferInfo* out_buffer_info) {
@@ -8411,10 +8419,18 @@ static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_descriptor_binding(
       binding->offset, binding->length, &descriptor_offset,
       &descriptor_length));
   if (descriptor_length == 0) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "Vulkan queue_dispatch binding %" PRIhsz
-                            " resolved to an empty buffer range",
-                            binding_ordinal);
+    if (!builtins || !builtins->empty_binding_buffer) {
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "Vulkan queue_dispatch binding %" PRIhsz
+                              " is empty but no empty-binding buffer exists",
+                              binding_ordinal);
+    }
+    *out_buffer_info = (VkDescriptorBufferInfo){
+        .buffer = builtins->empty_binding_buffer,
+        .offset = 0,
+        .range = IREE_HAL_VULKAN_EMPTY_BINDING_BUFFER_SIZE,
+    };
+    return iree_ok_status();
   }
 
   iree_hal_buffer_t* backing_buffer = NULL;
@@ -8448,7 +8464,11 @@ static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_descriptor_binding(
   return iree_ok_status();
 }
 
+// Resolves queue_dispatch binding |binding_ordinal| to its device address. An
+// empty range resolves to |empty_binding_address|, which the dispatch never
+// dereferences.
 static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_bda_binding(
+    VkDeviceAddress empty_binding_address,
     const iree_hal_vulkan_queue_pending_submission_t* submission,
     const iree_hal_vulkan_pipeline_t* pipeline,
     iree_host_size_t binding_ordinal, VkDeviceAddress* out_device_address) {
@@ -8461,29 +8481,32 @@ static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_bda_binding(
   IREE_RETURN_IF_ERROR(iree_hal_buffer_calculate_range(
       /*base_offset=*/0, iree_hal_buffer_byte_length(binding->buffer),
       binding->offset, binding->length, &binding_offset, &binding_length));
+  VkDeviceAddress device_address = empty_binding_address;
   if (binding_length == 0) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "Vulkan queue_dispatch binding %" PRIhsz
-                            " resolved to an empty buffer range",
-                            binding_ordinal);
+    if (empty_binding_address == 0) {
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "Vulkan queue_dispatch binding %" PRIhsz
+                              " is empty but no empty-binding address exists",
+                              binding_ordinal);
+    }
+  } else {
+    VkDeviceAddress buffer_address = 0;
+    IREE_RETURN_IF_ERROR(iree_hal_vulkan_buffer_device_address(
+        binding->buffer, &buffer_address));
+    if (buffer_address == 0) {
+      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                              "Vulkan queue_dispatch binding %" PRIhsz
+                              " buffer has no device address",
+                              binding_ordinal);
+    }
+    if (binding_offset > UINT64_MAX - buffer_address) {
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                              "Vulkan queue_dispatch binding %" PRIhsz
+                              " device address overflows",
+                              binding_ordinal);
+    }
+    device_address = buffer_address + binding_offset;
   }
-
-  VkDeviceAddress buffer_address = 0;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_vulkan_buffer_device_address(binding->buffer, &buffer_address));
-  if (buffer_address == 0) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                            "Vulkan queue_dispatch binding %" PRIhsz
-                            " buffer has no device address",
-                            binding_ordinal);
-  }
-  if (binding_offset > UINT64_MAX - buffer_address) {
-    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                            "Vulkan queue_dispatch binding %" PRIhsz
-                            " device address overflows",
-                            binding_ordinal);
-  }
-  const VkDeviceAddress device_address = buffer_address + binding_offset;
   if (binding_length > UINT64_MAX - device_address) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "Vulkan queue_dispatch binding %" PRIhsz
@@ -8620,7 +8643,7 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_descriptor_native(
     const iree_hal_vulkan_descriptor_binding_t* descriptor_binding =
         &pipeline->descriptor_bindings[i];
     status = iree_hal_vulkan_queue_resolve_dispatch_descriptor_binding(
-        submission, descriptor_binding, i, &buffer_infos[i]);
+        queue->builtins, submission, descriptor_binding, i, &buffer_infos[i]);
     if (iree_status_is_ok(status)) {
       write_infos[i] = (VkWriteDescriptorSet){
           .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
@@ -8773,7 +8796,8 @@ static iree_status_t iree_hal_vulkan_queue_record_dispatch_bda_native(
          ++i) {
       VkDeviceAddress device_address = 0;
       status = iree_hal_vulkan_queue_resolve_dispatch_bda_binding(
-          submission, pipeline, i, &device_address);
+          queue->builtins->empty_binding_address, submission, pipeline, i,
+          &device_address);
       if (iree_status_is_ok(status)) {
         binding_table[i] = device_address;
       }

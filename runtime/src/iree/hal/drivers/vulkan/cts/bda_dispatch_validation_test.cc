@@ -382,7 +382,9 @@ TEST_P(BdaDispatchValidationTest,
   iree_hal_buffer_release(input_buffer);
 }
 
-TEST_P(BdaDispatchValidationTest, QueueDispatchRejectsEmptyBindingRange) {
+// An empty binding range is valid: dispatches over empty tensors bind no bytes
+// and the dispatch never accesses them.
+TEST_P(BdaDispatchValidationTest, QueueDispatchAcceptsEmptyBindingRange) {
   iree_hal_buffer_t* input_buffer = nullptr;
   iree_hal_buffer_t* output_buffer = nullptr;
   IREE_ASSERT_OK(CreateInputOutputBuffers(&input_buffer, &output_buffer));
@@ -397,21 +399,22 @@ TEST_P(BdaDispatchValidationTest, QueueDispatchRejectsEmptyBindingRange) {
       /*.values=*/binding_refs,
   };
 
-  EXPECT_THAT(
-      Status(iree_hal_device_queue_dispatch(
-          device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
-          iree_hal_semaphore_list_empty(), executable_,
-          iree_hal_executable_function_from_index(0),
-          iree_hal_make_static_dispatch_config(1, 1, 1), constants(), bindings,
-          IREE_HAL_DISPATCH_FLAG_NONE)),
-      StatusIs(StatusCode::kInvalidArgument));
+  SemaphoreList empty_wait;
+  SemaphoreList dispatch_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_dispatch(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, dispatch_signal,
+      executable_, iree_hal_executable_function_from_index(0),
+      iree_hal_make_static_dispatch_config(1, 1, 1), constants(), bindings,
+      IREE_HAL_DISPATCH_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      dispatch_signal, iree_make_timeout_ms(10000), IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_buffer_release(output_buffer);
   iree_hal_buffer_release(input_buffer);
 }
 
 TEST_P(BdaDispatchValidationTest,
-       CommandBufferExecuteRejectsEmptyBindingRange) {
+       CommandBufferExecuteAcceptsEmptyBindingRange) {
   iree_hal_buffer_t* input_buffer = nullptr;
   iree_hal_buffer_t* output_buffer = nullptr;
   IREE_ASSERT_OK(CreateInputOutputBuffers(&input_buffer, &output_buffer));
@@ -438,12 +441,14 @@ TEST_P(BdaDispatchValidationTest,
       IREE_HAL_DISPATCH_FLAG_NONE));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
-  EXPECT_THAT(
-      Status(iree_hal_device_queue_execute(
-          device_, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
-          iree_hal_semaphore_list_empty(), command_buffer,
-          iree_hal_buffer_binding_table_empty(), IREE_HAL_EXECUTE_FLAG_NONE)),
-      StatusIs(StatusCode::kInvalidArgument));
+  SemaphoreList empty_wait;
+  SemaphoreList execute_signal(device_, {0}, {1});
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, empty_wait, execute_signal,
+      command_buffer, iree_hal_buffer_binding_table_empty(),
+      IREE_HAL_EXECUTE_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+      execute_signal, iree_make_timeout_ms(10000), IREE_ASYNC_WAIT_FLAG_NONE));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_buffer_release(output_buffer);

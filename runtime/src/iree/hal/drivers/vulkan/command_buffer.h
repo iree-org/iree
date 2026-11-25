@@ -103,10 +103,12 @@ typedef struct iree_hal_vulkan_command_buffer_bda_binding_cache_t {
 
 // Resolves one HAL binding table slot to its BDA device address and length.
 //
+// An empty slot resolves to |empty_binding_address| with length 0.
 // |bda_binding_cache| may be NULL. When present and the slot is within cache
 // bounds, the resolved address and length are cached for the caller.
 iree_status_t iree_hal_vulkan_command_buffer_resolve_bda_binding_table_slot(
     iree_hal_buffer_binding_table_t binding_table, uint32_t buffer_slot,
+    VkDeviceAddress empty_binding_address,
     iree_hal_vulkan_command_buffer_bda_binding_cache_t* bda_binding_cache,
     iree_hal_vulkan_command_buffer_bda_binding_slot_t* out_slot);
 
@@ -127,11 +129,13 @@ iree_status_t iree_hal_vulkan_command_buffer_native_bda_publication_length(
 //
 // The table layout matches iree_hal_vulkan_command_buffer_record_native, so a
 // native command buffer recorded against |bda_publication| can be resubmitted
-// after this updates the publication contents for a new binding table.
+// after this updates the publication contents for a new binding table. Empty
+// bindings publish |empty_binding_address|.
 iree_status_t iree_hal_vulkan_command_buffer_publish_bda_binding_tables(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_vulkan_command_buffer_bda_publication_t* bda_publication,
+    VkDeviceAddress empty_binding_address,
     iree_hal_vulkan_command_buffer_bda_binding_cache_t* bda_binding_cache);
 
 // Emits executable/export metadata referenced by recorded dispatch commands.
