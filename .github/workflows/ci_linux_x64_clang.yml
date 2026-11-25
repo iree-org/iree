@@ -59,6 +59,8 @@ jobs:
           "${sdk_venv}/bin/python" -m pip install \
             -r ./runtime/bindings/python/iree/runtime/build_requirements.txt \
             -r ./build_tools/github_actions/ci_requirements.txt
+          "${sdk_venv}/bin/python" -m pip install --require-hashes --only-binary=:all: \
+            -r ./core/python/requirements.txt
           "${sdk_venv}/bin/python" -m pip install --pre \
             --index-url https://nightly.repo.amd.com/rocm/whl-next/ \
             "rocm[libraries,devel]==10.2.0a20261006"

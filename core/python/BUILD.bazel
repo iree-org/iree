@@ -1,0 +1,80 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+# Also exported as files, for consumers that assemble the Python packages
+# themselves.
+PY_SRCS = enforce_glob(
+    [
+        "iree/core/__init__.py",
+    ],
+    include = ["iree/core/**/*.py"],
+)
+
+PY_TESTS = enforce_glob(
+    [
+        "test/package_test.py",
+    ],
+    include = ["test/**/*.py"],
+)
+
+exports_files(PY_SRCS + PY_TESTS)
+
+py_library(
+    name = "core",
+    srcs = PY_SRCS,
+    imports = ["."],
+)
+
+py_test(
+    name = "package_test",
+    size = "small",
+    srcs = ["test/package_test.py"],
+    # A generated `iree/__init__.py` would hide iree.compiler and iree.runtime,
+    # which share the `iree` namespace.
+    legacy_create_init = False,
+    main = "test/package_test.py",
+    deps = [":core"],
+)
+
+# bazel_to_cmake does not convert py_test, so each test is mirrored here for
+# CTest. The tests are registered only if the dependencies in pyproject.toml
+# are installed, so that builds that use no Python need not install them.
+iree_cmake_extra_content(
+    content = """
+if(IREE_BUILD_TESTS)
+  execute_process(
+    COMMAND
+      "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/check_requirements.py"
+    RESULT_VARIABLE _IREE_CORE_REQUIREMENTS_RESULT
+    ERROR_VARIABLE _IREE_CORE_REQUIREMENTS_ERROR
+    OUTPUT_QUIET
+    ERROR_STRIP_TRAILING_WHITESPACE
+  )
+  if(_IREE_CORE_REQUIREMENTS_RESULT EQUAL 0)
+    iree_local_py_test(
+      NAME
+        package_test
+      SRC
+        "test/package_test.py"
+      PACKAGE_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+  else()
+    message(STATUS "Not adding the iree.core tests: ${_IREE_CORE_REQUIREMENTS_ERROR}")
+  endif()
+endif()
+""",
+    inline = True,
+)

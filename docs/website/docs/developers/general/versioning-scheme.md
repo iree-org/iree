@@ -8,6 +8,7 @@ A shared version format is used for the packages
 
 * `iree-base-compiler` (formally named `iree-compiler`)
 * `iree-base-runtime` (formally named `iree-runtime`)
+* `iree-base-core`
 * `iree-turbine`
 
 ## Overview

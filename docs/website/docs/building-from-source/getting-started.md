@@ -423,13 +423,15 @@ through creating an editable wheel or through extending `PYTHONPATH`.
 #### Option A: Installing the bindings as editable wheels
 
 This method links the files in your build tree into your Python package directory
-as an editable wheel.
+as an editable wheel. `iree.core` is pure Python and is installed from the
+source tree.
 
 === ":fontawesome-brands-linux: Linux"
 
     ``` shell
     CMAKE_INSTALL_METHOD=ABS_SYMLINK python -m pip install -e ../iree-build/compiler
     CMAKE_INSTALL_METHOD=ABS_SYMLINK python -m pip install -e ../iree-build/runtime
+    python -m pip install -e core/python
     ```
 
 === ":fontawesome-brands-apple: macOS"
@@ -437,6 +439,7 @@ as an editable wheel.
     ``` shell
     CMAKE_INSTALL_METHOD=ABS_SYMLINK python -m pip install -e ../iree-build/compiler
     CMAKE_INSTALL_METHOD=ABS_SYMLINK python -m pip install -e ../iree-build/runtime
+    python -m pip install -e core/python
     ```
 
 === ":fontawesome-brands-windows: Windows"
@@ -446,6 +449,7 @@ as an editable wheel.
     python -m pip install -e ..\iree-build\compiler
     python -m pip install -e ..\iree-build\runtime
     $env:CMAKE_INSTALL_MODE=null
+    python -m pip install -e core\python
     ```
 
 #### Option B: Extending PYTHONPATH
@@ -454,17 +458,21 @@ This method more effectively captures the state of your build directory,
 but is prone to errors arising from forgetting to source the environment
 variables.
 
-Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
+Extend your `PYTHONPATH` with IREE's `bindings/python` paths and `core/python`,
+install the dependencies of `iree.core` with
+`python -m pip install --require-hashes -r core/python/requirements.txt`, and
+try importing:
 
 === ":fontawesome-brands-linux: Linux"
 
     ``` shell
     source ../iree-build/.env && export PYTHONPATH
     # The 'PYTHONPATH' environment variable should now contain
-    #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
+    #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python;iree/core/python
 
     python -c "import iree.compiler; help(iree.compiler)"
     python -c "import iree.runtime; help(iree.runtime)"
+    python -c "import iree.core; help(iree.core)"
     ```
 
 === ":fontawesome-brands-apple: macOS"
@@ -472,10 +480,11 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
     ``` shell
     source ../iree-build/.env && export PYTHONPATH
     # The 'PYTHONPATH' environment variable should now contain
-    #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
+    #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python;iree/core/python
 
     python -c "import iree.compiler; help(iree.compiler)"
     python -c "import iree.runtime; help(iree.runtime)"
+    python -c "import iree.core; help(iree.core)"
     ```
 
 === ":fontawesome-brands-windows: Windows"
@@ -483,10 +492,11 @@ Extend your `PYTHONPATH` with IREE's `bindings/python` paths and try importing:
     ``` powershell
     ..\iree-build\.env.ps1  # or ..\iree-build\.env.bat
     # The 'PYTHONPATH' environment variable should now contain
-    #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python
+    #   iree-build/compiler/bindings/python;iree-build/runtime/bindings/python;iree/core/python
 
     python -c "import iree.compiler; help(iree.compiler)"
     python -c "import iree.runtime; help(iree.runtime)"
+    python -c "import iree.core; help(iree.core)"
     ```
 
 #### Tensorflow/TFLite bindings

@@ -1203,6 +1203,8 @@ add_subdirectory(build_tools/embed_data/)
 add_subdirectory(tools)
 add_subdirectory(compiler)
 add_subdirectory(runtime)
+# Pure Python: this only registers tests.
+add_subdirectory(core)
 
 # Note: Test deps are not built as part of all (use the iree-test-deps target).
 add_subdirectory(tests EXCLUDE_FROM_ALL)
@@ -1227,13 +1229,13 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   # Write out a .env file to make IDEs and developers happy.
   # Yes, we are writing this to the source dir. It is only for IDEs and if
   # it gets clobbered, it is fine (it is also ignored in .gitignore).
-  set(_PYTHONPATH_ENV "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
+  set(_PYTHONPATH_ENV "PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python;${CMAKE_CURRENT_SOURCE_DIR}/core/python>\n")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/.env" CONTENT "${_PYTHONPATH_ENV}")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env" CONTENT "${_PYTHONPATH_ENV}")
   # Similarly, write out .env.bat and .env.ps1 for Windows.
-  set(_PYTHONPATH_ENV_BAT "set PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>\n")
+  set(_PYTHONPATH_ENV_BAT "set PYTHONPATH=$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python;${CMAKE_CURRENT_SOURCE_DIR}/core/python>\n")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env.bat" CONTENT "${_PYTHONPATH_ENV_BAT}")
-  set(_PYTHONPATH_ENV_PS1 "$env:PYTHONPATH = '$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python>'\n")
+  set(_PYTHONPATH_ENV_PS1 "$env:PYTHONPATH = '$<SHELL_PATH:${CMAKE_CURRENT_BINARY_DIR}/compiler/bindings/python;${CMAKE_CURRENT_BINARY_DIR}/runtime/bindings/python;${CMAKE_CURRENT_SOURCE_DIR}/core/python>'\n")
   file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env.ps1" CONTENT "${_PYTHONPATH_ENV_PS1}")
 endif()
 

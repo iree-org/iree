@@ -5,7 +5,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Sets up a Python venv with compiler/runtime from a workflow run.
+"""Sets up a Python venv with core/compiler/runtime from a workflow run.
 
 There are several modes in which to use this script:
 
@@ -265,6 +265,24 @@ def find_wheel_for_variants(
     return (artifact_path, package_name)
 
 
+def find_core_wheel(args) -> Optional[Tuple[Path, str]]:
+    """Returns where to install the iree-base-core wheel from.
+
+    Returns None for a fetched workflow run that predates the package, so that
+    such a run can still be set up, for example when bisecting.
+    """
+    artifact_path = Path(args.artifact_path)
+    package_name = "iree-base-core"
+    if glob(str(artifact_path / "iree_base_core-*.whl")):
+        return (artifact_path, package_name)
+    if args.fetch_gh_workflow:
+        print(f"Skipping {package_name}: not in the artifacts of this run")
+        return None
+    raise RuntimeError(
+        f"Could not find package {package_name} to install from {artifact_path}"
+    )
+
+
 def main(args):
     # Look up the workflow run for latest main.
     if args.fetch_latest_main:
@@ -295,6 +313,9 @@ def main(args):
         wheels.append(
             find_wheel_for_variants(args, artifact_prefix, package_stem, variant)
         )
+    core_wheel = find_core_wheel(args)
+    if core_wheel:
+        wheels.append(core_wheel)
     print("\nInstalling wheels:", wheels)
 
     # Set up venv.

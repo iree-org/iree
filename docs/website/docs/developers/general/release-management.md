@@ -355,7 +355,8 @@ module version, and whether they changed since the previous release:
 4. Increment the versions in source code to the next minor release, so that
    nightly releases sort after the new stable release (see
    [Versioning scheme](./versioning-scheme.md)): set `package-version` to
-   `X.{Y+1}.0.dev` in both `compiler/version.json` and `runtime/version.json`,
+   `X.{Y+1}.0.dev` in `compiler/version.json`, `runtime/version.json` and
+   `core/python/version.json`,
    e.g. <https://github.com/iree-org/iree/pull/23866>.
 
 5. Complete any remaining checkbox items on the release tracking issue then
@@ -382,6 +383,9 @@ module version, and whether they changed since the previous release:
     * Adjust `compiler/version.json` if patches are applied to the compiler.
 
     * Adjust `runtime/version.json` if patches are applied to the runtime.
+
+    * Adjust `core/python/version.json` if patches are applied to the core
+      Python package.
 
 4. Push all changes to the new branch.
 

@@ -110,12 +110,12 @@ repos:
         name: Run bazel_to_cmake.py on BUILD.bazel files
         language: python
         entry: ./build_tools/bazel_to_cmake/bazel_to_cmake.py
-        files: '^(compiler|runtime|samples|tests|tools)/(.*/)?(BUILD\.bazel)$'
+        files: '^(compiler|core|runtime|samples|tests|tools)/(.*/)?(BUILD\.bazel)$'
       - id: bazel_to_cmake_2
         name: Run bazel_to_cmake.py on CMakeLists.txt files
         language: python
         entry: ./build_tools/bazel_to_cmake/bazel_to_cmake.py
-        files: "^(compiler|runtime|samples|tests|tools)/(.*/)?(CMakeLists.txt)$"
+        files: "^(compiler|core|runtime|samples|tests|tools)/(.*/)?(CMakeLists.txt)$"
 
       - id: amdgpu_target_map
         name: Check AMDGPU target map generated files
