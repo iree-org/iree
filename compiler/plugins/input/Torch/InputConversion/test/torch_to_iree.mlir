@@ -125,3 +125,29 @@ func.func @scatter_amin(%input: !torch.vtensor<[8],f16>, %indices: !torch.vtenso
   %result = torch.aten.scatter_reduce.two %input, %dim, %indices, %updates, %reduce, %false : !torch.vtensor<[8],f16>, !torch.int, !torch.vtensor<[4],si64>, !torch.vtensor<[4],f16>, !torch.str, !torch.bool -> !torch.vtensor<[8],f16>
   return %result : !torch.vtensor<[8],f16>
 }
+
+// -----
+
+// CHECK-LABEL: util.func public @topk_single_row$async(
+// CHECK: iree_linalg_ext.sort
+// CHECK: iree_linalg_ext.topk
+func.func @topk_single_row(%input: !torch.vtensor<[1,8],f32>) -> (!torch.vtensor<[1,3],f32>, !torch.vtensor<[1,3],si64>) {
+  %k = torch.constant.int 3
+  %dim = torch.constant.int -1
+  %true = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %true, %true : !torch.vtensor<[1,8],f32>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[1,3],f32>, !torch.vtensor<[1,3],si64>
+  return %values, %indices : !torch.vtensor<[1,3],f32>, !torch.vtensor<[1,3],si64>
+}
+
+// -----
+
+// CHECK-LABEL: util.func public @topk_batched_fallback$async(
+// CHECK: iree_linalg_ext.sort
+// CHECK-NOT: iree_linalg_ext.topk
+func.func @topk_batched_fallback(%input: !torch.vtensor<[2,8],f32>) -> (!torch.vtensor<[2,3],f32>, !torch.vtensor<[2,3],si64>) {
+  %k = torch.constant.int 3
+  %dim = torch.constant.int -1
+  %true = torch.constant.bool true
+  %values, %indices = torch.aten.topk %input, %k, %dim, %true, %true : !torch.vtensor<[2,8],f32>, !torch.int, !torch.int, !torch.bool, !torch.bool -> !torch.vtensor<[2,3],f32>, !torch.vtensor<[2,3],si64>
+  return %values, %indices : !torch.vtensor<[2,3],f32>, !torch.vtensor<[2,3],si64>
+}

@@ -32,6 +32,129 @@ namespace mlir::iree_compiler::TorchInput {
 
 namespace {
 
+struct TopkOpConversion : OpRewritePattern<torch::Torch::AtenTopkOp> {
+  using Base::Base;
+  LogicalResult matchAndRewrite(torch::Torch::AtenTopkOp op,
+                                PatternRewriter &rewriter) const override {
+    auto inputType =
+        dyn_cast<torch::Torch::ValueTensorType>(op.getSelf().getType());
+    int64_t dim, k;
+    bool largest;
+    if (!inputType || !inputType.hasSizes() || !inputType.hasDtype() ||
+        !matchPattern(op.getDim(), torch::Torch::m_TorchConstantInt(&dim)) ||
+        !matchPattern(op.getK(), torch::Torch::m_TorchConstantInt(&k)) ||
+        !matchPattern(op.getLargest(),
+                      torch::Torch::m_TorchConstantBool(&largest)) ||
+        !largest) {
+      return failure();
+    }
+    auto type = dyn_cast<RankedTensorType>(inputType.toBuiltinTensor());
+    if (!type || !type.hasStaticShape() || type.getRank() == 0) {
+      return failure();
+    }
+    if (dim < 0) {
+      dim += type.getRank();
+    }
+    if (dim < 0 || dim >= type.getRank() || k <= 1 ||
+        k >= type.getDimSize(dim) || type.getDimSize(dim) > INT32_MAX) {
+      return failure();
+    }
+    // Optimize multi-candidate single-row selections. Top-1 and batched
+    // selections retain their existing lowering.
+    if (type.getNumElements() != type.getDimSize(dim)) {
+      return failure();
+    }
+    auto elementType = dyn_cast<FloatType>(type.getElementType());
+    if (!elementType) {
+      return failure();
+    }
+    Location loc = op.getLoc();
+    Value input = torch::TorchConversion::ToBuiltinTensorOp::create(
+        rewriter, loc, type, op.getSelf());
+    SmallVector<int64_t> shape(type.getShape());
+    shape[dim] = k;
+    auto valuesType = RankedTensorType::get(shape, elementType);
+    auto indicesType = RankedTensorType::get(shape, rewriter.getI32Type());
+    // Seed with real input values, so infinities need no shader constants.
+    auto fullIndicesType =
+        RankedTensorType::get(type.getShape(), rewriter.getI32Type());
+    Value fullIndicesEmpty = tensor::EmptyOp::create(
+        rewriter, loc, type.getShape(), rewriter.getI32Type());
+    SmallVector<utils::IteratorType> iterators(type.getRank(),
+                                               utils::IteratorType::parallel);
+    Value fullIndices =
+        linalg::GenericOp::create(
+            rewriter, loc, TypeRange{fullIndicesType}, ValueRange{},
+            ValueRange{fullIndicesEmpty},
+            ArrayRef<AffineMap>{
+                rewriter.getMultiDimIdentityMap(type.getRank())},
+            iterators,
+            [&](OpBuilder &b, Location loc, ValueRange) {
+              Value index = linalg::IndexOp::create(b, loc, dim);
+              index = arith::IndexCastOp::create(b, loc, b.getI32Type(), index);
+              linalg::YieldOp::create(b, loc, index);
+            })
+            .getResult(0);
+    auto slice = [&](Value value, int64_t start, int64_t size) -> Value {
+      SmallVector<OpFoldResult> offsets(type.getRank(),
+                                        rewriter.getIndexAttr(0));
+      SmallVector<OpFoldResult> sizes =
+          tensor::getMixedSizes(rewriter, loc, value);
+      SmallVector<OpFoldResult> strides(type.getRank(),
+                                        rewriter.getIndexAttr(1));
+      offsets[dim] = rewriter.getIndexAttr(start);
+      sizes[dim] = rewriter.getIndexAttr(size);
+      return tensor::ExtractSliceOp::create(rewriter, loc, value, offsets,
+                                            sizes, strides);
+    };
+    auto populateComparator = [&](Region &region, TypeRange argumentTypes) {
+      OpBuilder::InsertionGuard guard(rewriter);
+      Block *body = rewriter.createBlock(
+          &region, {}, argumentTypes,
+          SmallVector<Location>(argumentTypes.size(), loc));
+      Value lhs = body->getArgument(0), rhs = body->getArgument(1);
+      Value greater = arith::CmpFOp::create(
+          rewriter, loc, arith::CmpFPredicate::OGT, lhs, rhs);
+      Value lhsNaN = arith::CmpFOp::create(rewriter, loc,
+                                           arith::CmpFPredicate::UNO, lhs, lhs);
+      Value rhsOrdered = arith::CmpFOp::create(
+          rewriter, loc, arith::CmpFPredicate::ORD, rhs, rhs);
+      Value nanFirst = arith::AndIOp::create(rewriter, loc, lhsNaN, rhsOrdered);
+      Value before = arith::OrIOp::create(rewriter, loc, greater, nanFirst);
+      IREE::LinalgExt::YieldOp::create(rewriter, loc, before);
+    };
+    Value prefixValues = slice(input, 0, k);
+    Value prefixIndices = slice(fullIndices, 0, k);
+    Value emptyValues =
+        tensor::EmptyOp::create(rewriter, loc, shape, elementType);
+    Value emptyIndices =
+        tensor::EmptyOp::create(rewriter, loc, shape, rewriter.getI32Type());
+    auto initialSort = IREE::LinalgExt::SortOp::create(
+        rewriter, loc, TypeRange{valuesType, indicesType},
+        ValueRange{prefixValues, prefixIndices},
+        ValueRange{emptyValues, emptyIndices}, rewriter.getI64IntegerAttr(dim));
+    populateComparator(initialSort.getRegion(),
+                       {elementType, elementType, rewriter.getI32Type(),
+                        rewriter.getI32Type()});
+    int64_t remaining = type.getDimSize(dim) - k;
+    auto topk = IREE::LinalgExt::TopkOp::create(
+        rewriter, loc, TypeRange{valuesType, indicesType},
+        slice(input, k, remaining), slice(fullIndices, k, remaining),
+        initialSort.getResult(0), initialSort.getResult(1),
+        rewriter.getI64IntegerAttr(dim));
+    populateComparator(topk.getRegion(), {elementType, elementType});
+    Value indices = arith::ExtSIOp::create(
+        rewriter, loc, RankedTensorType::get(shape, rewriter.getI64Type()),
+        topk.getResult(1));
+    Value values = torch::TorchConversion::FromBuiltinTensorOp::create(
+        rewriter, loc, op.getResult(0).getType(), topk.getResult(0));
+    indices = torch::TorchConversion::FromBuiltinTensorOp::create(
+        rewriter, loc, op.getResult(1).getType(), indices);
+    rewriter.replaceOp(op, {values, indices});
+    return success();
+  }
+};
+
 struct FftRfftOpConversion : OpRewritePattern<torch::Torch::AtenFftRfftOp> {
   using Base::Base;
   LogicalResult matchAndRewrite(torch::Torch::AtenFftRfftOp op,
@@ -967,6 +1090,7 @@ class ConvertTorchUnstructuredToLinalgExtPass final
     : public impl::ConvertTorchUnstructuredToLinalgExtPassBase<
           ConvertTorchUnstructuredToLinalgExtPass> {
 public:
+  using Base::Base;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect,
                     torch::Torch::TorchDialect, tensor::TensorDialect,
@@ -978,12 +1102,15 @@ public:
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
 
-    patterns.add<FftRfftOpConversion>(context);
-    patterns.add<FlexAttentionOpConversion>(context);
-    patterns.add<ArgCompareOpConversion<torch::Torch::AtenArgmaxOp,
-                                        /*isMax=*/true>>(context);
-    patterns.add<ArgCompareOpConversion<torch::Torch::AtenArgminOp,
-                                        /*isMax=*/false>>(context);
+    patterns.add<TopkOpConversion>(context);
+    if (!topkOnly) {
+      patterns.add<FftRfftOpConversion>(context);
+      patterns.add<FlexAttentionOpConversion>(context);
+      patterns.add<ArgCompareOpConversion<torch::Torch::AtenArgmaxOp,
+                                          /*isMax=*/true>>(context);
+      patterns.add<ArgCompareOpConversion<torch::Torch::AtenArgminOp,
+                                          /*isMax=*/false>>(context);
+    }
 
     if (failed(applyPatternsGreedily(getOperation(), std::move(patterns)))) {
       signalPassFailure();

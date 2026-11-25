@@ -27,6 +27,9 @@ def ConvertTMTensorToLinalgExtPass :
 def ConvertTorchUnstructuredToLinalgExtPass :
     InterfacePass<"torch-iree-torch-unstructured-to-linalg-ext", "mlir::FunctionOpInterface"> {
   let summary = "Convert unstructured Torch ops to LinalgExt ops";
+  let options = [
+    Option<"topkOnly", "topk-only", "bool", /*default=*/"false",
+           "Only convert TopK operations, before generic decomposition.">];
 }
 
 def ConvertTorchQuantizationToLinalgExtPass :
