@@ -4119,6 +4119,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pull-request-descriptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pull request descriptions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#merging-approved-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6541,6 +6552,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#pull-request-descriptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pull request descriptions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#merging-approved-changes" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7026,13 +7048,68 @@ runs.</p>
 <p><img alt="ci-extra" src="../contributing-ci-extra.png" /></p>
 <p>The enabled jobs can be viewed from the Summary page of an action run:</p>
 <p><img alt="ci_enabled_jobs" src="../contributing-ci-enabled-jobs.png" /></p>
+<h3 id="pull-request-descriptions">Pull request descriptions<a class="headerlink" href="#pull-request-descriptions" title="Permanent link">link</a></h3>
+<p>PRs are <a href="#merging-approved-changes">squash-merged</a>, so the PR title and
+description become the commit message, and the commit messages on the PR
+branch are discarded. Write them for someone reading <code>git log</code> or bisecting
+a regression later, and update them when the PR changes during review.</p>
+<p><strong>Title</strong>: a short, imperative summary of what changes and, if it fits, why,
+prefixed with the affected area, for example
+<code>[CI] Bump iree-test-suites to fix sharktank test failure</code>. Keep it under 72
+characters. Avoid ambiguous titles like "Fix bug" or "Fix CI".</p>
+<p><strong>Description</strong>: start with <em>why</em>, then <em>what</em>.</p>
+<ol>
+<li><strong>Why</strong>: The most important part of a PR description.
+   Explain the underlying motivation of the PR. Why did you create it and what is the use-case this enables or fixes.
+   Be concise. Depending on the change, this covers:<ul>
+<li>for a bug fix, the symptom, its impact, and the issue or failing run</li>
+<li>for a regression fix, also the commit or PR that introduced it</li>
+<li>for a feature, the missing capability and what it is used for</li>
+<li>for a refactor, the current limitation</li>
+<li>for a performance change, the bottleneck, with numbers</li>
+<li>for a revert or reland, what broke or what was fixed since, and the
+  original PR</li>
+</ul>
+</li>
+<li><strong>Change</strong>: what the PR does and why this approach. The diff shows the
+   details. For refactors, state "No functional change intended". For small
+   PRs, one sentence is enough.</li>
+<li><strong>If relevant</strong>:<ul>
+<li>results: before/after numbers for performance, memory, or size
+  changes, and how they were measured</li>
+<li>trade-offs: known shortcomings, costs, or side effects</li>
+<li>testing: only tests that CI does not cover</li>
+<li>review notes: where reviewers should start in large PRs</li>
+</ul>
+</li>
+<li><strong>Trailers</strong> at the end: <code>Fixes #1234</code> for issues that the PR resolves,
+   <code>Depends on #1234</code> for PRs that it builds on,
+   <a href="https://iree.dev/developers/general/contributing/#ci-behavior-manipulation">CI trailers</a>
+   such as <code>ci-extra:</code>, and <code>Assisted-by:</code> for <a href="#ai-tool-use">AI tools</a>.</li>
+</ol>
+<p>Keep the description concise and self-contained: links add context but do
+not replace an explanation, and they must be public. Leave out restatements
+of the diff, implementation details that belong in code comments, review
+history, and <code>@</code>-mentions, which notify people again on every cherry-pick.
+A description that keeps growing is a sign that the PR should be split.
+Small changes need one or two sentences; longer descriptions can use
+headings such as <code>## Why</code>, <code>## Change</code>, and <code>## Results</code>.</p>
+<p>See also:</p>
+<ul>
+<li><a href="https://llvm.org/docs/DeveloperPolicy.html#commit-messages">LLVM: Commit messages</a></li>
+<li><a href="https://google.github.io/eng-practices/review/developer/cl-descriptions.html">Google Engineering Practices: Writing good CL descriptions</a></li>
+<li><a href="https://docs.kernel.org/process/submitting-patches.html#describe-your-changes">Linux kernel: Describe your changes</a></li>
+<li><a href="https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/helping-others-review-your-changes">GitHub: Helping others review your changes</a></li>
+<li><a href="https://cbea.ms/git-commit/">How to write a Git commit message</a></li>
+</ul>
 <h3 id="merging-approved-changes">Merging approved changes<a class="headerlink" href="#merging-approved-changes" title="Permanent link">link</a></h3>
 <p>After review and presubmit checks, PRs should typically be merged using
 "squash and merge".</p>
 <ul>
 <li>The squashed commit summary should match the PR title and the commit
   description should match the PR body (this is the default behavior).
-  Accordingly, please write these as you would a helpful commit message.</li>
+  Accordingly, please write these as you would a helpful commit message
+  (see <a href="#pull-request-descriptions">Pull request descriptions</a>).</li>
 </ul>
 <p>It is assumed that the PR author will merge their change unless they ask
 someone else to merge it for them (e.g. because they don't have write access

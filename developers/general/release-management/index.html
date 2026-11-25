@@ -6813,7 +6813,8 @@ gh<span class="w"> </span>release<span class="w"> </span>upload<span class="w"> 
 <p>Increment the versions in source code to the next minor release, so that
    nightly releases sort after the new stable release (see
    <a href="../versioning-scheme/">Versioning scheme</a>): set <code>package-version</code> to
-   <code>X.{Y+1}.0.dev</code> in both <code>compiler/version.json</code> and <code>runtime/version.json</code>,
+   <code>X.{Y+1}.0.dev</code> in <code>compiler/version.json</code>, <code>runtime/version.json</code> and
+   <code>core/python/version.json</code>,
    e.g. <a href="https://github.com/iree-org/iree/pull/23866">https://github.com/iree-org/iree/pull/23866</a>.</p>
 </li>
 <li>
@@ -6843,6 +6844,10 @@ git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </
 </li>
 <li>
 <p>Adjust <code>runtime/version.json</code> if patches are applied to the runtime.</p>
+</li>
+<li>
+<p>Adjust <code>core/python/version.json</code> if patches are applied to the core
+  Python package.</p>
 </li>
 </ul>
 </li>
