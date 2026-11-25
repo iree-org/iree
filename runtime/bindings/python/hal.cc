@@ -1083,11 +1083,11 @@ py::list HalDriver::QueryAvailableDevices() {
   py::list results;
   for (iree_host_size_t i = 0; i < count; ++i) {
     py::dict device_data;
-    device_data["device_id"] = py::cast(device_infos[i].device_id);
-    device_data["path"] =
-        py::str(device_infos[i].path.data, device_infos[i].path.size);
-    device_data["name"] =
-        py::str(device_infos[i].name.data, device_infos[i].name.size);
+    device_data["device_id"] = py::cast(device_infos_guard[i].device_id);
+    device_data["path"] = py::str(device_infos_guard[i].path.data,
+                                  device_infos_guard[i].path.size);
+    device_data["name"] = py::str(device_infos_guard[i].name.data,
+                                  device_infos_guard[i].name.size);
     results.append(device_data);
   }
   return results;
