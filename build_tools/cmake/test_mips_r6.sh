@@ -117,6 +117,12 @@ declare -a runtime_test_exclude_args=(
   "iree/tokenizer/regex/compile_benchmark_test"
   "iree/tokenizer/regex/regex_test"
   "iree/tokenizer/segmenter/split_test"
+
+  # Same QEMU data-parse family, but a wrong-value read, not a SIGBUS: QEMU
+  # mis-reads a descriptor's i32_register_count in the VM verifier, so it
+  # spuriously rejects a valid module ("insufficient register storage").
+  # Not codegen and not from this change (passes natively on the host).
+  "iree/vm/test/bytecode/bytecode_module_test"
 )
 
 runtime_label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"
