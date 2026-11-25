@@ -265,15 +265,15 @@ def find_wheel_for_variants(
     return (artifact_path, package_name)
 
 
-def find_core_wheel(args) -> Optional[Tuple[Path, str]]:
-    """Returns where to install the iree-base-core wheel from.
+def find_pure_python_wheel(args, package_name: str) -> Optional[Tuple[Path, str]]:
+    """Returns where to install a pure Python wheel such as iree-base-core from.
 
     Returns None for a fetched workflow run that predates the package, so that
     such a run can still be set up, for example when bisecting.
     """
     artifact_path = Path(args.artifact_path)
-    package_name = "iree-base-core"
-    if glob(str(artifact_path / "iree_base_core-*.whl")):
+    norm_package_name = package_name.replace("-", "_")
+    if glob(str(artifact_path / f"{norm_package_name}-*.whl")):
         return (artifact_path, package_name)
     if args.fetch_gh_workflow:
         print(f"Skipping {package_name}: not in the artifacts of this run")
@@ -313,9 +313,10 @@ def main(args):
         wheels.append(
             find_wheel_for_variants(args, artifact_prefix, package_stem, variant)
         )
-    core_wheel = find_core_wheel(args)
-    if core_wheel:
-        wheels.append(core_wheel)
+    for package_name in ("iree-base-core", "iree-importer-torch"):
+        pure_python_wheel = find_pure_python_wheel(args, package_name)
+        if pure_python_wheel:
+            wheels.append(pure_python_wheel)
     print("\nInstalling wheels:", wheels)
 
     # Set up venv.

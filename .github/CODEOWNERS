@@ -21,6 +21,7 @@
 
 # Bindings
 /runtime/bindings/python/ @devtbi @Manewing @schuermans-roofline @stellaraccident
+/integrations/torch/ @devtbi @Manewing @schuermans-roofline
 /runtime/bindings/tflite/ @AGindinson @benvanik @maxbartel
 
 # Experimental

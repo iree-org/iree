@@ -27,6 +27,7 @@
 #
 # Valid packages:
 #   iree-base-core
+#   iree-importer-torch
 #   iree-base-runtime
 #   iree-base-compiler
 #
@@ -69,7 +70,7 @@ manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 =
 python_versions="${override_python_versions:-cp311-cp311}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 cache_dir="${cache_dir:-}"
-packages="${packages:-iree-base-core iree-base-runtime iree-base-compiler}"
+packages="${packages:-iree-base-core iree-importer-torch iree-base-runtime iree-base-compiler}"
 package_suffix="${package_suffix:-}"
 toolchain_suffix="${toolchain_suffix:-release}"
 # Return ON if we are on a supported platform for CUDA.
@@ -163,6 +164,12 @@ function run_in_docker() {
           build_iree_core
           break
           ;;
+        iree-importer-torch)
+          # Pure Python, like iree-base-core.
+          clean_wheels "iree_importer_torch" "py3"
+          build_iree_importer_torch
+          break
+          ;;
         iree-base-runtime)
           clean_wheels "iree_base_runtime${package_suffix}" "${python_version}"
           build_iree_runtime
@@ -199,6 +206,11 @@ function build_iree_core() {
   # Without --no-deps, pip would also download the dependencies, unpinned,
   # although only the iree wheels are kept.
   build_wheel core/python/ --no-deps
+}
+
+function build_iree_importer_torch() {
+  # Without --no-deps, pip would download torch to build this wheel.
+  build_wheel integrations/torch/python/ --no-deps
 }
 
 function build_iree_runtime() {
