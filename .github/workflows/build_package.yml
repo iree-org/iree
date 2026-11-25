@@ -214,9 +214,21 @@ jobs:
       - name: "Configure MSVC (Windows)"
         if: "matrix.build-family == 'windows'"
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          # The versions that the runner image used by default in November
+          # 2026. They are pinned so that the builds of a release and of its
+          # candidates use the same compiler, until the image drops them.
+          toolset: "14.44"
+          sdk: "10.0.26100.0"
       - name: Install dependencies (macOS)
         if: "matrix.build-family == 'macos'"
         run: sudo ./c/build_tools/python_deploy/install_macos_deps.sh
+      # The runner image's default Xcode in November 2026, pinned like MSVC.
+      - name: Select Xcode (macOS)
+        if: "matrix.build-family == 'macos'"
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_16.4.app
+          xcodebuild -version
 
       ##########################################################################
       # Download version_info.json
