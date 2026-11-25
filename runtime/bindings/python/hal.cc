@@ -198,11 +198,11 @@ py::str HalAllocator::FormattedStatistics() {
       builder_guard(&builder, &iree_string_builder_deinitialize);
   iree_hal_allocator_statistics_t stats;
   iree_hal_allocator_query_statistics(raw_ptr(), &stats);
-  iree::Status status(iree_hal_allocator_statistics_format(&stats, &builder));
-  iree_string_view_t view = iree_string_builder_view(&builder);
+  iree::Status status(
+      iree_hal_allocator_statistics_format(&stats, builder_guard.get()));
+  iree_string_view_t view = iree_string_builder_view(builder_guard.get());
 
   py::str result = py::str(view.data, view.size);
-  // Check/raise after all memory alloc/dealloc.
   CheckApiStatus(static_cast<iree_status_t>(std::move(status)),
                  "unable to format statistics");
   return result;
