@@ -74,7 +74,7 @@ jobs:
 
       # Use uv instead of plain pip since cpp-linter uses it anyway.
       - name: Install uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           version: "0.13.7"
           # uv-x86_64-unknown-linux-gnu.tar.gz, as published in uv's release.
@@ -113,7 +113,7 @@ jobs:
 
       - name: Run clang-tidy
         if: steps.tidy-diff-mode.outputs.use_cpp_linter == 'true'
-        uses: cpp-linter/cpp-linter-action@774040af57f011a5fc47911f08ff0c3059d1835a # v2.24.0
+        uses: cpp-linter/cpp-linter-action@71cf8e84d4876ee304e3330f314df15b9da49c67 # v2.24.1
         id: linter
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
