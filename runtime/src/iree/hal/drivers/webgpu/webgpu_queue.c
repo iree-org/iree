@@ -18,6 +18,7 @@
 #include "iree/hal/drivers/webgpu/webgpu_fd_file.h"
 #include "iree/hal/drivers/webgpu/webgpu_imports.h"
 #include "iree/hal/drivers/webgpu/webgpu_semaphore.h"
+#include "iree/hal/utils/memory_file.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_webgpu_queue_t
@@ -729,6 +730,16 @@ static void iree_hal_webgpu_queue_op_wait_completion(
               (uintptr_t)mapping.contents.data, state->read.length);
           iree_hal_buffer_unmap_range(&mapping);
         }
+      } else if (iree_hal_memory_file_isa(state->read.source_file)) {
+        iree_byte_span_t contents = iree_byte_span_empty();
+        work_status =
+            iree_hal_memory_file_contents(state->read.source_file, &contents);
+        if (iree_status_is_ok(work_status)) {
+          iree_hal_webgpu_import_queue_write_buffer(
+              queue->queue_handle, gpu_handle, gpu_offset,
+              (uintptr_t)(contents.data + state->read.source_offset),
+              state->read.length);
+        }
       } else {
         // FD: use zero-copy bridge import.
         int fd = iree_hal_webgpu_fd_file_fd(state->read.source_file);
@@ -1311,9 +1322,16 @@ static iree_status_t iree_hal_webgpu_queue_read_inline(
           (uintptr_t)mapping.contents.data, length);
       iree_hal_buffer_unmap_range(&mapping);
     }
+  } else if (iree_hal_memory_file_isa(source_file)) {
+    iree_byte_span_t contents = iree_byte_span_empty();
+    status = iree_hal_memory_file_contents(source_file, &contents);
+    if (iree_status_is_ok(status)) {
+      iree_hal_webgpu_import_queue_write_buffer(
+          queue->queue_handle, gpu_handle, gpu_offset,
+          (uintptr_t)(contents.data + source_offset), length);
+    }
   } else {
-    // FD: use zero-copy bridge import. The import_file dispatch guarantees
-    // that files with NULL storage are webgpu_fd_files.
+    // FD: use zero-copy bridge import.
     int fd = iree_hal_webgpu_fd_file_fd(source_file);
     iree_hal_webgpu_import_queue_write_buffer_from_file(
         queue->queue_handle, gpu_handle, gpu_offset, (uint32_t)fd,
@@ -1585,6 +1603,14 @@ static void iree_hal_webgpu_queue_write_phase3(
           state->staging_handle, /*offset=*/0, state->length,
           (uintptr_t)mapping.contents.data);
       iree_hal_buffer_unmap_range(&mapping);
+    }
+  } else if (iree_hal_memory_file_isa(state->target_file)) {
+    iree_byte_span_t contents = iree_byte_span_empty();
+    status = iree_hal_memory_file_contents(state->target_file, &contents);
+    if (iree_status_is_ok(status)) {
+      iree_hal_webgpu_import_buffer_get_mapped_range(
+          state->staging_handle, /*offset=*/0, state->length,
+          (uintptr_t)(contents.data + state->target_offset));
     }
   } else {
     // FD: write from mapped staging buffer directly to the file object.
