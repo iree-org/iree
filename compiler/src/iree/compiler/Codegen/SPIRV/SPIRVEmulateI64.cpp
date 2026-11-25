@@ -25,6 +25,7 @@
 #include "mlir/Dialect/Arith/Transforms/WideIntEmulationConverter.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -33,6 +34,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#include <optional>
 
 #define DEBUG_TYPE "iree-spirv-emulate-i64"
 
@@ -129,6 +132,51 @@ struct ConvertUtilAssumeIntOp final
     }
 
     rewriter.replaceOp(op, replacements);
+    return success();
+  }
+};
+
+// Keep emulated vector storage flat: SPIR-V cannot represent an array element
+// whose vector type acquires the extra low/high-word dimension.
+static bool hasWideVectorElement(MemRefType type) {
+  auto vector = dyn_cast<VectorType>(type.getElementType());
+  return vector && !vector.isScalable() &&
+         vector.getElementType().isInteger(64);
+}
+
+struct ConvertWideVectorLoad final : OpConversionPattern<memref::LoadOp> {
+  using Base::Base;
+  LogicalResult
+  matchAndRewrite(memref::LoadOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!hasWideVectorElement(op.getMemRefType())) {
+      return failure();
+    }
+    auto memory = cast<MemRefType>(adaptor.getMemref().getType());
+    Value loaded = memref::LoadOp::create(
+        rewriter, op.getLoc(), memory.getElementType(), adaptor.getMemref(),
+        adaptor.getIndices(), op.getNontemporalAttr(), op.getAlignmentAttr(),
+        op.getInvariantAttr());
+    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(
+        op, getTypeConverter()->convertType(op.getType()), loaded);
+    return success();
+  }
+};
+
+struct ConvertWideVectorStore final : OpConversionPattern<memref::StoreOp> {
+  using Base::Base;
+  LogicalResult
+  matchAndRewrite(memref::StoreOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!hasWideVectorElement(op.getMemRefType())) {
+      return failure();
+    }
+    auto memory = cast<MemRefType>(adaptor.getMemref().getType());
+    Value packed = vector::ShapeCastOp::create(
+        rewriter, op.getLoc(), memory.getElementType(), adaptor.getValue());
+    rewriter.replaceOpWithNewOp<memref::StoreOp>(
+        op, packed, adaptor.getMemref(), adaptor.getIndices(),
+        op.getNontemporalAttr(), op.getAlignmentAttr());
     return success();
   }
 };
@@ -247,6 +295,22 @@ struct SPIRVEmulateI64Pass final
 
     arith::WideIntEmulationConverter typeConverter(32);
     memref::populateMemRefWideIntEmulationConversions(typeConverter);
+    typeConverter.addConversion([&](MemRefType type) -> std::optional<Type> {
+      if (!hasWideVectorElement(type)) {
+        return std::nullopt;
+      }
+      auto converted = dyn_cast_or_null<VectorType>(
+          typeConverter.convertType(type.getElementType()));
+      if (!converted) {
+        return nullptr;
+      }
+      auto flat = VectorType::get({converted.getNumElements()},
+                                  converted.getElementType());
+      if (!spirv::CompositeType::isValid(flat)) {
+        return nullptr;
+      }
+      return type.cloneWith(std::nullopt, flat);
+    });
 
     MLIRContext *ctx = &getContext();
 
@@ -271,6 +335,8 @@ struct SPIRVEmulateI64Pass final
       arith::populateArithWideIntEmulationPatterns(typeConverter, patterns);
       memref::populateMemRefWideIntEmulationPatterns(typeConverter, patterns);
       populateIreeI64EmulationPatterns(typeConverter, patterns);
+      patterns.add<ConvertWideVectorLoad, ConvertWideVectorStore>(
+          typeConverter, ctx, PatternBenefit(2));
 
       if (failed(applyPartialConversion(op, target, std::move(patterns)))) {
         signalPassFailure();
