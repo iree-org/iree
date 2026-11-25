@@ -283,7 +283,7 @@ static iree_status_t iree_hal_vulkan_builtins_create_empty_binding_buffer(
     bool device_addresses, iree_hal_vulkan_builtins_t* builtins) {
   VkBufferCreateInfo buffer_create_info = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-      .size = sizeof(uint32_t),
+      .size = IREE_HAL_VULKAN_EMPTY_BINDING_BUFFER_SIZE,
       .usage =
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
           VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |

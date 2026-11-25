@@ -8428,7 +8428,7 @@ static iree_status_t iree_hal_vulkan_queue_resolve_dispatch_descriptor_binding(
     *out_buffer_info = (VkDescriptorBufferInfo){
         .buffer = builtins->empty_binding_buffer,
         .offset = 0,
-        .range = sizeof(uint32_t),
+        .range = IREE_HAL_VULKAN_EMPTY_BINDING_BUFFER_SIZE,
     };
     return iree_ok_status();
   }

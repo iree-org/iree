@@ -17,6 +17,8 @@ typedef struct iree_hal_test_rounding_allocator_t {
   iree_hal_resource_t resource;
   // Host allocator used for wrapper metadata and staging allocations.
   iree_allocator_t host_allocator;
+  // Heap allocator that backs the buffers this allocator allocates.
+  iree_hal_allocator_t* backing_allocator;
 } iree_hal_test_rounding_allocator_t;
 
 static void iree_hal_test_rounding_allocator_destroy(
@@ -24,6 +26,7 @@ static void iree_hal_test_rounding_allocator_destroy(
   iree_hal_test_rounding_allocator_t* allocator =
       (iree_hal_test_rounding_allocator_t*)base_allocator;
   iree_allocator_t host_allocator = allocator->host_allocator;
+  iree_hal_allocator_release(allocator->backing_allocator);
   iree_allocator_free(host_allocator, allocator);
 }
 
@@ -45,6 +48,16 @@ iree_hal_test_rounding_allocator_query_buffer_compatibility(
          IREE_HAL_BUFFER_COMPATIBILITY_LOW_PERFORMANCE;
 }
 
+static iree_status_t iree_hal_test_rounding_allocator_allocate_buffer(
+    iree_hal_allocator_t* base_allocator,
+    const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
+    iree_hal_buffer_t** out_buffer) {
+  iree_hal_test_rounding_allocator_t* allocator =
+      (iree_hal_test_rounding_allocator_t*)base_allocator;
+  return iree_hal_allocator_allocate_buffer(
+      allocator->backing_allocator, *params, allocation_size, out_buffer);
+}
+
 static const iree_hal_allocator_vtable_t
     iree_hal_test_rounding_allocator_vtable = {
         /*.destroy=*/iree_hal_test_rounding_allocator_destroy,
@@ -54,6 +67,7 @@ static const iree_hal_allocator_vtable_t
         /*.query_memory_heaps=*/NULL,
         /*.query_buffer_compatibility=*/
         iree_hal_test_rounding_allocator_query_buffer_compatibility,
+        /*.allocate_buffer=*/iree_hal_test_rounding_allocator_allocate_buffer,
 };
 
 static iree_status_t iree_hal_test_rounding_allocator_create(
@@ -64,6 +78,13 @@ static iree_status_t iree_hal_test_rounding_allocator_create(
   iree_hal_resource_initialize(&iree_hal_test_rounding_allocator_vtable,
                                &allocator->resource);
   allocator->host_allocator = host_allocator;
+  iree_status_t status = iree_hal_allocator_create_heap(
+      IREE_SV("rounding_backing"), host_allocator, host_allocator,
+      &allocator->backing_allocator);
+  if (!iree_status_is_ok(status)) {
+    iree_allocator_free(host_allocator, allocator);
+    return status;
+  }
   *out_allocator = (iree_hal_allocator_t*)allocator;
   return iree_ok_status();
 }
@@ -73,6 +94,9 @@ typedef struct iree_hal_test_generate_buffer_state_t {
   iree_device_size_t expected_content_size;
   // Observed generator mapping byte length.
   iree_device_size_t actual_content_size;
+  // Whether the generator completes; otherwise it cancels generation once the
+  // size has been checked.
+  bool complete_generation;
 } iree_hal_test_generate_buffer_state_t;
 
 static iree_status_t iree_hal_test_generate_buffer_callback(
@@ -84,6 +108,7 @@ static iree_status_t iree_hal_test_generate_buffer_callback(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "generator received padded contents");
   }
+  if (state->complete_generation) return iree_ok_status();
   return iree_make_status(IREE_STATUS_CANCELLED, "contract check complete");
 }
 
@@ -324,6 +349,7 @@ TEST(BufferViewUtilTest, GenerateBufferUsesLogicalViewSizeForGenerator) {
   iree_hal_test_generate_buffer_state_t state = {
       /*.expected_content_size=*/sizeof(float),
       /*.actual_content_size=*/0,
+      /*.complete_generation=*/false,
   };
   iree_hal_dim_t shape[] = {1};
   iree_hal_buffer_params_t buffer_params = {
@@ -353,6 +379,49 @@ TEST(BufferViewUtilTest, GenerateBufferUsesLogicalViewSizeForGenerator) {
       &buffer_view);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_CANCELLED, status);
   EXPECT_EQ(0u, state.actual_content_size);
+
+  iree_hal_buffer_view_release(buffer_view);
+  iree_hal_allocator_release(allocator);
+}
+
+TEST(BufferViewUtilTest, GenerateBufferReturnsEmptyViewWithoutDevice) {
+  iree_allocator_t host_allocator = iree_allocator_system();
+
+  iree_hal_allocator_t* allocator = NULL;
+  IREE_ASSERT_OK(
+      iree_hal_test_rounding_allocator_create(host_allocator, &allocator));
+
+  // The allocator only offers low-performance mappings, so generation goes
+  // through host staging. An empty view needs no device for the upload.
+  iree_hal_test_generate_buffer_state_t state = {
+      /*.expected_content_size=*/0,
+      /*.actual_content_size=*/IREE_DEVICE_SIZE_MAX,
+      /*.complete_generation=*/true,
+  };
+  const iree_hal_dim_t shape[] = {2, 0};
+  iree_hal_buffer_params_t buffer_params = {
+      /*.usage=*/IREE_HAL_BUFFER_USAGE_DEFAULT,
+      /*.access=*/0,
+      /*.type=*/IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+      /*.queue_affinity=*/0,
+  };
+  iree_hal_buffer_view_t* buffer_view = NULL;
+  IREE_ASSERT_OK(iree_hal_buffer_view_generate_buffer(
+      /*device=*/NULL, allocator, IREE_ARRAYSIZE(shape), shape,
+      IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+      buffer_params, iree_hal_test_generate_buffer_callback, &state,
+      &buffer_view));
+  EXPECT_EQ(0u, state.actual_content_size);
+
+  ASSERT_NE(nullptr, buffer_view);
+  EXPECT_EQ(IREE_ARRAYSIZE(shape),
+            iree_hal_buffer_view_shape_rank(buffer_view));
+  EXPECT_EQ(2u, iree_hal_buffer_view_shape_dim(buffer_view, 0));
+  EXPECT_EQ(0u, iree_hal_buffer_view_shape_dim(buffer_view, 1));
+  EXPECT_EQ(IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+            iree_hal_buffer_view_element_type(buffer_view));
+  EXPECT_EQ(0u, iree_hal_buffer_view_element_count(buffer_view));
+  EXPECT_EQ(0u, iree_hal_buffer_view_byte_length(buffer_view));
 
   iree_hal_buffer_view_release(buffer_view);
   iree_hal_allocator_release(allocator);

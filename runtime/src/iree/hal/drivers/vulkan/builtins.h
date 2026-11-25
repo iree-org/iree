@@ -18,6 +18,10 @@ extern "C" {
 typedef struct iree_hal_vulkan_physical_device_snapshot_t
     iree_hal_vulkan_physical_device_snapshot_t;
 
+// Byte size of the buffer bound in place of an empty binding range. Descriptors
+// for that buffer use the same size as their range.
+#define IREE_HAL_VULKAN_EMPTY_BINDING_BUFFER_SIZE sizeof(uint32_t)
+
 // Device-owned Vulkan built-in pipelines used for command polyfills.
 typedef struct iree_hal_vulkan_builtins_t {
   // Device-level Vulkan dispatch table copied at initialization.
