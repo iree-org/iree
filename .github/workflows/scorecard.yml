@@ -1,0 +1,57 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Runs the OpenSSF Scorecard (https://scorecard.dev) and publishes the results
+# for github.com/iree-org/iree, which backs the Scorecard badge in README.md.
+#
+# Publishing only works if this workflow keeps to the restrictions listed in
+# https://github.com/ossf/scorecard-action#workflow-restrictions: no top-level
+# or job-level `env` or `defaults`, no write permissions at the top level, no
+# containers or services, an Ubuntu GitHub-hosted runner, no `run` steps, and
+# only allowlisted actions in the analysis job.
+
+name: OpenSSF Scorecard
+
+on:
+  # Weekly on Mondays at 06:17 UTC.
+  schedule:
+    - cron: "17 6 * * 1"
+  # Re-score when the branch protection settings change.
+  branch_protection_rule:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analysis:
+    if: ${{ github.repository == 'iree-org/iree' }}
+    name: "Scorecard analysis"
+    runs-on: ubuntu-24.04
+    permissions:
+      security-events: write  # Uploads the SARIF results to code scanning.
+      id-token: write  # Publishes the results to the Scorecard API.
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Running Scorecard analysis
+        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+      - name: Uploading results as a workflow artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: scorecard-results
+          path: results.sarif
+          retention-days: 5
+      - name: Uploading results to code scanning
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: results.sarif

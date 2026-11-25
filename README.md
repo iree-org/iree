@@ -14,6 +14,7 @@ guides, and instructions on building from source.
 [![IREE Discord Status](https://discordapp.com/api/guilds/689900678990135345/widget.png?style=shield)]([https://discord.gg/wEWh6Z9nMU](https://discord.gg/wEWh6Z9nMU))
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/8738/badge)](https://www.bestpractices.dev/projects/8738)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/iree-org/iree/badge)](https://scorecard.dev/viewer/?uri=github.com/iree-org/iree)
 
 ## Project news
 
