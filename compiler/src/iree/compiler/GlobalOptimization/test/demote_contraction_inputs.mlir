@@ -2,6 +2,8 @@
 // RUN: iree-opt --split-input-file -iree-global-opt-demote-contraction-inputs="type=bf16 operation=conv" %s | FileCheck %s --check-prefix=BF16-CONV
 // RUN: iree-opt --split-input-file -iree-global-opt-demote-contraction-inputs="type=f16 operation=matmul" %s | FileCheck %s --check-prefix=F16-MATMUL
 // RUN: iree-opt --split-input-file -iree-global-opt-demote-contraction-inputs="type=f16 operation=conv" %s | FileCheck %s --check-prefix=F16-CONV
+// RUN: iree-opt --split-input-file -iree-global-opt-demote-contraction-inputs="type=bf16 operation=matmul min-reduction-size=1" %s | FileCheck %s --check-prefix=BF16-MATMUL-MIN-RED-1
+// RUN: iree-opt --split-input-file -iree-global-opt-demote-contraction-inputs="type=f16 operation=matmul min-reduction-size=1" %s | FileCheck %s --check-prefix=F16-MATMUL-MIN-RED-1
 
 util.func public @matmul_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf32>,
     %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
@@ -487,56 +489,86 @@ util.func public @preserve_conv_strides(%input: tensor<1x8x8x4xf32>, %filter: te
 
 // -----
 
-// The K=1 outer product that computes rotary-embedding angles from integer
-// positions (Hugging Face: inv_freq[32,1] @ position_ids[1,P]) must not be
-// demoted: bf16/f16 cannot represent positions above 256 exactly, and a
-// reduction of length 1 has nothing to accumulate, so narrower inputs gain
-// nothing. Reduced from granite-3.3-2b prefill, global-optimization phase,
-// `%77 = linalg.batch_matmul ins(%cst_9, %cst_8 : tensor<1x32x1xf32>, tensor<1x1x512xf32>) ...`.
-util.func public @rotary_outer_product(%inv_freq : tensor<1x32x1xf32>,
-    %positions : tensor<1x1x512xf32>, %init : tensor<1x32x512xf32>) -> tensor<1x32x512xf32> {
-  %0 = linalg.batch_matmul ins(%inv_freq, %positions : tensor<1x32x1xf32>, tensor<1x1x512xf32>)
+// The reduction extent of this contraction is a static 1 (1x32x1 and 1x1x512).
+// - With the default `min-reduction-size` of 2, the inputs stay f32.
+// - With `min-reduction-size=1`, the inputs are demoted to bf16/f16.
+util.func public @unit_reduction(%lhs : tensor<1x32x1xf32>,
+    %rhs : tensor<1x1x512xf32>, %init : tensor<1x32x512xf32>) -> tensor<1x32x512xf32> {
+  %0 = linalg.batch_matmul ins(%lhs, %rhs : tensor<1x32x1xf32>, tensor<1x1x512xf32>)
       outs(%init : tensor<1x32x512xf32>) -> tensor<1x32x512xf32>
   util.return %0 : tensor<1x32x512xf32>
 }
 
-// BF16-MATMUL-LABEL: @rotary_outer_product
+// BF16-MATMUL-LABEL: @unit_reduction
 // BF16-MATMUL-NOT: arith.truncf
 // BF16-MATMUL: linalg.batch_matmul
 // BF16-MATMUL-SAME: ins({{.+}} : tensor<1x32x1xf32>, tensor<1x1x512xf32>)
+// BF16-MATMUL-SAME: outs({{.+}} : tensor<1x32x512xf32>)
 
-// F16-MATMUL-LABEL: @rotary_outer_product
+// F16-MATMUL-LABEL: @unit_reduction
 // F16-MATMUL-NOT: arith.truncf
 // F16-MATMUL: linalg.batch_matmul
 // F16-MATMUL-SAME: ins({{.+}} : tensor<1x32x1xf32>, tensor<1x1x512xf32>)
+// F16-MATMUL-SAME: outs({{.+}} : tensor<1x32x512xf32>)
 
-// BF16-CONV-LABEL: @rotary_outer_product
+// BF16-CONV-LABEL: @unit_reduction
 // BF16-CONV: linalg.batch_matmul
-// F16-CONV-LABEL: @rotary_outer_product
+// F16-CONV-LABEL: @unit_reduction
 // F16-CONV: linalg.batch_matmul
+
+// BF16-MATMUL-MIN-RED-1-LABEL: @unit_reduction
+// BF16-MATMUL-MIN-RED-1: arith.truncf {{.*}} : f32 to bf16
+// BF16-MATMUL-MIN-RED-1: arith.truncf {{.*}} : f32 to bf16
+// BF16-MATMUL-MIN-RED-1: linalg.batch_matmul
+// BF16-MATMUL-MIN-RED-1-SAME: ins({{.+}} : tensor<1x32x1xbf16>, tensor<1x1x512xbf16>)
+// BF16-MATMUL-MIN-RED-1-SAME: outs({{.+}} : tensor<1x32x512xf32>)
+
+// F16-MATMUL-MIN-RED-1-LABEL: @unit_reduction
+// F16-MATMUL-MIN-RED-1: arith.truncf {{.*}} : f32 to f16
+// F16-MATMUL-MIN-RED-1: arith.truncf {{.*}} : f32 to f16
+// F16-MATMUL-MIN-RED-1: linalg.batch_matmul
+// F16-MATMUL-MIN-RED-1-SAME: ins({{.+}} : tensor<1x32x1xf16>, tensor<1x1x512xf16>)
+// F16-MATMUL-MIN-RED-1-SAME: outs({{.+}} : tensor<1x32x512xf32>)
 
 // -----
 
-// Same table with a dynamic prompt length: the reduction is still the static 1,
-// so it stays protected; only N is dynamic.
-util.func public @rotary_outer_product_dynamic(%inv_freq : tensor<1x32x1xf32>,
-    %positions : tensor<1x1x?xf32>, %init : tensor<1x32x?xf32>) -> tensor<1x32x?xf32> {
-  %0 = linalg.batch_matmul ins(%inv_freq, %positions : tensor<1x32x1xf32>, tensor<1x1x?xf32>)
+// Only the reduction dimension is compared against `min-reduction-size`. A
+// dynamic parallel dimension does not change the decision: the reduction
+// extent is still a static 1, so the inputs stay f32 by default.
+util.func public @unit_reduction_dynamic_parallel_dim(%lhs : tensor<1x32x1xf32>,
+    %rhs : tensor<1x1x?xf32>, %init : tensor<1x32x?xf32>) -> tensor<1x32x?xf32> {
+  %0 = linalg.batch_matmul ins(%lhs, %rhs : tensor<1x32x1xf32>, tensor<1x1x?xf32>)
       outs(%init : tensor<1x32x?xf32>) -> tensor<1x32x?xf32>
   util.return %0 : tensor<1x32x?xf32>
 }
 
-// BF16-MATMUL-LABEL: @rotary_outer_product_dynamic
+// BF16-MATMUL-LABEL: @unit_reduction_dynamic_parallel_dim
 // BF16-MATMUL-NOT: arith.truncf
 // BF16-MATMUL: linalg.batch_matmul
 // BF16-MATMUL-SAME: ins({{.+}} : tensor<1x32x1xf32>, tensor<1x1x?xf32>)
+// BF16-MATMUL-SAME: outs({{.+}} : tensor<1x32x?xf32>)
 
-// F16-MATMUL-LABEL: @rotary_outer_product_dynamic
+// F16-MATMUL-LABEL: @unit_reduction_dynamic_parallel_dim
 // F16-MATMUL-NOT: arith.truncf
 // F16-MATMUL: linalg.batch_matmul
 // F16-MATMUL-SAME: ins({{.+}} : tensor<1x32x1xf32>, tensor<1x1x?xf32>)
+// F16-MATMUL-SAME: outs({{.+}} : tensor<1x32x?xf32>)
 
-// BF16-CONV-LABEL: @rotary_outer_product_dynamic
+// BF16-CONV-LABEL: @unit_reduction_dynamic_parallel_dim
 // BF16-CONV: linalg.batch_matmul
-// F16-CONV-LABEL: @rotary_outer_product_dynamic
+// F16-CONV-LABEL: @unit_reduction_dynamic_parallel_dim
 // F16-CONV: linalg.batch_matmul
+
+// BF16-MATMUL-MIN-RED-1-LABEL: @unit_reduction_dynamic_parallel_dim
+// BF16-MATMUL-MIN-RED-1: arith.truncf {{.*}} : f32 to bf16
+// BF16-MATMUL-MIN-RED-1: arith.truncf {{.*}} : f32 to bf16
+// BF16-MATMUL-MIN-RED-1: linalg.batch_matmul
+// BF16-MATMUL-MIN-RED-1-SAME: ins({{.+}} : tensor<1x32x1xbf16>, tensor<1x1x?xbf16>)
+// BF16-MATMUL-MIN-RED-1-SAME: outs({{.+}} : tensor<1x32x?xf32>)
+
+// F16-MATMUL-MIN-RED-1-LABEL: @unit_reduction_dynamic_parallel_dim
+// F16-MATMUL-MIN-RED-1: arith.truncf {{.*}} : f32 to f16
+// F16-MATMUL-MIN-RED-1: arith.truncf {{.*}} : f32 to f16
+// F16-MATMUL-MIN-RED-1: linalg.batch_matmul
+// F16-MATMUL-MIN-RED-1-SAME: ins({{.+}} : tensor<1x32x1xf16>, tensor<1x1x?xf16>)
+// F16-MATMUL-MIN-RED-1-SAME: outs({{.+}} : tensor<1x32x?xf32>)

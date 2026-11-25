@@ -48,11 +48,10 @@ struct DemoteContractionInputsPattern
       return failure();
     }
 
-    // Skip contractions with a tiny static reduction extent. Narrower inputs
-    // gain nothing, and often are index-derived data, e.g. the inv_freq x
-    // position_ids outer product (reduction dimension K = 1) that computes
-    // rotary-embedding angles. Rounding position ids above 256 to bf16 silently
-    // corrupts every token past that position.
+    // Skip contractions whose static reduction extent (the product of all
+    // reduction dimension sizes) is below `minReductionSize`. If any reduction
+    // dimension is dynamic the extent is unknown and the contraction is
+    // demoted as before.
     if (minReductionSize > 1 &&
         isa<linalg::ContractionOpInterface>(linalgOp.getOperation())) {
       FailureOr<linalg::ContractionDimensions> dims =
