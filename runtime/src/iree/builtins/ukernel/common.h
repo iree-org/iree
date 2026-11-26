@@ -136,6 +136,17 @@
 #define IREE_UK_UNROLL
 #endif  // defined(IREE_UK_COMPILER_CLANG)
 
+// IREE_UK_UNROLL_DISABLE: request that a loop be kept rolled.
+#if defined(IREE_UK_COMPILER_CLANG)
+#define IREE_UK_UNROLL_DISABLE _Pragma("clang loop unroll(disable)")
+#elif defined(IREE_UK_COMPILER_GCC)
+// GCC spells "don't unroll" as an unroll factor of 1.
+#define IREE_UK_UNROLL_DISABLE _Pragma("GCC unroll 1")
+#else
+// MSVC doesn't have a pragma unroll.
+#define IREE_UK_UNROLL_DISABLE
+#endif  // defined(IREE_UK_COMPILER_CLANG)
+
 //===----------------------------------------------------------------------===//
 // Local replacement for stdbool.h
 //===----------------------------------------------------------------------===//

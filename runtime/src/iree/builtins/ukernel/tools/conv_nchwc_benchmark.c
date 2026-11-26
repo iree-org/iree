@@ -125,11 +125,16 @@ int main(int argc, char** argv) {
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK, &argc, &argv);
   iree_uk_benchmark_initialize(&argc, argv);
 
-#if defined(IREE_ARCH_X86_64)
+#if defined(IREE_ARCH_ARM_64)
+  iree_uk_benchmark_register_conv_nchwc(IREE_UK_FLAG_CONV_NCHWC_TYPE_F32F32F32,
+                                        8, 8, "");
+#elif defined(IREE_ARCH_X86_64)
   iree_uk_benchmark_register_conv_nchwc(IREE_UK_FLAG_CONV_NCHWC_TYPE_F32F32F32,
                                         16, 16, "avx512_base");
 #endif
   // Generic fallback (no CPU features), for comparison against the arch tile.
+  // No arch provides a baseline 16x16 tile, so this always selects the generic
+  // tile function.
   iree_uk_benchmark_register_conv_nchwc(IREE_UK_FLAG_CONV_NCHWC_TYPE_F32F32F32,
                                         16, 16, "");
 
