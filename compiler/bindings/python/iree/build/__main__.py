@@ -7,5 +7,9 @@
 from .main import CliMain
 
 
+def main(args=None):
+    CliMain(args=args).run()
+
+
 if __name__ == "__main__":
-    CliMain().run()
+    main()
