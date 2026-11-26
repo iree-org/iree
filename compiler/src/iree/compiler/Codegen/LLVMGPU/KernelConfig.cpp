@@ -12,8 +12,10 @@
 
 #include "compiler/src/iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUSelectUKernels.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUNestedLayoutUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/DerivedConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/GPULoweringConfigUtils.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
@@ -94,6 +96,12 @@ static llvm::cl::opt<bool> clGPUUseTileAndFuseConvolution(
     llvm::cl::desc(
         "enable the tile and fuse pipeline for supported convolutions"),
     llvm::cl::init(true));
+
+static llvm::cl::opt<bool> clNVVMFullValueAttentionTile(
+    "iree-llvmgpu-experimental-nvvm-full-value-attention-tile",
+    llvm::cl::desc("Prefer a complete value dimension tile for eligible "
+                   "NVIDIA attention"),
+    llvm::cl::init(false), llvm::cl::Hidden);
 
 static llvm::cl::opt<int> clGPUMatmulCThreshold(
     "iree-codegen-llvmgpu-matmul-c-matrix-threshold",
@@ -918,6 +926,105 @@ static LogicalResult setAttentionIntrinsicBasedVectorDistributionConfig(
   if (!attSchedule) {
     LDBG() << "Failed to deduce Attention schedule";
     return failure();
+  }
+
+  // Splitting PV's output columns requires each workgroup to recompute QK
+  // and softmax. Prefer one tile across those columns when the resulting
+  // query tile grid still has enough parallelism and the schedule fits.
+  constexpr int64_t kMinKeyLengthForFullValueTile = 512;
+  constexpr int64_t kMaxFullValueTileWidth = 128;
+  constexpr int64_t kMinWorkgroupsPerSM = 2;
+  if (clNVVMFullValueAttentionTile && target.isNVIDIA() && target.getChip() &&
+      qElementType.isBF16() && kElementType.isBF16() && vElementType.isBF16() &&
+      !ShapedType::isDynamic(mSize) &&
+      batchDims.size() == opInfo.getBatchDims().size() &&
+      opInfo.getNDims().size() == 1 && opInfo.getK2Dims().size() == 1 &&
+      k1Dims.size() == opInfo.getK1Dims().size() &&
+      bounds[k2Dims[0]] >= kMinKeyLengthForFullValueTile) {
+    int64_t width = bounds[nDims[0]];
+    const GPUMMASchedule &pv = attSchedule->second;
+    auto coveredN = [](const GPUMMASchedule &schedule) {
+      return schedule.getTotalNTileSize() * schedule.getTotalNSize() *
+             schedule.getTotalNSubgroupCount();
+    };
+    if (width <= kMaxFullValueTileWidth && coveredN(pv) < width) {
+      int64_t nTiles = llvm::divideCeil(width, pv.getTotalNSize());
+      // Smaller subgroup schedules lost throughput on grids with only
+      // about one workgroup per SM in measurements on RTX 5090.
+      int64_t minGrid = kMinWorkgroupsPerSM * target.getChip().getWgpCount();
+      auto tryFullTile = [&](int64_t subgroups, int64_t mTiles, int64_t kTiles)
+          -> FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> {
+        GPUMMAHeuristicSeeds seeds{subgroups, nTiles * mTiles, kTiles};
+        auto candidate = deduceAttentionSchedule(
+            qkMatmul, pvMatmul, intrinsics, seeds, maxSharedMemoryBytes,
+            targetSubgroupSize, transposedQ, transposedK, transposedV);
+        if (failed(candidate) || coveredN(candidate->second) != width) {
+          return failure();
+        }
+        const GPUMMASchedule &schedule = candidate->second;
+        int64_t mTile = schedule.getTotalMTileSize() *
+                        schedule.getTotalMSize() *
+                        schedule.getTotalMSubgroupCount();
+        int64_t minQueryTiles = minGrid;
+        for (int64_t dim : batchDims) {
+          if (bounds[dim] <= 0) {
+            return failure();
+          }
+          minQueryTiles = llvm::divideCeil(minQueryTiles, bounds[dim]);
+        }
+        if (llvm::divideCeil(mSize, mTile) < minQueryTiles) {
+          return failure();
+        }
+        int64_t threads = targetSubgroupSize *
+                          schedule.getTotalMSubgroupCount() *
+                          schedule.getTotalNSubgroupCount();
+        SmallVector<int64_t> tileShape(bounds.size(), 1);
+        for (auto [index, dim] : llvm::enumerate(mDims)) {
+          tileShape[dim] =
+              schedule.mTileSizes[index] * schedule.mSubgroupCounts[index];
+        }
+        tileShape[mDims.back()] *= schedule.getTotalMSize();
+        tileShape[nDims[0]] = width;
+        tileShape[k2Dims[0]] =
+            schedule.getTotalKTileSize() * schedule.getTotalKSize();
+        for (int64_t dim : k1Dims) {
+          tileShape[dim] = bounds[dim];
+        }
+        // The MMA schedule checks the innermost copy extent. The full tile
+        // also needs a derived thread layout for shared memory promotion.
+        auto canPromote = [&](AffineMap map) {
+          SmallVector<int64_t> shape =
+              llvm::map_to_vector(map.getResults(), [&](AffineExpr dim) {
+                return tileShape[cast<AffineDimExpr>(dim).getPosition()];
+              });
+          SmallVector<int64_t> elementTile = IREE::GPU::deriveThreadTileSizes(
+              shape, threads, qElementType.getIntOrFloatBitWidth());
+          return succeeded(
+              getDerivedThreadLayout(context, {threads}, shape, elementTile));
+        };
+        if (!canPromote(op.getQueryMap()) || !canPromote(op.getKeyMap()) ||
+            !canPromote(op.getValueMap())) {
+          return failure();
+        }
+        return candidate;
+      };
+      FailureOr<std::pair<GPUMMASchedule, GPUMMASchedule>> full = failure();
+      if (nTiles % 3 == 0) {
+        // An aligned 48- or 96-column tile also admits three M subgroups.
+        full = tryFullTile(3, 1, 2);
+      }
+      // Limit the live score and output fragments for wider value tiles.
+      bool wideValue = width > 64;
+      if (failed(full)) {
+        full = wideValue ? tryFullTile(4, 1, 2) : tryFullTile(4, 2, 4);
+      }
+      if (failed(full)) {
+        full = wideValue ? tryFullTile(2, 1, 1) : tryFullTile(2, 1, 2);
+      }
+      if (succeeded(full)) {
+        attSchedule = std::move(*full);
+      }
+    }
   }
 
   auto [qkSchedule, pvSchedule] = attSchedule.value();
