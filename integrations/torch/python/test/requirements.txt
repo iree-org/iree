@@ -1,5 +1,8 @@
 # What the tests need besides the IREE compiler and runtime packages.
 --extra-index-url https://download.pytorch.org/whl/cpu
+# iree.runtime needs it, and the CI installs the IREE wheels without their
+# dependencies.
+ml_dtypes>=0.5.4
 numpy
 pytest
 torch>=2.13
