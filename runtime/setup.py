@@ -69,6 +69,8 @@ def combine_dicts(*ds):
 CONFIGURED_SOURCE_DIR = "@IREE_SOURCE_DIR@"
 CONFIGURED_BINARY_DIR = "@IREE_BINARY_DIR@"
 
+ENABLE_THREADING = getenv_bool("IREE_ENABLE_THREADING", "@IREE_ENABLE_THREADING@", "ON")
+
 ENABLE_TRACY = getenv_bool(
     "IREE_RUNTIME_BUILD_TRACY", "@IREE_RUNTIME_BUILD_TRACY@", "ON"
 )
@@ -310,6 +312,7 @@ def build_configuration(cmake_build_dir, cmake_install_dir, extra_cmake_args=())
             "-DIREE_BUILD_COMPILER=OFF",
             "-DIREE_BUILD_SAMPLES=OFF",
             "-DIREE_BUILD_TESTS=OFF",
+            f"-DIREE_ENABLE_THREADING={'ON' if ENABLE_THREADING else 'OFF'}",
             "-DPython3_EXECUTABLE={}".format(sys.executable),
             "-DCMAKE_BUILD_TYPE={}".format(cfg),
             get_env_cmake_option(
@@ -689,34 +692,38 @@ setup(
             else {}
         ),
     ),
-    entry_points={
-        "console_scripts": [
-            "iree-as-module = iree._runtime.scripts.iree_as_module.__main__:main",
-            "iree-run-module = iree._runtime.scripts.iree_run_module.__main__:main",
-            "iree-run-replay = iree._runtime.scripts.iree_run_replay.__main__:main",
-            "iree-benchmark-executable = iree._runtime.scripts.iree_benchmark_executable.__main__:main",
-            "iree-benchmark-module = iree._runtime.scripts.iree_benchmark_module.__main__:main",
-            "iree-benchmark-replay = iree._runtime.scripts.iree_benchmark_replay.__main__:main",
-            "iree-c-embed-data = iree._runtime.scripts.iree_c_embed_data.__main__:main",
-            "iree-create-parameters = iree._runtime.scripts.iree_create_parameters.__main__:main",
-            "iree-convert-parameters = iree._runtime.scripts.iree_convert_parameters.__main__:main",
-            "iree-dump-module = iree._runtime.scripts.iree_dump_module.__main__:main",
-            "iree-dump-replay = iree._runtime.scripts.iree_dump_replay.__main__:main",
-            "iree-dump-parameters = iree._runtime.scripts.iree_dump_parameters.__main__:main",
-            "iree-cpuinfo = iree._runtime.scripts.iree_cpuinfo.__main__:main",
-            "iree-flatcc-cli = iree._runtime.scripts.iree_flatcc_cli.__main__:main",
-            "iree-profile = iree._runtime.scripts.iree_profile.__main__:main",
-            "iree-profile-render = "
-            "iree._runtime.scripts.iree_profile_render.__main__:main",
-        ]
-        + (
-            [
-                "iree-tracy-capture = iree._runtime.scripts.iree_tracy_capture.__main__:main"
+    entry_points=(
+        {
+            "console_scripts": [
+                "iree-as-module = iree._runtime.scripts.iree_as_module.__main__:main",
+                "iree-run-module = iree._runtime.scripts.iree_run_module.__main__:main",
+                "iree-run-replay = iree._runtime.scripts.iree_run_replay.__main__:main",
+                "iree-benchmark-executable = iree._runtime.scripts.iree_benchmark_executable.__main__:main",
+                "iree-benchmark-module = iree._runtime.scripts.iree_benchmark_module.__main__:main",
+                "iree-benchmark-replay = iree._runtime.scripts.iree_benchmark_replay.__main__:main",
+                "iree-c-embed-data = iree._runtime.scripts.iree_c_embed_data.__main__:main",
+                "iree-create-parameters = iree._runtime.scripts.iree_create_parameters.__main__:main",
+                "iree-convert-parameters = iree._runtime.scripts.iree_convert_parameters.__main__:main",
+                "iree-dump-module = iree._runtime.scripts.iree_dump_module.__main__:main",
+                "iree-dump-replay = iree._runtime.scripts.iree_dump_replay.__main__:main",
+                "iree-dump-parameters = iree._runtime.scripts.iree_dump_parameters.__main__:main",
+                "iree-cpuinfo = iree._runtime.scripts.iree_cpuinfo.__main__:main",
+                "iree-flatcc-cli = iree._runtime.scripts.iree_flatcc_cli.__main__:main",
+                "iree-profile = iree._runtime.scripts.iree_profile.__main__:main",
+                "iree-profile-render = "
+                "iree._runtime.scripts.iree_profile_render.__main__:main",
             ]
-            if ENABLE_TRACY_TOOLS
-            else []
-        ),
-    },
+            + (
+                [
+                    "iree-tracy-capture = iree._runtime.scripts.iree_tracy_capture.__main__:main"
+                ]
+                if ENABLE_TRACY_TOOLS
+                else []
+            ),
+        }
+        if ENABLE_THREADING
+        else {}
+    ),
     install_requires=[
         "numpy",
         "ml_dtypes",
