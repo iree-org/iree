@@ -6,12 +6,11 @@
 
 """Import of programs that were saved with ``torch.export.save``."""
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 
 import torch
 
-from iree.importers.torch.decompositions import current_aot_decompositions
 from iree.importers.torch.exporter import ExportOutput, export
 from iree.importers.torch.fx_programs import FxPrograms
 from iree.importers.torch.import_decompositions import import_decompositions
@@ -134,6 +133,7 @@ def import_programs(
     *,
     module_name: str | None = None,
     decompose: bool = True,
+    decompositions: Mapping[torch._ops.OperatorBase, Callable] | None = None,
     share_tensors: bool = True,
     externalize_parameters: bool = False,
     save_parameters_to: str | Path | None = None,
@@ -145,6 +145,10 @@ def import_programs(
         programs: The programs by the name of the function each becomes.
         module_name: Name of the module.
         decompose: Whether to run the import decompositions on the programs.
+        decompositions: Decompositions to run on the programs as well, by
+            operator. They take precedence over the import decompositions,
+            and are the way to inline custom operators that IREE has no
+            lowering for.
         share_tensors: Whether to share the tensors that programs have in
             common, see ``share_program_tensors``.
         externalize_parameters: Whether to keep the parameters and buffers out
@@ -163,13 +167,16 @@ def import_programs(
         raise ValueError("save_parameters_to requires externalize_parameters")
 
     programs = dict(programs)
+    table: dict[torch._ops.OperatorBase, Callable] = {}
     if decompose:
-        with import_decompositions():
-            table = current_aot_decompositions()
-            programs = {
-                name: program.run_decompositions(table)
-                for name, program in programs.items()
-            }
+        with import_decompositions() as import_table:
+            table.update(import_table)
+    table.update(decompositions or {})
+    if table:
+        programs = {
+            name: program.run_decompositions(table)
+            for name, program in programs.items()
+        }
     if share_tensors and len(programs) > 1:
         share_program_tensors(programs)
     if externalize_parameters:

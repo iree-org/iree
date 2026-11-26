@@ -19,7 +19,10 @@ becomes the function ``main``.
 import argparse
 import importlib
 import sys
+from collections.abc import Callable, Mapping
 from pathlib import Path
+
+import torch
 
 from iree.importers.torch.pt2 import import_programs, load_pt2
 
@@ -115,8 +118,16 @@ def parse_arguments(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
-def main(args: argparse.Namespace) -> int:
-    """Import the programs as ``parse_arguments`` describes them."""
+def main(
+    args: argparse.Namespace,
+    *,
+    decompositions: Mapping[torch._ops.OperatorBase, Callable] | None = None,
+) -> int:
+    """Import the programs as ``parse_arguments`` describes them.
+
+    Tools that wrap this one pass the decompositions of their custom operators
+    as ``decompositions``, see ``import_programs``.
+    """
     for module in args.import_module:
         importlib.import_module(module)
 
@@ -125,6 +136,7 @@ def main(args: argparse.Namespace) -> int:
         programs,
         module_name=args.module_name,
         decompose=not args.no_decompose,
+        decompositions=decompositions,
         share_tensors=not args.no_share_tensors,
         externalize_parameters=args.externalize_params,
         save_parameters_to=args.save_params_to,

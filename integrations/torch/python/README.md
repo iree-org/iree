@@ -50,6 +50,20 @@ output.lower_to_iree()
 output.save_mlir("model.mlirbc")
 ```
 
+`import_programs` takes further decompositions as `decompositions`, by
+operator. They take precedence over the ones of the importer and are the way to
+inline custom operators. For operators that are registered with an
+implementation, PyTorch already has the decompositions:
+
+```python
+custom = {
+    op: decomposition
+    for op, decomposition in torch.export.default_decompositions().items()
+    if op.namespace == "my_namespace"
+}
+output = import_programs(programs, decompositions=custom)
+```
+
 ## Testing
 
 The tests need `iree.compiler` and `iree.runtime`, from a build or from the

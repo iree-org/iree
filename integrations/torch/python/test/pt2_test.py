@@ -175,6 +175,62 @@ class ImportProgramsTest(unittest.TestCase):
                 {"main": _export(Prefill())}, save_parameters_to="weights.irpa"
             )
 
+    def test_runs_the_given_decompositions(self):
+        class Relu(torch.nn.Module):
+            def forward(self, x):
+                return torch.relu(x)
+
+        output = import_programs(
+            {"main": torch.export.export(Relu(), (torch.zeros(1, 64),))},
+            decompositions={
+                torch.ops.aten.relu.default: lambda x: torch.clamp(x, min=0.0)
+            },
+        )
+
+        text = str(output.mlir_module)
+        self.assertIn("torch.aten.clamp", text)
+        self.assertNotIn("torch.aten.relu", text)
+
+    def test_given_decompositions_take_precedence_over_the_import_ones(self):
+        class Hardtanh(torch.nn.Module):
+            def forward(self, x):
+                return torch.nn.functional.hardtanh(x)
+
+        def hardtanh_as_relus(x, min_val=-1.0, max_val=1.0):
+            return max_val - torch.relu(max_val - min_val - torch.relu(x - min_val))
+
+        output = import_programs(
+            {"main": torch.export.export(Hardtanh(), (torch.zeros(1, 64),))},
+            decompositions={torch.ops.aten.hardtanh.default: hardtanh_as_relus},
+        )
+
+        text = str(output.mlir_module)
+        self.assertIn("torch.aten.relu", text)
+        self.assertNotIn("torch.aten.clamp", text)
+        self.assertNotIn("torch.aten.hardtanh", text)
+
+    def test_runs_only_the_given_decompositions_without_the_import_ones(self):
+        class LinearRelu(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear = torch.nn.Linear(64, 8)
+
+            def forward(self, x):
+                return torch.relu(self.linear(x))
+
+        output = import_programs(
+            {"main": torch.export.export(LinearRelu(), (torch.zeros(1, 64),))},
+            decompose=False,
+            decompositions={
+                torch.ops.aten.relu.default: lambda x: torch.clamp(x, min=0.0)
+            },
+        )
+
+        text = str(output.mlir_module)
+        self.assertIn("torch.aten.linear", text)
+        self.assertIn("torch.aten.clamp", text)
+        self.assertNotIn("torch.aten.relu", text)
+
     def test_embeds_parameters_by_default(self):
         output = import_programs({"main": _export(Prefill())})
 

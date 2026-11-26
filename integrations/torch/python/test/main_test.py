@@ -101,6 +101,23 @@ class MainTest(unittest.TestCase):
         self.assertIn('#flow.parameter.named<"model"::"offset">', output.read_text())
         self.assertGreater(archive.stat().st_size, 64 * 64 * 4)
 
+    def test_runs_the_decompositions_of_a_wrapping_tool(self):
+        output = self.dir / "model.mlir"
+
+        result = run_import(
+            parse_arguments(
+                [str(self.model), "-o", str(output), "--output-type=torch"]
+            ),
+            decompositions={
+                torch.ops.aten.add.Tensor: lambda x, y: torch.sub(x, torch.neg(y))
+            },
+        )
+
+        self.assertEqual(result, 0)
+        text = output.read_text()
+        self.assertIn("torch.aten.sub", text)
+        self.assertNotIn("torch.aten.add", text)
+
     def test_rejects_a_function_name_used_twice(self):
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             main([str(self.model), str(self.model), "-o", str(self.dir / "o.mlir")])
