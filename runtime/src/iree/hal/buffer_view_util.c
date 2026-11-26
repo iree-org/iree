@@ -286,16 +286,25 @@ static iree_status_t iree_hal_buffer_view_generate_buffer_in_situ(
       iree_hal_buffer_params_with_usage(buffer_params,
                                         IREE_HAL_BUFFER_USAGE_MAPPING),
       iree_const_byte_span_empty(), &buffer_view));
+  iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_view);
 
   // Map the buffer into host-visible memory.
   iree_hal_buffer_mapping_t buffer_mapping = {{0}};
   iree_status_t status = iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MAPPING_MODE_SCOPED,
+      buffer, IREE_HAL_MAPPING_MODE_SCOPED,
       IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, 0, content_size, &buffer_mapping);
 
   // Generate using the callback directly into the buffer.
   if (iree_status_is_ok(status)) {
     status = callback(&buffer_mapping, user_data);
+  }
+
+  // Make host writes visible to the device on non-coherent memory.
+  if (iree_status_is_ok(status) &&
+      !iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
+                         IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+    status = iree_hal_buffer_mapping_flush_range(&buffer_mapping, 0,
+                                                 IREE_HAL_WHOLE_BUFFER);
   }
 
   status =

@@ -119,6 +119,13 @@ static iree_status_t iree_hal_device_transfer_mappable_range(
           source.device_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
           IREE_HAL_MEMORY_ACCESS_READ, source_offset, data_length,
           &source_mapping);
+      // Make device writes visible to the host on non-coherent memory.
+      if (iree_status_is_ok(status) &&
+          !iree_all_bits_set(iree_hal_buffer_memory_type(source.device_buffer),
+                             IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+        status = iree_hal_buffer_mapping_invalidate_range(
+            &source_mapping, 0, IREE_HAL_WHOLE_BUFFER);
+      }
     } else {
       source_mapping = (iree_hal_buffer_mapping_t){
           .contents = source.host_buffer,

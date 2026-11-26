@@ -717,11 +717,20 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_read(
                                     IREE_HAL_MEMORY_ACCESS_READ, source_offset,
                                     data_length, &source_mapping));
 
-  memcpy(target_buffer, source_mapping.contents.data, data_length);
+  // Make device writes visible to the host on non-coherent memory.
+  iree_status_t status = iree_ok_status();
+  if (!iree_all_bits_set(iree_hal_buffer_memory_type(source_buffer),
+                         IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+    status = iree_hal_buffer_mapping_invalidate_range(&source_mapping, 0,
+                                                      IREE_HAL_WHOLE_BUFFER);
+  }
+  if (iree_status_is_ok(status)) {
+    memcpy(target_buffer, source_mapping.contents.data, data_length);
+  }
 
   iree_hal_buffer_unmap_range(&source_mapping);
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_map_write(
@@ -819,10 +828,19 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_copy(
     return iree_ok_status();
   }
 
-  memcpy(target_mapping.contents.data, source_mapping.contents.data,
-         adjusted_data_length);
+  // Make device writes visible to the host on non-coherent memory.
+  if (!iree_all_bits_set(iree_hal_buffer_memory_type(source_buffer),
+                         IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+    status = iree_hal_buffer_mapping_invalidate_range(&source_mapping, 0,
+                                                      adjusted_data_length);
+  }
+  if (iree_status_is_ok(status)) {
+    memcpy(target_mapping.contents.data, source_mapping.contents.data,
+           adjusted_data_length);
+  }
 
-  if (!iree_all_bits_set(iree_hal_buffer_memory_type(target_buffer),
+  if (iree_status_is_ok(status) &&
+      !iree_all_bits_set(iree_hal_buffer_memory_type(target_buffer),
                          IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
     status = iree_hal_buffer_mapping_flush_range(&target_mapping, 0,
                                                  adjusted_data_length);
