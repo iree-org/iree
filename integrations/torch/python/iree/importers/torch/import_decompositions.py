@@ -150,14 +150,6 @@ def register_import_decomposition(
     _CUSTOM_DECOMPOSITIONS[op] = decomposition
 
 
-def _torchao_intmm():
-    try:
-        import torchao.kernel.intmm as intmm
-    except ImportError:
-        return None
-    return intmm
-
-
 def import_decomposition_table() -> DecompositionTable:
     """Return the decompositions to apply before importing a program."""
     table = get_decompositions(IMPORT_DECOMPOSITION_OPS)
@@ -170,37 +162,7 @@ def import_decomposition_table() -> DecompositionTable:
 
 
 @contextlib.contextmanager
-def _host_independent_torchao_matmul() -> Iterator[None]:
-    """Make torchao decompose its int8 matmul the same way on every host.
-
-    torchao picks the lowering from the instruction set of the host: with
-    AVX512_VNNI but no AMX it shifts the activations by +128 into uint8 and
-    subtracts 128 * colsum(W) afterwards. Both are correct, but the imported
-    program would differ per machine. Claiming AMX pins every host to plain
-    s8 x s8.
-
-    Overriding the VNNI probe instead would also change should_reduce_range(),
-    which narrows the int8 range and changes numerics, not just the graph.
-
-    https://github.com/pytorch/ao/blob/v0.18.0/torchao/kernel/intmm.py#L113-L145
-    """
-    intmm = _torchao_intmm()
-    if intmm is None or not hasattr(intmm, "_cpu_is_amx_tile_supported"):
-        yield
-        return
-    saved = intmm._cpu_is_amx_tile_supported
-    intmm._cpu_is_amx_tile_supported = lambda: True
-    try:
-        yield
-    finally:
-        intmm._cpu_is_amx_tile_supported = saved
-
-
-@contextlib.contextmanager
 def import_decompositions() -> Iterator[DecompositionTable]:
     """Context manager that makes exports and imports use the import table."""
-    with (
-        _host_independent_torchao_matmul(),
-        extend_aot_decompositions(add_decomps=import_decomposition_table()) as table,
-    ):
+    with extend_aot_decompositions(add_decomps=import_decomposition_table()) as table:
         yield table
