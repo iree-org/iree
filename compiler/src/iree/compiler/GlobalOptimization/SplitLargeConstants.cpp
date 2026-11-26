@@ -102,6 +102,23 @@ static std::optional<ArrayRef<char>> getRawBytes(Attribute value) {
   return std::nullopt;
 }
 
+/// Returns whether `value` is a named parameter. Both #flow.parameter.named
+/// and #stream.parameter.named are accepted, as frontends still emit the
+/// latter at this level. A shard keeps the attribute of the original.
+static bool isNamedParameter(Attribute value) {
+  return isa_and_present<IREE::Flow::NamedParameterAttr,
+                         IREE::Stream::NamedParameterAttr>(value);
+}
+
+/// Returns the config of a named parameter (see isNamedParameter), which may be
+/// null.
+static DictionaryAttr getParameterConfig(Attribute value) {
+  if (auto parameterAttr = dyn_cast<IREE::Flow::NamedParameterAttr>(value)) {
+    return parameterAttr.getConfig();
+  }
+  return cast<IREE::Stream::NamedParameterAttr>(value).getConfig();
+}
+
 /// Returns how to split `globalOp`, or std::nullopt when it fits into one
 /// allocation or cannot be split (a warning is emitted for the latter).
 static std::optional<SplitPlan> planSplit(IREE::Util::GlobalOp globalOp) {
@@ -128,18 +145,18 @@ static std::optional<SplitPlan> planSplit(IREE::Util::GlobalOp globalOp) {
     return std::nullopt;
   }
   Attribute initialValue = globalOp.getInitialValueAttr();
-  auto parameterAttr =
-      dyn_cast_if_present<IREE::Flow::NamedParameterAttr>(initialValue);
+  bool isParameter = isNamedParameter(initialValue);
   std::optional<ArrayRef<char>> rawBytes =
-      initialValue && !parameterAttr ? getRawBytes(initialValue) : std::nullopt;
-  if (!parameterAttr && !rawBytes) {
+      initialValue && !isParameter ? getRawBytes(initialValue) : std::nullopt;
+  if (!isParameter && !rawBytes) {
     warn() << "the initial value is neither an inline dense constant nor a "
               "named parameter";
     return std::nullopt;
   }
-  if (parameterAttr && parameterAttr.getConfig() &&
-      parameterAttr.getConfig().contains("offset") &&
-      !parameterAttr.getConfig().getAs<IntegerAttr>("offset")) {
+  DictionaryAttr parameterConfig =
+      isParameter ? getParameterConfig(initialValue) : DictionaryAttr();
+  if (parameterConfig && parameterConfig.contains("offset") &&
+      !parameterConfig.getAs<IntegerAttr>("offset")) {
     warn() << "the parameter offset is not an integer";
     return std::nullopt;
   }
@@ -162,10 +179,14 @@ static std::optional<SplitPlan> planSplit(IREE::Util::GlobalOp globalOp) {
            << " bytes, expected " << expectedBytes;
     return std::nullopt;
   }
-  if (parameterAttr && parameterAttr.getStorageSize() != expectedBytes) {
-    warn() << "the parameter has " << parameterAttr.getStorageSize()
-           << " bytes, expected " << expectedBytes;
-    return std::nullopt;
+  if (isParameter) {
+    int64_t parameterBytes =
+        cast<IREE::Util::SizedStorageAttr>(initialValue).getStorageSize();
+    if (parameterBytes != expectedBytes) {
+      warn() << "the parameter has " << parameterBytes << " bytes, expected "
+             << expectedBytes;
+      return std::nullopt;
+    }
   }
 
   SplitPlan plan;
@@ -290,10 +311,11 @@ analyzeUses(Value value, const SplitPlan &plan, IREE::Util::GlobalOp globalOp,
 /// Builds a parameter that refers to `byteLength` bytes at `byteOffset` within
 /// `parameterAttr`: the same scope and key, with the offset added to the one
 /// the parameter already has. Any other config entries are kept.
-static IREE::Flow::NamedParameterAttr
-buildShardParameter(IREE::Flow::NamedParameterAttr parameterAttr,
-                    RankedTensorType shardType, int64_t byteOffset,
-                    int64_t byteLength) {
+/// `ParameterAttrT` is the Flow or the Stream named parameter attribute.
+template <typename ParameterAttrT>
+static ParameterAttrT
+buildShardParameter(ParameterAttrT parameterAttr, RankedTensorType shardType,
+                    int64_t byteOffset, int64_t byteLength) {
   MLIRContext *context = parameterAttr.getContext();
   Builder builder(context);
   NamedAttrList config;
@@ -306,9 +328,9 @@ buildShardParameter(IREE::Flow::NamedParameterAttr parameterAttr,
   }
   config.set("offset", builder.getI64IntegerAttr(baseOffset + byteOffset));
   config.set("length", builder.getI64IntegerAttr(byteLength));
-  return IREE::Flow::NamedParameterAttr::get(
-      context, shardType, parameterAttr.getScope(), parameterAttr.getKey(),
-      config.getDictionary(context));
+  return ParameterAttrT::get(context, shardType, parameterAttr.getScope(),
+                             parameterAttr.getKey(),
+                             config.getDictionary(context));
 }
 
 /// Builds the initial value of one shard.
@@ -318,6 +340,10 @@ static TypedAttr buildShardValue(Attribute value, const SplitPlan &plan,
   int64_t byteOffset = plan.offsets[shard] * plan.sliceBytes;
   int64_t byteLength = plan.sizes[shard] * plan.sliceBytes;
   if (auto parameterAttr = dyn_cast<IREE::Flow::NamedParameterAttr>(value)) {
+    return buildShardParameter(parameterAttr, shardType, byteOffset,
+                               byteLength);
+  }
+  if (auto parameterAttr = dyn_cast<IREE::Stream::NamedParameterAttr>(value)) {
     return buildShardParameter(parameterAttr, shardType, byteOffset,
                                byteLength);
   }
