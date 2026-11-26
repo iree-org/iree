@@ -47,6 +47,7 @@ PY_TESTS = enforce_glob(
         "test/compiled_exported_program_test.py",
         "test/conversions_test.py",
         "test/dynamic_shape_export_test.py",
+        "test/erfinv_decomposition_test.py",
         "test/export_context_test.py",
         "test/floordiv_symbolic_shape_test.py",
         "test/fx_programs_test.py",
