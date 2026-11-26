@@ -314,23 +314,22 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       // Even though not a streamable op we still want to track it below.
     }
 
-    // Synchronizing operations should join with their producers if the producer
-    // is streamable.
-    if (dyn_cast<IREE::Stream::AsyncBarrierOp>(op) ||
-        dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
+    // A transfer joins a streamable producer's partition when they can execute
+    // together, unless the producer is itself a transfer. The walk skips
+    // joining ops so a transfer waiting on one would never be placed. Barriers
+    // don't join and partition with their consumers instead.
+    if (auto transferOp = dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
       auto producer = op.getOperand(0).getDefiningOp();
       auto streamable =
           dyn_cast_if_present<IREE::Stream::StreamableOpInterface>(producer);
-      bool hasCompatibleAffinity = true;
-      if (auto transferOp = dyn_cast<IREE::Stream::AsyncTransferOp>(op)) {
-        auto producerAffinityOp =
-            dyn_cast_if_present<IREE::Stream::AffinityOpInterface>(producer);
-        hasCompatibleAffinity = !producerAffinityOp ||
-                                IREE::Stream::AffinityAttr::canExecuteTogether(
-                                    transferOp.getAffinityAttr(),
-                                    producerAffinityOp.getAffinityAttr());
-      }
-      if (streamable && hasCompatibleAffinity) {
+      auto producerAffinityOp =
+          dyn_cast_if_present<IREE::Stream::AffinityOpInterface>(producer);
+      bool hasCompatibleAffinity =
+          !producerAffinityOp || IREE::Stream::AffinityAttr::canExecuteTogether(
+                                     transferOp.getAffinityAttr(),
+                                     producerAffinityOp.getAffinityAttr());
+      if (streamable && hasCompatibleAffinity &&
+          !isa<IREE::Stream::AsyncTransferOp>(producer)) {
         if (!syncOps.contains(producer)) {
           syncOps[producer] = llvm::SmallVector<Operation *>();
         }
@@ -358,6 +357,12 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
     // dependency chain down the use-def chain to a partition.
     llvm::BitVector consumers(builders.size(), /*t=*/false);
 
+    // Partitions that a non-streamable user of this op (e.g., scf.for) depends
+    // on. Such a user stays outside of all partitions, so this op must not join
+    // one of them even if another user is a member. The partition would then
+    // feed its own input through the non-streamable user.
+    llvm::BitVector blockedConsumers(builders.size(), /*t=*/false);
+
     // Process direct users (common case).
     for (auto user : op.getUsers()) {
       OpInfo *effectiveUserInfo =
@@ -381,7 +386,11 @@ partitionStreamableOpsReference(IREE::Stream::PartitioningConfigAttr config,
       consumers |= userInfo.membership;
       opInfo.hazards |= userInfo.membership;
       opInfo.hazards |= userInfo.hazards;
+      if (!isa<IREE::Stream::StreamableOpInterface>(user)) {
+        blockedConsumers |= userInfo.hazards;
+      }
     }
+    consumers.reset(blockedConsumers);
 
     // Process indirect users (operations that consume this op's results in
     // their nested regions e.g. scf.for using a value in its body).

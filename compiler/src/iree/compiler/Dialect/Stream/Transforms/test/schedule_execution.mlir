@@ -61,8 +61,6 @@ util.func public @deviceMultiDeviceSync(%arg0: i1) -> !stream.resource<transient
   %5 = stream.async.barrier %2 : !stream.resource<transient>{%c128}
   %6 = stream.async.transfer %2 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@device1>) -> to(#hal.device.affinity<@device0>) !stream.resource<transient>{%c128}
 
-  // CHECK: stream.async.execute on(#hal.device.affinity<@device0>)
-  // CHECK: stream.async.dispatch
   %7 = stream.async.dispatch on(#hal.device.affinity<@device0>) @ex::@dispatch2[%c1, %c1, %c1](%3[%c0 to %c128 for %c128], %6[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}, !stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
   %8 = stream.async.barrier %7 : !stream.resource<transient>{%c128}
 
@@ -74,9 +72,241 @@ util.func public @deviceMultiDeviceSync(%arg0: i1) -> !stream.resource<transient
 
   // CHECK: stream.async.execute on(#hal.device.affinity<@device0>)
   // CHECK: stream.async.dispatch
+  // CHECK: stream.async.dispatch
   %11 = stream.async.dispatch on(#hal.device.affinity<@device0>) @ex::@dispatch2[%c1, %c1, %c1](%8[%c0 to %c128 for %c128], %10[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}, !stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
 
   util.return %11 : !stream.resource<transient>
+}
+
+// -----
+
+// Tests a chain of barriers and transfers crossing a device boundary. The
+// transfer joins the producer's partition through the barrier before it and the
+// barrier after it stays with its consumer on the other device.
+
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+
+// CHECK-LABEL: @barrierTransferBarrier
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<transient>)
+util.func public @barrierTransferBarrier(%arg0: !stream.resource<transient>) -> !stream.resource<transient> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+
+  // CHECK: %[[TRANSFERRED:.+]], %[[TIMEPOINT0:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE:.+]]: !stream.resource<transient>{%c128})
+  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1](%[[ARG0_CAPTURE]][{{.+}}])
+  %0 = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch_0[%c1](%arg0[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
+  %1 = stream.async.barrier on(#hal.device.affinity<@device_a>) %0 : !stream.resource<transient>{%c128}
+  // CHECK-NEXT: %[[TRANSFER:.+]] = stream.async.transfer %[[DISPATCH0]]
+  // CHECK-SAME: to(#hal.device.affinity<@device_b>)
+  %2 = stream.async.transfer %1 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<transient>{%c128}
+  // CHECK-NEXT: stream.yield %[[TRANSFER]]
+  // CHECK-NEXT: } => !stream.timepoint
+  %3 = stream.async.barrier on(#hal.device.affinity<@device_b>) %2 : !stream.resource<transient>{%c128}
+
+  // CHECK: %[[RESULT:.+]], %[[TIMEPOINT1:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.device.affinity<@device_b>)
+  // CHECK-SAME: await(%[[TIMEPOINT0]])
+  // CHECK-SAME: with(%[[TRANSFERRED]] as %[[TRANSFERRED_CAPTURE:.+]]: !stream.resource<transient>{%c128})
+  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1](%[[TRANSFERRED_CAPTURE]][{{.+}}])
+  %4 = stream.async.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch_1[%c1](%3[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
+  // CHECK-NEXT: stream.yield %[[DISPATCH1]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await %[[TIMEPOINT1]] => %[[RESULT]]
+  // CHECK-NEXT: util.return %[[READY]]
+  util.return %4 : !stream.resource<transient>
+}
+
+// -----
+
+// Tests that barriers on barriers on a single device stay with their consumer.
+
+util.global private @device_a : !hal.device
+
+// CHECK-LABEL: @barrierOnBarrier
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<transient>)
+util.func public @barrierOnBarrier(%arg0: !stream.resource<transient>) -> !stream.resource<transient> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+
+  // CHECK: %[[RESULT:.+]], %[[TIMEPOINT:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE:.+]]: !stream.resource<transient>{%c128})
+  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1](%[[ARG0_CAPTURE]][{{.+}}])
+  %0 = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch_0[%c1](%arg0[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
+  %1 = stream.async.barrier on(#hal.device.affinity<@device_a>) %0 : !stream.resource<transient>{%c128}
+  %2 = stream.async.barrier on(#hal.device.affinity<@device_a>) %1 : !stream.resource<transient>{%c128}
+  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1](%[[DISPATCH0]][{{.+}}])
+  %3 = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch_1[%c1](%2[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
+  // CHECK-NEXT: stream.yield %[[DISPATCH1]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[RESULT]]
+  // CHECK-NEXT: util.return %[[READY]]
+  util.return %3 : !stream.resource<transient>
+}
+
+// -----
+
+// Tests that a barrier on another device than its producer does not join the
+// producer's partition, which would mix devices and lose the partition
+// affinity.
+
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+
+// CHECK-LABEL: @barrierOnOtherDevice
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<transient>)
+util.func public @barrierOnOtherDevice(%arg0: !stream.resource<transient>) -> !stream.resource<transient> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+
+  // CHECK: %[[PRODUCED:.+]], %[[TIMEPOINT0:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE:.+]]: !stream.resource<transient>{%c128})
+  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1](%[[ARG0_CAPTURE]][{{.+}}])
+  %0 = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch_0[%c1](%arg0[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
+  // CHECK-NEXT: stream.yield %[[DISPATCH0]]
+  // CHECK-NEXT: } => !stream.timepoint
+  %1 = stream.async.barrier on(#hal.device.affinity<@device_b>) %0 : !stream.resource<transient>{%c128}
+
+  // CHECK: %[[RESULT:.+]], %[[TIMEPOINT1:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.device.affinity<@device_b>)
+  // CHECK-SAME: await(%[[TIMEPOINT0]])
+  // CHECK-SAME: with(%[[PRODUCED]] as %[[PRODUCED_CAPTURE:.+]]: !stream.resource<transient>{%c128})
+  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1](%[[PRODUCED_CAPTURE]][{{.+}}])
+  %2 = stream.async.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch_1[%c1](%1[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
+  // CHECK-NEXT: stream.yield %[[DISPATCH1]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await %[[TIMEPOINT1]] => %[[RESULT]]
+  // CHECK-NEXT: util.return %[[READY]]
+  util.return %2 : !stream.resource<transient>
+}
+
+// -----
+
+// Tests that a transfer of a transfer joining its producer is partitioned on
+// its own instead of being left outside of all execution regions.
+
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+util.global private @device_c : !hal.device
+
+// CHECK-LABEL: @transferOfJoinedTransfer
+// CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<transient>)
+util.func public @transferOfJoinedTransfer(%arg0: !stream.resource<transient>) -> !stream.resource<transient> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+
+  // CHECK: %[[TRANSFERRED0:.+]], %[[TIMEPOINT0:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE:.+]]: !stream.resource<transient>{%c128})
+  // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1](%[[ARG0_CAPTURE]][{{.+}}])
+  %0 = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch_0[%c1](%arg0[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
+  // CHECK-NEXT: %[[TRANSFER0:.+]] = stream.async.transfer %[[DISPATCH0]]
+  // CHECK-SAME: to(#hal.device.affinity<@device_b>)
+  %1 = stream.async.transfer %0 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@device_a>) -> to(#hal.device.affinity<@device_b>) !stream.resource<transient>{%c128}
+  // CHECK-NEXT: stream.yield %[[TRANSFER0]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK: %[[TRANSFERRED1:.+]], %[[TIMEPOINT1:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.device.affinity<@device_a>)
+  // CHECK-SAME: await(%[[TIMEPOINT0]])
+  // CHECK-SAME: with(%[[TRANSFERRED0]] as %[[TRANSFERRED0_CAPTURE:.+]]: !stream.resource<transient>{%c128})
+  // CHECK-NEXT: %[[TRANSFER1:.+]] = stream.async.transfer %[[TRANSFERRED0_CAPTURE]]
+  // CHECK-SAME: from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_c>)
+  %2 = stream.async.transfer on(#hal.device.affinity<@device_a>) %1 : !stream.resource<transient>{%c128} from(#hal.device.affinity<@device_b>) -> to(#hal.device.affinity<@device_c>) !stream.resource<transient>{%c128}
+  // CHECK-NEXT: stream.yield %[[TRANSFER1]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK: %[[RESULT:.+]], %[[TIMEPOINT2:.+]] = stream.async.execute
+  // CHECK-SAME: on(#hal.device.affinity<@device_c>)
+  // CHECK-SAME: await(%[[TIMEPOINT1]])
+  // CHECK-SAME: with(%[[TRANSFERRED1]] as %[[TRANSFERRED1_CAPTURE:.+]]: !stream.resource<transient>{%c128})
+  // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1](%[[TRANSFERRED1_CAPTURE]][{{.+}}])
+  %3 = stream.async.dispatch on(#hal.device.affinity<@device_c>) @ex::@dispatch_1[%c1](%2[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
+  // CHECK-NEXT: stream.yield %[[DISPATCH1]]
+  // CHECK-NEXT: } => !stream.timepoint
+
+  // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await %[[TIMEPOINT2]] => %[[RESULT]]
+  // CHECK-NEXT: util.return %[[READY]]
+  util.return %3 : !stream.resource<transient>
+}
+
+// -----
+
+// Tests that an interleaved device-0/device-1 stream with a barrier on a
+// transfer from device 1 schedules into acyclic execution regions.
+
+module @module attributes {stream.affinity.default = #hal.device.affinity<@__device_0>} {
+  util.global private @__device_0 : !hal.device
+  util.global private @__device_1 : !hal.device
+
+  // CHECK-LABEL: @interleavedDevicePartitions
+  util.func public @interleavedDevicePartitions(
+      %input: !stream.resource<external>,
+      %constant0: !stream.resource<constant>,
+      %constant1: !stream.resource<constant>,
+      %fence: !hal.fence) -> !hal.buffer_view {
+    %timepoint = stream.timepoint.immediate => !stream.timepoint
+    %c0 = arith.constant 0 : index
+    %c4 = arith.constant 4 : index
+    %c8 = arith.constant 8 : index
+    %c256 = arith.constant 256 : index
+    %c512 = arith.constant 512 : index
+    %c1024 = arith.constant 1024 : index
+    %to_device_1 = stream.async.transfer %input : !stream.resource<external>{%c8} from(#hal.device.affinity<@__device_0>) -> to(#hal.device.affinity<@__device_1>) !stream.resource<transient>{%c8}
+    // CHECK: %[[BASE:.+]], %[[BASE_TIMEPOINT:.+]] = stream.async.execute
+    // CHECK-SAME: on(#hal.device.affinity<@__device_0>)
+    // CHECK-NEXT: stream.async.dispatch @ex::@base
+    %base = stream.async.dispatch on(#hal.device.affinity<@__device_0>) @ex::@base(%constant0[%c0 to %c512 for %c512], %input[%c0 to %c8 for %c8]) : (!stream.resource<constant>{%c512}, !stream.resource<external>{%c8}) -> !stream.resource<transient>{%c512}
+    %barrier0 = stream.async.barrier on(#hal.device.affinity<@__device_0>) %base : !stream.resource<transient>{%c512}
+    %barrier1 = stream.async.barrier on(#hal.device.affinity<@__device_0>) %base : !stream.resource<transient>{%c512}
+    // CHECK: %[[MID:.+]]:2, %[[MID_TIMEPOINT:.+]] = stream.async.execute
+    // CHECK-SAME: on(#hal.device.affinity<@__device_1>)
+    // CHECK-SAME: await(%[[BASE_TIMEPOINT]])
+    // CHECK-SAME: %[[BASE]] as
+    // CHECK-NEXT: stream.async.transfer
+    // CHECK-NEXT: stream.async.dispatch @ex::@device_1_mid
+    %device_1_mid = stream.async.dispatch on(#hal.device.affinity<@__device_1>) @ex::@device_1_mid(%to_device_1[%c0 to %c512 for %c512], %base[%c0 to %c512 for %c512]) : (!stream.resource<transient>{%c512}, !stream.resource<transient>{%c512}) -> !stream.resource<transient>{%c512}
+    %device_0_mid = stream.async.dispatch @ex::@device_0_mid(%constant1[%c0 to %c1024 for %c1024], %base[%c0 to %c1024 for %c1024], %base[%c0 to %c4 for %c4]) : (!stream.resource<constant>{%c1024}, !stream.resource<transient>{%c1024}, !stream.resource<transient>{%c4}) -> !stream.resource<transient>{%c512}
+    %barrier2 = stream.async.barrier on(#hal.device.affinity<@__device_0>) %device_0_mid : !stream.resource<transient>{%c512}
+    %from_device_1 = stream.async.transfer %device_1_mid : !stream.resource<transient>{%c512} from(#hal.device.affinity<@__device_1>) -> !stream.resource<transient>{%c512}
+    %barrier3 = stream.async.barrier on(#hal.device.affinity<@__device_0>) %from_device_1 : !stream.resource<transient>{%c512}
+    %device_0_join = stream.async.dispatch @ex::@device_0_join(%base[%c0 to %c512 for %c512], %barrier3[%c0 to %c512 for %c512]) : (!stream.resource<transient>{%c512}, !stream.resource<transient>{%c512}) -> !stream.resource<transient>{%c512}
+    // CHECK: %[[TAIL:.+]], %[[TAIL_TIMEPOINT:.+]] = stream.async.execute
+    // CHECK-SAME: on(#hal.device.affinity<@__device_1>)
+    // CHECK-SAME: await(%[[MID_TIMEPOINT]])
+    // CHECK-SAME: %[[MID]]#0 as
+    // CHECK-NEXT: stream.async.dispatch @ex::@device_1_tail
+    // CHECK-NEXT: stream.async.dispatch @ex::@device_1_result
+    %device_1_tail = stream.async.dispatch on(#hal.device.affinity<@__device_1>) @ex::@device_1_tail(%device_1_mid[%c0 to %c512 for %c512]) : (!stream.resource<transient>{%c512}) -> !stream.resource<transient>{%c1024}
+    %device_0_tail = stream.async.dispatch @ex::@device_0_tail(%base[%c0 to %c512 for %c512], %constant1[%c0 to %c512 for %c512], %device_0_join[%c0 to %c4 for %c4]) : (!stream.resource<transient>{%c1024}, !stream.resource<constant>{%c512}, !stream.resource<transient>{%c4}) -> !stream.resource<transient>{%c256}
+    %device_1_result = stream.async.dispatch on(#hal.device.affinity<@__device_1>) @ex::@device_1_result(%device_1_tail[%c0 to %c256 for %c256], %constant0[%c0 to %c512 for %c512]) : (!stream.resource<transient>{%c256}, !stream.resource<constant>{%c512}) -> !stream.resource<transient>{%c512}
+    // CHECK: %[[READY:.+]] = stream.timepoint.join max(%[[BASE_TIMEPOINT]], %[[MID_TIMEPOINT]], %[[TAIL_TIMEPOINT]])
+    // CHECK: stream.async.execute
+    // CHECK-SAME: on(#hal.device.affinity<@__device_0>)
+    // CHECK-SAME: await(%[[READY]])
+    // CHECK-SAME: %[[BASE]] as
+    // CHECK-SAME: %[[MID]]#1 as
+    // CHECK-SAME: %[[TAIL]] as
+    // CHECK-NEXT: stream.async.dispatch @ex::@device_0_join
+    // CHECK-NEXT: stream.async.dispatch @ex::@device_0_tail
+    // CHECK-NEXT: stream.async.dispatch @ex::@result
+    %barrier4 = stream.async.barrier on(#hal.device.affinity<@__device_0>) %device_0_tail : !stream.resource<transient>{%c512}
+    %result = stream.async.dispatch @ex::@result(%device_0_tail[%c0 to %c512 for %c512], %device_1_result[%c0 to %c512 for %c512]) : (!stream.resource<transient>{%c512}, !stream.resource<transient>{%c512}) -> !stream.resource<external>{%c512}
+    stream.timepoint.chain_external %timepoint => (%fence : !hal.fence)
+    %buffer_view = stream.tensor.export %result : tensor<1x1x256xf16> in !stream.resource<external>{%c512} -> !hal.buffer_view
+    util.return %buffer_view : !hal.buffer_view
+  }
 }
 
 // -----
