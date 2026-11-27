@@ -282,6 +282,13 @@ Dependency updates | `integrates/*` | `integrates/llvm-20240501`
 Branches that do not meet these guidelines may be deleted, especially if
 they [appear to be stale](https://github.com/iree-org/iree/branches/stale).
 
+### :octicons-issue-closed-16: Stale issues and pull requests
+
+Maintainers and reviewers are encouraged to label outdated issues and PRs with
+[`zombie 🧟`](https://github.com/iree-org/iree/labels/zombie%20%F0%9F%A7%9F)
+and to close them. Every open issue and PR should either be worked on or be
+closed as no longer applicable.
+
 ## Tips for contributors
 
 ### Tool recommendations

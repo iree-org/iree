@@ -48,28 +48,32 @@ class PullRequestGreeter(FirstTimeContributorGreeter):
 {FIRST_TIME_CONTRIBUTOR_COMMENT_TAG}
 Hello @{author} :wave:
 
-Thank you for submitting a Pull Request to IREE! It looks like this is your first one. We have one ask, and you can also find some general tips below.
+Thank you for submitting a pull request to IREE! It looks like this is your first one. We have one ask, and you can also find some general tips below.
 
 ---
 
-### Action required: acknowledge IREE project policies
+### Action required: acknowledge the IREE policies and contribution guidelines
 IREE is a Linux Foundation project. All participants are expected to follow the [LF Projects Code of Conduct](https://lfprojects.org/policies/code-of-conduct/).
 
-All contributions to IREE must follow our [IREE AI Tool Use Policy](https://iree.dev/developers/general/contributing/#ai-tool-use). In particular:
-- Contributors must fully understand, and vouch for, **all** submitted changes and the intent behind them.
-- Substantial use of LLM/generative AI tools must be noted in the PR description, e.g. via `Assisted-by: tool-name` or `Co-authored-by: tool-name tool@email` trailers.
-- Contributors must write PR descriptions themselves. There must always be a human in the loop: contributors must respond to reviews and questions by themselves.
-  If a response includes LLM-assisted segments (e.g. reproducers, LLM agent analysis excerpts), the segment should be clearly marked as "assisted", same as for PR contents.
-- GitHub issues labeled as "Good first issue" are explicitly designated as learning opportunities for newcomers to the project. With exceptions for boilerplate edits, AI tool usage for resolutions to such issues is **forbidden**.
+All contributions to IREE must follow our [contribution guidelines](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md). In particular:
+- [Contributors own their changes](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ai-2): they must review **all** of them themselves and understand them well enough to explain and defend them. AI review tools do not replace this review.
+- [Contributors also own their changes after merge](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ai-7): they fix or revert them when problems come up.
+- [PR descriptions may be AI-assisted](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ai-3), but contributors must review them and follow the [pull request description guidelines](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#pull-request-descriptions).
+- [Contributions are written for human readers](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ai-4): the people who review and maintain them, and who read the history later. AI clutter, such as boilerplate, comments that narrate obvious code, restated diffs, agent logs, or filler text, does not belong in any contribution.
+- [There must always be a human in the loop](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ai-5): contributors must respond to reviews and questions by themselves. A lack of understanding makes a contribution [extractive](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#extractive-contributions), because it puts the burden on the reviewers instead of the author.
+- Every contribution, whether a pull request, an issue, or a comment, [should be worth more to the project than the time maintainers spend on it](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ext-1). Otherwise it is [extractive](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#extractive-contributions) and may be closed. It is then [up to the author to show that it is not](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ext-2).
+- GitHub issues labeled as "Good first issue" are explicitly designated as learning opportunities for newcomers to the project. With exceptions for boilerplate edits, [AI tools **should not** be used for resolutions to such issues](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ai-8).
 
-We kindly ask you to **reply to this message** and confirm that you understand and accept the cited policies, particularly the AI Tool Use Policy.
+If this pull request does not follow these guidelines yet, for example because an [AI agent opened it without your review](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ai-1), please close it and reopen it once you have reworked the change.
+
+We kindly ask you to **reply to this message** and confirm that you understand and accept the policies and contribution guidelines.
 
 ---
 
 ### General guidance
-Our general [Contributing guide](https://iree.dev/developers/general/contributing/) contains information and links to detailed guides on code quality, testing, commit summaries and our CI system.
+The [website version of the contribution guidelines](https://iree.dev/developers/general/contributing/) also covers CI configuration, commit signing, and commit access.
 
-A common point for new PRs: if a DCO signing check fails for you, check out the section on [Developer Certificate of Origin](https://iree.dev/developers/general/contributing/#developer-certificate-of-origin).
+A common point for new PRs: if a DCO signing check fails for you, check out the section on [Developer Certificate of Origin](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#developer-certificate-of-origin).
 In these cases, it should suffice to amend your commit signature(s) per the guide and force-push the PR branch.
 
 If you have any questions, feel free to leave a comment here, or ask away on [IREE Discord](https://discord.gg/e4F4NzX99).
@@ -87,22 +91,20 @@ Hello @{author} :wave:
 Thank you for submitting an issue to IREE! It looks like it's your first one.
 
 The volume of issues is huge, and triage times may vary. If you need quicker assistance on the issue, consider posting it on [IREE Discord](https://discord.gg/e4F4NzX99) and providing short context there.
-Feel free to identify the most frequent contributors to the corresponding part of the codebase via Git history/[CODEOWNERS](.github/CODEOWNERS) and (gently!) tag them below.
 
 ---
 
-### Action required: acknowledge IREE project policies
+### Action required: acknowledge the IREE policies and contribution guidelines
 IREE is a Linux Foundation project. All participants are expected to follow the [LF Projects Code of Conduct](https://lfprojects.org/policies/code-of-conduct/).
 
-Please note that all contributions to IREE, **including GitHub issues**, must follow our [IREE AI Tool Use Policy](https://iree.dev/developers/general/contributing/#ai-tool-use). This means:
-- Issue reporters must fully understand the primary issue and the impact of the problem.
-  For bug reports, specifics of the use-case, workflow and/or crash scenario usually suffice.
-  For improvement suggestions, this usually implies deeper understanding of suboptimal code, IR design choices, assumed performance tradeoffs, etc.
-- Contributors must write the summary of the issue themselves, so that the exact impact and scenario is clear to other participants.
-- Issue authors are expected to review and understand all LLM/AI-assisted segments of the report, if any. E.g.: CLI commands and IR reproducers, model/framework details, lowering pipeline details, assumptions about problematic behaviors of IREE components.
-- Substantial use of LLM/generative AI tools must be disclaimed in the header or footer of the issue description.
+Please note that all contributions to IREE, **including GitHub issues**, must follow our [contribution guidelines](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md). In particular:
+- [Issue authors own their report](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ai-2): they must understand the problem and its impact, and review every AI-assisted part, such as reproducers, commands, or analysis.
+- [The description may be AI-assisted](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ai-3), but it must make the scenario and impact clear to others. For a bug, this is the use case, workflow, or crash. For an improvement, it is the affected code and the expected benefit.
+- [Issues are written for human readers](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ai-4): the maintainers and contributors who triage and fix them. AI clutter, such as boilerplate, agent logs, or filler text, does not belong in the report.
+- [There must always be a human in the loop](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ai-5): issue authors answer follow-up questions themselves.
+- Every contribution, whether a pull request, an issue, or a comment, [should be worth more to the project than the time maintainers spend on it](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ext-1). Otherwise it is [extractive](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#extractive-contributions) and may be closed. It is then [up to the author to show that it is not](https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#cg-ext-2).
 
-Before the issue can be triaged, we kindly ask you to **reply to this message** and confirm that you understand and accept the proposed policy. As required, please adjust your initial issue description.
+Before the issue can be triaged, we kindly ask you to **reply to this message** and confirm that you understand and accept the policies and contribution guidelines. If needed, update the issue description accordingly.
 
 ---
 

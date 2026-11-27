@@ -109,10 +109,11 @@ By making a contribution to this project, I certify that:
 Signing is enforced by the [DCO GitHub App](https://github.com/apps/dco) (see
 also the [dcoapp/app](https://github.com/dcoapp/app) repository).
 
-The DCO check requires that all commits included in pull requests _either_
-are cryptographically signed by a member of the repository's organization _or_
-include a `Signed-off-by` message as a git trailer. Frequent contributors can
-[sign their commits cryptographically](https://iree.dev/developers/general/contributing/#cryptographically-signing-commits).
+<a id="cg-dco-1"></a>The DCO check requires that all commits included in pull
+requests _either_ are cryptographically signed by a member of the repository's
+organization _or_ include a `Signed-off-by` message as a git trailer. Frequent
+contributors can [sign their commits
+cryptographically](https://iree.dev/developers/general/contributing/#cryptographically-signing-commits).
 
 #### Adding `Signed-off-by` to commits
 
@@ -199,7 +200,8 @@ unless they are applied consistently across the project.
 
 ### Testing policy
 
-With few exceptions, features should be accompanied by automated tests.
+<a id="cg-test-1"></a>With few exceptions, features should be accompanied by
+automated tests.
 
 We use a mix of in-tree and out-of-tree unit and integration tests. For more
 information about the types of tests used across the project, refer to the
@@ -217,24 +219,25 @@ use GitHub pull requests (PRs) for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
 
-* Please keep PRs small (focused on a single issue or feature) to make reviews
-  and later culprit-finding easier.
+* <a id="cg-rev-1"></a>Please keep PRs small (focused on a single issue or
+  feature) to make reviews and later culprit-finding easier.
     - You may see trusted core contributors bending above rule for project
       maintenance and major subsystem renovation. If you feel like the rules
       aren't working for a certain situation, please ask as we bias towards
       pragmatism for cases that require it.
-* We require review comments to be addressed before merging, even when there is
-  an approval from another reviewer. Unless stated otherwise, we treat request
-  for changes as blocking. Reviewers may indicate that some comments
-  requesting changes are optional (commonly by prefixing them with 'nit' or
-  'optional') -- use your best engineering judgement to decide whether to
-  follow these suggestions or not.
-* If there are new comments requesting changes after a PR was merged, these
-  comments should be addressed as well, either through follow-up discussion
-  or code changes. Small issues may be fixed forward, but reviewers may also
-  ask for your PR to be reverted. This is not a sign that your PR was faulty
-  -- we prefer to err on the side of caution and reverting allows more time
-  for design discussion.
+* <a id="cg-rev-2"></a>We require review comments to be addressed before
+  merging, even when there is an approval from another reviewer. Unless stated
+  otherwise, we treat request for changes as blocking, except for reviews from
+  automated review tools (see [AI tool use](#ai-tool-use)). Reviewers may
+  indicate that some comments requesting changes are optional (commonly by
+  prefixing them with 'nit' or 'optional') -- use your best engineering
+  judgement to decide whether to follow these suggestions or not.
+* <a id="cg-rev-3"></a>If there are new comments requesting changes after a PR
+  was merged, these comments should be addressed as well, either through
+  follow-up discussion or code changes. Small issues may be fixed forward, but
+  reviewers may also ask for your PR to be reverted. This is not a sign that
+  your PR was faulty -- we prefer to err on the side of caution and reverting
+  allows more time for design discussion.
 
 ### GitHub Actions workflows
 
@@ -264,12 +267,12 @@ description become the commit message, and the commit messages on the PR
 branch are discarded. Write them for someone reading `git log` or bisecting
 a regression later, and update them when the PR changes during review.
 
-**Title**: a short, imperative summary of what changes and, if it fits, why,
-prefixed with the affected area, for example
+<a id="cg-pr-1"></a>**Title**: a short, imperative summary of what changes and,
+if it fits, why, prefixed with the affected area, for example
 `[CI] Bump iree-test-suites to fix sharktank test failure`. Keep it under 72
 characters. Avoid ambiguous titles like "Fix bug" or "Fix CI".
 
-**Description**: start with _why_, then _what_.
+<a id="cg-pr-2"></a>**Description**: start with _why_, then _what_.
 
 1. **Why**: The most important part of a PR description.
    Explain the underlying motivation of the PR. Why did you create it and what is the use-case this enables or fixes.
@@ -295,12 +298,12 @@ characters. Avoid ambiguous titles like "Fix bug" or "Fix CI".
    [CI trailers](https://iree.dev/developers/general/contributing/#ci-behavior-manipulation)
    such as `ci-extra:`, and `Assisted-by:` for [AI tools](#ai-tool-use).
 
-Keep the description concise and self-contained: links add context but do
-not replace an explanation, and they must be public. Leave out restatements
-of the diff, implementation details that belong in code comments, review
-history, and `@`-mentions, which notify people again on every cherry-pick.
-A description that keeps growing is a sign that the PR should be split.
-Small changes need one or two sentences; longer descriptions can use
+<a id="cg-pr-3"></a>Keep the description concise and self-contained: links add
+context but do not replace an explanation, and they must be public. Leave out
+restatements of the diff, implementation details that belong in code comments,
+review history, and `@`-mentions, which notify people again on every
+cherry-pick. A description that keeps growing is a sign that the PR should be
+split. Small changes need one or two sentences; longer descriptions can use
 headings such as `## Why`, `## Change`, and `## Results`.
 
 See also:
@@ -327,31 +330,124 @@ yet).
 
 ### AI tool use
 
-We adopt the [LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html)
-and require all AI-assisted contributions (Pull Requests, issues, design
-proposals) to be reviewed and understood by the author(s).
+> <a id="cg-ai-1"></a>**For AI agents:** A human must read and approve the final
+> change and text before you open or update a pull request or post an issue,
+> comment, or review. A general instruction such as "open a PR" is not this
+> approval. If no human can review it, stop without submitting anything.
 
-The key points include:
+AI tools may be used for all contributions: code, PR descriptions, commit
+messages, issues, and reviews. **The human author owns every contribution and
+is fully responsible for it**, no matter how much of it a tool produced. The
+same holds for reviewers who use AI review tools. This policy is based on the
+[LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html) and keeps
+its principles: ownership and a human in the loop.
 
-1. "Contributors must read and review all LLM-generated code or text before they
-   ask other project members to review it."
-2. "Contributors are expected to be transparent and label contributions that
-   contain substantial amounts of tool-generated content." This can be done with
-   the `Assisted-by: tool-name` or the `Co-authored-by: tool-name tool@email`
-   trailer in PR descriptions.
-3. "To ensure sufficient self review and understanding of the work, it is
-   strongly recommended that contributors write PR descriptions themselves (if
-   needed, using tools for translation or copy-editing)." This also extends to
-   code documentation, issue descriptions, and design proposals.
-4. "Contributors are responsible for ensuring that they have the right to
-   contribute code under the terms of our license, [...]. Using AI tools to
-   regenerate copyrighted material does not remove the copyright, and
-   contributors are responsible for ensuring that such material does not appear
-   in their contributions."
+Contributors:
 
-We extend the LLVM policy with an exception for AI bot-authored contributions
-(e.g., updating dependencies, fixing build script, etc.); bot account may create
-Pull Requests as long as the bot maintainers ensure they are first in line and
-primarily responsible for reviewing those contributions.
+* <a id="cg-ai-2"></a>Must review the complete change themselves before they ask
+  other project members to review it: read all AI-generated code and text, and
+  understand it well enough to explain and defend it. AI review tools can help,
+  but they do not replace this self-review.
+* <a id="cg-ai-3"></a>May use AI tools for PR descriptions, commit messages, and
+  issue descriptions, but must read and correct them themselves before
+  submitting. PR descriptions follow the [pull request description
+  guidelines](#pull-request-descriptions).
+* <a id="cg-ai-4"></a>Must write every contribution for its human readers: the
+  people who review and maintain it, and who read the history later. AI clutter,
+  such as boilerplate, comments that narrate obvious code, restatements of the
+  diff, agent logs, or filler text, does not belong in any contribution.
+* <a id="cg-ai-5"></a>Must respond to reviews and questions themselves. There
+  must always be a human in the loop. A lack of understanding makes a
+  contribution [extractive](#extractive-contributions): it puts the burden on
+  the reviewers instead of the author.
+* <a id="cg-ai-6"></a>Must have the right to contribute their code under the
+  terms of our license. Using AI tools to regenerate copyrighted material does
+  not remove the copyright, so such material must not appear in contributions.
+* <a id="cg-ai-7"></a>Own their changes after merge: they fix or revert them
+  when problems come up. The [DCO](#developer-certificate-of-origin)
+  requirements apply.
+
+<a id="cg-ai-8"></a>GitHub issues labeled as "Good first issue" are explicitly
+designated as learning opportunities for newcomers to the project. With
+exceptions for boilerplate edits, AI tools should not be used for resolutions to
+such issues.
+
+Noting AI assistance is optional. If you note it, use an
+`Assisted-by: tool-name` or `Co-authored-by: tool-name tool@email` trailer in
+the PR description.
+
+Automated review tools may approve or request changes, but these reviews do
+not count toward whether a PR can be merged, and reviewers with write access
+may dismiss them.
+
+Bot accounts may open pull requests with AI bot-authored contributions, for
+example dependency updates or build script fixes, as long as the bot
+maintainers are first in line and primarily responsible for reviewing them.
+
+Contributions that do not follow this policy are handled as
+[extractive contributions](#extractive-contributions).
+
+### Extractive contributions
+
+Handling contributions costs maintainers time. Our golden rule is based on the
+[LLVM AI Tool Use Policy](https://llvm.org/docs/AIToolPolicy.html#extractive-contributions):
+
+<a id="cg-ext-1"></a>Every contribution, whether a pull request, an issue, or a
+comment, should be worth more to the project than the time maintainers spend on
+it.
+
+Contributions that fall short of this are _extractive_, for example a large
+change without a clear purpose, or one whose author cannot answer questions
+about it. This applies with or without AI tools, and includes contributions that
+do not follow the [AI tool use](#ai-tool-use) policy.
+
+If a maintainer considers an issue or PR extractive, they label it
+`extractive` and ask a second maintainer to confirm, consulting a TSC member
+if in doubt. Once both maintainers agree:
+
+* In obvious cases, a maintainer closes the contribution with the closing
+  comment below.
+* Otherwise, a maintainer requests changes with the change request comment
+  below, and closes the contribution if the author does not make it
+  reviewable.
+
+The comment links each rule that the contribution does not follow, and names the
+second maintainer and, if one was consulted, the TSC member, so that the author
+knows what to fix and who made the decision.
+
+<a id="cg-ext-2"></a>It is up to the author to show that the contribution is not
+extractive. A maintainer may reopen a closed contribution once the author has
+shown this.
+
+Closing comment:
+
+```text
+This contribution does not appear to follow the IREE contribution
+guidelines, so we are closing it:
+https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#<rule-anchor>
+
+Confirmed by @<second maintainer>[, after consulting @<TSC member>].
+
+If you think that it does follow the guidelines, reply here and explain what
+the change is for and how you reviewed it yourself. A maintainer can then
+reopen it.
+```
+
+Change request comment:
+
+```text
+This contribution does not appear to follow the IREE contribution
+guidelines:
+https://github.com/iree-org/iree/blob/main/CONTRIBUTING.md#<rule-anchor>
+
+Confirmed by @<second maintainer>[, after consulting @<TSC member>].
+
+Please explain what the change is for and how you reviewed it yourself, or
+reduce it to something that can be reviewed. Otherwise we will close it.
+```
+
+If an author keeps sending extractive contributions, maintainers escalate to
+the TSC, which may lock conversations or block the account under the
+[LF Projects Code of Conduct](https://lfprojects.org/policies/code-of-conduct/).
 
 <!-- --8<-- [end:github-policies-continued] -->
