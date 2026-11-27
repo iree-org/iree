@@ -228,6 +228,43 @@ module @parameter attributes {
 
 // -----
 
+// Frontends still emit #stream.parameter.named at this level. It is split the
+// same way, and the shards keep the Stream attribute.
+
+module @stream_parameter attributes {
+  stream.resources = #stream.resource_config<{max_allocation_size = 16}>
+} {
+  util.global private @weight = #stream.parameter.named<"model"::"lm_head.weight"> : tensor<6x4xf16>
+  util.func public @main(%lhs: tensor<3x4xf16>) -> tensor<3x6xf32> {
+    %cst = arith.constant 0.0 : f32
+    %weight = util.global.load immutable @weight : tensor<6x4xf16>
+    %empty = tensor.empty() : tensor<3x6xf32>
+    %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<3x6xf32>) -> tensor<3x6xf32>
+    %0 = linalg.matmul
+        indexing_maps = [affine_map<(m, n, k) -> (m, k)>,
+                         affine_map<(m, n, k) -> (n, k)>,
+                         affine_map<(m, n, k) -> (m, n)>]
+        ins(%lhs, %weight : tensor<3x4xf16>, tensor<6x4xf16>)
+        outs(%fill : tensor<3x6xf32>) -> tensor<3x6xf32>
+    util.return %0 : tensor<3x6xf32>
+  }
+}
+
+// CHECK-LABEL: module @stream_parameter
+//   CHECK-NOT:   util.global private @weight =
+//       CHECK:   util.global private @weight_shard0 = #stream.parameter.named<"model"::"lm_head.weight", {length = 16 : i64, offset = 0 : i64}> : tensor<2x4xf16>
+//       CHECK:   util.global private @weight_shard1 = #stream.parameter.named<"model"::"lm_head.weight", {length = 16 : i64, offset = 16 : i64}> : tensor<2x4xf16>
+//       CHECK:   util.global private @weight_shard2 = #stream.parameter.named<"model"::"lm_head.weight", {length = 16 : i64, offset = 32 : i64}> : tensor<2x4xf16>
+//       CHECK:   util.func public @main
+//       CHECK:     linalg.matmul
+//  CHECK-SAME:         tensor<3x4xf16>, tensor<2x4xf16>
+//       CHECK:     linalg.matmul
+//  CHECK-SAME:         tensor<3x4xf16>, tensor<2x4xf16>
+//       CHECK:     linalg.matmul
+//  CHECK-SAME:         tensor<3x4xf16>, tensor<2x4xf16>
+
+// -----
+
 // A parameter that already is a range of a larger entry: the shard offsets are
 // relative to its offset of 1024, and other config entries are kept. 5x4xf16
 // (40 bytes) becomes shards of 2, 2 and 1 rows, so the last one has 8 bytes.
