@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "abi_ops.mlir"
     "import_dims.mlir"
+    "invalid_encoding.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -19,6 +19,7 @@ iree_lit_test_suite(
         [
             "abi_ops.mlir",
             "import_dims.mlir",
+            "invalid_encoding.mlir",
         ],
         include = ["*.mlir"],
     ),

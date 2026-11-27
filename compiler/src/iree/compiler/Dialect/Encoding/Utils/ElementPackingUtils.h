@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_ENCODING_UTILS_ELEMENTPACKINGUTILS_H_
 #define IREE_COMPILER_DIALECT_ENCODING_UTILS_ELEMENTPACKINGUTILS_H_
 
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Types.h"
@@ -27,6 +28,15 @@ bool needToPackSubByteElements(RankedTensorType shapedType);
 /// cases.
 Type legalizeStorageElementType(RankedTensorType shapedType);
 
+/// Converts a scalar or ranked tensor between logical and storage element types
+/// without numerical floating-point conversion. Integer containers are
+/// truncated or zero-extended; floating-point values are bitcast through
+/// signless integers. Returns null without emitting IR for unsupported element
+/// types. Source and target must have the same shape, with at least one
+/// signless integer element type unless the types are identical.
+Value convertStorageElementType(Location loc, Value source, Type targetType,
+                                OpBuilder &builder);
+
 /// Emits IR with the given |builder| to calculate the total number of bytes
 /// required for the given |shapedType| in storage. Returns the value for the
 /// final count on success; returns nullptr on failure. Dynamic dimensions in
@@ -36,11 +46,16 @@ Value calculateStorageElementCountInBytes(Location loc,
                                           ValueRange dynamicDims,
                                           OpBuilder &builder);
 
-/// Emits IR with the given |builder| to calculate the byte offset for the
-/// element at the given |linearizedIndex|.
-Value calculateStorageElementOffsetInBytes(Location loc,
-                                           RankedTensorType originalType,
-                                           Value linearizedIndex,
+/// Maps logical element indices to byte offsets, using the default dense layout
+/// for unencoded tensors. Returns null for unsupported encodings.
+AffineMap getStorageElementOffsetMap(RankedTensorType type);
+
+/// Emits the byte offset of the element at `indices`. `dynamicDims` supplies
+/// the dynamic extents in tensor dimension order. Returns null without emitting
+/// IR if the storage layout is unsupported.
+Value calculateStorageElementOffsetInBytes(Location loc, RankedTensorType type,
+                                           ValueRange dynamicDims,
+                                           ValueRange indices,
                                            OpBuilder &builder);
 
 } // namespace mlir::iree_compiler

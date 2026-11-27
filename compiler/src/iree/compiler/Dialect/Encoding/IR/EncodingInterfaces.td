@@ -268,6 +268,43 @@ def IREEEncoding_SerializableAttr :
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns the storage element type, or null to use default storage
+        legalization. Sub-byte types denote tightly packed elements. Integer
+        types wider than `elementType` denote zero-extended bit-pattern
+        containers; loads truncate them to the logical width. Floating-point
+        elements are bitcast to and from their integer bit patterns, without
+        numerical conversion. This is a pure query.
+      }],
+      /*retTy=*/"::mlir::Type",
+      /*methodName=*/"getStorageElementType",
+      /*args=*/(ins "::mlir::Type":$elementType),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{ return {}; }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns a single-result map from logical indices to the byte containing
+        the element. Returns null for unsupported, unresolved or ambiguous
+        layouts. This query emits no IR.
+
+        Map dimensions are logical indices; symbols are dynamic tensor extents,
+        both in tensor dimension order. Static extents are constants. Indices
+        must be in bounds; lengths and one-past-the-end positions are unsupported.
+
+        Intermediate values must be non-negative, divisors must be positive
+        constants, and the result must fit in the target index type.
+
+        Sub-byte elements may share a byte. The map does not establish whether
+        a scalar access or contiguous slice copy is legal.
+      }],
+      /*retTy=*/"::mlir::AffineMap",
+      /*methodName=*/"getStorageElementOffsetMap",
+      /*args=*/(ins "::mlir::RankedTensorType":$type),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{ return {}; }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns the new encoding after collapsing the type from `origShape`
         to `targetShape`. If the type with this encoding cannot be collapsed,
         returns `nullptr`.
@@ -325,6 +362,12 @@ def IREEEncoding_SerializableAttr :
   ];
 
   let extraClassDeclaration = [{
+    /// Emits the byte offset of an element using getStorageElementOffsetMap.
+    /// Returns null without emitting IR if the mapping is unavailable.
+    Value calculateStorageElementOffsetInBytes(
+        Location loc, OpBuilder &builder, RankedTensorType type,
+        ValueRange dynamicDims, ValueRange indices);
+
     /// Returns true if they are the same attribute. Otherwise, returns true if
     /// both attributes implement SerializableAttr interface
     /// and they are compatible with each other.

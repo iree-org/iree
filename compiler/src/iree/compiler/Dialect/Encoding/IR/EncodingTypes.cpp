@@ -23,6 +23,76 @@
 
 namespace mlir::iree_compiler::IREE::Encoding {
 
+AffineMap getRowMajorStorageElementOffsetMap(RankedTensorType type,
+                                             int64_t storageBits,
+                                             ArrayRef<int64_t> padding) {
+  if (!padding.empty() &&
+      (padding.size() != type.getRank() ||
+       llvm::any_of(padding, [](int64_t value) { return value < 0; }))) {
+    return {};
+  }
+  MLIRContext *ctx = type.getContext();
+  AffineExpr offset = getAffineConstantExpr(0, ctx);
+  int64_t dynamicIndex = 0;
+  for (int64_t i = 0; i < type.getRank(); ++i) {
+    AffineExpr extent = type.isDynamicDim(i)
+                            ? getAffineSymbolExpr(dynamicIndex++, ctx)
+                            : getAffineConstantExpr(type.getDimSize(i), ctx);
+    if (!padding.empty()) {
+      extent = extent + padding[i];
+    }
+    offset = offset * extent + getAffineDimExpr(i, ctx);
+  }
+  return AffineMap::get(type.getRank(), dynamicIndex,
+                        (offset * storageBits).floorDiv(8));
+}
+
+// Storage offsets use unsigned arithmetic without signed-overflow assumptions.
+Value buildStorageElementByteOffset(Location loc, OpBuilder &builder,
+                                    AffineExpr expr, ValueRange indices,
+                                    ValueRange dynamicDims) {
+  if (auto dim = dyn_cast<AffineDimExpr>(expr)) {
+    return indices[dim.getPosition()];
+  }
+  if (auto symbol = dyn_cast<AffineSymbolExpr>(expr)) {
+    return dynamicDims[symbol.getPosition()];
+  }
+  if (auto constant = dyn_cast<AffineConstantExpr>(expr)) {
+    return builder.createOrFold<arith::ConstantIndexOp>(loc,
+                                                        constant.getValue());
+  }
+  auto binary = cast<AffineBinaryOpExpr>(expr);
+  Value lhs = buildStorageElementByteOffset(loc, builder, binary.getLHS(),
+                                            indices, dynamicDims);
+  Value rhs = buildStorageElementByteOffset(loc, builder, binary.getRHS(),
+                                            indices, dynamicDims);
+  switch (expr.getKind()) {
+  case AffineExprKind::Add:
+    return builder.createOrFold<arith::AddIOp>(loc, lhs, rhs);
+  case AffineExprKind::Mul:
+    return builder.createOrFold<arith::MulIOp>(loc, lhs, rhs);
+  case AffineExprKind::FloorDiv:
+    return builder.createOrFold<arith::DivUIOp>(loc, lhs, rhs);
+  case AffineExprKind::CeilDiv:
+    return builder.createOrFold<arith::CeilDivUIOp>(loc, lhs, rhs);
+  case AffineExprKind::Mod:
+    return builder.createOrFold<arith::RemUIOp>(loc, lhs, rhs);
+  default:
+    llvm_unreachable("expected an affine binary expression");
+  }
+}
+
+Value SerializableAttr::calculateStorageElementOffsetInBytes(
+    Location loc, OpBuilder &builder, RankedTensorType type,
+    ValueRange dynamicDims, ValueRange indices) {
+  AffineMap map = getStorageElementOffsetMap(type);
+  if (!map) {
+    return {};
+  }
+  return buildStorageElementByteOffset(loc, builder, map.getResult(0), indices,
+                                       dynamicDims);
+}
+
 // static
 bool SerializableAttr::areCompatible(Attribute lhs, Attribute rhs) {
   if (lhs == rhs) {

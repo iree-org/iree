@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "materialize_encoding_invalid.mlir"
     "materialize_encoding_scalar.mlir"
     "roundtrip.mlir"
+    "storage_offsets.mlir"
   TOOLS
     FileCheck
     iree-opt
