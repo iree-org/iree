@@ -337,14 +337,26 @@ deduplicateWorkloads(IREE::Stream::ExecutableExportOp exportOp,
     }
   });
 
-  // Update the ordinals in the workload ordinal ops.
+  // Workload ordinals index the `workgroup_count_from_slice` operands, so they
+  // can only be renumbered if it takes the workload arguments in order.
+  Block &entryBlock = exportOp.getWorkgroupCount().front();
+  SmallVector<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp> fromSliceOps =
+      llvm::to_vector(
+          entryBlock
+              .getOps<IREE::TensorExt::DispatchWorkgroupCountFromSliceOp>());
+  for (auto fromSliceOp : fromSliceOps) {
+    if (!llvm::equal(fromSliceOp.getOperands(), entryBlock.getArguments())) {
+      return;
+    }
+  }
+
+  // Update the ordinals in the workload ordinal ops. The base workload of a
+  // duplicate comes before it, so its new ordinal is already set.
   unsigned ordinalCount = 0;
   SmallVector<unsigned> newOrdinals(uniformDupeIndexMap.size());
   for (auto [deadIdx, liveIdx] : llvm::enumerate(uniformDupeIndexMap)) {
-    if (deadIdx != liveIdx) {
-      continue;
-    }
-    newOrdinals[deadIdx] = ordinalCount++;
+    newOrdinals[deadIdx] =
+        deadIdx == liveIdx ? ordinalCount++ : newOrdinals[liveIdx];
   }
   funcOp->walk([&](IREE::TensorExt::DispatchWorkloadOrdinalOp ordinalOp) {
     uint64_t ordinal = ordinalOp.getOrdinal().getZExtValue();
@@ -358,9 +370,6 @@ deduplicateWorkloads(IREE::Stream::ExecutableExportOp exportOp,
   });
 
   // Update the workgroup region arguments.
-  Block &entryBlock = exportOp.getWorkgroupCount().front();
-  auto argReplacementMap = llvm::to_vector(
-      llvm::seq(0u, entryBlock.getNumArguments())); // old -> new
   llvm::BitVector deadArgMap(entryBlock.getNumArguments());
   for (auto [deadIdx, liveIdx] : llvm::enumerate(uniformDupeIndexMap)) {
     if (deadIdx == liveIdx) {
@@ -384,6 +393,9 @@ deduplicateWorkloads(IREE::Stream::ExecutableExportOp exportOp,
 
   // Update the block arguments.
   entryBlock.eraseArguments(deadArgMap);
+  for (auto fromSliceOp : fromSliceOps) {
+    fromSliceOp->setOperands(entryBlock.getArguments());
+  }
 }
 
 //===----------------------------------------------------------------------===//
