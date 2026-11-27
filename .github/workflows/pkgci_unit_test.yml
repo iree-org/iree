@@ -66,6 +66,7 @@ jobs:
             echo "This run has no iree-base-core wheel, skipping its tests"
             exit 0
           fi
+          python -m iree.core._package_test
           python core/python/test/package_test.py
       - name: Validate runtime wheel
         run: |

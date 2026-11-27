@@ -17,6 +17,9 @@ on:
       runtime_package_version:
         description: "Version of the iree-base-runtime package"
         required: true
+      core_package_version:
+        description: "Version of the iree-base-core package"
+        required: true
       legacy_package_version:
         description: "Version of the iree-tools-tf and iree-tools-tflite packages"
         required: true
@@ -57,11 +60,18 @@ jobs:
         env:
           COMPILER_PACKAGE_VERSION: ${{ github.event.inputs.compiler_package_version }}
           RUNTIME_PACKAGE_VERSION: ${{ github.event.inputs.runtime_package_version }}
+          CORE_PACKAGE_VERSION: ${{ github.event.inputs.core_package_version }}
           LEGACY_PACKAGE_VERSION: ${{ github.event.inputs.legacy_package_version }}
         run: |
+          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-core-pkg/ "iree-base-core==${CORE_PACKAGE_VERSION}"
           python -m pip install -f file://$PWD/wheels-linux-x86_64-py-compiler-pkg/ "iree-base-compiler[onnx]==${COMPILER_PACKAGE_VERSION}"
           python -m pip install -f file://$PWD/wheels-linux-x86_64-py-runtime-pkg/ "iree-base-runtime==${RUNTIME_PACKAGE_VERSION}"
           python -m pip install -f file://$PWD/wheels-linux-x86_64-py-tf-compiler-tools-pkg/ "iree-tools-tflite==${LEGACY_PACKAGE_VERSION}" "iree-tools-tf==${LEGACY_PACKAGE_VERSION}"
+      - name: Validate IREE Core Package
+        id: validate_core_package
+        run: |
+          echo "Testing core package:"
+          python -m iree.core._package_test
       - name: Validate IREE Compiler Package
         id: validate_compiler_package
         run: |

@@ -62,6 +62,7 @@ graph TD
   subgraph iree["iree-org/iree"]
     iree-base-compiler
     iree-base-runtime
+    iree-base-core
     iree-tools-tf
     iree-tools-tflite
   end
@@ -170,6 +171,7 @@ Stable release history:
 | | GitHub release (nightly) | [![GitHub Release](https://img.shields.io/github/v/release/iree-org/iree?include_prereleases)](https://github.com/iree-org/iree/releases) |
 | | `iree-base-compiler` | [![PyPI version](https://badge.fury.io/py/iree-base-compiler.svg)](https://pypi.org/project/iree-base-compiler) |
 | | `iree-base-runtime` | [![PyPI version](https://badge.fury.io/py/iree-base-runtime.svg)](https://pypi.org/project/iree-base-runtime) |
+| | `iree-base-core` | [![PyPI version](https://badge.fury.io/py/iree-base-core.svg)](https://pypi.org/project/iree-base-core) |
 | | `iree-tools-tf` | [![PyPI version](https://badge.fury.io/py/iree-tools-tf.svg)](https://pypi.org/project/iree-tools-tf) |
 | | `iree-tools-tflite` | [![PyPI version](https://badge.fury.io/py/iree-tools-tflite.svg)](https://pypi.org/project/iree-tools-tflite) |
 | [iree-org/iree-turbine](https://github.com/iree-org/iree-turbine) | GitHub release (stable) | [![GitHub Release](https://img.shields.io/github/v/release/iree-org/iree-turbine)](https://github.com/iree-org/iree-turbine/releases/latest) |

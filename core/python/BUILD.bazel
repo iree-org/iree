@@ -18,6 +18,7 @@ package(
 PY_SRCS = enforce_glob(
     [
         "iree/core/__init__.py",
+        "iree/core/_package_test.py",
     ],
     include = ["iree/core/**/*.py"],
 )

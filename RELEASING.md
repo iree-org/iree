@@ -33,6 +33,8 @@ A number of packages are produced automatically:
   of the project.
 * `iree-base-compiler`: Binary Python wheels
 * `iree-base-runtime`: Binary Python wheels
+* `iree-base-core`: Pure Python wheel, built on Linux and used on every
+  platform
 * `iree-tools-tf` and `iree-tools-tflite`: Pure Python wheels
 
 #### Linux Builds
@@ -83,6 +85,7 @@ release process:
 
 * https://pypi.org/project/iree-base-compiler/
 * https://pypi.org/project/iree-base-runtime/
+* https://pypi.org/project/iree-base-core/
 * https://pypi.org/project/iree-turbine/
 * https://pypi.org/project/iree-tools-tf/
 * https://pypi.org/project/iree-tools-tflite/

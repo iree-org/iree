@@ -65,6 +65,10 @@ jobs:
           runtime_package_version="$(python3 build_tools/python_deploy/compute_local_version.py runtime -rc)"
           echo "runtime_package_version=${runtime_package_version}" >> $GITHUB_ENV
 
+          # iree-base-core version
+          core_package_version="$(python3 build_tools/python_deploy/compute_local_version.py core/python -rc)"
+          echo "core_package_version=${core_package_version}" >> $GITHUB_ENV
+
       - name: Updating candidate tag
         run: |
           git tag "${tag_name}"
@@ -101,6 +105,7 @@ jobs:
               "package_version": "${{ env.package_version }}",
               "compiler_package_version": "${{ env.compiler_package_version }}",
               "runtime_package_version": "${{ env.runtime_package_version }}",
+              "core_package_version": "${{ env.core_package_version }}",
               "release_id": "${{ steps.create_release.outputs.id }}",
               "commit": "${{ steps.last_green_commit.outputs.release-commit }}"
             }

@@ -35,6 +35,7 @@ GitHub release (stable) | [![GitHub Release](https://img.shields.io/github/v/rel
 GitHub release (nightly) | [![GitHub Release](https://img.shields.io/github/v/release/iree-org/iree?include_prereleases)](https://github.com/iree-org/iree/releases)
 `iree-base-compiler` | [![PyPI version](https://badge.fury.io/py/iree-base-compiler.svg)](https://pypi.org/project/iree-base-compiler)
 `iree-base-runtime` | [![PyPI version](https://badge.fury.io/py/iree-base-runtime.svg)](https://pypi.org/project/iree-base-runtime)
+`iree-base-core` | [![PyPI version](https://badge.fury.io/py/iree-base-core.svg)](https://pypi.org/project/iree-base-core)
 
 For more details on the release process, see
 https://iree.dev/developers/general/release-management/.

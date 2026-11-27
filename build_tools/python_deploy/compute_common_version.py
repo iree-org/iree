@@ -6,8 +6,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # This scripts grabs the X.Y.Z[.dev]` version identifier from the
-# compiler's and runtime's `version.json` files and computes the
-# shared version.
+# `version.json` files of the compiler, runtime and core Python packages
+# and computes the shared version: the highest of them.
 #
 # Usage:
 #   ./compute_common_version.py --stable-release
@@ -36,6 +36,7 @@ REPO_ROOT = THIS_DIR.parent.parent
 
 VERSION_FILE_COMPILER_PATH = REPO_ROOT / "compiler/version.json"
 VERSION_FILE_RUNTIME_PATH = REPO_ROOT / "runtime/version.json"
+VERSION_FILE_CORE_PATH = REPO_ROOT / "core/python/version.json"
 
 
 def load_version_info(version_file):
@@ -51,10 +52,14 @@ runtime_version = load_version_info(VERSION_FILE_RUNTIME_PATH)
 runtime_package_version = runtime_version.get("package-version")
 runtime_base_version = Version(runtime_package_version).base_version
 
-if runtime_base_version > compiler_base_version:
-    common_version = runtime_base_version
-else:
-    common_version = compiler_base_version
+core_version = load_version_info(VERSION_FILE_CORE_PATH)
+core_package_version = core_version.get("package-version")
+core_base_version = Version(core_package_version).base_version
+
+# Compare as versions, not as strings: 3.10.0 is higher than 3.9.0.
+common_version = max(
+    compiler_base_version, runtime_base_version, core_base_version, key=Version
+)
 
 if args.nightly_release:
     common_version += "rc" + datetime.today().strftime("%Y%m%d")
