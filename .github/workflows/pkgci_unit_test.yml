@@ -66,7 +66,9 @@ jobs:
             echo "This run has no iree-base-core wheel, skipping its tests"
             exit 0
           fi
-          python core/python/test/package_test.py
+          for test in core/python/test/*_test.py; do
+            python "${test}"
+          done
       - name: Validate runtime wheel
         run: |
           source ${VENV_DIR}/bin/activate
