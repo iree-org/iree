@@ -343,3 +343,20 @@ vm.module @module_i64_alignment {
     vm.return %3 : i64
   }
 }
+
+// -----
+
+// CHECK-LABEL: @module_mixed_width_remap
+vm.module @module_mixed_width_remap {
+  // An i64 destination can overlap a still-live i32 source.
+  // CHECK-LABEL: @mixed_width_swap
+  vm.func @mixed_width_swap(%a: i32, %b: i64, %c: i32, %d: i64) -> (i32, i64, i32, i64) {
+    // CHECK: vm.br
+    // CHECK-SAME: remap_registers = {{\[\[}}"i3->i5", "i7->i3", "i0->i1", "i4->i0", "i2->i4", "i6->i2"{{\]\]}}
+    vm.br ^bb1(%c, %d, %a, %b : i32, i64, i32, i64)
+  ^bb1(%w: i32, %x: i64, %y: i32, %z: i64):
+    // CHECK: vm.return
+    // CHECK-SAME: block_registers = ["i0", "i2+3", "i1", "i4+5"]
+    vm.return %w, %x, %y, %z : i32, i64, i32, i64
+  }
+}
