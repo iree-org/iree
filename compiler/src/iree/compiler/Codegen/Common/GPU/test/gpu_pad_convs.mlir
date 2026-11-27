@@ -71,3 +71,32 @@ func.func @conv_2d_chwn_chwf(%arg0: tensor<16x193x129x40xbf16>, %arg1: tensor<16
 //       CHECK:   %[[EXTRACT:.+]] = tensor.extract_slice %[[PADDED_RESULT]][0, 0, 0, 0] [40, 3, 3, 40] [1, 1, 1, 1]
 //  CHECK-SAME:     : tensor<48x3x3x48xf32> to tensor<40x3x3x40xf32>
 //       CHECK:   return %[[EXTRACT]] : tensor<40x3x3x40xf32>
+
+// -----
+
+// The output height is not padded, so the padded op reads input rows 0..10 and
+// leaves row 11 unread; the input must be cropped before it is padded.
+#map = affine_map<(n, oh, ow, f, kh, kw, c) -> (n, oh * 2 + kh, ow * 3 + kw, c)>
+#map1 = affine_map<(n, oh, ow, f, kh, kw, c) -> (f, kh, kw, c)>
+#map2 = affine_map<(n, oh, ow, f, kh, kw, c) -> (n, oh, ow, f)>
+#lowering_config = #iree_gpu.lowering_config<{padding_conv = [0, 0, 8, 16, 0, 0, 16]}>
+func.func @conv_2d_nhwc_fhwc_strided_unread_row(%arg0: tensor<2x12x13x5xf16>, %arg1: tensor<7x3x2x5xf16>, %arg2: tensor<2x5x4x7xf32>) -> tensor<2x5x4x7xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]} ins(%arg0, %arg1 : tensor<2x12x13x5xf16>, tensor<7x3x2x5xf16>) outs(%arg2 : tensor<2x5x4x7xf32>) attrs = {lowering_config = #lowering_config} {
+  ^bb0(%in: f16, %in_0: f16, %out: f32):
+    %1 = arith.extf %in : f16 to f32
+    %2 = arith.extf %in_0 : f16 to f32
+    %3 = arith.mulf %1, %2 : f32
+    %4 = arith.addf %out, %3 : f32
+    linalg.yield %4 : f32
+  } -> tensor<2x5x4x7xf32>
+  return %0 : tensor<2x5x4x7xf32>
+}
+
+// CHECK-LABEL: func.func @conv_2d_nhwc_fhwc_strided_unread_row
+//  CHECK-SAME:   %[[A:[A-Za-z0-9]+]]: tensor<2x12x13x5xf16>
+//       CHECK:   %[[CROPPED:.+]] = tensor.extract_slice %[[A]][0, 0, 0, 0] [2, 11, 13, 5] [1, 1, 1, 1]
+//  CHECK-SAME:     : tensor<2x12x13x5xf16> to tensor<2x11x13x5xf16>
+//       CHECK:   %[[PADDED_LHS:.+]] = tensor.pad %[[CROPPED]] low[0, 0, 0, 0] high[0, 0, 10, 11]
+//       CHECK:     : tensor<2x11x13x5xf16> to tensor<2x11x23x16xf16>
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[PADDED_LHS]], %{{.+}} : tensor<2x11x23x16xf16>, tensor<16x3x2x16xf16>)

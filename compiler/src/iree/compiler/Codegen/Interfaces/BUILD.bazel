@@ -366,6 +366,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":TensorMaskingOpInterfaceGen",
+        "//compiler/src/iree/compiler/Codegen/Transforms",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithDialect",

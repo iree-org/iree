@@ -95,6 +95,32 @@ void populateForallLoopHoistingPattern(RewritePatternSet &patterns);
 /// Populate pattern that folds fill into pad ops.
 void populateFoldFillIntoPadPattern(RewritePatternSet &patterns);
 
+/// Pads `op` with `linalg::rewriteAsPaddedOp` after cropping every input that
+/// extends beyond the region the padded op reads.
+///
+/// The padded shape of an operand is the bounding box of the elements the
+/// padded op reads. A strided or dilated window can leave trailing elements
+/// unread, so that box can be smaller than the operand: with
+/// `affine_map<(d0, d1) -> (d0 * 2 + d1)>` and loop sizes 1 and 2, the op
+/// reads 2 elements of a 3-element input. Such inputs are first replaced by a
+/// `tensor.extract_slice` of the read region, so that `tensor.pad` only grows
+/// them. Dimensions that cannot be proven large enough are cropped to
+/// `min(size, padded size)`.
+///
+/// Cropping updates the inputs of `op` in place and keeps it equivalent, so
+/// `op` stays valid if padding fails. Only DPS inputs are cropped; inits
+/// define the result types.
+///
+/// The padded shape is exact only for indexing maps whose results are sums of
+/// dimensions, dimensions times constants and constants. If an input that
+/// needs cropping has any other indexing map, this fails without changing
+/// `op`.
+FailureOr<linalg::PadTilingInterfaceResult> cropAndPadTilingInterfaceOp(
+    OpBuilder &builder, TilingInterface op,
+    const linalg::PadTilingInterfaceOptions &options,
+    const linalg::PadSizeComputationFunction &computePaddingSizeFn =
+        &linalg::computeIndexingMapOpInterfacePaddedShape);
+
 using GetMinMaxExprFn =
     std::function<std::optional<std::pair<AffineExpr, AffineExpr>>(
         Value value, SmallVectorImpl<Value> &dims,

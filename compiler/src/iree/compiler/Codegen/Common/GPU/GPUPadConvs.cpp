@@ -34,7 +34,7 @@ static LogicalResult padToStaticSizes(RewriterBase &rewriter,
                      .setPadToMultipleOf(true);
 
   FailureOr<linalg::PadTilingInterfaceResult> maybePadResult =
-      linalg::rewriteAsPaddedOp(rewriter, tilingInterfaceOp, options);
+      cropAndPadTilingInterfaceOp(rewriter, tilingInterfaceOp, options);
   if (failed(maybePadResult)) {
     return tilingInterfaceOp->emitOpError("failed to pad op");
   }

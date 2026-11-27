@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Interfaces/TensorMaskingOpInterface.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -73,7 +74,7 @@ maskTilingInterfaceOp(OpBuilder &b, Operation *op,
           .setPadToMultipleOf(true);
 
   FailureOr<linalg::PadTilingInterfaceResult> result =
-      linalg::rewriteAsPaddedOp(b, tilingInterfaceOp, options);
+      cropAndPadTilingInterfaceOp(b, tilingInterfaceOp, options);
   return result;
 }
 
@@ -183,6 +184,9 @@ struct LinalgGenericOpInterface final
                           ArrayRef<OpFoldResult> padMultiples) const {
     FailureOr<linalg::PadTilingInterfaceResult> result =
         maskTilingInterfaceOp(builder, op, padMultiples);
+    if (failed(result)) {
+      return failure();
+    }
     // Properly mask the reductions to avoid reducing poison values.
     auto paddedGeneric =
         cast<linalg::GenericOp>(result->paddedOp.getOperation());
