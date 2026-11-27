@@ -78,6 +78,8 @@ TEST_P(CommandBufferStressTest, RapidCopySubmit) {
       for (iree_device_size_t j = 0; j < buffer_size / sizeof(uint32_t); ++j) {
         data[j] = pattern;
       }
+      IREE_ASSERT_OK(iree_hal_buffer_mapping_flush_range(
+          &mapping, /*byte_offset=*/0, /*byte_length=*/buffer_size));
       IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
     }
 
