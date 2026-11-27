@@ -358,6 +358,12 @@ static FuncAnalysis analyzeFuncOp(IREE::Util::FuncOp funcOp,
       analysis.calleeUniformResultDupeMap[i] = i;
     }
   }
+  // Callers of a used duplicate are redirected to its base, keeping it live.
+  for (unsigned i = 0; i < resultCount; ++i) {
+    if (analysis.callerUsedResults.test(i)) {
+      analysis.callerUsedResults.set(analysis.calleeUniformResultDupeMap[i]);
+    }
+  }
 
   // If analysis was incomplete we reset things to safe values.
   if (analysis.isIncomplete) {
@@ -598,17 +604,18 @@ static bool applyCallChanges(FuncAnalysis &analysis,
       deadResults.set(i);
       continue;
     }
+    // If pass-through then just use the arg we were passing in as the result.
+    // Checked before duplicates as the base of a duplicate may be pass-through.
+    int passthroughIndex = analysis.passthroughResultArgs[i];
+    if (passthroughIndex != kUnassigned) {
+      value.replaceAllUsesWith(oldOperands[passthroughIndex]);
+      deadResults.set(i);
+      continue;
+    }
     // If the result is a duplicate then we replace uses with the base value.
     int dupeIndex = analysis.calleeUniformResultDupeMap[i];
     if (dupeIndex != i) {
       value.replaceAllUsesWith(oldResults[dupeIndex]);
-      deadResults.set(i);
-      continue;
-    }
-    // If pass-through then just use the arg we were passing in as the result.
-    int passthroughIndex = analysis.passthroughResultArgs[i];
-    if (passthroughIndex != kUnassigned) {
-      value.replaceAllUsesWith(oldOperands[passthroughIndex]);
       deadResults.set(i);
       continue;
     }

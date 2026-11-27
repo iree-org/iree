@@ -71,8 +71,15 @@ static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
 }
 
 void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
-                                bool enableUKernels) {
+                                bool enableUKernels,
+                                bool reassociateFpReductions) {
   addTileAndDistributePasses(funcPassManager);
+
+  if (reassociateFpReductions) {
+    VMVXSplitReductionPassOptions options;
+    options.reassociateFpReductions = true;
+    funcPassManager.addPass(createVMVXSplitReductionPass(options));
+  }
 
   if (enableUKernels) {
     funcPassManager.addPass(createCPUPrepareUkernelsPass());
@@ -115,7 +122,8 @@ static LogicalResult buildVMVXPipeline(Attribute pipelineAttr,
     return emitError(UnknownLoc::get(pipelineAttr.getContext()))
            << "VMVX pipeline expects VMVXCodegenPipelineOptions";
   }
-  addVMVXDefaultPassPipeline(pm, vmvxOptions->enableUKernels);
+  addVMVXDefaultPassPipeline(pm, vmvxOptions->enableUKernels,
+                             vmvxOptions->reassociateFpReductions);
   return success();
 }
 

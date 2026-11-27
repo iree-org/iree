@@ -8,6 +8,7 @@
 
 #include <cstring>
 
+#include "iree/async/notification.h"
 #include "iree/async/operations/scheduling.h"
 #include "iree/async/proactor.h"
 #include "iree/testing/gtest.h"
@@ -75,9 +76,304 @@ class JsProactorTest : public ::testing::Test {
   iree_async_proactor_t* proactor_ = NULL;
 };
 
+class JsNotificationTest : public JsProactorTest {
+ protected:
+  void SetUp() override {
+    JsProactorTest::SetUp();
+    ASSERT_NE(proactor_, nullptr);
+    IREE_ASSERT_OK(iree_async_notification_create(
+        proactor_, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification_));
+  }
+
+  void TearDown() override {
+    iree_async_notification_release(notification_);
+    JsProactorTest::TearDown();
+  }
+
+  void InitWait(iree_async_notification_wait_operation_t* wait,
+                iree_status_code_t* status) {
+    memset(wait, 0, sizeof(*wait));
+    wait->base.type = IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT;
+    wait->base.completion_fn = StatusRecordingCallback;
+    wait->base.user_data = status;
+    wait->notification = notification_;
+  }
+
+  iree_async_notification_t* notification_ = nullptr;
+};
+
 TEST_F(JsProactorTest, CreateAndDestroy) {
   // SetUp and TearDown exercise create/destroy.
   EXPECT_NE(proactor_, nullptr);
+}
+
+TEST_F(JsProactorTest, NotificationEpoch) {
+  iree_async_notification_t* notification = nullptr;
+  IREE_ASSERT_OK(iree_async_notification_create(
+      proactor_, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &notification));
+  uint32_t initial_epoch = iree_async_notification_query_epoch(notification);
+  EXPECT_FALSE(
+      iree_async_notification_signal_if_observed(notification, INT32_MAX));
+  EXPECT_NE(iree_async_notification_query_epoch(notification), initial_epoch);
+  uint32_t token = iree_async_notification_begin_observe(notification);
+  EXPECT_FALSE(iree_async_notification_wait_for_token(
+      notification, token, iree_immediate_timeout()));
+  EXPECT_TRUE(
+      iree_async_notification_signal_if_observed(notification, INT32_MAX));
+  EXPECT_TRUE(iree_async_notification_wait_for_token(notification, token,
+                                                     iree_immediate_timeout()));
+  iree_async_notification_end_observe(notification);
+  EXPECT_FALSE(
+      iree_async_notification_signal_if_observed(notification, INT32_MAX));
+  iree_async_notification_release(notification);
+}
+
+TEST_F(JsNotificationTest, DefaultWaitCapturesNewSignals) {
+  iree_async_notification_signal(notification_, INT32_MAX);
+  iree_status_code_t status = IREE_STATUS_UNKNOWN;
+  iree_async_notification_wait_operation_t wait;
+  InitWait(&wait, &status);
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait.base));
+  iree_host_size_t completed = 0;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_DEADLINE_EXCEEDED,
+                        iree_async_proactor_poll(
+                            proactor_, iree_immediate_timeout(), &completed));
+  EXPECT_EQ(status, IREE_STATUS_UNKNOWN);
+  EXPECT_EQ(completed, 0u);
+  EXPECT_TRUE(
+      iree_async_notification_signal_if_observed(notification_, INT32_MAX));
+  EXPECT_EQ(status, IREE_STATUS_UNKNOWN);
+  IREE_ASSERT_OK(iree_async_proactor_poll(proactor_, iree_immediate_timeout(),
+                                          &completed));
+  EXPECT_EQ(status, IREE_STATUS_OK);
+  EXPECT_EQ(completed, 1u);
+  EXPECT_FALSE(
+      iree_async_notification_signal_if_observed(notification_, INT32_MAX));
+}
+
+TEST_F(JsNotificationTest, ExplicitTokenPreservesSignalBeforeSubmit) {
+  uint32_t token = iree_async_notification_begin_observe(notification_);
+  iree_async_notification_signal(notification_, INT32_MAX);
+  iree_status_code_t status = IREE_STATUS_UNKNOWN;
+  iree_async_notification_wait_operation_t wait;
+  InitWait(&wait, &status);
+  wait.wait_flags = IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN;
+  wait.wait_token = token;
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait.base));
+  iree_async_notification_end_observe(notification_);
+  EXPECT_EQ(status, IREE_STATUS_UNKNOWN);
+  iree_host_size_t completed = 0;
+  IREE_ASSERT_OK(iree_async_proactor_poll(proactor_, iree_immediate_timeout(),
+                                          &completed));
+  EXPECT_EQ(status, IREE_STATUS_OK);
+  EXPECT_EQ(completed, 1u);
+  EXPECT_FALSE(
+      iree_async_notification_signal_if_observed(notification_, INT32_MAX));
+}
+
+TEST_F(JsNotificationTest, PendingWaitsRetainLastNotificationReferences) {
+  iree_async_notification_wait_operation_t waits[2];
+  iree_status_code_t statuses[2] = {IREE_STATUS_UNKNOWN, IREE_STATUS_UNKNOWN};
+  for (int i = 0; i < 2; ++i) {
+    InitWait(&waits[i], &statuses[i]);
+    IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &waits[i].base));
+  }
+  iree_async_notification_t* borrowed_notification = notification_;
+  iree_async_notification_release(notification_);
+  notification_ = nullptr;
+  // Both waits own a reference. The final completion destroys the notification
+  // while the ready queue is being drained.
+  iree_async_notification_signal(borrowed_notification, INT32_MAX);
+  iree_host_size_t completed = 0;
+  IREE_ASSERT_OK(iree_async_proactor_poll(proactor_, iree_immediate_timeout(),
+                                          &completed));
+  EXPECT_EQ(completed, 2u);
+  EXPECT_EQ(statuses[0], IREE_STATUS_OK);
+  EXPECT_EQ(statuses[1], IREE_STATUS_OK);
+}
+
+TEST_F(JsProactorTest, NotificationRetainedThroughLinkedDispatch) {
+  struct State {
+    iree_async_notification_t* notification = nullptr;
+    bool freed = false;
+    bool completed = false;
+    bool continuation_completed = false;
+  } state;
+  iree_allocator_t allocator = {
+      &state, [](void* self, iree_allocator_command_t command,
+                 const void* params, void** inout_ptr) {
+        auto* state = static_cast<State*>(self);
+        if (command == IREE_ALLOCATOR_COMMAND_FREE &&
+            *inout_ptr == state->notification) {
+          state->freed = true;
+        }
+        auto system = iree_allocator_system();
+        return system.ctl(system.self, command, params, inout_ptr);
+      }};
+  iree_async_proactor_t* proactor = nullptr;
+  IREE_ASSERT_OK(iree_async_proactor_create_js(
+      iree_async_proactor_options_default(), allocator, &proactor));
+  IREE_ASSERT_OK(iree_async_notification_create(
+      proactor, IREE_ASYNC_NOTIFICATION_FLAG_NONE, &state.notification));
+  iree_async_notification_wait_operation_t wait = {};
+  wait.base.type = IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT;
+  wait.notification = state.notification;
+  wait.base.user_data = &state;
+  wait.base.completion_fn =
+      [](void* user_data, iree_async_operation_t* operation,
+         iree_status_t status, iree_async_completion_flags_t flags) {
+        IREE_EXPECT_OK(status);
+        auto* state = static_cast<State*>(user_data);
+        EXPECT_TRUE(state->freed);
+        state->completed = true;
+      };
+  // A failed continuation runs its callback during linked dispatch. The
+  // predecessor still owns its resources then, but releases them before its
+  // own callback, which may free the operation.
+  iree_async_notification_signal_operation_t signal = {};
+  signal.base.type = IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_SIGNAL;
+  signal.notification = state.notification;
+  signal.base.user_data = &state;
+  signal.base.completion_fn =
+      [](void* user_data, iree_async_operation_t* operation,
+         iree_status_t status, iree_async_completion_flags_t flags) {
+        IREE_EXPECT_STATUS_IS(IREE_STATUS_UNIMPLEMENTED, status);
+        auto* state = static_cast<State*>(user_data);
+        EXPECT_FALSE(state->freed);
+        state->continuation_completed = true;
+      };
+  wait.base.flags = IREE_ASYNC_OPERATION_FLAG_LINKED;
+  iree_async_operation_t* operations[] = {&wait.base, &signal.base};
+  IREE_ASSERT_OK(iree_async_proactor_submit(proactor, {operations, 2}));
+  iree_async_notification_release(state.notification);
+  iree_async_notification_signal(state.notification, INT32_MAX);
+  IREE_ASSERT_OK(
+      iree_async_proactor_poll(proactor, iree_immediate_timeout(), nullptr));
+  EXPECT_TRUE(state.completed);
+  EXPECT_TRUE(state.continuation_completed);
+  EXPECT_TRUE(state.freed);
+  iree_async_proactor_release(proactor);
+}
+
+TEST_F(JsNotificationTest, CancelPendingAndReadyWaits) {
+  for (bool explicit_token : {false, true}) {
+    for (bool signaled : {false, true}) {
+      SCOPED_TRACE(::testing::Message() << "explicit_token=" << explicit_token
+                                        << ", signaled=" << signaled);
+      iree_status_code_t status = IREE_STATUS_UNKNOWN;
+      iree_async_notification_wait_operation_t wait;
+      InitWait(&wait, &status);
+      if (explicit_token) {
+        wait.wait_flags = IREE_ASYNC_NOTIFICATION_WAIT_FLAG_USE_WAIT_TOKEN;
+        wait.wait_token = iree_async_notification_begin_observe(notification_);
+      }
+      IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait.base));
+      if (explicit_token) iree_async_notification_end_observe(notification_);
+      if (signaled) iree_async_notification_signal(notification_, INT32_MAX);
+      IREE_ASSERT_OK(iree_async_proactor_cancel(proactor_, &wait.base));
+      EXPECT_EQ(status, IREE_STATUS_UNKNOWN);
+      iree_host_size_t completed = 0;
+      IREE_ASSERT_OK(iree_async_proactor_poll(
+          proactor_, iree_immediate_timeout(), &completed));
+      EXPECT_EQ(status, IREE_STATUS_CANCELLED);
+      EXPECT_EQ(completed, 1u);
+      EXPECT_FALSE(
+          iree_async_notification_signal_if_observed(notification_, INT32_MAX));
+      IREE_EXPECT_STATUS_IS(
+          IREE_STATUS_DEADLINE_EXCEEDED,
+          iree_async_proactor_poll(proactor_, iree_immediate_timeout(),
+                                   &completed));
+      EXPECT_EQ(completed, 0u);
+    }
+  }
+}
+
+TEST_F(JsNotificationTest, CompletionCanResubmitSameWait) {
+  struct State {
+    iree_async_proactor_t* proactor;
+    int calls = 0;
+  } state{proactor_};
+  iree_async_notification_wait_operation_t wait = {};
+  wait.base.type = IREE_ASYNC_OPERATION_TYPE_NOTIFICATION_WAIT;
+  wait.notification = notification_;
+  wait.base.user_data = &state;
+  wait.base.completion_fn =
+      [](void* user_data, iree_async_operation_t* operation,
+         iree_status_t status, iree_async_completion_flags_t flags) {
+        IREE_EXPECT_OK(status);
+        auto* state = static_cast<State*>(user_data);
+        if (++state->calls == 1) {
+          IREE_EXPECT_OK(
+              iree_async_proactor_submit_one(state->proactor, operation));
+        }
+      };
+  IREE_ASSERT_OK(iree_async_proactor_submit_one(proactor_, &wait.base));
+  for (int expected_calls = 1; expected_calls <= 2; ++expected_calls) {
+    iree_async_notification_signal(notification_, INT32_MAX);
+    iree_host_size_t completed = 0;
+    IREE_ASSERT_OK(iree_async_proactor_poll(proactor_, iree_immediate_timeout(),
+                                            &completed));
+    EXPECT_EQ(completed, 1u);
+    EXPECT_EQ(state.calls, expected_calls);
+  }
+}
+
+TEST_F(JsNotificationTest, ForeignProactorWaitIsRejected) {
+  iree_async_proactor_t* other = nullptr;
+  IREE_ASSERT_OK(iree_async_proactor_create_js(
+      iree_async_proactor_options_default(), iree_allocator_system(), &other));
+  iree_status_code_t status = IREE_STATUS_UNKNOWN;
+  iree_async_notification_wait_operation_t wait;
+  InitWait(&wait, &status);
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_async_proactor_submit_one(other, &wait.base));
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_async_proactor_cancel(other, &wait.base));
+  EXPECT_FALSE(
+      iree_async_notification_signal_if_observed(notification_, INT32_MAX));
+  EXPECT_EQ(status, IREE_STATUS_UNKNOWN);
+  iree_async_proactor_release(other);
+}
+
+TEST_F(JsNotificationTest, NullNotificationIsRejected) {
+  iree_status_code_t status = IREE_STATUS_UNKNOWN;
+  iree_async_notification_wait_operation_t wait;
+  InitWait(&wait, &status);
+  wait.notification = nullptr;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_async_proactor_submit_one(proactor_, &wait.base));
+  EXPECT_EQ(status, IREE_STATUS_UNKNOWN);
+}
+
+TEST_F(JsNotificationTest, UnknownWaitFlagsAreRejected) {
+  iree_status_code_t status = IREE_STATUS_UNKNOWN;
+  iree_async_notification_wait_operation_t wait;
+  InitWait(&wait, &status);
+  wait.wait_flags = 2;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT,
+                        iree_async_proactor_submit_one(proactor_, &wait.base));
+  EXPECT_EQ(status, IREE_STATUS_UNKNOWN);
+  EXPECT_FALSE(
+      iree_async_notification_signal_if_observed(notification_, INT32_MAX));
+}
+
+TEST_F(JsNotificationTest, SynchronousWaitHonoursDeadline) {
+  uint32_t token = iree_async_notification_begin_observe(notification_);
+  iree_time_t deadline_ns = iree_time_now() + 2000000;
+  EXPECT_FALSE(iree_async_notification_wait_for_token(
+      notification_, token, iree_make_deadline(deadline_ns)));
+  EXPECT_GE(iree_time_now(), deadline_ns);
+  iree_async_notification_end_observe(notification_);
+}
+
+TEST_F(JsProactorTest, CrossThreadPollingIsRejected) {
+  auto options = iree_async_proactor_options_default();
+  options.threading_mode = IREE_ASYNC_PROACTOR_THREADING_CROSS_THREAD;
+  iree_async_proactor_t* proactor = nullptr;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNAVAILABLE,
+                        iree_async_proactor_create_js(
+                            options, iree_allocator_system(), &proactor));
+  EXPECT_EQ(proactor, nullptr);
 }
 
 TEST_F(JsProactorTest, QueryCapabilities) {
@@ -257,11 +553,20 @@ TEST_F(JsProactorTest, UnavailableEventReturnsUnavailable) {
                         proactor_->vtable->create_event(proactor_, &event));
 }
 
-TEST_F(JsProactorTest, UnavailableNotificationReturnsUnavailable) {
+TEST_F(JsProactorTest, SharedNotificationIsRejected) {
   iree_async_notification_t* notification = NULL;
   IREE_EXPECT_STATUS_IS(
       IREE_STATUS_UNAVAILABLE,
-      proactor_->vtable->create_notification(proactor_, 0, &notification));
+      iree_async_notification_create(
+          proactor_, IREE_ASYNC_NOTIFICATION_FLAG_SHARED, &notification));
+  EXPECT_EQ(notification, nullptr);
+  iree_atomic_int32_t epoch = IREE_ATOMIC_VAR_INIT(0);
+  iree_async_notification_shared_options_t options = {};
+  options.epoch_address = &epoch;
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_UNAVAILABLE,
+                        iree_async_notification_create_shared(
+                            proactor_, &options, &notification));
+  EXPECT_EQ(notification, nullptr);
 }
 
 TEST_F(JsProactorTest, UnavailableFenceReturnsUnavailable) {

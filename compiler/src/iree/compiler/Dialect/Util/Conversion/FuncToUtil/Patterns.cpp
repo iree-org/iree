@@ -14,13 +14,14 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
 
 namespace {
 
-struct FuncFuncOpPattern : OpConversionPattern<func::FuncOp> {
+struct FuncFuncOpPattern final : OpConversionPattern<func::FuncOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(func::FuncOp srcOp, OpAdaptor adaptor,
@@ -52,6 +53,7 @@ struct FuncFuncOpPattern : OpConversionPattern<func::FuncOp> {
           srcOp.getResultAttrOfType<IntegerAttr>(i, "iree.abi.tied");
       if (tiedAttr) {
         tiedOperands.push_back(tiedAttr.getInt());
+        anyTiedOperands = true;
       } else {
         tiedOperands.push_back(-1);
       }
@@ -73,7 +75,7 @@ struct FuncFuncOpPattern : OpConversionPattern<func::FuncOp> {
                                 newFuncOp.end());
 
     // Handle defacto attrs to specialized ones.
-    if (srcOp->hasAttr("noinline")) {
+    if (srcOp.getNoInline() || srcOp->hasAttr("noinline")) {
       newFuncOp.setInliningPolicyAttr(
           rewriter.getAttr<IREE::Util::InlineNeverAttr>());
     }
@@ -88,6 +90,9 @@ struct FuncFuncOpPattern : OpConversionPattern<func::FuncOp> {
         "vm.fallback",
         "vm.signature",
         "vm.version",
+        // Native ABI invocation contract.
+        "iree.abi.declaration",
+        "iree.abi.model",
         // Overrides.
         // TODO(benvanik): add a util.func structured attr ala inlining policy.
         "nosideeffects",
@@ -124,7 +129,7 @@ struct FuncFuncOpPattern : OpConversionPattern<func::FuncOp> {
   }
 };
 
-struct FuncCallOpPattern : OpConversionPattern<func::CallOp> {
+struct FuncCallOpPattern final : OpConversionPattern<func::CallOp> {
   using Base::Base;
   LogicalResult
   matchAndRewrite(func::CallOp srcOp, OpAdaptor adaptor,
@@ -136,6 +141,39 @@ struct FuncCallOpPattern : OpConversionPattern<func::CallOp> {
     }
     auto tiedOperandsAttr =
         srcOp->getAttrOfType<ArrayAttr>("iree.abi.tied_operands");
+    if (srcOp->hasAttr("iree.abi.tied_operands") && !tiedOperandsAttr) {
+      srcOp.emitError("iree.abi.tied_operands must be an array");
+      return failure();
+    }
+    if (!tiedOperandsAttr) {
+      Operation *callee =
+          SymbolTable::lookupNearestSymbolFrom(srcOp, srcOp.getCalleeAttr());
+      ArrayAttr calleeTies;
+      if (auto funcCallee = dyn_cast_if_present<func::FuncOp>(callee)) {
+        SmallVector<Attribute> mappings;
+        bool anyTied = false;
+        for (unsigned i = 0; i < funcCallee.getNumResults(); ++i) {
+          auto tied =
+              funcCallee.getResultAttrOfType<IntegerAttr>(i, "iree.abi.tied");
+          int64_t index = tied ? tied.getInt() : -1;
+          mappings.push_back(rewriter.getIndexAttr(index));
+          anyTied |= index >= 0;
+        }
+        if (anyTied) {
+          calleeTies = rewriter.getArrayAttr(mappings);
+        }
+      } else if (auto utilCallee =
+                     dyn_cast_if_present<IREE::Util::FuncOp>(callee)) {
+        calleeTies = utilCallee.getTiedOperandsAttr();
+        if (calleeTies && llvm::none_of(calleeTies, [](Attribute attr) {
+              auto indexAttr = dyn_cast<IntegerAttr>(attr);
+              return indexAttr && indexAttr.getInt() >= 0;
+            })) {
+          calleeTies = {};
+        }
+      }
+      tiedOperandsAttr = calleeTies;
+    }
     rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
         srcOp, resultTypes, srcOp.getCallee(), adaptor.getOperands(),
         tiedOperandsAttr, srcOp.getArgAttrsAttr(), srcOp.getResAttrsAttr());
