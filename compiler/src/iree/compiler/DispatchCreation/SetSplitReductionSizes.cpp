@@ -9,6 +9,8 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/DispatchCreation/Passes.h"
 #include "llvm/Support/DebugLog.h"
+#include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 
 #define DEBUG_TYPE "iree-dispatch-creation-set-split-reduction-sizes"
@@ -52,6 +54,25 @@ static std::optional<SmallVector<int64_t>> getReductionDimSizes(Operation *Op) {
     }
   }
   return reductionDimSizes;
+}
+
+/// Returns whether each output has a single combiner with a known neutral
+/// element, as required by generic Linalg partial reduction.
+static bool supportsGenericPartialReduction(linalg::LinalgOp op) {
+  for (unsigned initIndex = 0, e = op->getNumResults(); initIndex < e;
+       ++initIndex) {
+    SmallVector<Operation *, 4> combinerOps;
+    if (!matchReduction(op.getRegionOutputArgs(), initIndex, combinerOps) ||
+        combinerOps.size() != 1) {
+      LDBG() << "skipping op; no single combiner for result " << initIndex;
+      return false;
+    }
+    if (!arith::getNeutralElement(combinerOps.front()).has_value()) {
+      LDBG() << "skipping op; no neutral element for result " << initIndex;
+      return false;
+    }
+  }
+  return true;
 }
 
 static std::optional<int64_t>
@@ -592,6 +613,14 @@ struct SetSplitReductionSizesPass final
           });
       if (numReduction == 0) {
         return;
+      }
+
+      // Linalg ops use the generic partial-reduction implementation; other ops
+      // may provide their own.
+      if (auto linalgOp = dyn_cast<linalg::LinalgOp>(tilingOp.getOperation())) {
+        if (!supportsGenericPartialReduction(linalgOp)) {
+          return;
+        }
       }
 
       // --- Case 1: Outer reduction ---
