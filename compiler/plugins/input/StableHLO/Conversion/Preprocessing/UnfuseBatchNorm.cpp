@@ -254,18 +254,19 @@ struct UnfuseBatchNormTrainingPattern final
       }
     }
 
-    // zero constant
-    Value constZero = mlir::stablehlo::ConstantOp::create(
-        rewriter, bnOp.getLoc(),
-        DenseFPElementsAttr::get(RankedTensorType::get({}, fpType),
-                                 APFloat::getZero(fpType.getFloatSemantics())));
-    // epsilon
+    // epsilon (may fail; do this before creating any other IR so that a
+    // failing pattern leaves the IR unchanged)
     auto epsilon =
         materializeEpsilon(bnOp.getOperation(), bnOp.getEpsilonAttr(), fpType,
                            bnOp.getScale(), scaleType, rewriter);
     if (!epsilon) {
       return failure();
     }
+    // zero constant
+    Value constZero = mlir::stablehlo::ConstantOp::create(
+        rewriter, bnOp.getLoc(),
+        DenseFPElementsAttr::get(RankedTensorType::get({}, fpType),
+                                 APFloat::getZero(fpType.getFloatSemantics())));
     // reduce size constant
     Value reduceSize =
         calculateReduceSize(bnOp.getOperation(), bnOp.getOperand(), operandType,
