@@ -22,9 +22,11 @@ bazel test //core/python/...
 ```
 
 With CMake, the tests are registered if the Python interpreter of the build has
-the dependencies installed. The Python bindings are not needed:
+the dependencies installed. They are run by pytest. The Python bindings are not
+needed:
 
 ```shell
+python -m pip install pytest
 python -m pip install --require-hashes -r core/python/requirements.txt
 ctest --test-dir ${BUILD_DIR} -R iree/core/python
 ```
@@ -32,6 +34,6 @@ ctest --test-dir ${BUILD_DIR} -R iree/core/python
 Against the installed package:
 
 ```shell
-python -m pip install core/python/
-python -m unittest discover -s core/python/test -p "*_test.py"
+python -m pip install pytest core/python/
+python -m pytest core/python/test
 ```

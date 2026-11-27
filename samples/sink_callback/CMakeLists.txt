@@ -18,6 +18,7 @@ iree_py_test(
     sink_callback_log_simple
   SRCS
     "sink_callback_log.py"
+  SCRIPT
 )
 
 iree_py_test(
@@ -25,4 +26,5 @@ iree_py_test(
     sink_callback_log_async
   SRCS
     "sink_callback_log_async.py"
+  SCRIPT
 )

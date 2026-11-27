@@ -62,20 +62,45 @@ function(iree_py_library)
   endif()
 endfunction()
 
+# Warns, once per configuration, when pytest is not installed for the Python
+# interpreter that runs the tests. The tests are still added and then fail,
+# so that a missing package cannot make them go unnoticed.
+function(_iree_warn_without_pytest)
+  get_property(_CHECKED GLOBAL PROPERTY _IREE_PYTEST_CHECKED)
+  if(_CHECKED)
+    return()
+  endif()
+  set_property(GLOBAL PROPERTY _IREE_PYTEST_CHECKED TRUE)
+  execute_process(
+    COMMAND "${Python3_EXECUTABLE}" -c "import pytest"
+    RESULT_VARIABLE _RESULT
+    OUTPUT_QUIET
+    ERROR_QUIET
+  )
+  if(NOT _RESULT EQUAL 0)
+    message(WARNING
+      "pytest is not installed for ${Python3_EXECUTABLE}, so the Python tests "
+      "will fail. Install it with: python -m pip install -r "
+      "runtime/bindings/python/iree/runtime/build_requirements.txt")
+  endif()
+endfunction()
+
 # iree_local_py_test()
 #
 # CMake function to run python test with provided python package paths.
 #
 # Parameters:
 # NAME: name of test
-# SRC: Test source file
-# ARGS: Command line arguments to the Python source file.
+# SRC: Test source file. pytest runs the tests in it, unless SCRIPT is given.
+# ARGS: Command line arguments to pytest or, with SCRIPT, to the source file.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
 # WILL_FAIL: The test will run, but its pass/fail status will be inverted.
 # GENERATED_IN_BINARY_DIR: If present, indicates that the srcs have been
 #   in the CMAKE_CURRENT_BINARY_DIR.
 # PACKAGE_DIRS: Python package paths to be added to PYTHONPATH.
+# SCRIPT: If present, the source file is run as a script. This is for files
+#   that are not made of tests that pytest can collect, such as samples.
 function(iree_local_py_test)
   if(NOT IREE_BUILD_TESTS OR ANDROID OR EMSCRIPTEN)
     return()
@@ -83,7 +108,7 @@ function(iree_local_py_test)
 
   cmake_parse_arguments(
     _RULE
-    "GENERATED_IN_BINARY_DIR"
+    "GENERATED_IN_BINARY_DIR;SCRIPT"
     "NAME;SRC;WILL_FAIL"
     "ARGS;LABELS;PACKAGE_DIRS;TIMEOUT"
     ${ARGN}
@@ -106,10 +131,20 @@ function(iree_local_py_test)
     set(_RULE_TIMEOUT 60)
   endif()
 
+  if(_RULE_SCRIPT)
+    set(_RUNNER)
+  else()
+    _iree_warn_without_pytest()
+    # Without the cache provider, pytest writes nothing into the source tree.
+    # With the log level, a failed test reports all that it logged.
+    set(_RUNNER -m pytest -p no:cacheprovider --log-level=DEBUG)
+  endif()
+
   add_test(
     NAME ${_NAME_PATH}
     COMMAND
       "${Python3_EXECUTABLE}"
+      ${_RUNNER}
       "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}"
       ${_RULE_ARGS}
   )
@@ -145,23 +180,31 @@ endfunction()
 #
 # Parameters:
 # NAME: name of test
-# SRCS: Test source file (single file only, despite name)
-# ARGS: Command line arguments to the Python source file.
+# SRCS: Test source file (single file only, despite name). pytest runs the
+#   tests in it, unless SCRIPT is given.
+# ARGS: Command line arguments to pytest or, with SCRIPT, to the source file.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
 # WILL_FAIL: The test will run, but its pass/fail status will be inverted.
 # GENERATED_IN_BINARY_DIR: If present, indicates that the srcs have been
 #   in the CMAKE_CURRENT_BINARY_DIR.
+# SCRIPT: If present, the source file is run as a script. This is for files
+#   that are not made of tests that pytest can collect, such as samples.
 function(iree_py_test)
   cmake_parse_arguments(
     _RULE
-    "GENERATED_IN_BINARY_DIR"
+    "GENERATED_IN_BINARY_DIR;SCRIPT"
     "NAME;SRCS;WILL_FAIL"
     "ARGS;LABELS;TIMEOUT"
     ${ARGN}
   )
   if(NOT IREE_BUILD_PYTHON_BINDINGS)
     return()
+  endif()
+
+  set(_SCRIPT)
+  if(_RULE_SCRIPT)
+    set(_SCRIPT SCRIPT)
   endif()
 
   iree_local_py_test(
@@ -182,5 +225,6 @@ function(iree_py_test)
       "${_RULE_GENERATED_IN_BINARY_DIR}"
     TIMEOUT
       ${_RULE_TIMEOUT}
+    ${_SCRIPT}
   )
 endfunction()

@@ -21,6 +21,7 @@ if(IREE_TARGET_BACKEND_LLVM_CPU AND IREE_HAL_DRIVER_LOCAL_TASK)
       mnist_train_test_cpu
     SRCS
       "mnist_train_test.py"
+    SCRIPT
     ARGS
       "--target_backend=llvm-cpu"
       "--driver=local-task"
@@ -35,6 +36,7 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
       mnist_train_test_cuda
     SRCS
       "mnist_train_test.py"
+    SCRIPT
     ARGS
       "--target_backend=cuda"
       "--driver=cuda"
@@ -50,6 +52,7 @@ if(IREE_TARGET_BACKEND_VULKAN_SPIRV AND IREE_HAL_DRIVER_VULKAN)
       mnist_train_test_vulkan
     SRCS
       "mnist_train_test.py"
+    SCRIPT
     ARGS
       "--target_backend=vulkan-spirv"
       "--driver=vulkan"

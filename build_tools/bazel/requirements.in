@@ -1,0 +1,16 @@
+# Version ranges for the Bazel pip hub (@pip, see MODULE.bazel). Bazel reads
+# only requirements.txt: a lock file generated from this file and
+# core/python/pyproject.toml that pins every package to an exact version with
+# hashes.
+#
+# List here each package that a Bazel target uses through @pip and that
+# core/python/pyproject.toml does not declare. After a change here or in that
+# pyproject.toml, regenerate requirements.txt with the command at its top, from
+# this directory.
+
+# Used by runtime/bindings/python for the numpy headers, which numpy 2 moved to
+# numpy/_core/include, and by tools/test.
+numpy>=2.0.0
+
+# Used by iree_py_test (build_tools/bazel/iree_py_test.bzl) to run the tests.
+pytest>=8.0.0

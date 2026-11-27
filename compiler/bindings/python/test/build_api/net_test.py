@@ -6,10 +6,15 @@
 
 import io
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 
 from iree.build import *
+
+# iree.build looks up the entry points in this module, whether it runs as a
+# script or is imported by a test runner.
+THIS_MODULE = sys.modules[__name__]
 
 
 TEST_URL = None
@@ -53,6 +58,7 @@ class BasicTest(unittest.TestCase):
                 out_io = io.StringIO()
                 err_io = io.StringIO()
                 iree_build_main(
+                    THIS_MODULE,
                     args=[
                         "file_via_http",
                         "--output-dir",
