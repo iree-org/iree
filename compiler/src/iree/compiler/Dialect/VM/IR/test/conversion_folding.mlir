@@ -230,3 +230,19 @@ vm.module public @float_cast_folds {
     vm.return %0 : f64
   }
 }
+
+// -----
+
+// CHECK-LABEL: @trunc_f64_f32_inexact
+vm.module @trunc_f64_f32_inexact {
+  // A constant f32 cannot hold exactly rounds to the nearest even f32.
+  // CHECK-LABEL: vm.func @inexact
+  vm.func @inexact() -> f32 {
+    // CHECK: %[[CONST:.+]] = vm.const.f32 1.000000e-01
+    %cst = vm.const.f64 0.1
+    // CHECK-NOT: vm.trunc.f64.f32
+    %0 = vm.trunc.f64.f32 %cst : f64 -> f32
+    // CHECK: vm.return %[[CONST]]
+    vm.return %0 : f32
+  }
+}

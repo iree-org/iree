@@ -13,7 +13,7 @@ util.func public @importBufferViewWithConsumerDims(%view: !hal.buffer_view, %sto
   // CHECK-DAG: %[[IMPORT_SIZE:.+]] = stream.tensor.sizeof tensor<?x?xf32>{%[[C4]], %[[C8]]} : index
   // CHECK: %[[RESOURCE:.+]] = stream.tensor.import %[[VIEW]]
   // CHECK-SAME: tensor<?x?xf32>{%[[C4]], %[[C8]]} in !stream.resource<external>{%[[IMPORT_SIZE]]}
-  // CHECK: %[[TENSOR:.+]] = stream.async.cast %[[RESOURCE]]
+  // CHECK: %[[TENSOR:.+]] = stream.async.clone %[[RESOURCE]]
   // CHECK-DAG: %[[STORAGE_SIZE:.+]] = stream.tensor.sizeof tensor<?x?xf32>{%[[C4]], %[[C8]]} : index
   // CHECK: %[[STORAGE_RESOURCE:.+]] = stream.tensor.import consume %[[STORAGE]]
   // CHECK-SAME: tensor<?x?xf32>{%[[C4]], %[[C8]]} in !stream.resource<external>{%[[STORAGE_SIZE]]}

@@ -12,7 +12,7 @@ util.func public @importBufferView(%view: !hal.buffer_view) -> tensor<?x?x4xf32>
   //  CHECK-DAG: %[[SIZE:.+]] = stream.tensor.sizeof tensor<?x?x4xf32>{%[[DIM0]], %[[DIM1]]} : index
   //      CHECK: %[[RESOURCE:.+]] = stream.tensor.import %[[VIEW]] : !hal.buffer_view ->
   // CHECK-SAME:     tensor<?x?x4xf32>{%[[DIM0]], %[[DIM1]]} in !stream.resource<external>{%[[SIZE]]}
-  // CHECK-NEXT: %[[RESULT:.+]] = stream.async.cast %[[RESOURCE]] :
+  // CHECK-NEXT: %[[RESULT:.+]] = stream.async.clone %[[RESOURCE]] :
   // CHECK-SAME:     !stream.resource<external>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
   %0 = hal.tensor.import %view : !hal.buffer_view -> tensor<?x?x4xf32>{%dim0, %dim1}
   // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
@@ -34,7 +34,7 @@ util.func public @importBufferViewWithOffset(%view: !hal.buffer_view, %fence: !h
   // CHECK-SAME:     : !stream.resource<external>{%[[TOTAL_SIZE]]}
   //      CHECK: %[[SUBVIEW:.+]] = stream.resource.subview %[[SYNCED]][%[[OFFSET]]] :
   // CHECK-SAME:     !stream.resource<external>{%[[TOTAL_SIZE]]} -> !stream.resource<external>{%[[TENSOR_SIZE]]}
-  // CHECK-NEXT: %[[RESULT:.+]] = stream.async.cast %[[SUBVIEW]]
+  // CHECK-NEXT: %[[RESULT:.+]] = stream.async.clone %[[SUBVIEW]]
   // CHECK-SAME:     : !stream.resource<external>{%[[TENSOR_SIZE]]} -> !stream.resource<*>{%[[TENSOR_SIZE]]}
   %0 = hal.tensor.import wait(%fence) => %view offset(%offset) : !hal.buffer_view -> tensor<4xf32>
   // CHECK: util.return %[[RESULT]], %[[TENSOR_SIZE]] : !stream.resource<*>, index
@@ -53,7 +53,7 @@ util.func public @importBufferViewWithOffsetNoFence(%view: !hal.buffer_view, %of
   // CHECK-SAME:     : !hal.buffer_view -> tensor<4xf32> in !stream.resource<external>{%[[TOTAL_SIZE]]}
   //      CHECK: %[[SUBVIEW:.+]] = stream.resource.subview %[[RESOURCE]][%[[OFFSET]]] :
   // CHECK-SAME:     !stream.resource<external>{%[[TOTAL_SIZE]]} -> !stream.resource<external>{%[[TENSOR_SIZE]]}
-  // CHECK-NEXT: %[[RESULT:.+]] = stream.async.cast %[[SUBVIEW]]
+  // CHECK-NEXT: %[[RESULT:.+]] = stream.async.clone %[[SUBVIEW]]
   // CHECK-SAME:     : !stream.resource<external>{%[[TENSOR_SIZE]]} -> !stream.resource<*>{%[[TENSOR_SIZE]]}
   %0 = hal.tensor.import %view offset(%offset) : !hal.buffer_view -> tensor<4xf32>
   // CHECK: util.return %[[RESULT]], %[[TENSOR_SIZE]] : !stream.resource<*>, index
@@ -68,7 +68,7 @@ util.func public @importBufferViewBitcasting(%view: !hal.buffer_view) -> tensor<
   //  CHECK-DAG: %[[SIZE:.+]] = stream.tensor.sizeof tensor<4xbf16>
   //      CHECK: %[[RESOURCE:.+]] = stream.tensor.import %[[VIEW]] : !hal.buffer_view ->
   // CHECK-SAME:     tensor<2xui32> in !stream.resource<external>{%[[SIZE]]}
-  // CHECK-NEXT: %[[RESULT:.+]] = stream.async.cast %[[RESOURCE]] :
+  // CHECK-NEXT: %[[RESULT:.+]] = stream.async.clone %[[RESOURCE]] :
   // CHECK-SAME:     !stream.resource<external>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
   %0 = hal.tensor.import %view : !hal.buffer_view -> tensor<2xui32> as tensor<4xbf16>
   // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
@@ -87,7 +87,7 @@ util.func public @importBufferViewAsync(%view: !hal.buffer_view, %fence: !hal.fe
   //      CHECK: %[[TIMEPOINT:.+]] = stream.timepoint.import %[[FENCE]]
   //      CHECK: %[[SYNC_RESOURCE:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[ASYNC_RESOURCE]]
   // CHECK-SAME:     : !stream.resource<external>{%[[SIZE]]}
-  // CHECK-NEXT: %[[RESULT:.+]] = stream.async.cast %[[SYNC_RESOURCE]]
+  // CHECK-NEXT: %[[RESULT:.+]] = stream.async.clone %[[SYNC_RESOURCE]]
   // CHECK-SAME:     : !stream.resource<external>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
   %0 = hal.tensor.import wait(%fence) => %view : !hal.buffer_view -> tensor<4xf32>
   // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
@@ -205,7 +205,7 @@ util.func public @importBufferViewCrossDevice(%view: !hal.buffer_view) -> tensor
   //  CHECK-DAG: %[[SIZE:.+]] = stream.tensor.sizeof on(#hal.device.promise<@dev_a>) tensor<4xf32>
   //      CHECK: %[[RESOURCE:.+]] = stream.tensor.import on(#hal.device.promise<@dev_a>) %[[VIEW]] : !hal.buffer_view ->
   // CHECK-SAME:     tensor<4xf32> in !stream.resource<external>{%[[SIZE]]}
-  // CHECK-NEXT: %[[CLONE:.+]] = stream.async.cast on(#hal.device.promise<@dev_a>) %[[RESOURCE]] :
+  // CHECK-NEXT: %[[CLONE:.+]] = stream.async.clone on(#hal.device.promise<@dev_a>) %[[RESOURCE]] :
   // CHECK-SAME:     !stream.resource<external>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
   %0 = hal.tensor.import on(#hal.device.promise<@dev_a>) %view : !hal.buffer_view -> tensor<4xf32>
   // CHECK: util.return %[[CLONE]], %[[SIZE]] : !stream.resource<*>, index
@@ -322,5 +322,20 @@ util.func public @tensorTransientsBufferView(%tensor: tensor<4xf32>, %storage: !
   // CHECK: %[[RESULT:.+]] = stream.timepoint.await %[[TRANSIENTS_TP]] => %[[TRANSIENTS_RESULT]] : !stream.resource<*>{%[[SIZE]]}
   %0 = hal.tensor.transients %tensor : tensor<4xf32> from %storage : !hal.buffer_view
   // CHECK: util.return %[[RESULT]], %[[SIZE]] : !stream.resource<*>, index
+  util.return %0 : tensor<4xf32>
+}
+
+// -----
+
+// Consuming an import permits storage reuse without a protective clone.
+// CHECK-LABEL: @importConsumedBufferView
+// CHECK-SAME: (%[[VIEW:.+]]: !hal.buffer_view)
+util.func public @importConsumedBufferView(%view: !hal.buffer_view) -> tensor<4xf32> {
+  // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof tensor<4xf32>
+  // CHECK: %[[RESOURCE:.+]] = stream.tensor.import consume %[[VIEW]]
+  // CHECK-NEXT: %[[RESULT:.+]] = stream.async.cast %[[RESOURCE]]
+  // CHECK-NOT: stream.async.clone
+  %0 = hal.tensor.import consume %view : !hal.buffer_view -> tensor<4xf32>
+  // CHECK: util.return %[[RESULT]], %[[SIZE]]
   util.return %0 : tensor<4xf32>
 }

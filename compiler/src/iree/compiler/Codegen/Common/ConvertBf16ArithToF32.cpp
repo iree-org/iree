@@ -110,9 +110,38 @@ struct FloatTypeConverter : PrimitiveTypeConverter<SourceType, TargetType> {
   }
 };
 
+static bool isBf16RoundingBoundary(Type fromType, Type toType) {
+  Type fromElementType = getElementTypeOrSelf(fromType);
+  Type toElementType = getElementTypeOrSelf(toType);
+  return (fromElementType.isBF16() && toElementType.isF32()) ||
+         (fromElementType.isF32() && toElementType.isBF16());
+}
+
+// Retains each BF16 result's rounding after widening its operation. Consumers
+// materialise f32 extensions as needed; boundaries keep the rounded BF16 value.
+// The insertion guard keeps region and result construction independent.
+static SmallVector<Value>
+createBf16RoundedResults(Operation *original, Operation *converted,
+                         ConversionPatternRewriter &rewriter) {
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPointAfter(converted);
+  SmallVector<Value> results;
+  for (auto [oldResult, newResult] :
+       llvm::zip_equal(original->getResults(), converted->getResults())) {
+    Value result = newResult;
+    if (getElementTypeOrSelf(oldResult.getType()).isBF16()) {
+      result = arith::TruncFOp::create(
+          rewriter, original->getLoc(), TypeRange{oldResult.getType()},
+          ValueRange{newResult}, arith::TruncFOp::Properties{});
+    }
+    results.push_back(result);
+  }
+  return results;
+}
+
 // Tries to completely convert a generic Operation.
 // This will process attributes, result types, and nested regions.
-struct GenericTypeConversionPattern : ConversionPattern {
+struct GenericTypeConversionPattern final : ConversionPattern {
   GenericTypeConversionPattern(MLIRContext *context,
                                TypeConverter &typeConverter)
       : ConversionPattern(typeConverter, MatchAnyOpTypeTag(), 0, context) {}
@@ -125,28 +154,47 @@ struct GenericTypeConversionPattern : ConversionPattern {
     // them all the ops would become invalid. This may still be too broad,
     // though, if some constant ops include attributes with both the type we
     // want to convert and structural information in the same type.
-    llvm::SmallVector<Type> newResults;
-    (void)getTypeConverter()->convertTypes(op->getResultTypes(), newResults);
+    if (isa<math::FmaOp, vector::FMAOp>(op) &&
+        llvm::any_of(op->getResultTypes(), [](Type type) {
+          return getElementTypeOrSelf(type).isBF16();
+        })) {
+      return rewriter.notifyMatchFailure(
+          op, "requires an exact BF16 fused multiply-add implementation");
+    }
+    SmallVector<Type> convertedResultTypes;
+    if (failed(getTypeConverter()->convertTypes(op->getResultTypes(),
+                                                convertedResultTypes))) {
+      return rewriter.notifyMatchFailure(op, "unsupported result types");
+    }
+    SmallVector<TypeConverter::SignatureConversion> signatures;
+    for (Region &region : op->getRegions()) {
+      TypeConverter::SignatureConversion signature(region.getNumArguments());
+      if (failed(getTypeConverter()->convertSignatureArgs(
+              region.getArgumentTypes(), signature))) {
+        return rewriter.notifyMatchFailure(op,
+                                           "unsupported region argument types");
+      }
+      signatures.push_back(std::move(signature));
+    }
 
-    Operation *newOp = op->clone(
-        Operation::CloneOptions().withResultTypes(llvm::to_vector(newResults)));
+    Operation *newOp = op->clone(Operation::CloneOptions().withResultTypes(
+        llvm::to_vector(convertedResultTypes)));
     newOp->setOperands(operands);
     rewriter.insert(newOp);
     if (op->hasTrait<OpTrait::ConstantLike>() ||
         isa<IREE::Util::GlobalOpInterface>(op)) {
-      convertAttributes(newOp, *getTypeConverter());
+      rewriter.modifyOpInPlace(newOp, [newOp, converter = getTypeConverter()] {
+        convertAttributes(newOp, *converter);
+      });
     }
 
-    for (auto [r, newRegion] :
-         llvm::zip_equal(op->getRegions(), newOp->getRegions())) {
-      rewriter.inlineRegionBefore(r, newRegion, newRegion.begin());
-      TypeConverter::SignatureConversion result(newRegion.getNumArguments());
-      (void)getTypeConverter()->convertSignatureArgs(
-          newRegion.getArgumentTypes(), result);
-      rewriter.applySignatureConversion(&newRegion.front(), result);
+    for (auto [region, newRegion, signature] :
+         llvm::zip_equal(op->getRegions(), newOp->getRegions(), signatures)) {
+      rewriter.inlineRegionBefore(region, newRegion, newRegion.begin());
+      rewriter.applySignatureConversion(&newRegion.front(), signature);
     }
 
-    rewriter.replaceOp(op, newOp->getResults());
+    rewriter.replaceOp(op, createBf16RoundedResults(op, newOp, rewriter));
     return success();
   }
 };
@@ -235,8 +283,13 @@ struct PromoteBF16ToF32Converter
 struct ConvertBf16ArithToF32Pass final
     : impl::ConvertBf16ArithToF32PassBase<ConvertBf16ArithToF32Pass> {
   using Base::Base;
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<arith::ArithDialect, math::MathDialect,
+                    vector::VectorDialect>();
+  }
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
+    PromoteBF16ToF32Converter typeConverter;
     RewritePatternSet patterns(context);
     patterns.insert<GenericTypeConversionPattern>(context, typeConverter);
     patterns.insert<ConvertTypeSensitiveArithCastOp<arith::TruncFOp, FloatType,
@@ -257,7 +310,7 @@ struct ConvertBf16ArithToF32Pass final
     ConversionTarget target(*context);
     target.markUnknownOpDynamicallyLegal([](Operation *op) { return true; });
 
-    auto checkOp = [&](Operation *op) {
+    auto checkOp = [&typeConverter](Operation *op) {
       for (Type type : op->getResultTypes()) {
         if (!typeConverter.isLegal(type)) {
           return false;
@@ -288,6 +341,12 @@ struct ConvertBf16ArithToF32Pass final
 
     // Some ops are always legal.
     target.addLegalOp<arith::BitcastOp>();
+    target.addDynamicallyLegalOp<arith::TruncFOp, arith::ExtFOp>(
+        [&checkOp](Operation *op) {
+          return isBf16RoundingBoundary(op->getOperand(0).getType(),
+                                        op->getResult(0).getType()) ||
+                 checkOp(op);
+        });
 
     if (failed(applyFullConversion(this->getOperation(), target,
                                    std::move(patterns)))) {
@@ -306,8 +365,6 @@ struct ConvertBf16ArithToF32Pass final
       return this->signalPassFailure();
     }
   }
-
-  PromoteBF16ToF32Converter typeConverter;
 };
 
 } // namespace

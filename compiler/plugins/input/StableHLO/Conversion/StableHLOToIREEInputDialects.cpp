@@ -7,6 +7,8 @@
 // Implements IREE-specific logic for lowering StableHLO dialect to
 // IREE dialects: Linalg, Arith, Math, Tensor, Util, ML Program, etc.
 
+#include <type_traits>
+
 #include "compiler/plugins/input/StableHLO/Conversion/LegalizeToLinalgUtils.h"
 #include "compiler/plugins/input/StableHLO/Conversion/PassDetail.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
@@ -45,6 +47,40 @@ namespace mlir::iree_compiler::stablehlo {
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h.inc"
 
 namespace {
+
+// Keep low-precision dot inputs in their storage type, accumulate in f32, and
+// round only the completed contraction. Rounding every partial sum to the
+// result type loses contributions before cancellation, including with HIGHEST
+// precision. Explicit algorithms own their accumulation contract and are
+// handled separately. For example: dot(bf16, bf16) -> bf16 becomes
+// convert(dot(bf16, bf16) -> f32).
+template <typename DotOpTy>
+struct WidenDotAccumulation final : OpConversionPattern<DotOpTy> {
+  using OpConversionPattern<DotOpTy>::OpConversionPattern;
+
+  LogicalResult
+  matchAndRewrite(DotOpTy op, typename DotOpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto resultType = dyn_cast<RankedTensorType>(op.getType());
+    if (!resultType || !(resultType.getElementType().isF16() ||
+                         resultType.getElementType().isBF16())) {
+      return rewriter.notifyMatchFailure(op, "expected f16 or bf16 result");
+    }
+    if constexpr (std::is_same_v<DotOpTy, mlir::stablehlo::DotGeneralOp>) {
+      if (op.getAlgorithm()) {
+        return rewriter.notifyMatchFailure(op,
+                                           "explicit accumulation algorithm");
+      }
+    }
+    auto wideType = resultType.clone(rewriter.getF32Type());
+    auto wideDot = DotOpTy::create(
+        rewriter, op.getLoc(), TypeRange{wideType}, adaptor.getOperands(),
+        op.getProperties(), op->getDiscardableAttrDictionary().getValue());
+    rewriter.replaceOpWithNewOp<mlir::stablehlo::ConvertOp>(
+        op, resultType, wideDot.getResult());
+    return success();
+  }
+};
 
 /// Converts stablehlo.concatenate operation to extract_slice ops + insert_slice
 /// ops. mlir::stablehlo::populateStablehloToLinalgConversionPatterns provides a
@@ -569,7 +605,9 @@ struct ConvertStableHloToIreeInputDialects final
                                      /*reorderElementwiseAndShape=*/false);
 
     // Run custom patterns with a high benefit to override stablehlo patterns.
-    patterns.add<ConcatenateOpConversion, FftOpConversion,
+    patterns.add<WidenDotAccumulation<mlir::stablehlo::DotOp>,
+                 WidenDotAccumulation<mlir::stablehlo::DotGeneralOp>,
+                 ConcatenateOpConversion, FftOpConversion,
                  OptimizationBarrierOpConversion>(*typeConverter, context,
                                                   PatternBenefit{1000});
     populateDynamicShapeConversionPatterns(context, *typeConverter, &patterns);

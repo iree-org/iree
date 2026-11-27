@@ -196,6 +196,18 @@ static iree_status_t iree_hal_metal_compile_source(id<MTLDevice> device,
   @autoreleasepool {
     MTLCompileOptions* compile_options = [[MTLCompileOptions new] autorelease];
     compile_options.languageVersion = MTLLanguageVersion3_0;
+    // Preserve the IR's floating-point semantics during Metal compilation.
+    if (@available(macOS 15.0, iOS 18.0, *)) {
+      compile_options.mathMode = MTLMathModeSafe;
+      compile_options.mathFloatingPointFunctions = MTLMathFloatingPointFunctionsPrecise;
+    } else {
+      // macOS 13/14 and iOS 16/17 support MSL 3.0 but lack mathMode. Their
+      // legacy switch is required to preserve signed zeros and NaNs too.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+      compile_options.fastMathEnabled = NO;
+#pragma clang diagnostic pop
+    }
     if (iree_hal_metal_MSLSourceDef_version_is_present(source_def)) {
       compile_options.languageVersion =
           (MTLLanguageVersion)iree_hal_metal_MSLSourceDef_version_get(source_def);

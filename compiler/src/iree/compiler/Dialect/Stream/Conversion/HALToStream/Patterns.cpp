@@ -108,13 +108,20 @@ struct ConvertTensorImportOp
       castSize = tensorSize;
     }
 
-    // Cast to unknown lifetime for use in the program.
-    // This is an async-phase operation that RefineUsage will resolve by
-    // propagating the external constraint. The cast will fold when types match.
+    // A borrowed buffer may still be used by its caller after this invocation.
+    // Keep an independent tensor value until copy elision proves it read-only.
+    // A consuming import transfers ownership and only needs a lifetime cast.
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    Value newImport = IREE::Stream::AsyncCastOp::create(
-        rewriter, op.getLoc(), unknownType, castSource, castSize,
-        executionAffinityAttr);
+    Value newImport;
+    if (op.getConsume()) {
+      newImport = IREE::Stream::AsyncCastOp::create(
+          rewriter, op.getLoc(), unknownType, castSource, castSize,
+          executionAffinityAttr);
+    } else {
+      newImport = IREE::Stream::AsyncCloneOp::create(
+          rewriter, op.getLoc(), unknownType, castSource, castSize, castSize,
+          executionAffinityAttr);
+    }
     rewriter.replaceOpWithMultiple(op, {{newImport, castSize}});
     return success();
   }

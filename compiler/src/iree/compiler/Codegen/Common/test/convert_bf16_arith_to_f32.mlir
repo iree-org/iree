@@ -113,7 +113,9 @@ func.func @store_reduction_bf16(%arg0 : vector<3xbf16>, %arg1 : vector<3xbf16>, 
 // CHECK-DAG:  %[[VAL0:.+]] = arith.extf %arg0 : vector<3xbf16> to vector<3xf32>
 // CHECK-DAG:  %[[VAL1:.+]] = arith.extf %arg1 : vector<3xbf16> to vector<3xf32>
 // CHECK:      %[[VAL4:.+]] = arith.mulf %[[VAL0]], %[[VAL1]] : vector<3xf32>
-// CHECK:      %[[VAL5:.+]] = vector.reduction <add>, %[[VAL4]], %[[CST]] : vector<3xf32> into f32
+// CHECK:      %[[ROUNDED:.+]] = arith.truncf %[[VAL4]] : vector<3xf32> to vector<3xbf16>
+// CHECK:      %[[WIDE:.+]] = arith.extf %[[ROUNDED]] : vector<3xbf16> to vector<3xf32>
+// CHECK:      %[[VAL5:.+]] = vector.reduction <add>, %[[WIDE]], %[[CST]] : vector<3xf32> into f32
 // CHECK:      %[[VAL6:.+]] = arith.truncf %[[VAL5]] : f32 to bf16
 // CHECK:      memref.store %[[VAL6]], %arg2[] : memref<bf16>
 
@@ -142,3 +144,36 @@ func.func @outerproduct_bf16(%arg0 : vector<1xbf16>, %arg1 : vector<1xbf16>, %ar
 // CHECK: %[[PROD:.+]] = vector.outerproduct %[[EXT0]], %[[EXT1]], %[[EXT2]] {kind = #vector.kind<add>} : vector<1xf32>, vector<1xf32>
 // CHECK: %[[TRUNC:.+]] = arith.truncf %[[PROD]] : vector<1x1xf32> to vector<1x1xbf16>
 // CHECK: return %[[TRUNC]] : vector<1x1xbf16>
+
+
+// -----
+
+// The second operation must consume the rounded first result, even when both
+// operations are widened to f32 within one dispatch.
+// CHECK-LABEL: func.func @intermediate_rounding
+// CHECK: %[[SUM:.+]] = arith.addf %{{.+}}, %{{.+}} : f32
+// CHECK: %[[ROUNDED:.+]] = arith.truncf %[[SUM]] : f32 to bf16
+// CHECK: %[[WIDE:.+]] = arith.extf %[[ROUNDED]] : bf16 to f32
+// CHECK: %[[RESULT:.+]] = arith.subf %[[WIDE]], %{{.+}} : f32
+// CHECK: %[[FINAL:.+]] = arith.truncf %[[RESULT]] : f32 to bf16
+// CHECK: return %[[FINAL]] : bf16
+func.func @intermediate_rounding(%lhs: bf16, %rhs: bf16) -> bf16 {
+  %sum = arith.addf %lhs, %rhs : bf16
+  %result = arith.subf %sum, %lhs : bf16
+  return %result : bf16
+}
+
+
+// -----
+
+// Explicit casts establish a rounding boundary even when arithmetic otherwise
+// uses f32 throughout the surrounding computation.
+// CHECK-LABEL: func.func @explicit_bf16_rounding
+// CHECK: %[[NARROW:.+]] = arith.truncf %arg0 : f32 to bf16
+// CHECK: %[[WIDE:.+]] = arith.extf %[[NARROW]] : bf16 to f32
+// CHECK: return %[[WIDE]] : f32
+func.func @explicit_bf16_rounding(%input: f32) -> f32 {
+  %narrow = arith.truncf %input : f32 to bf16
+  %wide = arith.extf %narrow : bf16 to f32
+  return %wide : f32
+}
