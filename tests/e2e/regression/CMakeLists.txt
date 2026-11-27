@@ -54,6 +54,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_regression_llvm-cpu
   SRCS
+    "bitextend_matmul_fusion.mlir"
     "broadcast_batch_matmul.mlir"
     "i1_inlined_constant.mlir"
     "layernorm.mlir"
