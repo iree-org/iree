@@ -121,6 +121,9 @@ static inline uint32_t iree_hal_webgpu_isa_header_size_words(uint32_t header) {
 // and copy compute shader are required.
 #define IREE_HAL_WEBGPU_ISA_UPDATE_FLAG_ALIGNED 0x01
 
+// DISPATCH flag: explicit binding count followed by inline uint32 constants.
+#define IREE_HAL_WEBGPU_ISA_DISPATCH_FLAG_CONSTANTS 0x01
+
 //===----------------------------------------------------------------------===//
 // Instruction layouts
 //===----------------------------------------------------------------------===//
@@ -228,6 +231,8 @@ typedef struct iree_hal_webgpu_isa_fill_buffer_t {
 //   [6 + i*3 + 2] length
 //
 // binding_count = (size_words - 6) / 3
+// With DISPATCH_FLAG_CONSTANTS, word [6] contains binding_count, bindings
+// start at [7], and remaining words contain constants for group 1, binding 0.
 //
 // Pipeline and bind group layout handles are baked at recording time from the
 // executable. The processor creates a bind group from the layout and resolved
