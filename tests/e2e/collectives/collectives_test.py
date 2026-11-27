@@ -201,6 +201,33 @@ class SingleRank(unittest.TestCase):
 
 
 class TwoRanks(unittest.TestCase):
+    def test_all_gather(self):
+        # Specify the per-rank send count directly to exercise the runtime.
+        mlir = """
+            util.func public @main(%input: !hal.buffer_view) -> !hal.buffer_view {
+              %c0 = arith.constant 0 : index
+              %send_count = arith.constant 6 : index
+              %send_size = stream.tensor.sizeof tensor<3x2xf32> : index
+              %recv_size = stream.tensor.sizeof tensor<6x2xf32> : index
+              %channel = stream.channel.create : !stream.channel
+              %send = stream.tensor.import %input : !hal.buffer_view
+                  -> tensor<3x2xf32> in !stream.resource<external>{%send_size}
+              %recv = stream.tensor.empty : tensor<6x2xf32> in !stream.resource<*>{%recv_size}
+              %gathered = stream.async.collective<all_gather : f32>[%send_count]
+                  channel(%channel) %send[%c0 to %send_size for %send_size],
+                  %recv[%c0 to %recv_size for %recv_size] :
+                  !stream.resource<external>{%send_size} -> %recv as !stream.resource<*>{%recv_size}
+              %output = stream.tensor.export %gathered : tensor<6x2xf32>
+                  in !stream.resource<*>{%recv_size} -> !hal.buffer_view
+              util.return %output : !hal.buffer_view
+            }
+        """
+        # Each rank receives the rows from rank 0 followed by those from rank 1.
+        gathered = np.arange(12, dtype=np.float32).reshape(6, 2)
+        inputs = [[shard] for shard in np.split(gathered, 2)]
+        expected_outputs = [[gathered]] * 2
+        run_test(mlir=mlir, inputs=inputs, expected_outputs=expected_outputs)
+
     def test_stablehlo_all_reduce(self):
         """
         Test all_reduce([1, 2, 3, 4], [5, 6, 7, 8]) == [6, 8, 10, 12].
