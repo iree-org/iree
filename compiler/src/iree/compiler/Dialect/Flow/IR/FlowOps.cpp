@@ -1120,14 +1120,18 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
       newArguments, newArgumentDims, newTiedOperandIndices,
       getOperation()->getAttrs());
   newOp->setDialectAttrs(getOperation()->getDialectAttrs());
+  // The builder created an empty entry block. Replace it through the rewriter
+  // so that listeners see the change.
   auto &newBody = newOp.getClosureBodyRegion();
-  newBody.takeBody(getClosureBodyRegion());
+  rewriter.eraseBlock(&newBody.front());
+  rewriter.inlineRegionBefore(getClosureBodyRegion(), newBody, newBody.end());
 
-  // Copy the workgroup_count region.
+  // Move the workgroup_count region.
   auto &workgroupCountRegion = getWorkgroupCount();
   if (!workgroupCountRegion.empty()) {
     auto &newWorkgroupCountRegion = newOp.getWorkgroupCount();
-    newWorkgroupCountRegion.takeBody(workgroupCountRegion);
+    rewriter.inlineRegionBefore(workgroupCountRegion, newWorkgroupCountRegion,
+                                newWorkgroupCountRegion.end());
   }
 
   // For dropped results, erase all the store-op uses. It is a pre-requisite
