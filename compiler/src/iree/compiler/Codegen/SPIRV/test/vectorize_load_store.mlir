@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-vectorize-load-store, canonicalize, cse))" --mlir-print-local-scope %s | FileCheck %s
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-vectorize-load-store, cse))" --mlir-print-local-scope %s | FileCheck %s --check-prefix=BASE
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-vectorize-load-store, canonicalize, cse))" --mlir-print-local-scope %s | FileCheck %s --check-prefixes=CHECK,PACK
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-vectorize-load-store, cse))" --mlir-print-local-scope %s | FileCheck %s --check-prefixes=BASE,PACK
 
 func.func @alloc_transfer_read_write_vector4_vector8(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
   %cst = arith.constant 0.000000e+00 : f32
@@ -732,3 +732,96 @@ func.func @extract_vector_transfer_read_mask_bits(%arg: vector<3xf32>, %index: i
 //     CHECK: scf.if %[[MB2]] -> (f32) {
 //     CHECK:   memref.load %{{.*}}[%[[C5]]] : memref<20xf32>
 //     CHECK: vector.from_elements {{.+}} : vector<3xf32>
+
+// -----
+
+#layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+// PACK-LABEL: func.func @packed_i8x4
+// PACK: %[[MEM_i8x4:.*]] = hal.interface.binding.subspan
+// PACK-SAME: : memref<16xvector<1xi32>>
+// PACK: memref.load %[[MEM_i8x4]]{{.*}} : memref<16xvector<1xi32>>
+// PACK: vector.bitcast {{.*}} : vector<1xi32> to vector<4xi8>
+// PACK: vector.bitcast {{.*}} : vector<4xi8> to vector<1xi32>
+// PACK: memref.store {{.*}}, %[[MEM_i8x4]]{{.*}} : memref<16xvector<1xi32>>
+func.func @packed_i8x4(%offset: index, %value: vector<4xi8>) -> vector<4xi8> {
+  %c0 = arith.constant 0 : index
+  %padding = arith.constant 0 : i8
+  %mem = hal.interface.binding.subspan layout(#layout) binding(0) alignment(16) offset(%offset) : memref<64xi8>
+  %read = vector.transfer_read %mem[%c0], %padding {in_bounds = [true]} : memref<64xi8>, vector<4xi8>
+  vector.transfer_write %value, %mem[%c0] {in_bounds = [true]} : vector<4xi8>, memref<64xi8>
+  return %read : vector<4xi8>
+}
+
+// -----
+
+#layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+// PACK-LABEL: func.func @packed_i16x2
+// PACK: %[[MEM_i16x2:.*]] = hal.interface.binding.subspan
+// PACK-SAME: : memref<32xvector<1xi32>>
+// PACK: memref.load %[[MEM_i16x2]]{{.*}} : memref<32xvector<1xi32>>
+// PACK: vector.bitcast {{.*}} : vector<1xi32> to vector<2xi16>
+// PACK: vector.bitcast {{.*}} : vector<2xi16> to vector<1xi32>
+// PACK: memref.store {{.*}}, %[[MEM_i16x2]]{{.*}} : memref<32xvector<1xi32>>
+func.func @packed_i16x2(%offset: index, %value: vector<2xi16>) -> vector<2xi16> {
+  %c0 = arith.constant 0 : index
+  %padding = arith.constant 0 : i16
+  %mem = hal.interface.binding.subspan layout(#layout) binding(0) alignment(16) offset(%offset) : memref<64xi16>
+  %read = vector.transfer_read %mem[%c0], %padding {in_bounds = [true]} : memref<64xi16>, vector<2xi16>
+  vector.transfer_write %value, %mem[%c0] {in_bounds = [true]} : vector<2xi16>, memref<64xi16>
+  return %read : vector<2xi16>
+}
+
+// -----
+
+#layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+// PACK-LABEL: func.func @packed_i16x4
+// PACK: %[[MEM_i16x4:.*]] = hal.interface.binding.subspan
+// PACK-SAME: : memref<16xvector<2xi32>>
+// PACK: memref.load %[[MEM_i16x4]]{{.*}} : memref<16xvector<2xi32>>
+// PACK: vector.bitcast {{.*}} : vector<2xi32> to vector<4xi16>
+// PACK: vector.bitcast {{.*}} : vector<4xi16> to vector<2xi32>
+// PACK: memref.store {{.*}}, %[[MEM_i16x4]]{{.*}} : memref<16xvector<2xi32>>
+func.func @packed_i16x4(%offset: index, %value: vector<4xi16>) -> vector<4xi16> {
+  %c0 = arith.constant 0 : index
+  %padding = arith.constant 0 : i16
+  %mem = hal.interface.binding.subspan layout(#layout) binding(0) alignment(16) offset(%offset) : memref<64xi16>
+  %read = vector.transfer_read %mem[%c0], %padding {in_bounds = [true]} : memref<64xi16>, vector<4xi16>
+  vector.transfer_write %value, %mem[%c0] {in_bounds = [true]} : vector<4xi16>, memref<64xi16>
+  return %read : vector<4xi16>
+}
+
+// -----
+
+#layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+// PACK-LABEL: func.func @packed_i8x8_control
+// PACK: %[[MEM_i8x8_control:.*]] = hal.interface.binding.subspan
+// PACK-SAME: : memref<8xvector<2xi32>>
+// PACK: memref.load %[[MEM_i8x8_control]]{{.*}} : memref<8xvector<2xi32>>
+// PACK: vector.bitcast {{.*}} : vector<2xi32> to vector<8xi8>
+// PACK: vector.bitcast {{.*}} : vector<8xi8> to vector<2xi32>
+// PACK: memref.store {{.*}}, %[[MEM_i8x8_control]]{{.*}} : memref<8xvector<2xi32>>
+func.func @packed_i8x8_control(%offset: index, %value: vector<8xi8>) -> vector<8xi8> {
+  %c0 = arith.constant 0 : index
+  %padding = arith.constant 0 : i8
+  %mem = hal.interface.binding.subspan layout(#layout) binding(0) alignment(16) offset(%offset) : memref<64xi8>
+  %read = vector.transfer_read %mem[%c0], %padding {in_bounds = [true]} : memref<64xi8>, vector<8xi8>
+  vector.transfer_write %value, %mem[%c0] {in_bounds = [true]} : vector<8xi8>, memref<64xi8>
+  return %read : vector<8xi8>
+}
+
+// -----
+
+#layout = #hal.pipeline.layout<bindings = [#hal.pipeline.binding<storage_buffer>]>
+// PACK-LABEL: func.func @packed_f16x2_control
+// PACK: %[[MEM_f16x2_control:.*]] = hal.interface.binding.subspan
+// PACK-SAME: : memref<32xvector<2xf16>>
+// PACK: memref.load %[[MEM_f16x2_control]]{{.*}} : memref<32xvector<2xf16>>
+// PACK: memref.store {{.*}}, %[[MEM_f16x2_control]]{{.*}} : memref<32xvector<2xf16>>
+func.func @packed_f16x2_control(%offset: index, %value: vector<2xf16>) -> vector<2xf16> {
+  %c0 = arith.constant 0 : index
+  %padding = arith.constant 0.0 : f16
+  %mem = hal.interface.binding.subspan layout(#layout) binding(0) alignment(16) offset(%offset) : memref<64xf16>
+  %read = vector.transfer_read %mem[%c0], %padding {in_bounds = [true]} : memref<64xf16>, vector<2xf16>
+  vector.transfer_write %value, %mem[%c0] {in_bounds = [true]} : vector<2xf16>, memref<64xf16>
+  return %read : vector<2xf16>
+}
