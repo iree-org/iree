@@ -81,6 +81,11 @@ jobs:
           python3 build_tools/python_deploy/compute_local_version.py core/python -dev --write-json
           realpath core/python/version_local.json
           cat core/python/version_local.json
+          echo
+
+          python3 build_tools/python_deploy/compute_local_version.py integrations/torch/python -dev --write-json
+          realpath integrations/torch/python/version_local.json
+          cat integrations/torch/python/version_local.json
 
       - name: Enable cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

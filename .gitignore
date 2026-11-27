@@ -28,6 +28,7 @@ Testing/
 /compiler/build/
 /runtime/build/
 /core/python/build/
+/integrations/torch/python/build/
 /integrations/tensorflow/python_projects/iree_tf/build/
 /integrations/tensorflow/python_projects/iree_tflite/build/
 

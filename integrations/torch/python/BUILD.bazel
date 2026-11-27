@@ -1,0 +1,69 @@
+# Copyright 2026 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+# Exported as files, for consumers that assemble the Python packages
+# themselves. The package needs torch and the compiler Python bindings, which
+# this workspace does not provide to Bazel.
+PY_SRCS = enforce_glob(
+    [
+        "iree/importers/torch/__init__.py",
+        "iree/importers/torch/__main__.py",
+        "iree/importers/torch/decompositions.py",
+        "iree/importers/torch/export_context.py",
+        "iree/importers/torch/exporter.py",
+        "iree/importers/torch/fx_programs.py",
+        "iree/importers/torch/import_decompositions.py",
+        "iree/importers/torch/params.py",
+        "iree/importers/torch/pt2.py",
+        "iree/importers/torch/support/__init__.py",
+        "iree/importers/torch/support/_logging.py",
+        "iree/importers/torch/support/conversions.py",
+        "iree/importers/torch/support/ir_imports.py",
+        "iree/importers/torch/support/ir_utils.py",
+        "iree/importers/torch/support/procedural/__init__.py",
+        "iree/importers/torch/support/procedural/base.py",
+        "iree/importers/torch/support/procedural/exported_program.py",
+        "iree/importers/torch/support/procedural/globals.py",
+        "iree/importers/torch/support/procedural/primitives.py",
+        "iree/importers/torch/support/tensor_traits.py",
+    ],
+    include = ["iree/importers/torch/**/*.py"],
+)
+
+PY_TESTS = enforce_glob(
+    [
+        "test/aot_decompositions_test.py",
+        "test/api_test.py",
+        "test/compiled_exported_program_test.py",
+        "test/conversions_test.py",
+        "test/dynamic_shape_export_test.py",
+        "test/erfinv_decomposition_test.py",
+        "test/export_context_test.py",
+        "test/floordiv_symbolic_shape_test.py",
+        "test/fx_programs_test.py",
+        "test/globals_test.py",
+        "test/import_decompositions_test.py",
+        "test/main_test.py",
+        "test/non_strict_export_test.py",
+        "test/params_test.py",
+        "test/pt2_test.py",
+    ],
+    include = ["test/**/*.py"],
+)
+
+exports_files(PY_SRCS + PY_TESTS)
+
+filegroup(
+    name = "srcs",
+    srcs = PY_SRCS,
+)

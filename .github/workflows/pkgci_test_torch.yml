@@ -110,3 +110,49 @@ jobs:
               --config-files=${CONFIG_FILE_PATH} \
               --artifact-directory=${{ matrix.cache-dir }}/torch_ops/artifacts \
               ${{ matrix.extra-flags }}
+
+  test_torch_importer:
+    name: "test_torch_importer"
+    permissions:
+      contents: read
+      actions: read  # setup_venv.py --fetch-gh-workflow (dispatch with artifact_run_id).
+    runs-on: ubuntu-24.04
+    env:
+      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+      VENV_DIR: ${{ github.workspace }}/venv
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checking out IREE repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          # Must match the subset of versions built in pkgci_build_packages.
+          python-version: "3.11"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: ${{ inputs.artifact_run_id == '' }}
+        with:
+          name: linux_x86_64_release_packages
+          path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
+      - name: Setup venv
+        env:
+          ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
+        run: |
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
+            --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
+            --fetch-gh-workflow="${ARTIFACT_RUN_ID}"
+      - name: Install torch importer test requirements
+        run: |
+          source ${VENV_DIR}/bin/activate
+          python -m pip install -r integrations/torch/python/test/requirements.txt
+      - name: Run torch importer tests
+        run: |
+          source ${VENV_DIR}/bin/activate
+          # Runs from before the package existed have no wheel for it.
+          if ! python -m pip show iree-importer-torch; then
+            echo "This run has no iree-importer-torch wheel, skipping its tests"
+            exit 0
+          fi
+          pytest integrations/torch/python/test -rpfE --durations=20

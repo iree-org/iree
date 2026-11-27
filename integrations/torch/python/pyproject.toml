@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iree-importer-torch"
+description = "IREE importer for PyTorch programs"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+    { name = "IREE Authors", email = "iree-technical-discussion@lists.lfaidata.foundation" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "iree-base-compiler",
+    "numpy",
+    "torch>=2.13",
+]
+# Computed by setup.py.
+dynamic = ["version"]
+
+[project.optional-dependencies]
+# Writing parameter archives (.irpa).
+params = ["iree-base-runtime"]
+
+[project.scripts]
+iree-import-torch = "iree.importers.torch.__main__:_cli_main"
+
+[project.readme]
+content-type = "text/markdown"
+text = """
+# IREE PyTorch Importer
+
+Imports PyTorch programs (`torch.export`) into IREE, importable as
+`iree.importers.torch` and usable from the command line as `iree-import-torch`.
+"""
+
+[project.urls]
+homepage = "https://iree.dev/"
+repository = "https://github.com/iree-org/iree"
+
+[tool.setuptools.packages.find]
+include = ["iree.importers.torch*"]
+namespaces = true
