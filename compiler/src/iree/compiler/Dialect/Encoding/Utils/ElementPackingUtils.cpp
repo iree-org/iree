@@ -91,22 +91,27 @@ Value calculateStorageElementCountInBytes(Location loc,
       staticCount *= shapedType.getDimSize(i);
     }
   }
+  // Sub-byte packing requires putting multiple elements in the same byte.
+  // Check this before creating any IR so that a failing pattern leaves the IR
+  // unchanged.
+  if (needsPacking) {
+    assert(8 % elementBits == 0);
+    if (dynamicDims.empty() && (staticCount * elementBits) % 8 != 0) {
+      return nullptr;
+    }
+  }
+
   // Scale by dynamic dims, if present.
   auto value =
       arith::ConstantIndexOp::create(builder, loc, staticCount).getResult();
   for (auto dim : dynamicDims) {
     value = builder.createOrFold<arith::MulIOp>(loc, value, dim);
   }
-  // Sub-byte packing requires putting multiple elements in the same byte.
   if (needsPacking) {
-    assert(8 % elementBits == 0);
     unsigned byteElements = 8 / elementBits;
     // TODO(antiagainst): We may want to emit runtime check to make sure this is
     // divisible.
     auto divisor = arith::ConstantIndexOp::create(builder, loc, byteElements);
-    if (dynamicDims.empty() && (staticCount * elementBits) % 8 != 0) {
-      return nullptr;
-    }
     value = builder.createOrFold<arith::CeilDivUIOp>(loc, value, divisor);
   }
 
