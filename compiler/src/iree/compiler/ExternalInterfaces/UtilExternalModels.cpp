@@ -30,6 +30,7 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 
+#include <algorithm>
 #include <numeric>
 
 namespace mlir::iree_compiler {
@@ -413,6 +414,16 @@ struct ArithSelectInferIntDivisibilityOpInterface
   }
 };
 
+/// Returns a divisor of `magnitude`, read as unsigned, that fits in 64 bits:
+/// the magnitude itself when it fits, otherwise its largest power-of-two
+/// factor up to 2^63.
+static uint64_t computeDivisorInUInt64(const APInt &magnitude) {
+  if (magnitude.getActiveBits() <= 64) {
+    return magnitude.getZExtValue();
+  }
+  return uint64_t{1} << std::min(magnitude.countTrailingZeros(), 63u);
+}
+
 struct ArithConstantInferIntDivisibilityOpInterface
     : IREE::Util::InferIntDivisibilityOpInterface::ExternalModel<
           ArithConstantInferIntDivisibilityOpInterface, arith::ConstantOp> {
@@ -424,8 +435,10 @@ struct ArithConstantInferIntDivisibilityOpInterface
     auto constAttr = dyn_cast_if_present<IntegerAttr>(constOp.getValue());
     if (constAttr) {
       const APInt &value = constAttr.getValue();
-      uint64_t udiv = value.getZExtValue();
-      uint64_t sdiv = llvm::AbsoluteValue(value.getSExtValue());
+      uint64_t udiv = computeDivisorInUInt64(value);
+      // abs() of the signed minimum keeps its bit pattern, which read as
+      // unsigned is the correct magnitude 2^(bitwidth - 1).
+      uint64_t sdiv = computeDivisorInUInt64(value.abs());
       setResultDivs(constOp.getResult(),
                     IREE::Util::ConstantIntDivisibility(udiv, sdiv));
     }

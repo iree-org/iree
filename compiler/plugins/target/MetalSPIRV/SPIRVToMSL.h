@@ -10,13 +10,25 @@
 #include <array>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "./MetalTargetPlatform.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler {
+
+struct MetalLoopMemoryRequirements {
+  // (Descriptor set, binding) pairs whose direct loop accesses need volatile
+  // device pointers to preserve previous iterations' updates.
+  SmallVector<std::pair<uint32_t, uint32_t>> volatileBuffers;
+  // SPIRV-Cross does not preserve volatile qualifiers on every derived pointer.
+  // Indirect and composite accesses instead require unoptimised MSL without
+  // these qualifiers.
+  bool disableOptimization = false;
+};
 
 struct MetalShader {
   std::string source;
@@ -29,11 +41,12 @@ struct MetalShader {
 
 // Cross compiles SPIR-V into Metal Shading Language source code for the
 // compute shader with |entryPoint| and returns the MSL source and the new
-// entry point name. Returns std::nullopt on failure.
+// entry point name. |loopMemory| preserves device-memory updates across loop
+// iterations in Metal's optimiser. Returns std::nullopt on failure.
 std::optional<std::pair<MetalShader, std::string>>
 crossCompileSPIRVToMSL(IREE::HAL::MetalTargetPlatform targetPlatform,
-                       llvm::ArrayRef<uint32_t> spvBinary,
-                       StringRef entryPoint);
+                       llvm::ArrayRef<uint32_t> spvBinary, StringRef entryPoint,
+                       const MetalLoopMemoryRequirements &loopMemory);
 
 } // namespace mlir::iree_compiler
 

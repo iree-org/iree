@@ -321,14 +321,16 @@ struct FoldZeroConstPrimitive final : OpRewritePattern<GeneralOp> {
   using OpRewritePattern<GeneralOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(GeneralOp constOp,
                                 PatternRewriter &rewriter) const override {
+    // The compact floating-point zero opcode denotes +0, not -0.
     if ((std::is_same<AttrT, IntegerAttr>::value &&
          matchPattern(constOp.getResult(), m_Zero())) ||
         (std::is_same<AttrT, FloatAttr>::value &&
-         matchPattern(constOp.getResult(), m_AnyZeroFloat()))) {
+         matchPattern(constOp.getResult(), m_PosZeroFloat()))) {
       rewriter.replaceOpWithNewOp<ZeroOp>(constOp);
       return success();
     }
-    return failure();
+    return rewriter.notifyMatchFailure(constOp,
+                                       "requires a positive zero constant");
   }
 };
 
@@ -680,22 +682,27 @@ static OpFoldResult foldAddOp(ADD op, Attribute lhs, Attribute rhs) {
   if ((std::is_same<AttrElementT, IntegerAttr>::value &&
        matchPattern(op.getRhs(), m_Zero())) ||
       (std::is_same<AttrElementT, FloatAttr>::value &&
-       matchPattern(op.getRhs(), m_AnyZeroFloat()))) {
-    // x + 0 = x or 0 + y = y (commutative)
+       matchPattern(op.getRhs(), m_NegZeroFloat()))) {
+    // Integer zero and floating-point negative zero are additive identities.
+    // Adding positive zero can change the sign of a negative-zero operand.
     return op.getLhs();
   }
-  if (auto subOp = dyn_cast_if_present<SUB>(op.getLhs().getDefiningOp())) {
-    // t = vm.sub x, y
-    //   = vm.add t, z
-    if (subOp.getRhs() == op.getRhs()) { // y == z:
-      return subOp.getLhs();             // (x - y) + y = x
-    }
-  } else if (auto subOp =
-                 dyn_cast_if_present<SUB>(op.getRhs().getDefiningOp())) {
-    // t = vm.sub x, y
-    //   = vm.add z, t
-    if (subOp.getRhs() == op.getLhs()) { // y == z:
-      return subOp.getLhs();             // y + (x - y) = x
+  // Cancellation is valid for modular integers. Floating-point rounding,
+  // infinities and NaNs do not permit these reassociations.
+  if constexpr (std::is_same<AttrElementT, IntegerAttr>::value) {
+    if (auto subOp = dyn_cast_if_present<SUB>(op.getLhs().getDefiningOp())) {
+      // t = vm.sub x, y
+      //   = vm.add t, z
+      if (subOp.getRhs() == op.getRhs()) { // y == z:
+        return subOp.getLhs();             // (x - y) + y = x
+      }
+    } else if (auto subOp =
+                   dyn_cast_if_present<SUB>(op.getRhs().getDefiningOp())) {
+      // t = vm.sub x, y
+      //   = vm.add z, t
+      if (subOp.getRhs() == op.getLhs()) { // y == z:
+        return subOp.getLhs();             // y + (x - y) = x
+      }
     }
   }
   return constFoldBinaryOp<AttrElementT>(

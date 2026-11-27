@@ -53,6 +53,14 @@ static constexpr bool kFavorTransients = false;
 //  - Conservative fallback: unknown tied ops are assumed to mutate.
 static bool hasMutatingTiedUses(Value value) {
   for (OpOperand &use : value.getUses()) {
+    // Barriers preserve storage identity without implementing TiedOpInterface.
+    if (auto barrier =
+            dyn_cast<IREE::Util::OptimizationBarrierOp>(use.getOwner())) {
+      if (hasMutatingTiedUses(barrier.getResult(use.getOperandNumber()))) {
+        return true;
+      }
+      continue;
+    }
     auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(use.getOwner());
     if (!tiedOp || !tiedOp.isOperandTied(use.getOperandNumber())) {
       continue;

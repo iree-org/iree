@@ -16,8 +16,11 @@ iree_lit_test_suite(
   SRCS
     "canonicalization.mlir"
     "canonicalize_dot_general.mlir"
+    "canonicalize_reductions.mlir"
     "complex_lowering.mlir"
     "dot_general_to_dot.mlir"
+    "dynamic_conv_invalid.mlir"
+    "dynamic_conv_unsigned_constant_padding.mlir"
     "einsum_to_dot_general.mlir"
     "flatten_tuples_in_cfg.mlir"
     "flatten_tuples_in_scf.mlir"

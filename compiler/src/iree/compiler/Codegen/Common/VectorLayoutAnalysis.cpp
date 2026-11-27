@@ -35,8 +35,9 @@ using namespace IREE::VectorExt;
 static constexpr int kMaxCandidatesPerValue = 4;
 
 /// Maximum length of chains of cheap-to-compute operations that get duplicated
-/// for layout conflict resolution.
-static constexpr size_t kMaxChainLength = 8;
+/// for layout conflict resolution. A 3-D mask built from two 1-D bounds takes
+/// about ten.
+static constexpr size_t kMaxChainLength = 16;
 
 //===----------------------------------------------------------------------===//
 // Layout Analysis
@@ -563,6 +564,30 @@ static bool isCheapToClone(Operation *op) {
 /// leaves, constants, or non-vector operands. Returns true if the entire
 /// chain is safe to clone. Shared intermediates (with multiple uses) are
 /// allowed because all ops in the chain are cheap to duplicate.
+/// Returns whether |op| is in |block| or in a block of a region enclosing it.
+/// Producers in an enclosing block dominate every op of |block|; producers in
+/// a sibling block of the same region do not.
+static bool isInBlockOrEnclosingBlock(Operation *op, Block *block) {
+  Block *opBlock = op->getBlock();
+  if (opBlock == block) {
+    return true;
+  }
+  Region *opRegion = opBlock->getParent();
+  return opRegion != block->getParent() &&
+         opRegion->isAncestor(block->getParent());
+}
+
+/// Returns where to clone |chain| for the use |val|: before its first op when
+/// the chain is in one block, otherwise at the use, where all operands of a
+/// chain spanning enclosing blocks are available.
+static Operation *getChainCloneInsertionPoint(ArrayRef<Operation *> chain,
+                                              OpOperand *val) {
+  Block *firstBlock = chain.front()->getBlock();
+  bool inOneBlock = llvm::all_of(
+      chain, [&](Operation *op) { return op->getBlock() == firstBlock; });
+  return inOneBlock ? chain.front() : val->getOwner();
+}
+
 static bool collectDuplicatableChain(Operation *op,
                                      SmallVectorImpl<Operation *> &chain) {
   // The chain is built bottom-up (from consumer toward producers).
@@ -604,7 +629,7 @@ static bool collectDuplicatableChain(Operation *op,
       if (defOp->hasTrait<OpTrait::ConstantLike>()) {
         continue;
       }
-      if (defOp->getBlock() != block) {
+      if (!isInBlockOrEnclosingBlock(defOp, block)) {
         return false;
       }
       worklist.push(defOp);
@@ -645,7 +670,7 @@ void LayoutAnalysis::setLayoutOrClone(OpOperand *val,
         // Sort so cloning visits producers before consumers.
         computeTopologicalSorting(chain);
         IRMapping mapping;
-        b.setInsertionPoint(chain.front());
+        b.setInsertionPoint(getChainCloneInsertionPoint(chain, val));
         for (Operation *op : chain) {
           b.clone(*op, mapping);
         }

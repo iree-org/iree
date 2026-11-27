@@ -109,9 +109,13 @@ static FailureOr<DescriptorInfo> resolveBufferDescriptorForInterfaceBinding(
   resultDescriptor.strides =
       getStridesFromSizes(rewriter, loc, resultDescriptor.sizes);
 
-  // Offset.
+  // Offset. The byte offset is optional; a binding without one starts at 0.
+  OpFoldResult byteOffset = rewriter.getIndexAttr(0);
+  if (Value bindingOffset = binding.getByteOffset()) {
+    byteOffset = bindingOffset;
+  }
   resultDescriptor.offset = convertByteOffsetToElementOffset(
-      rewriter, loc, binding.getByteOffset(), memRefType.getElementType());
+      rewriter, loc, byteOffset, memRefType.getElementType());
   return resultDescriptor;
 }
 

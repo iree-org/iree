@@ -52,6 +52,7 @@ class TargetConverter:
                 "@llvm-project//llvm:config": [],
                 "@llvm-project//llvm:IPO": ["LLVMipo"],
                 "@llvm-project//llvm:FileCheck": ["FileCheck"],
+                "@llvm-project//llvm:split-file": ["split-file"],
                 "@llvm-project//llvm:not": ["not"],
                 "@llvm-project//llvm:llvm-link": ["${IREE_LLVM_LINK_TARGET}"],
                 "@llvm-project//llvm:NVPTXUtilsAndDesc": [
