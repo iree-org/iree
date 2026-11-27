@@ -206,18 +206,6 @@ void buildHALDeviceAssignmentPassPipeline(
   // derives/specifies the target devices and annotates the module with that
   // information. This allows subsequent passes to lookup which devices they are
   // targeting.
-  if (!assignmentOptions.legacyTargetBackends.empty()) {
-    // Today we just assign devices from parameters but we should instead be
-    // performing analysis at the flow level and then doing magic device
-    // database lookups here.
-    AssignLegacyTargetDevicesPassOptions options;
-    options.targetRegistry = &targetRegistry;
-    options.targetBackends.assign(
-        assignmentOptions.legacyTargetBackends.begin(),
-        assignmentOptions.legacyTargetBackends.end());
-    passManager.addPass(
-        IREE::HAL::createAssignLegacyTargetDevicesPass(options));
-  }
   if (!assignmentOptions.targetDevices.empty()) {
     AssignTargetDevicesPassOptions options;
     options.targetDevices.assign(assignmentOptions.targetDevices.begin(),
@@ -336,7 +324,6 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   if (compileFrom < PipelinePhase::ExecutableSources) {
     AssignmentOptions assignmentOptions;
-    assignmentOptions.legacyTargetBackends = targetOptions.legacyTargetBackends;
     assignmentOptions.targetDevices = targetOptions.targetDevices;
     assignmentOptions.defaultDevice = targetOptions.defaultDevice;
     buildHALDeviceAssignmentPassPipeline(passManager, targetRegistry,

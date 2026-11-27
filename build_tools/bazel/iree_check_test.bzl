@@ -15,6 +15,22 @@ DEFAULT_TARGET_BACKENDS_AND_DRIVERS = [
     ("llvm-cpu", "local-task"),
 ]
 
+def _target_backend_to_compiler_flags(target_backend):
+    if target_backend in ["llvm-cpu", "vmvx", "vmvx-inline"]:
+        return [
+            "--iree-hal-target-device=local",
+            "--iree-hal-local-target-device-backends=%s" % target_backend,
+        ]
+    if target_backend == "rocm":
+        return ["--iree-hal-target-device=hip"]
+    if target_backend == "vulkan-spirv":
+        return ["--iree-hal-target-device=vulkan"]
+    if target_backend == "cuda":
+        return ["--iree-hal-target-device=cuda"]
+    if target_backend == "metal-spirv":
+        return ["--iree-hal-target-device=metal"]
+    fail("Unsupported target backend: %s" % target_backend)
+
 def iree_check_test(
         name,
         src,
@@ -54,9 +70,11 @@ def iree_check_test(
     input_type_flags = []
     if input_type:
         input_type_flags = ["--iree-input-type=%s" % input_type]
-    flags = [
-        "--iree-hal-target-backends=%s" % target_backend,
-    ] + compiler_flags + input_type_flags
+    flags = (
+        _target_backend_to_compiler_flags(target_backend)
+        + compiler_flags
+        + input_type_flags
+    )
     bytecode_module_name = name + "_bytecode_module"
 
     iree_bytecode_module(
