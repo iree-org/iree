@@ -14,6 +14,7 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -1393,6 +1394,185 @@ QuantizeAffineOp::decomposeOperation(OpBuilder &b) {
         return convertScalarToDtype(nested, loc, clamped, storageType,
                                     /*isUnsignedCast=*/storageUnsigned);
       });
+}
+
+//===----------------------------------------------------------------------===//
+// ChooseQParamsAffineOp
+//===----------------------------------------------------------------------===//
+
+FailureOr<SmallVector<Value>>
+ChooseQParamsAffineOp::decomposeOperation(OpBuilder &b) {
+  Location loc = getLoc();
+  auto computeType = cast<FloatType>(getInputType().getElementType());
+  Type scaleType = getScaleElementType();
+  Value zeroPointInit = getZeroPoint();
+  Type zeroPointType =
+      zeroPointInit ? getElementTypeOrSelf(zeroPointInit.getType()) : Type();
+  bool zpUnsigned = getZpUnsigned();
+  QuantizationMapping mapping = getMapping();
+  auto quantMin = static_cast<double>(getQuantMin());
+  auto quantMax = static_cast<double>(getQuantMax());
+  double eps = getEps().convertToDouble();
+
+  // Reduces each block to its minimum and maximum. The results are shaped like
+  // the scale and indexed by the scale map.
+  SmallVector<OpFoldResult> parameterSizes =
+      tensor::getMixedSizes(b, loc, getScale());
+  auto createFilledInit = [&](bool negative) -> Value {
+    Value empty = tensor::EmptyOp::create(b, loc, parameterSizes, computeType);
+    // Types without infinities start from their largest finite values.
+    bool finite = !APFloat::semanticsHasInf(computeType.getFloatSemantics());
+    Value identity = arith::getIdentityValue(
+        negative ? arith::AtomicRMWKind::maximumf
+                 : arith::AtomicRMWKind::minimumf,
+        computeType, b, loc, /*useOnlyFiniteValue=*/finite);
+    return linalg::FillOp::create(b, loc, identity, empty).getResult(0);
+  };
+  Value minInit = createFilledInit(/*negative=*/false);
+  Value maxInit = createFilledInit(/*negative=*/true);
+  AffineMap parameterMap = getScaleMap();
+  auto minMax = linalg::GenericOp::create(
+      b, loc, TypeRange{minInit.getType(), maxInit.getType()}, getInput(),
+      ValueRange{minInit, maxInit},
+      SmallVector<AffineMap>{getInputMap(), parameterMap, parameterMap},
+      getLoopIteratorTypes(),
+      [&](OpBuilder &nested, Location nestedLoc, ValueRange args) {
+        Value min =
+            arith::MinimumFOp::create(nested, nestedLoc, args[0], args[1]);
+        Value max =
+            arith::MaximumFOp::create(nested, nestedLoc, args[0], args[2]);
+        linalg::YieldOp::create(nested, nestedLoc, ValueRange{min, max});
+      });
+
+  // Maps the range of each block to its parameters.
+  int64_t parameterRank = getScaleType().getRank();
+  AffineMap identity = b.getMultiDimIdentityMap(parameterRank);
+  SmallVector<Value> inits = {getScale()};
+  if (zeroPointInit) {
+    inits.push_back(zeroPointInit);
+  }
+  SmallVector<AffineMap> maps(2 + inits.size(), identity);
+  SmallVector<utils::IteratorType> iteratorTypes(parameterRank,
+                                                 utils::IteratorType::parallel);
+  auto parameters = linalg::GenericOp::create(
+      b, loc, TypeRange(ValueRange(inits)), minMax.getResults(), inits, maps,
+      iteratorTypes,
+      [&](OpBuilder &nested, Location nestedLoc, ValueRange args) {
+        auto constant = [&](double value) -> Value {
+          return arith::ConstantOp::create(
+              nested, nestedLoc, nested.getFloatAttr(computeType, value));
+        };
+        Value min = args[0];
+        Value max = args[1];
+        Value zero = constant(0.0);
+        Value minNeg = arith::MinimumFOp::create(nested, nestedLoc, min, zero);
+        Value maxPos = arith::MaximumFOp::create(nested, nestedLoc, max, zero);
+        Value epsValue = constant(eps);
+        // The bounds are only materialized by the mappings that use them.
+        Value qmin, qmax;
+        auto getQMin = [&]() -> Value {
+          return qmin ? qmin : (qmin = constant(quantMin));
+        };
+        auto getQMax = [&]() -> Value {
+          return qmax ? qmax : (qmax = constant(quantMax));
+        };
+        // `maxnumf`/`minnumf` bring a NaN zero point onto a bound, where
+        // converting it to an integer would be poison.
+        auto clamp = [&](Value value) -> Value {
+          Value clamped =
+              arith::MaxNumFOp::create(nested, nestedLoc, value, getQMin());
+          return arith::MinNumFOp::create(nested, nestedLoc, clamped,
+                                          getQMax());
+        };
+
+        auto computeAbsMax = [&]() -> Value {
+          Value negMinNeg = arith::NegFOp::create(nested, nestedLoc, minNeg);
+          return arith::MaximumFOp::create(nested, nestedLoc, negMinNeg,
+                                           maxPos);
+        };
+        auto computeAsymmetricScale = [&]() -> Value {
+          Value range =
+              arith::SubFOp::create(nested, nestedLoc, maxPos, minNeg);
+          Value divided = arith::DivFOp::create(nested, nestedLoc, range,
+                                                constant(quantMax - quantMin));
+          return arith::MaximumFOp::create(nested, nestedLoc, divided,
+                                           epsValue);
+        };
+
+        Value scale;
+        Value zeroPoint;
+        switch (mapping) {
+        case QuantizationMapping::Symmetric: {
+          Value divided =
+              arith::DivFOp::create(nested, nestedLoc, computeAbsMax(),
+                                    constant((quantMax - quantMin) / 2.0));
+          scale =
+              arith::MaximumFOp::create(nested, nestedLoc, divided, epsValue);
+          zeroPoint = constant(static_cast<double>(
+              getSymmetricZeroPoint(getQuantMin(), getQuantMax())));
+          break;
+        }
+        case QuantizationMapping::SymmetricQmax: {
+          Value clamped = arith::MaximumFOp::create(nested, nestedLoc,
+                                                    computeAbsMax(), epsValue);
+          scale = arith::DivFOp::create(nested, nestedLoc, clamped, getQMax());
+          zeroPoint = zero;
+          break;
+        }
+        case QuantizationMapping::Asymmetric: {
+          scale = computeAsymmetricScale();
+          Value descaledMin =
+              arith::DivFOp::create(nested, nestedLoc, minNeg, scale);
+          Value rounded =
+              math::RoundEvenOp::create(nested, nestedLoc, descaledMin);
+          zeroPoint = clamp(
+              arith::SubFOp::create(nested, nestedLoc, getQMin(), rounded));
+          break;
+        }
+        case QuantizationMapping::AsymmetricMinError: {
+          scale = computeAsymmetricScale();
+          Value descaledMin =
+              arith::DivFOp::create(nested, nestedLoc, minNeg, scale);
+          Value descaledMax =
+              arith::DivFOp::create(nested, nestedLoc, maxPos, scale);
+          Value minError =
+              arith::AddFOp::create(nested, nestedLoc, getQMin(), descaledMin);
+          Value maxError =
+              arith::AddFOp::create(nested, nestedLoc, getQMax(), descaledMax);
+          Value errorSum =
+              arith::AddFOp::create(nested, nestedLoc, minError, maxError);
+          Value useMin = arith::CmpFOp::create(
+              nested, nestedLoc, arith::CmpFPredicate::OGT, errorSum, zero);
+          Value fromMin =
+              arith::SubFOp::create(nested, nestedLoc, getQMin(), descaledMin);
+          Value fromMax =
+              arith::SubFOp::create(nested, nestedLoc, getQMax(), descaledMax);
+          Value selected = arith::SelectOp::create(nested, nestedLoc, useMin,
+                                                   fromMin, fromMax);
+          zeroPoint =
+              math::RoundEvenOp::create(nested, nestedLoc, clamp(selected));
+          break;
+        }
+        }
+
+        // A block without elements keeps the identities of the reduction, so
+        // its minimum exceeds its maximum.
+        Value isEmpty = arith::CmpFOp::create(
+            nested, nestedLoc, arith::CmpFPredicate::OGT, min, max);
+        scale = arith::SelectOp::create(nested, nestedLoc, isEmpty,
+                                        constant(1.0), scale);
+        SmallVector<Value> results = {convertScalarToDtype(
+            nested, nestedLoc, scale, scaleType, /*isUnsignedCast=*/false)};
+        if (zeroPointType) {
+          zeroPoint = arith::SelectOp::create(nested, nestedLoc, isEmpty, zero,
+                                              zeroPoint);
+          results.push_back(
+              convertScalarToDtype(nested, nestedLoc, zeroPoint, zeroPointType,
+                                   /*isUnsignedCast=*/zpUnsigned));
+        }
+        linalg::YieldOp::create(nested, nestedLoc, results);
+      });
+  return SmallVector<Value>(parameters->getResults());
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

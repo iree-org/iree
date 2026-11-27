@@ -14,6 +14,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_llvm-cpu_local-task
   SRCS
+    "choose_qparams.mlir"
     "contraction_scaling.mlir"
   TARGET_BACKEND
     "llvm-cpu"
@@ -30,6 +31,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_reference_llvm-cpu_local-task
   SRCS
+    "choose_qparams.mlir"
     "contraction_scaling.mlir"
   TARGET_BACKEND
     "llvm-cpu"

@@ -18,6 +18,7 @@ iree_cc_library(
     "LinalgExtAttrs.h.inc"
     "LinalgExtDialect.h"
     "LinalgExtDialect.h.inc"
+    "LinalgExtEnums.h.inc"
     "LinalgExtInterfaces.h"
     "LinalgExtInterfaces.h.inc"
     "LinalgExtOps.h"
@@ -32,6 +33,7 @@ iree_cc_library(
     "LinalgExtAttrs.cpp.inc"
     "LinalgExtDialect.cpp"
     "LinalgExtDialect.cpp.inc"
+    "LinalgExtEnums.cpp.inc"
     "LinalgExtInterfaces.cpp"
     "LinalgExtInterfaces.cpp.inc"
     "LinalgExtOps.cpp"
@@ -39,6 +41,7 @@ iree_cc_library(
     "LinalgExtTypes.cpp.inc"
     "TilingInterfaceImpl.cpp"
   DEPS
+    ::LinalgExtEnumsGen
     ::LinalgExtInterfacesIncGen
     ::LinalgExtOpsIncGen
     ::LinalgExtPureOpsIncGen
@@ -106,6 +109,16 @@ iree_tablegen_library(
     --gen-op-defs LinalgExtOps.cpp.inc
     --dialect=iree_linalg_ext --gen-dialect-decls LinalgExtDialect.h.inc
     --dialect=iree_linalg_ext --gen-dialect-defs LinalgExtDialect.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    LinalgExtEnumsGen
+  TD_FILE
+    "LinalgExtEnums.td"
+  OUTS
+    --gen-enum-decls LinalgExtEnums.h.inc
+    --gen-enum-defs LinalgExtEnums.cpp.inc
 )
 
 iree_tablegen_library(

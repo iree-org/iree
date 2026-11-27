@@ -35,7 +35,9 @@ def ConvertTorchQuantizationToLinalgExtPass :
   let description = [{
     Preserves PT2E per-tensor, per-channel, per-channel-group, and per-token
     quantization, and torchao affine quantization, as
-    `iree_linalg_ext.quantize_affine` and `dequantize_affine` operations. This
+    `iree_linalg_ext.quantize_affine` and `dequantize_affine` operations, and
+    the PT2E per-tensor and per-token parameter computations as
+    `iree_linalg_ext.choose_qparams_affine` operations. This
     pass runs before Torch-to-Linalg expands the PT2E and torchao operations
     into generic arithmetic so later IREE optimization can still identify
     quantized computations.

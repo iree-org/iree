@@ -3094,3 +3094,97 @@ func.func @group_mmt4d_transposed(%input: tensor<2x3x4x5xf32>,
 // CHECK: %[[ROW_STRIDE:.+]] = tensor.dim %[[INPUT]], %[[ROW_STRIDE_DIM]] : tensor<2x3x4x5xf32>
 // CHECK: %[[RESULT:.+]] = iree_linalg_ext.group_mmt4d <transposed = true> ins(%[[INPUT]], %[[WEIGHTS]], %[[OFFSETS]], %[[ROW_BASE]], %[[ROW_STRIDE]] : tensor<2x3x4x5xf32>, tensor<4x6x3x7x5xf32>, tensor<4xi64>, index, index) outs(%[[OUTPUT]] : tensor<6x2x7x4xf32>) -> tensor<6x2x7x4xf32>
 // CHECK: return %[[RESULT]] : tensor<6x2x7x4xf32>
+
+// -----
+
+func.func @choose_qparams_affine_per_tensor(%input: tensor<4x8xf32>,
+    %scale: tensor<f64>, %zp: tensor<i64>) -> (tensor<f64>, tensor<i64>) {
+  %0:2 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> ()>,
+                        affine_map<(d0, d1) -> ()>],
+       mapping = asymmetric, quant_min = -128, quant_max = 127, eps = 1.0e-08>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale, %zp : tensor<f64>, tensor<i64>) -> tensor<f64>, tensor<i64>
+  return %0#0, %0#1 : tensor<f64>, tensor<i64>
+}
+// CHECK-LABEL: func.func @choose_qparams_affine_per_tensor(
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<4x8xf32>
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<f64>
+//  CHECK-SAME:     %[[ZP:[a-zA-Z0-9_]+]]: tensor<i64>
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.choose_qparams_affine
+//  CHECK-SAME:     mapping = asymmetric
+//  CHECK-SAME:     quant_min = -128
+//  CHECK-SAME:     quant_max = 127
+//  CHECK-SAME:     ins(%[[INPUT]] : tensor<4x8xf32>)
+//  CHECK-SAME:     outs(%[[SCALE]], %[[ZP]] : tensor<f64>, tensor<i64>)
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @choose_qparams_affine_symmetric_qmax(%input: tensor<?x16xbf16>,
+    %scale: tensor<?xf32>) -> tensor<?xf32> {
+  %0 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = symmetric_qmax, quant_min = -128, quant_max = 127, eps = 1.0e-05>
+      ins(%input : tensor<?x16xbf16>)
+      outs(%scale : tensor<?xf32>) -> tensor<?xf32>
+  return %0 : tensor<?xf32>
+}
+// CHECK-LABEL: func.func @choose_qparams_affine_symmetric_qmax(
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<?x16xbf16>
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<?xf32>
+//       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.choose_qparams_affine
+//  CHECK-SAME:     mapping = symmetric_qmax
+//  CHECK-SAME:     ins(%[[INPUT]] : tensor<?x16xbf16>)
+//  CHECK-SAME:     outs(%[[SCALE]] : tensor<?xf32>)
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func.func @choose_qparams_affine_symmetric(%input: tensor<4x8xf32>,
+    %scale: tensor<4xf32>, %zp: tensor<4xi64>) -> (tensor<4xf32>, tensor<4xi64>) {
+  %0:2 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = symmetric, quant_min = -128, quant_max = 127, eps = 1.0e-05>
+      ins(%input : tensor<4x8xf32>)
+      outs(%scale, %zp : tensor<4xf32>, tensor<4xi64>) -> tensor<4xf32>, tensor<4xi64>
+  return %0#0, %0#1 : tensor<4xf32>, tensor<4xi64>
+}
+// CHECK-LABEL: func.func @choose_qparams_affine_symmetric(
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<4x8xf32>
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<4xf32>
+//  CHECK-SAME:     %[[ZP:[a-zA-Z0-9_]+]]: tensor<4xi64>
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.choose_qparams_affine
+//  CHECK-SAME:     mapping = symmetric
+//  CHECK-SAME:     ins(%[[INPUT]] : tensor<4x8xf32>)
+//  CHECK-SAME:     outs(%[[SCALE]], %[[ZP]] : tensor<4xf32>, tensor<4xi64>)
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1
+
+// -----
+
+func.func @choose_qparams_affine_asymmetric_min_error(%input: tensor<?x32xf32>,
+    %scale: tensor<?xf32>, %zp: tensor<?xi64>) -> (tensor<?xf32>, tensor<?xi64>) {
+  %0:2 = iree_linalg_ext.choose_qparams_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>],
+       mapping = asymmetric_min_error, quant_min = -128, quant_max = 127, eps = 1.0e-08>
+      ins(%input : tensor<?x32xf32>)
+      outs(%scale, %zp : tensor<?xf32>, tensor<?xi64>) -> tensor<?xf32>, tensor<?xi64>
+  return %0#0, %0#1 : tensor<?xf32>, tensor<?xi64>
+}
+// CHECK-LABEL: func.func @choose_qparams_affine_asymmetric_min_error(
+//  CHECK-SAME:     %[[INPUT:[a-zA-Z0-9_]+]]: tensor<?x32xf32>
+//  CHECK-SAME:     %[[SCALE:[a-zA-Z0-9_]+]]: tensor<?xf32>
+//  CHECK-SAME:     %[[ZP:[a-zA-Z0-9_]+]]: tensor<?xi64>
+//       CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.choose_qparams_affine
+//  CHECK-SAME:     mapping = asymmetric_min_error
+//  CHECK-SAME:     quant_min = -128
+//  CHECK-SAME:     quant_max = 127
+//  CHECK-SAME:     ins(%[[INPUT]] : tensor<?x32xf32>)
+//  CHECK-SAME:     outs(%[[SCALE]], %[[ZP]] : tensor<?xf32>, tensor<?xi64>)
+//       CHECK:   return %[[RESULT]]#0, %[[RESULT]]#1

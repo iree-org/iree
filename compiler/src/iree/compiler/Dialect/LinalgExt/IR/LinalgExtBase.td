@@ -12,6 +12,7 @@ include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/OpBase.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
+include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtEnums.td"
 
 //===----------------------------------------------------------------------===//
 // Dialect definition
@@ -68,6 +69,12 @@ def IREELinalgExt_IteratorTypeEnum : EnumAttr<IREELinalgExt_Dialect,
 def IREELinalgExt_IteratorTypeArrayAttr :
     TypedArrayAttrBase<IREELinalgExt_IteratorTypeEnum,
     "LinalgExt iterator type">;
+
+def IREELinalgExt_QuantizationMappingAttr
+    : EnumAttr<IREELinalgExt_Dialect, IREELinalgExt_QuantizationMapping,
+               "quantization_mapping"> {
+  let assemblyFormat = "`<` $value `>`";
+}
 
 //===----------------------------------------------------------------------===//
 // Split reduction mapping attribute

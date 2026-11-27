@@ -829,3 +829,281 @@ func.func @torchao_reversed_bounds(
         -> !torch.vtensor<[4,8],f32>
   return %result : !torch.vtensor<[4,8],f32>
 }
+
+// -----
+
+// The parameters of choose_qparams.tensor describe the whole tensor, so their
+// maps index no dimension. PT2E gives them a unit dimension, into which the
+// rank-0 results are expanded.
+// CHECK: #map = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK: #map1 = affine_map<(d0, d1) -> ()>
+// CHECK-LABEL: func.func @choose_qparams_tensor(
+// CHECK: %[[RESULTS:.+]]:2 = iree_linalg_ext.choose_qparams_affine
+// CHECK-SAME: indexing_maps = [#map, #map1, #map1]
+// CHECK-SAME: mapping = asymmetric
+// CHECK-SAME: quant_min = -128
+// CHECK-SAME: quant_max = 127
+// CHECK-SAME: eps = 1.000000e-08
+// CHECK-SAME: ins({{.*}} : tensor<4x8xf32>)
+// CHECK-SAME: outs({{.*}} : tensor<f64>, tensor<i64>)
+// CHECK: tensor.expand_shape %[[RESULTS]]#0 [] output_shape [1]
+// CHECK-SAME: tensor<f64> into tensor<1xf64>
+// CHECK: tensor.expand_shape %[[RESULTS]]#1 [] output_shape [1]
+// CHECK-SAME: tensor<i64> into tensor<1xi64>
+func.func @choose_qparams_tensor(%input: !torch.vtensor<[4,8],f32>)
+    -> (!torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>) {
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %eps = torch.constant.float 1.000000e-08
+  %dtype = torch.constant.int 1
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams.tensor
+      %input, %minimum, %maximum, %eps, %dtype
+      : !torch.vtensor<[4,8],f32>, !torch.int, !torch.int, !torch.float,
+        !torch.int -> !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+}
+
+// -----
+
+// PT2E places the symmetric zero point of uint8 at 128, the middle of the
+// range.
+// CHECK-LABEL: func.func @choose_qparams_symmetric_tensor(
+// CHECK: iree_linalg_ext.choose_qparams_affine
+// CHECK-SAME: mapping = symmetric
+// CHECK-SAME: quant_min = 0
+// CHECK-SAME: quant_max = 255
+func.func @choose_qparams_symmetric_tensor(%input: !torch.vtensor<[4,8],f32>)
+    -> (!torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>) {
+  %minimum = torch.constant.int 0
+  %maximum = torch.constant.int 255
+  %eps = torch.constant.float 1.000000e-08
+  %dtype = torch.constant.int 0
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams_symmetric.tensor
+      %input, %minimum, %maximum, %eps, %dtype
+      : !torch.vtensor<[4,8],f32>, !torch.int, !torch.int, !torch.float,
+        !torch.int -> !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+}
+
+// -----
+
+// PT2E picks the symmetric zero point from the dtype (128 for uint8, else 0)
+// regardless of the bounds, while iree_linalg_ext.choose_qparams_affine with
+// mapping = symmetric takes the middle of [quant_min, quant_max]. They agree
+// for the bounds that quantizers use, but the op takes the bounds as
+// arguments, so bounds whose middle differs, such as [-128, 0], are left for
+// the Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @choose_qparams_symmetric_off_center(
+// CHECK: torch.quantized_decomposed.choose_qparams_symmetric.tensor
+// CHECK-NOT: iree_linalg_ext.choose_qparams_affine
+func.func @choose_qparams_symmetric_off_center(
+    %input: !torch.vtensor<[4,8],f32>)
+    -> (!torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>) {
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 0
+  %eps = torch.constant.float 1.000000e-08
+  %dtype = torch.constant.int 1
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams_symmetric.tensor
+      %input, %minimum, %maximum, %eps, %dtype
+      : !torch.vtensor<[4,8],f32>, !torch.int, !torch.int, !torch.float,
+        !torch.int -> !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+}
+
+// -----
+
+// The per-tensor references clamp to eps and compute the zero point of 16-bit
+// inputs in f32, unlike LinalgExt, so such inputs are left for the
+// Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @choose_qparams_tensor_f16(
+// CHECK: torch.quantized_decomposed.choose_qparams.tensor
+// CHECK-NOT: iree_linalg_ext.choose_qparams_affine
+func.func @choose_qparams_tensor_f16(%input: !torch.vtensor<[4,8],f16>)
+    -> (!torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>) {
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %eps = torch.constant.float 1.000000e-08
+  %dtype = torch.constant.int 1
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams.tensor
+      %input, %minimum, %maximum, %eps, %dtype
+      : !torch.vtensor<[4,8],f16>, !torch.int, !torch.int, !torch.float,
+        !torch.int -> !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+}
+
+// -----
+
+// Each token has its own parameters, indexed by the leading dimensions,
+// including the dynamic one, and the int8 dtype gives the bounds. The results
+// are expanded into the unit last dimension of PT2E.
+// CHECK: #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK: #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-LABEL: func.func @choose_qparams_per_token_asymmetric(
+// CHECK: %[[RESULTS:.+]]:2 = iree_linalg_ext.choose_qparams_affine
+// CHECK-SAME: indexing_maps = [#map, #map1, #map1]
+// CHECK-SAME: mapping = asymmetric_min_error
+// CHECK-SAME: quant_min = -128
+// CHECK-SAME: quant_max = 127
+// CHECK-SAME: eps = 1.1920928955078125E-7
+// CHECK-SAME: ins({{.*}} : tensor<2x?x8xbf16>)
+// CHECK-SAME: outs({{.*}} : tensor<2x?xf64>, tensor<2x?xi64>)
+// CHECK: tensor.expand_shape %[[RESULTS]]#0 {{\[}}[0], [1, 2]]
+// CHECK-SAME: tensor<2x?xf64> into tensor<2x?x1xf64>
+// CHECK: tensor.expand_shape %[[RESULTS]]#1 {{\[}}[0], [1, 2]]
+// CHECK-SAME: tensor<2x?xi64> into tensor<2x?x1xi64>
+func.func @choose_qparams_per_token_asymmetric(
+    %input: !torch.vtensor<[2,?,8],bf16>)
+    -> (!torch.vtensor<[2,?,1],f64>, !torch.vtensor<[2,?,1],si64>) {
+  %dtype = torch.constant.int 1
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams_per_token_asymmetric
+      %input, %dtype
+      : !torch.vtensor<[2,?,8],bf16>, !torch.int
+        -> !torch.vtensor<[2,?,1],f64>, !torch.vtensor<[2,?,1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[2,?,1],f64>, !torch.vtensor<[2,?,1],si64>
+}
+
+// -----
+
+// CHECK: #map = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK: #map1 = affine_map<(d0, d1) -> (d0)>
+// CHECK-LABEL: func.func @choose_qparams_per_token(
+// CHECK: iree_linalg_ext.choose_qparams_affine
+// CHECK-SAME: indexing_maps = [#map, #map1, #map1]
+// CHECK-SAME: mapping = symmetric_qmax
+// CHECK-SAME: eps = 1.000000e-05
+// CHECK-SAME: ins({{.*}} : tensor<4x8xbf16>)
+// CHECK-SAME: outs({{.*}} : tensor<4xf32>, tensor<4xi64>)
+func.func @choose_qparams_per_token(%input: !torch.vtensor<[4,8],bf16>)
+    -> (!torch.vtensor<[4,1],f32>, !torch.vtensor<[4,1],si64>) {
+  %dtype = torch.constant.int 1
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams_per_token
+      %input, %dtype
+      : !torch.vtensor<[4,8],bf16>, !torch.int
+        -> !torch.vtensor<[4,1],f32>, !torch.vtensor<[4,1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[4,1],f32>, !torch.vtensor<[4,1],si64>
+}
+
+// -----
+
+// choose_qparams_per_token promotes f16 inputs to f32, unlike LinalgExt, so
+// they are left for the Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @choose_qparams_per_token_f16(
+// CHECK: torch.quantized_decomposed.choose_qparams_per_token
+// CHECK-NOT: iree_linalg_ext.choose_qparams_affine
+func.func @choose_qparams_per_token_f16(%input: !torch.vtensor<[4,8],f16>)
+    -> (!torch.vtensor<[4,1],f32>, !torch.vtensor<[4,1],si64>) {
+  %dtype = torch.constant.int 1
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams_per_token
+      %input, %dtype
+      : !torch.vtensor<[4,8],f16>, !torch.int
+        -> !torch.vtensor<[4,1],f32>, !torch.vtensor<[4,1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[4,1],f32>, !torch.vtensor<[4,1],si64>
+}
+
+// -----
+
+// PT2E only supports int8 for the per-token ops, so other dtypes are left for
+// the Torch-to-Linalg lowering.
+// CHECK-LABEL: func.func @choose_qparams_per_token_uint8(
+// CHECK: torch.quantized_decomposed.choose_qparams_per_token_asymmetric
+// CHECK-NOT: iree_linalg_ext.choose_qparams_affine
+func.func @choose_qparams_per_token_uint8(%input: !torch.vtensor<[4,8],f32>)
+    -> (!torch.vtensor<[4,1],f64>, !torch.vtensor<[4,1],si64>) {
+  %dtype = torch.constant.int 0
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams_per_token_asymmetric
+      %input, %dtype
+      : !torch.vtensor<[4,8],f32>, !torch.int
+        -> !torch.vtensor<[4,1],f64>, !torch.vtensor<[4,1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[4,1],f64>, !torch.vtensor<[4,1],si64>
+}
+
+// -----
+
+// CHECK-LABEL: func.func @choose_qparams_tensor_dynamic_eps(
+// CHECK: torch.quantized_decomposed.choose_qparams.tensor
+// CHECK-NOT: iree_linalg_ext.choose_qparams_affine
+func.func @choose_qparams_tensor_dynamic_eps(
+    %input: !torch.vtensor<[4,8],f32>, %eps: !torch.float)
+    -> (!torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>) {
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %dtype = torch.constant.int 1
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams.tensor
+      %input, %minimum, %maximum, %eps, %dtype
+      : !torch.vtensor<[4,8],f32>, !torch.int, !torch.int, !torch.float,
+        !torch.int -> !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+}
+
+// -----
+
+// A rank-0 input has no token dimension.
+// CHECK-LABEL: func.func @choose_qparams_per_token_rank0(
+// CHECK: torch.quantized_decomposed.choose_qparams_per_token
+// CHECK-NOT: iree_linalg_ext.choose_qparams_affine
+func.func @choose_qparams_per_token_rank0(%input: !torch.vtensor<[],f32>)
+    -> (!torch.vtensor<[],f32>, !torch.vtensor<[],si64>) {
+  %dtype = torch.constant.int 1
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams_per_token
+      %input, %dtype
+      : !torch.vtensor<[],f32>, !torch.int
+        -> !torch.vtensor<[],f32>, !torch.vtensor<[],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[],f32>, !torch.vtensor<[],si64>
+}
+
+// -----
+
+// bf16 is promoted to f32 by the per-tensor references, like f16.
+// CHECK-LABEL: func.func @choose_qparams_symmetric_tensor_bf16(
+// CHECK: torch.quantized_decomposed.choose_qparams_symmetric.tensor
+// CHECK-NOT: iree_linalg_ext.choose_qparams_affine
+func.func @choose_qparams_symmetric_tensor_bf16(
+    %input: !torch.vtensor<[4,8],bf16>)
+    -> (!torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>) {
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %eps = torch.constant.float 1.000000e-08
+  %dtype = torch.constant.int 1
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams_symmetric.tensor
+      %input, %minimum, %maximum, %eps, %dtype
+      : !torch.vtensor<[4,8],bf16>, !torch.int, !torch.int, !torch.float,
+        !torch.int -> !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+}
+
+// -----
+
+// A rank-3 per-tensor input reduces all of its dimensions.
+// CHECK: #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK: #map1 = affine_map<(d0, d1, d2) -> ()>
+// CHECK-LABEL: func.func @choose_qparams_tensor_rank3(
+// CHECK: %[[RESULTS:.+]]:2 = iree_linalg_ext.choose_qparams_affine
+// CHECK-SAME: indexing_maps = [#map, #map1, #map1]
+// CHECK-SAME: ins({{.*}} : tensor<2x?x8xf32>)
+// CHECK-SAME: outs({{.*}} : tensor<f64>, tensor<i64>)
+// CHECK: tensor.expand_shape %[[RESULTS]]#0 [] output_shape [1]
+// CHECK: tensor.expand_shape %[[RESULTS]]#1 [] output_shape [1]
+func.func @choose_qparams_tensor_rank3(%input: !torch.vtensor<[2,?,8],f32>)
+    -> (!torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>) {
+  %minimum = torch.constant.int -128
+  %maximum = torch.constant.int 127
+  %eps = torch.constant.float 1.000000e-08
+  %dtype = torch.constant.int 1
+  %scale, %zero_point = torch.quantized_decomposed.choose_qparams.tensor
+      %input, %minimum, %maximum, %eps, %dtype
+      : !torch.vtensor<[2,?,8],f32>, !torch.int, !torch.int, !torch.float,
+        !torch.int -> !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+  return %scale, %zero_point
+      : !torch.vtensor<[1],f64>, !torch.vtensor<[1],si64>
+}
