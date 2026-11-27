@@ -1293,6 +1293,37 @@ static void propagateReductionTileSizes(linalg::LinalgOp rootOp,
   });
 }
 
+// The subgroup pipeline partially reduces every configured linalg reduction.
+// Mixed parallel outputs and reductions, and coupled combiners, need the
+// general pipeline because the partial-reduction interface cannot split them.
+static bool
+supportsSubgroupReductionTiling(linalg::LinalgOp op,
+                                ArrayRef<utils::IteratorType> rootIterators) {
+  SmallVector<unsigned> reductionDims;
+  op.getReductionDims(reductionDims);
+  for (auto [index, dim] : llvm::enumerate(llvm::reverse(reductionDims))) {
+    if (dim != op.getNumLoops() - 1 - index) {
+      return true; // The reduction-tiling pass leaves these operations intact.
+    }
+  }
+  if (reductionDims.empty()) {
+    return true;
+  }
+  // The root's tile sizes are propagated by loop position, without a map.
+  // Different iteration spaces therefore cannot share this configuration.
+  if (op.getIteratorTypesArray() != rootIterators) {
+    return false;
+  }
+  for (int64_t index = 0; index < op.getNumDpsInits(); ++index) {
+    SmallVector<Operation *> combiners;
+    if (!matchReduction(op.getRegionOutputArgs(), index, combiners) ||
+        combiners.size() != 1 || !arith::getNeutralElement(combiners.front())) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
                                         linalg::LinalgOp op) {
@@ -1364,6 +1395,15 @@ static LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   }
   if (!foundSingleReductionOutput) {
     return failure();
+  }
+
+  for (Operation *computeOp :
+       getComputeOps(op->getParentOfType<FunctionOpInterface>())) {
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp);
+    if (linalgOp && !supportsSubgroupReductionTiling(
+                        linalgOp, op.getIteratorTypesArray())) {
+      return failure();
+    }
   }
 
   int subgroupSize = target.getPreferredSubgroupSize();

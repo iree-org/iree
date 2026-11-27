@@ -31,6 +31,9 @@ iree_check_single_backend_test_suite(
     "arg_compare.mlir"
     "attention.mlir"
     "attention_i1_mask.mlir"
+    "attention_large_head.mlir"
+    "attention_masked_tiles.mlir"
+    "attention_masked_values.mlir"
     "dynamic_attention.mlir"
     "gather.mlir"
     "map_load.mlir"
@@ -58,6 +61,8 @@ iree_check_single_backend_test_suite(
   SRCS
     "arg_compare.mlir"
     "attention.mlir"
+    "attention_masked_tiles.mlir"
+    "attention_masked_values.mlir"
     "dynamic_attention.mlir"
     "gather.mlir"
     "map_load.mlir"
@@ -80,6 +85,8 @@ iree_check_single_backend_test_suite(
     check_cuda
   SRCS
     "arg_compare.mlir"
+    "attention_masked_tiles.mlir"
+    "attention_masked_values.mlir"
     "gather.mlir"
     "scan.mlir"
     "scan_configured.mlir"
@@ -107,6 +114,8 @@ iree_check_single_backend_test_suite(
   SRCS
     "arg_compare.mlir"
     "attention.mlir"
+    "attention_masked_tiles.mlir"
+    "attention_masked_values.mlir"
     "gather.mlir"
     "map_load.mlir"
     "map_store.mlir"
@@ -139,6 +148,8 @@ iree_check_single_backend_test_suite(
     check_metal-spirv_vulkan
   SRCS
     "arg_compare.mlir"
+    "attention_masked_tiles.mlir"
+    "attention_masked_values.mlir"
     "gather.mlir"
     "scan.mlir"
     "scatter.mlir"
@@ -157,6 +168,8 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "arg_compare.mlir"
+    "attention_masked_tiles.mlir"
+    "attention_masked_values.mlir"
     "gather.mlir"
     "map_load.mlir"
     "map_store.mlir"

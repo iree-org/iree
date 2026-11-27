@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -112,6 +113,7 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
       attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(), attnOp.getScale(),
       accFill, maxFill, sumFill, rewriter.getAffineMapArrayAttr(indexingMaps),
       mask);
+  onlineAttn.setAdditiveMask(attnOp.getAdditiveMask());
   if (attnOp.getDecompositionConfigAttr()) {
     onlineAttn.setDecompositionConfigAttr(attnOp.getDecompositionConfigAttr());
   }
@@ -137,10 +139,15 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   auto genericOp = linalg::GenericOp::create(
       rewriter, loc, attnOp.getOutput().getType(), ValueRange{sum, x},
       attnOp.getOutput(), compressedMaps, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
+      [safeSoftmax = attnOp.getSafeSoftmax()](OpBuilder &b, Location loc,
+                                              ValueRange args) {
+        Value divisor = args[0];
+        if (safeSoftmax) {
+          divisor = buildSafeSoftmaxDenominator(b, loc, divisor);
+        }
         Value one = arith::ConstantOp::create(
             b, loc, b.getFloatAttr(args[0].getType(), 1.0));
-        Value reciprocal = arith::DivFOp::create(b, loc, one, args[0]);
+        Value reciprocal = arith::DivFOp::create(b, loc, one, divisor);
         // Both sum and x are in fp32, as created earlier, so we only need
         // to cast after the mul.
         Value result = arith::MulFOp::create(b, loc, reciprocal, args[1]);

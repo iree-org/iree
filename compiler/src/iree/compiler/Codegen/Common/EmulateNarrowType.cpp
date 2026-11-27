@@ -39,6 +39,47 @@ namespace {
 // Conversion patterns
 //===----------------------------------------------------------------------===//
 
+// Match the converted static shape's rounding for dynamic owned storage too.
+// For example, memref<?xi1> with two elements needs one i8, not zero i8s.
+template <typename OpTy>
+struct ConvertDynamicNarrowAllocation final : OpConversionPattern<OpTy> {
+  ConvertDynamicNarrowAllocation(TypeConverter &converter, MLIRContext *context)
+      : OpConversionPattern<OpTy>(converter, context, PatternBenefit(2)) {}
+
+  LogicalResult
+  matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto currentType = op.getType();
+    if (currentType.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op, "allocation has a static shape");
+    }
+    auto convertedType =
+        this->getTypeConverter()->template convertType<MemRefType>(currentType);
+    if (!convertedType) {
+      return rewriter.notifyMatchFailure(op, "cannot convert allocation type");
+    }
+    if (convertedType == currentType) {
+      return rewriter.notifyMatchFailure(op, "allocation type is unchanged");
+    }
+    int srcBits = currentType.getElementTypeBitWidth();
+    int dstBits = convertedType.getElementTypeBitWidth();
+    if (srcBits >= dstBits) {
+      return rewriter.notifyMatchFailure(op,
+                                         "allocation does not need widening");
+    }
+
+    auto info = memref::getLinearizedMemRefOffsetAndSize(
+        rewriter, op.getLoc(), srcBits, dstBits, rewriter.getIndexAttr(0),
+        op.getMixedSizes(), memref::LinearizedDivKind::Ceil);
+    Value size = getValueOrCreateConstantIndexOp(rewriter, op.getLoc(),
+                                                 info.linearizedSize);
+    rewriter.replaceOpWithNewOp<OpTy>(op, convertedType, ValueRange{size},
+                                      adaptor.getSymbolOperands(),
+                                      adaptor.getAlignmentAttr());
+    return success();
+  }
+};
+
 struct ConvertHalInterfaceBindingSubspan final
     : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
   using Base::Base;
@@ -98,6 +139,9 @@ static void populateIreeNarrowTypeEmulationPatterns(
     RewritePatternSet &patterns) {
   patterns.add<ConvertHalInterfaceBindingSubspan>(converter,
                                                   patterns.getContext());
+  patterns.add<ConvertDynamicNarrowAllocation<memref::AllocOp>,
+               ConvertDynamicNarrowAllocation<memref::AllocaOp>>(
+      converter, patterns.getContext());
 }
 
 //===----------------------------------------------------------------------===//

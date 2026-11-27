@@ -395,6 +395,16 @@ void LLVMCPUTileAndFuseProducerConsumer::runOnOperation() {
           {anchorOp, getRootAndTransitiveConsumers(computeOps, rootOp)});
     }
   }
+  // A root op with this tiling level was tiled by an earlier pass, which
+  // fused the ops now sharing its block. Tiling them again would reinsert the
+  // fused result into the root's loop at full size.
+  if (skipRootFusedAnchors && rootOp &&
+      getLoweringConfig(rootOp).hasTilingLevel(
+          llvm::to_underlying(tilingLevel.getValue()))) {
+    llvm::erase_if(anchors, [&](const AnchorInfo &anchor) {
+      return anchor.anchorOp->getBlock() == rootOp->getBlock();
+    });
+  }
   if (anchors.empty()) {
     LDBG() << "unable to find an anchor operation that has "
            << IREE::CPU::getTilingLevelName(tilingLevel) << " config";
@@ -452,10 +462,11 @@ createLLVMCPUTileRootAndFuseInputOperandsPass(
 }
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileLastOpAndFuseProducerConsumerPass(
-    IREE::CPU::TilingLevel tilingLevel) {
+    IREE::CPU::TilingLevel tilingLevel, bool skipRootFusedAnchors) {
   LLVMCPUTileAndFuseProducerConsumerPassOptions options;
   options.tilingLevel = tilingLevel;
   options.anchorOnRootOp = false;
+  options.skipRootFusedAnchors = skipRootFusedAnchors;
   return std::make_unique<LLVMCPUTileAndFuseProducerConsumer>(options);
 }
 } // namespace mlir::iree_compiler

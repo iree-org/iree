@@ -51,6 +51,7 @@ iree_lit_test_suite(
             "eliminate_empty_tensors.mlir",
             "emulate_16bit_float_arithmetic.mlir",
             "emulate_narrow_copysign_invalid.mlir",
+            "emulate_narrow_dynamic_allocation.mlir",
             "emulate_narrow_fma_invalid.mlir",
             "emulate_narrow_storage_offset_invalid.mlir",
             "emulate_narrow_storage_width_invalid.mlir",

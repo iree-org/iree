@@ -2797,3 +2797,23 @@ func.func @general_scatter_float_indices(%updates: tensor<2xi32>, %indices: tens
   } -> tensor<4xi32>
   return %result : tensor<4xi32>
 }
+
+// -----
+
+// Attention indices are score coordinates: (batch, query, key) here.
+func.func @attention_index_beyond_score_rank(%query: tensor<3x12x8xf32>, %key: tensor<3x10x8xf32>, %value: tensor<3x10x5xf32>) -> tensor<3x12x5xf32> {
+  %init = tensor.empty() : tensor<3x12x5xf32>
+  %scale = arith.constant 1.0 : f32
+  %result = iree_linalg_ext.attention <indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d2)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>,
+                     affine_map<(d0, d1, d2, d3, d4) -> ()>,
+                     affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>]>
+                     ins(%query, %key, %value, %scale : tensor<3x12x8xf32>, tensor<3x10x8xf32>, tensor<3x10x5xf32>, f32) outs(%init : tensor<3x12x5xf32>) {
+                      ^bb0(%score: f32):
+                        // expected-error @+1 {{expected dim (3) to be lower than the score rank (3) of the enclosing attention}}
+                        %d = iree_linalg_ext.index 3 : index
+                        iree_linalg_ext.yield %score : f32
+                     } -> tensor<3x12x5xf32>
+  return %result : tensor<3x12x5xf32>
+}

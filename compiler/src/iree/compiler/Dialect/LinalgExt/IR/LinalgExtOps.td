@@ -1197,6 +1197,19 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     If an additional mask argument M is included, the result of the first matmul is modified according to:
 
     Q @ K.T += M
+
+    By default the mask excludes positions. A false boolean entry or a -inf
+    floating-point entry removes its position whatever its key holds; other
+    floating-point entries are added to the score.
+
+    With `additive_mask`, boolean mask entries become zero (true) or -inf
+    (false), and the mask is added to the scores without special handling of
+    non-finite values. The P @ V product retains ordinary floating-point
+    arithmetic, including zero times a non-finite value.
+
+    With `safe_softmax`, a row whose scores are all -inf has zero
+    probabilities. Other rows, including rows containing NaN, retain ordinary
+    softmax semantics.
   }];
 
   let arguments = (ins AnyShaped:$query,
@@ -1206,7 +1219,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
                        Optional<AnyShaped>:$mask,
                        AnyShaped:$output,
                        AffineMapArrayAttr:$indexing_maps,
-                       OptionalAttr<DictionaryAttr>:$decomposition_config
+                       OptionalAttr<DictionaryAttr>:$decomposition_config,
+                       UnitAttr:$safe_softmax,
+                       UnitAttr:$additive_mask
   );
   let regions = (region SizedRegion<1>:$region);
 
@@ -1315,6 +1330,19 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
 
     Q @ K.T += M
 
+    By default the mask excludes positions. A false boolean entry or a -inf
+    floating-point entry removes its position whatever its key holds; other
+    floating-point entries are added to the score.
+
+    With `additive_mask`, boolean mask entries become zero (true) or -inf
+    (false), and the mask is added to the scores without special handling of
+    non-finite values. The P @ V product retains ordinary floating-point
+    arithmetic, including zero times a non-finite value.
+
+    With the default exclusion mask, a finite running_max and finite values,
+    a row whose positions are all excluded leaves its output, running_max and
+    running_sum unchanged.
+
     The advantage of this online_normalizer is that it can be tiled along
     its reduction dimension, making the online_attention operator:
       - Tilable along softmax reduction dimension
@@ -1346,7 +1374,8 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
                        AnyShaped:$max,
                        AnyShaped:$sum,
                        AffineMapArrayAttr:$indexing_maps,
-                       OptionalAttr<DictionaryAttr>:$decomposition_config
+                       OptionalAttr<DictionaryAttr>:$decomposition_config,
+                       UnitAttr:$additive_mask
   );
   let regions = (region SizedRegion<1>:$region);
 

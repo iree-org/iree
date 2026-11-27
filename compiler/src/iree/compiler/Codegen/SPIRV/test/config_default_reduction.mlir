@@ -339,3 +339,90 @@ func.func @reduction_with_permuted_consumer_and_extra_parallel_dim(
 //      CHECK:   linalg.generic
 // CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel"]
 // CHECK-SAME:       lowering_config = #[[FUSED]]
+
+// -----
+
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = shuffle,
+    subgroup_size_choices = [16], max_workgroup_sizes = [512, 512, 512],
+    max_thread_count_per_workgroup = 512, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
+}>
+
+// A fused producer writes an elementwise result as well as a row reduction.
+// It cannot form independent partial reductions for every result.
+// CHECK-DAG: #[[$FALLBACK:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute>
+// CHECK-LABEL: func.func @mixed_parallel_reduction_outputs(
+// CHECK-SAME: translation_info = #[[$FALLBACK]]
+func.func @mixed_parallel_reduction_outputs(%x: tensor<4x?xf32>) -> tensor<4xf32>
+    attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %c1 = arith.constant 1 : index
+  %zero = arith.constant 0.0 : f32
+  %n = tensor.dim %x, %c1 : tensor<4x?xf32>
+  %empty = tensor.empty(%n) : tensor<4x?xf32>
+  %row = tensor.empty() : tensor<4xf32>
+  %zeros = linalg.fill ins(%zero : f32) outs(%row : tensor<4xf32>) -> tensor<4xf32>
+  %positive, %sum = linalg.generic {
+      indexing_maps = [affine_map<(m, n) -> (m, n)>, affine_map<(m, n) -> (m, n)>, affine_map<(m, n) -> (m)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%x : tensor<4x?xf32>) outs(%empty, %zeros : tensor<4x?xf32>, tensor<4xf32>) {
+    ^bb0(%value: f32, %unused: f32, %acc: f32):
+      %p = arith.maximumf %value, %zero : f32
+      %s = arith.addf %value, %acc : f32
+      linalg.yield %p, %s : f32, f32
+  } -> (tensor<4x?xf32>, tensor<4xf32>)
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(m, n) -> (m, n)>, affine_map<(m, n) -> (m)>, affine_map<(m, n) -> (m)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%positive, %sum : tensor<4x?xf32>, tensor<4xf32>) outs(%zeros : tensor<4xf32>) {
+    ^bb0(%value: f32, %scale: f32, %acc: f32):
+      %scaled = arith.mulf %value, %scale : f32
+      %s = arith.addf %scaled, %acc : f32
+      linalg.yield %s : f32
+  } -> tensor<4xf32>
+  return %result : tensor<4xf32>
+}
+
+// -----
+
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree_codegen.target_info = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
+    compute = fp32|int32, storage = b32, subgroup = shuffle,
+    subgroup_size_choices = [16], max_workgroup_sizes = [512, 512, 512],
+    max_thread_count_per_workgroup = 512, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
+}>
+
+// Propagated tile sizes use loop positions, so reductions with distinct
+// iteration spaces must use the general pipeline even with simple combiners.
+// CHECK-DAG: #[[$AXIS_FALLBACK:.+]] = #iree_codegen.translation_info<pipeline = #iree_gpu.spirv_pipeline<BaseDistribute>
+// CHECK-LABEL: func.func @different_reduction_iteration_spaces(
+// CHECK-SAME: translation_info = #[[$AXIS_FALLBACK]]
+func.func @different_reduction_iteration_spaces(%x: tensor<4x?x32xf32>) -> tensor<4xf32>
+    attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  %c1 = arith.constant 1 : index
+  %zero = arith.constant 0.0 : f32
+  %n = tensor.dim %x, %c1 : tensor<4x?x32xf32>
+  %empty = tensor.empty(%n) : tensor<4x?xf32>
+  %zeros = linalg.fill ins(%zero : f32) outs(%empty : tensor<4x?xf32>) -> tensor<4x?xf32>
+  %inner = linalg.generic {
+      indexing_maps = [affine_map<(m, n, k) -> (m, n, k)>, affine_map<(m, n, k) -> (m, n)>],
+      iterator_types = ["parallel", "parallel", "reduction"]}
+      ins(%x : tensor<4x?x32xf32>) outs(%zeros : tensor<4x?xf32>) {
+    ^bb0(%value: f32, %acc: f32):
+      %s = arith.addf %value, %acc : f32
+      linalg.yield %s : f32
+  } -> tensor<4x?xf32>
+  %row = tensor.empty() : tensor<4xf32>
+  %row_zeros = linalg.fill ins(%zero : f32) outs(%row : tensor<4xf32>) -> tensor<4xf32>
+  %result = linalg.generic {
+      indexing_maps = [affine_map<(m, n) -> (m, n)>, affine_map<(m, n) -> (m)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%inner : tensor<4x?xf32>) outs(%row_zeros : tensor<4xf32>) {
+    ^bb0(%value: f32, %acc: f32):
+      %s = arith.addf %value, %acc : f32
+      linalg.yield %s : f32
+  } -> tensor<4xf32>
+  return %result : tensor<4xf32>
+}

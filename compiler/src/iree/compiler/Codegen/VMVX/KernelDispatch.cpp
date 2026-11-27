@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "mlir/IR/Attributes.h"
 
 #define DEBUG_TYPE "vmvx-kernel-dispatch"
@@ -110,13 +111,40 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       getVMVXDefaultTranslationInfo(tilingInterfaceOp.getContext()));
 }
 
+/// Decomposition zeroes the values at masked keys only when all query rows of
+/// a tile share one mask row; otherwise a NaN or Inf value at a masked key
+/// still reaches the output. A mask that varies by query row therefore gets
+/// one query row per workgroup.
+static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                   IREE::LinalgExt::OnlineAttentionOp attnOp) {
+  assert(!getLoweringConfig(attnOp) && "expected lowering_config is not set");
+  SmallVector<int64_t> distTileSizes = getDefaultDistributionTileSizes(attnOp);
+  std::optional<AffineMap> maskMap = attnOp.getMaskMap();
+  FailureOr<IREE::LinalgExt::AttentionOpDetail> opInfo =
+      IREE::LinalgExt::AttentionOpDetail::get(
+          attnOp.getQueryMap(), attnOp.getKeyMap(), attnOp.getValueMap(),
+          attnOp.getOutputMap());
+  if (maskMap && succeeded(opInfo)) {
+    for (int64_t dim : opInfo->getMDims()) {
+      if (distTileSizes[dim] != 0 && maskMap->isFunctionOfDim(dim)) {
+        distTileSizes[dim] = 1;
+      }
+    }
+  }
+  IREE::CPU::LoweringConfigAttr loweringConfig =
+      getLoweringConfigWithDistributionTiles(attnOp.getContext(),
+                                             distTileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, attnOp, loweringConfig,
+      getVMVXDefaultTranslationInfo(attnOp.getContext()));
+}
+
 static LogicalResult
 setVMVXRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op) {
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
-        .Case([&](IREE::LinalgExt::FftOp op) {
-          return setRootConfig(entryPointFn, op);
-        })
+        .Case<IREE::LinalgExt::FftOp, IREE::LinalgExt::OnlineAttentionOp>(
+            [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case(
             [&](TilingInterface op) { return setRootConfig(entryPointFn, op); })
         .Default(success());

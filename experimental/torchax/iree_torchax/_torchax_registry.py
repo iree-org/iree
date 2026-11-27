@@ -25,13 +25,19 @@ import torch
 COMPOSITE = "composite"
 DECOMPOSITION = "decomposition"
 
-_BUILTINS = {}
+_BUILTINS = {"iree.attention": "iree_torchax.torchax_attention"}
 
 
 @functools.cache
 def _builtin_keys():
     """The torch keys reserved by the built-in providers."""
-    return {}
+    return dict.fromkeys(
+        [
+            torch.nn.functional.scaled_dot_product_attention,
+            torch.ops.aten.scaled_dot_product_attention.default,
+        ],
+        "iree.attention",
+    )
 
 
 @dataclasses.dataclass(frozen=True)
