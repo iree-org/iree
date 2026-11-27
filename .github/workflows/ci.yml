@@ -111,7 +111,7 @@ jobs:
           pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
           pip install --require-hashes --only-binary=:all: -r ./core/python/requirements.txt
       - name: ccache
-        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        uses: hendrikmuhs/ccache-action@e91f31892a1d1b8c44424b1a94c0b7f52d337168 # v1.2.26
         with:
           key: ${{ github.job }}-${{ matrix.name }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -151,7 +151,7 @@ jobs:
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        uses: hendrikmuhs/ccache-action@e91f31892a1d1b8c44424b1a94c0b7f52d337168 # v1.2.26
         with:
           key: ${{ github.job }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -197,7 +197,7 @@ jobs:
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        uses: hendrikmuhs/ccache-action@e91f31892a1d1b8c44424b1a94c0b7f52d337168 # v1.2.26
         with:
           key: ${{ github.job }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
@@ -266,7 +266,7 @@ jobs:
       - name: Checkout runtime submodules
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: ccache
-        uses: hendrikmuhs/ccache-action@f09c25b45002a07be2955cbe52e8cee55643f89d # v1.2.24
+        uses: hendrikmuhs/ccache-action@e91f31892a1d1b8c44424b1a94c0b7f52d337168 # v1.2.26
         with:
           key: ${{ github.job }}-${{ matrix.runs-on}}-${{ matrix.provider }}
           save: ${{ needs.setup.outputs.write-caches == 1 }}
