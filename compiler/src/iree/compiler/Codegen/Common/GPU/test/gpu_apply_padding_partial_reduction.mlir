@@ -317,3 +317,59 @@ func.func @reduction_static_incomplete_tile(%arg0: tensor<1x1024xf32>, %arg1: te
    } -> tensor<1xf32>
   return %0 : tensor<1xf32>
 }
+
+// -----
+
+// Rows are read with stride 2, so the padded op reads rows 0, 2 and 4 and
+// leaves row 5 unread; the input must be cropped before it is padded.
+#map = affine_map<(d0, d1) -> (d0 * 2, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+func.func @strided_rows_unread_row(%arg0: tensor<6x5xf32>, %arg1: tensor<3xf32>) -> tensor<3xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1],
+                       iterator_types = ["parallel", "reduction"]}
+                       ins(%arg0 : tensor<6x5xf32>) outs(%arg1 : tensor<3xf32>)
+    attrs =  {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 8]}>}
+    {
+    ^bb0(%in: f32, %out: f32):
+      %1 = arith.addf %in, %out : f32
+      linalg.yield %1 : f32
+    } -> tensor<3xf32>
+  return %0 : tensor<3xf32>
+}
+
+// CHECK-LABEL: func.func @strided_rows_unread_row
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<6x5xf32>
+//       CHECK:   %[[CROPPED:.+]] = tensor.extract_slice %[[ARG0]][0, 0] [5, 5] [1, 1]
+//  CHECK-SAME:     : tensor<6x5xf32> to tensor<5x5xf32>
+//       CHECK:   tensor.pad %[[CROPPED]] low[0, 0] high[0, 3]
+//       CHECK:     : tensor<5x5xf32> to tensor<5x8xf32>
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%{{.+}} : tensor<5x8xf32>)
+
+// -----
+
+// The padded shape of %arg0 cannot be computed for d1 floordiv 16, which reads
+// column 0 on every iteration; the op must be left unpadded.
+#map = affine_map<(d0, d1) -> (d0, d1 floordiv 16)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#map2 = affine_map<(d0, d1) -> (d0)>
+func.func @floordiv_read_not_cropped(%arg0: tensor<3x1xf32>, %arg1: tensor<3x5xf32>, %arg2: tensor<3xf32>) -> tensor<3xf32> {
+  %0 = linalg.generic {indexing_maps = [#map, #map1, #map2],
+                       iterator_types = ["parallel", "reduction"]}
+                       ins(%arg0, %arg1 : tensor<3x1xf32>, tensor<3x5xf32>) outs(%arg2 : tensor<3xf32>)
+    attrs =  {lowering_config = #iree_gpu.lowering_config<{partial_reduction = [0, 8]}>}
+    {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %1 = arith.mulf %in, %in_0 : f32
+      %2 = arith.addf %1, %out : f32
+      linalg.yield %2 : f32
+    } -> tensor<3xf32>
+  return %0 : tensor<3xf32>
+}
+
+// CHECK-LABEL: func.func @floordiv_read_not_cropped
+//  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<3x1xf32>
+//   CHECK-NOT:   tensor.extract_slice
+//   CHECK-NOT:   tensor.pad
+//       CHECK:   linalg.generic
+//  CHECK-SAME:     ins(%[[ARG0]], %{{.+}} : tensor<3x1xf32>, tensor<3x5xf32>)
