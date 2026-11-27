@@ -330,6 +330,13 @@ enum {
   IREE_ELF_DT_VERNEEDNUM = 0x6fffffff,    // d_val
   IREE_ELF_DT_AUXILIARY = 0x7ffffffd,     // d_val
   IREE_ELF_DT_USED = 0x7ffffffe,          // d_val
+
+  // MIPS processor-specific tags (DT_LOPROC range). MIPS has no explicit GOT
+  // relocations; the loader must relocate the GOT itself, and these tags
+  // describe its layout (see iree/hal/local/elf/arch/mips_64.c).
+  IREE_ELF_DT_MIPS_LOCAL_GOTNO = 0x7000000a,  // d_val: # of local GOT entries
+  IREE_ELF_DT_MIPS_SYMTABNO = 0x70000011,     // d_val: # of .dynsym entries
+  IREE_ELF_DT_MIPS_GOTSYM = 0x70000013,       // d_val: first global GOT symbol
 };
 
 typedef struct {

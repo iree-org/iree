@@ -148,7 +148,7 @@ endmacro()
 # Hard-code various LLVM CMake options needed for an in-tree bundled build.
 macro(iree_llvm_set_bundled_cmake_options)
   # When enabling an IREE CPU backend, automatically enable these targets.
-  set(IREE_DEFAULT_CPU_LLVM_TARGETS "X86;ARM;AArch64;RISCV"
+  set(IREE_DEFAULT_CPU_LLVM_TARGETS "X86;ARM;AArch64;RISCV;Mips"
       CACHE STRING "Initialization value for default LLVM CPU targets.")
 
   # Catch an incorrect usage pattern that has been used in the past.

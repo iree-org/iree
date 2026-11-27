@@ -103,6 +103,7 @@ bitcode_generic_archs = [
     "arm_32",
     "riscv_64",
     "riscv_32",
+    "mips_64",
 ]
 
 # Enumerate all archs for which we have arch-specific dedicated ukernel code,

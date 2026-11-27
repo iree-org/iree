@@ -227,6 +227,26 @@ iree_bitcode_library(
     "unpack_tile.c"
 )
 
+iree_bitcode_library(
+  NAME
+    ukernel_bitcode_generic_mips_64
+  ARCH
+    mips_64
+  INTERNAL_HDRS
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "internal_headers_filegroup.stamp"
+  SRCS
+    "conv_nchwc.c"
+    "conv_nchwc_tile_generic.c"
+    "fallback.c"
+    "mmt4d.c"
+    "mmt4d_tile_generic.c"
+    "pack.c"
+    "pack_tile.c"
+    "unpack.c"
+    "unpack_tile.c"
+)
+
 iree_link_bitcode(
   NAME
     ukernel_bitcode_x86_64
@@ -270,12 +290,21 @@ iree_link_bitcode(
 
 )
 
+iree_link_bitcode(
+  NAME
+    ukernel_bitcode_mips_64
+  SRCS
+    "ukernel_bitcode_generic_mips_64.bc"
+
+)
+
 iree_c_embed_data(
   NAME
     embed_ukernel_bitcode
   SRCS
     "ukernel_bitcode_arm_32.bc"
     "ukernel_bitcode_arm_64.bc"
+    "ukernel_bitcode_mips_64.bc"
     "ukernel_bitcode_riscv_32.bc"
     "ukernel_bitcode_riscv_64.bc"
     "ukernel_bitcode_x86_64.bc"

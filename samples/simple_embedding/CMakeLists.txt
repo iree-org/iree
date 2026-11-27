@@ -60,6 +60,7 @@ iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_ARM_32 "arm_32")
 iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_ARM_64 "arm_64")
 iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_RISCV_32 "riscv_32")
 iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_RISCV_64 "riscv_64")
+iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_MIPS_64 "mips_64")
 iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_X86_64 "x86_64")
 if(IREE_HAL_DRIVER_LOCAL_SYNC AND
    IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF AND
@@ -68,6 +69,7 @@ if(IREE_HAL_DRIVER_LOCAL_SYNC AND
     _IREE_COMPILER_TARGETING_ARM_64 AND
     _IREE_COMPILER_TARGETING_RISCV_32 AND
     _IREE_COMPILER_TARGETING_RISCV_64 AND
+    _IREE_COMPILER_TARGETING_MIPS_64 AND
     _IREE_COMPILER_TARGETING_X86_64) OR IREE_HOST_BIN_DIR))
 
 iree_cc_binary(
@@ -78,6 +80,7 @@ iree_cc_binary(
     "simple_embedding.c"
   DEPS
     ::simple_embedding_test_bytecode_module_cpu_arm_64_c
+    ::simple_embedding_test_bytecode_module_cpu_mips_64_c
     ::simple_embedding_test_bytecode_module_cpu_riscv_32_c
     ::simple_embedding_test_bytecode_module_cpu_riscv_64_c
     ::simple_embedding_test_bytecode_module_cpu_x86_64_c
@@ -152,6 +155,25 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME
+    simple_embedding_test_bytecode_module_cpu_mips_64
+  SRC
+    "simple_embedding_test.mlir"
+  C_IDENTIFIER
+    "iree_samples_simple_embedding_test_module_cpu_mips_64"
+  FLAGS
+    "--iree-hal-target-device=local"
+    "--iree-hal-local-target-device-backends=llvm-cpu"
+    "--iree-llvmcpu-target-triple=mips64el-linux-gnuabi64"
+    "--iree-llvmcpu-target-cpu=i6400"
+    "--iree-llvmcpu-target-cpu-features=+msa"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-vm-bytecode-module-strip-source-map=true"
+    "--iree-vm-emit-polyglot-zip=false"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
     simple_embedding_test_bytecode_module_cpu_arm_64
   SRC
     "simple_embedding_test.mlir"
@@ -185,6 +207,7 @@ iree_cc_binary(
     "simple_embedding.c"
   DEPS
     ::simple_embedding_test_bytecode_module_cpu_arm_64_c
+    ::simple_embedding_test_bytecode_module_cpu_mips_64_c
     ::simple_embedding_test_bytecode_module_cpu_riscv_32_c
     ::simple_embedding_test_bytecode_module_cpu_riscv_64_c
     ::simple_embedding_test_bytecode_module_cpu_x86_64_c

@@ -121,6 +121,7 @@ llvm_configure(
         "AArch64",
         "AMDGPU",
         "ARM",
+        "Mips",
         "NVPTX",
         "RISCV",
         "SPIRV",

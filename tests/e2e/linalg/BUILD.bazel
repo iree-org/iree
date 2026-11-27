@@ -18,6 +18,18 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# Data-tiling pack/unpack with wide (i32) inner tiles vectorize to vectors far
+# larger than a scalar target without SIMD can lower (generic MIPS has
+# native_vector_size=4), so iree-compile rejects them ("large vector sizes").
+# Split out and labelled nomips; efficient support is the motivation for MSA
+# vectorization (future work). pack_i8 stays in LLVM_SRCS - its narrower tiles
+# fit.
+DATATILING_SRCS = [
+    "pack.mlir",
+    "pack_dynamic_inner_tiles.mlir",
+    "unpack.mlir",
+]
+
 LLVM_SRCS = enforce_glob(
     # keep sorted
     [
@@ -28,20 +40,17 @@ LLVM_SRCS = enforce_glob(
         "fp_to_subbyte.mlir",
         "gather_like_ops.mlir",
         "narrow_n_matmuls.mlir",
-        "pack.mlir",
-        "pack_dynamic_inner_tiles.mlir",
         "pack_i8.mlir",
         "small_float_arith.mlir",
         "softmax.mlir",
         "subbyte_to_fp.mlir",
-        "unpack.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
         "argmax.mlir",
         "index.mlir",
         "large_linalg_matmul.mlir",
-    ],
+    ] + DATATILING_SRCS,
 )
 
 iree_check_single_backend_test_suite(
@@ -91,6 +100,18 @@ iree_check_single_backend_test_suite(
     driver = "local-task",
     tags = [
         # subbyte support for wasm is not on priorities.
+        "nowasm",
+    ],
+    target_backend = "llvm-cpu",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_datatiling_local-task",
+    srcs = DATATILING_SRCS,
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
+    driver = "local-task",
+    tags = [
+        "nomips",
         "nowasm",
     ],
     target_backend = "llvm-cpu",

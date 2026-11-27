@@ -350,7 +350,12 @@ getNativeVectorSizeInBytes(mlir::FunctionOpInterface entryPointFn) {
 /// fallback.
 static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
                              unsigned byteWidth) {
-  return getNativeVectorSizeInBytes(entryPointFn) / byteWidth;
+  // Clamp to at least 1: on targets whose native vector is narrower than a
+  // single element (e.g. scalar MIPS has a 4-byte native vector, too small for
+  // an f64/i64), the raw division would be 0 and later divide-by-zero in the
+  // tile-size math. Returning 1 matches the documented fallback (scalar).
+  return std::max<int64_t>(1, getNativeVectorSizeInBytes(entryPointFn) /
+                                  byteWidth);
 }
 static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
                              ShapedType shapedType) {
@@ -871,6 +876,9 @@ static int getRegisterSpaceBitsIfKnown(IREE::HAL::ExecutableTargetAttr target) {
   } else if (isAArch64(targetConfig)) {
     // 32 NEON/SVE registers (at least 128-bit each, returns the base size for
     // SVE).
+    return 32 * 128;
+  } else if (isMIPS(targetConfig) && hasFeature(targetConfig, "+msa")) {
+    // 32 MSA vector registers (w0-w31), 128-bit each.
     return 32 * 128;
   } else {
     // Don't know register space size as a compile-time constant on other
@@ -1523,6 +1531,14 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
       getMatmulRISCVVectorSizes(entryPointFn, op, vectorSize, matmulTileSizes,
                                 matmulScalableFlags);
     }
+  }
+
+  if (targetAttr && isMIPS(targetAttr.getConfiguration()) &&
+      hasFeature(targetAttr.getConfiguration(), "+msa")) {
+    // MSA is fixed-width 128-bit; maximize vector register utilization the same
+    // way AArch64 NEON does (honors native_vector_size=16 set for +msa).
+    getMatmulVectorSizesUsingFillRegisterFileHeuristic(
+        entryPointFn, op, vectorSize, matmulTileSizes, matmulScalableFlags);
   }
 
   // If tile sizes were not computed by previous heuristics, use default
@@ -2952,6 +2968,11 @@ getNhwcConvVectorSizes(mlir::FunctionOpInterface entryPointFn,
       }
       llvm_unreachable("unsupported conv");
     }
+    // MIPS deliberately has no conv branch here: the AArch64 conv tiles
+    // vectorize the reduction (input-channel) dimension, which the MSA backend
+    // lowers far less efficiently than NEON (measured ~7x more executed
+    // instructions, worse than scalar). The default tiling below is a better
+    // fit on MSA. The matmul tiling above is unaffected and stays.
   }
 
   // Get default hard-coded tile sizes if we couldn't compute anything

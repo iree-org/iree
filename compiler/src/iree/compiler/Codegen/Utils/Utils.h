@@ -128,6 +128,7 @@ bool isRISCV(DictionaryAttr targetConfig);
 bool isRISCV32(DictionaryAttr targetConfig);
 bool isRISCV64(DictionaryAttr targetConfig);
 bool isWasm(DictionaryAttr targetConfig);
+bool isMIPS(DictionaryAttr targetConfig);
 
 /// Get maximum workgroup count in [x, y, z] for target attribute if it is
 /// available. Returns ShapedType::kDynamic if it is unknown.

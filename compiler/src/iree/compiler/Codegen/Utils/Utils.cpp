@@ -198,6 +198,9 @@ const char *getIreeArchNameForTargetTriple(llvm::Triple triple) {
   if (triple.isRISCV32()) {
     return "riscv_32";
   }
+  if (triple.isMIPS64()) {
+    return "mips_64";
+  }
   return "unknown";
 }
 
@@ -365,6 +368,11 @@ bool isRISCV64(DictionaryAttr targetConfig) {
 bool isWasm(DictionaryAttr targetConfig) {
   std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
   return triple && triple.value().isWasm();
+}
+
+bool isMIPS(DictionaryAttr targetConfig) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetConfig);
+  return triple && triple.value().isMIPS();
 }
 
 std::array<int64_t, 3> getMaxWorkgroupCount(DictionaryAttr targetConfig) {

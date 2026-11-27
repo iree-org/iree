@@ -111,6 +111,13 @@ resolveCPUFeaturesForCPU(const llvm::Triple &triple, std::string &cpu,
     for (const auto &feature : features) {
       targetCpuFeatures.AddFeature(feature);
     }
+  } else if (triple.isMIPS()) {
+    // LLVM's TargetParser exposes no CPU->features mapping for MIPS (unlike
+    // x86/RISC-V/AArch64 above), and IREE's MIPS flow always passes the needed
+    // features explicitly (e.g. cpu_features="+msa"). Trust those explicit
+    // features and return without warning about the missing mapping. The CPU
+    // name still selects the scheduling model in the target machine.
+    return ResolveCPUAndCPUFeaturesStatus::OK;
   } else {
     return ResolveCPUAndCPUFeaturesStatus::UnimplementedMapping;
   }

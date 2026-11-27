@@ -21,13 +21,10 @@ iree_check_single_backend_test_suite(
     "fp_to_subbyte.mlir"
     "gather_like_ops.mlir"
     "narrow_n_matmuls.mlir"
-    "pack.mlir"
-    "pack_dynamic_inner_tiles.mlir"
     "pack_i8.mlir"
     "small_float_arith.mlir"
     "softmax.mlir"
     "subbyte_to_fp.mlir"
-    "unpack.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
@@ -71,6 +68,24 @@ iree_check_single_backend_test_suite(
     "--iree-opt-experimental-early-data-tiling"
     "--iree-llvmcpu-target-cpu=generic"
   LABELS
+    "nowasm"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_datatiling_local-task
+  SRCS
+    "pack.mlir"
+    "pack_dynamic_inner_tiles.mlir"
+    "unpack.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
+  LABELS
+    "nomips"
     "nowasm"
 )
 

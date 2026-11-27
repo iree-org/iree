@@ -12,6 +12,13 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# The winograd input transform vectorizes beyond the scalar MIPS target's
+# vector width ("large vector sizes"); no SIMD on generic MIPS (MSA future
+# work). Split out and labelled nomips. winograd_output below lowers fine.
+WINOGRAD_INPUT_SRCS = [
+    "winograd_input.mlir",
+]
+
 ALL_SRCS = enforce_glob(
     # keep sorted
     [
@@ -27,14 +34,13 @@ ALL_SRCS = enforce_glob(
         "sort.mlir",
         "top-k.mlir",
         "topk_v2.mlir",
-        "winograd_input.mlir",
         "winograd_output.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
         "grouped_matmul.mlir",
         "scan_configured.mlir",
-    ],
+    ] + WINOGRAD_INPUT_SRCS,
 )
 
 iree_check_single_backend_test_suite(
@@ -56,6 +62,18 @@ iree_check_single_backend_test_suite(
     tags = [
         # attention fails with a wasm target, just disable all tests there for now
         #   error: Yield operand #2 is not equivalent to the corresponding iter bbArg
+        "nowasm",
+    ],
+    target_backend = "llvm-cpu",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_llvm-cpu_winograd_input_local-task",
+    srcs = WINOGRAD_INPUT_SRCS,
+    compiler_flags = ["--iree-llvmcpu-target-cpu=generic"],
+    driver = "local-task",
+    tags = [
+        "nomips",
         "nowasm",
     ],
     target_backend = "llvm-cpu",

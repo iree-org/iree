@@ -426,6 +426,16 @@ void LLVMTarget::populateDefaultsFromTargetMachine() {
     auto targetMachine = getTargetMachine();
     auto targetFeatures = targetMachine->getTargetFeatureString();
 
+    // MipsTTIImpl has no getRegisterBitWidth override and always reports a
+    // fixed 32-bit (scalar) width regardless of +msa, so the TTI query below
+    // would yield native_vector_size=4. Force 128-bit (16-byte) MSA vectors
+    // when the MSA ASE is enabled, mirroring the RISCV +v / avx512
+    // special-cases.
+    if (llvm::Triple(getTriple()).isMIPS() && targetFeatures.contains("+msa")) {
+      vectorWidthInBytes = 16;
+      return;
+    }
+
     // The only way to get the real TTI is to create a function using it.
     // LLVM's TargetMachine and related APIs are terrible. Absolutely yuck.
     // Note that we use the data layout set above to either what the user
@@ -501,6 +511,7 @@ static void initializeLLVMTargets() {
 // to the build file or you will get undefined symbol errors at link time.
 #define LLVM_INITIALIZE_TARGET_AArch64() LLVM_INITIALIZE_GENERIC(AArch64)
 #define LLVM_INITIALIZE_TARGET_ARM() LLVM_INITIALIZE_GENERIC(ARM)
+#define LLVM_INITIALIZE_TARGET_Mips() LLVM_INITIALIZE_GENERIC(Mips)
 #define LLVM_INITIALIZE_TARGET_RISCV() LLVM_INITIALIZE_GENERIC(RISCV)
 #define LLVM_INITIALIZE_TARGET_X86() LLVM_INITIALIZE_GENERIC(X86)
 #define LLVM_INITIALIZE_TARGET_WebAssembly()                                   \
@@ -515,7 +526,6 @@ static void initializeLLVMTargets() {
 #define LLVM_INITIALIZE_TARGET_Hexagon()
 #define LLVM_INITIALIZE_TARGET_Lanai()
 #define LLVM_INITIALIZE_TARGET_LoongArch()
-#define LLVM_INITIALIZE_TARGET_Mips()
 #define LLVM_INITIALIZE_TARGET_MSP430()
 #define LLVM_INITIALIZE_TARGET_NVPTX()
 #define LLVM_INITIALIZE_TARGET_PowerPC()

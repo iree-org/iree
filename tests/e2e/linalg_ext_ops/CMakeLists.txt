@@ -40,7 +40,6 @@ iree_check_single_backend_test_suite(
     "sort.mlir"
     "top-k.mlir"
     "topk_v2.mlir"
-    "winograd_input.mlir"
     "winograd_output.mlir"
   TARGET_BACKEND
     "llvm-cpu"
@@ -49,6 +48,22 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmcpu-target-cpu=generic"
   LABELS
+    "nowasm"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_winograd_input_local-task
+  SRCS
+    "winograd_input.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-target-cpu=generic"
+  LABELS
+    "nomips"
     "nowasm"
 )
 

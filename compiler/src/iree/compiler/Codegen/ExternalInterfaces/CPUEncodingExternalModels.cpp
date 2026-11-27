@@ -1364,6 +1364,40 @@ enumerateMatmulTileRiscv64(TypeRange elementTypes, DictionaryAttr config) {
   return {};
 }
 
+// Enumerate data-tiling (mmt4d) inner tile sizes to choose from on MIPS with
+// MSA. MSA is a fixed-width 128-bit SIMD ISA with 32 vector registers
+// (w0-w31), structurally like AArch64 NEON, so the NEON fp tile shapes port
+// directly. Only the f32 (and f16/bf16-accumulating-in-f32) case is tuned for
+// now; integer matmul has no MSA dot-product instruction, so it is left to the
+// generic fallback. Callers gate this on the "+msa" feature being present.
+static SmallVector<TileMxNxK> enumerateMatmulTileMips(TypeRange elementTypes,
+                                                      DictionaryAttr config) {
+  assert(elementTypes.size() == 3);
+  Type lhs = elementTypes[0];
+  Type rhs = elementTypes[1];
+  Type out = elementTypes[2];
+
+  if ((out.isF32() || out.isF16() || out.isBF16()) && isa<FloatType>(lhs) &&
+      isa<FloatType>(rhs)) {
+    // N=8 is two 128-bit MSA registers wide (4 f32 lanes each); the 8x8
+    // accumulator occupies 16 of the 32 MSA registers, leaving headroom for the
+    // A/B operands (no spilling). Empirically the best of the tiles swept for
+    // square f32 matmul: larger M0/N0 (24-32 acc registers) spill and regress,
+    // an N0 that does not divide the problem (e.g. 12) is far worse, and K0=2
+    // adds operand pressure with no gain. Truncations of the base M tile cover
+    // the narrow-M cases.
+    return {
+        TileMxNxK{8, 8, 1},
+        TileMxNxK{4, 8, 1},
+        TileMxNxK{2, 8, 1},
+        TileMxNxK{1, 8, 1},
+    };
+  }
+
+  // No MSA-optimized tile for this type combination.
+  return {};
+}
+
 // Enumerate tile sizes to choose from on arm64.
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
@@ -1603,6 +1637,11 @@ enumerateCPUMatmulTiles(IREE::Encoding::EncodingAttr encoding,
   }
   if (isRISCV64(config)) {
     return enumerateMatmulTileRiscv64(elementTypes, config);
+  }
+  // Gate MIPS on MSA: without it the scalar (r2) target cannot lower 128-bit
+  // data-tiled vectors, so it must keep falling back to no tiling.
+  if (isMIPS(config) && hasFeature(config, "+msa")) {
+    return enumerateMatmulTileMips(elementTypes, config);
   }
   return {};
 }

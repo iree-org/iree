@@ -109,6 +109,14 @@ jobs:
     with:
       write-caches: ${{ needs.setup.outputs.write-caches }}
 
+  test_mips64r6:
+    name: Test MIPS64 r6
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_mips64r6')
+    uses: $/.github/workflows/pkgci_test_mips64r6.yml
+    with:
+      write-caches: ${{ needs.setup.outputs.write-caches }}
+
   ################################# Frameworks ################################
   # Jobs that test machine learning frameworks or their Python APIs
   #############################################################################
