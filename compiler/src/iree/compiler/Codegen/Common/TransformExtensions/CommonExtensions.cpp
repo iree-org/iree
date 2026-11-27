@@ -1127,6 +1127,7 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   IREE::VectorExt::populateNestedLayoutDistributionPatterns(
       patterns, laneId, subgroupSize, workgroupSize);
   populateMapDistributeGenericPatterns(patterns, laneId);
+  populateMapDistributeMemoryPatterns(patterns, laneId);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultDefiniteFailure(target);
   }

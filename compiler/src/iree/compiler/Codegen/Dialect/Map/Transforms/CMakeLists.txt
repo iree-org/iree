@@ -18,6 +18,7 @@ iree_cc_library(
     "MapPatterns.h"
   SRCS
     "MapDistributeGenericOps.cpp"
+    "MapDistributeMemoryOps.cpp"
     "MapDistributionUtils.cpp"
   DEPS
     LLVMSupport
