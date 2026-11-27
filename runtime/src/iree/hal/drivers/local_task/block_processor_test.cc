@@ -11,12 +11,109 @@
 
 #include "iree/base/threading/thread.h"
 #include "iree/hal/drivers/local_task/block_builder.h"
+#include "iree/hal/drivers/local_task/block_command_buffer.h"
 #include "iree/hal/drivers/local_task/block_isa.h"
+#include "iree/hal/drivers/local_task/task_queue.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
 namespace {
+
+struct CountingBuffer {
+  iree_hal_buffer_t base;
+  alignas(64) uint8_t storage[256] = {};
+  iree_atomic_int32_t map_count = IREE_ATOMIC_VAR_INIT(0);
+  iree_atomic_int32_t last_map_access = IREE_ATOMIC_VAR_INIT(0);
+  iree_atomic_int32_t unmap_count = IREE_ATOMIC_VAR_INIT(0);
+  iree_atomic_int32_t flush_count = IREE_ATOMIC_VAR_INIT(0);
+  iree_atomic_int32_t invalidate_count = IREE_ATOMIC_VAR_INIT(0);
+  iree_atomic_int64_t flush_offset = IREE_ATOMIC_VAR_INIT(0);
+  iree_atomic_int64_t flush_length = IREE_ATOMIC_VAR_INIT(0);
+  iree_atomic_int64_t invalidate_offset = IREE_ATOMIC_VAR_INIT(0);
+  iree_atomic_int64_t invalidate_length = IREE_ATOMIC_VAR_INIT(0);
+  bool mutate_on_flush = false;
+  uint8_t observed_before_flush = 0;
+};
+
+static void IREE_API_PTR
+counting_buffer_destroy(iree_hal_buffer_t* /*buffer*/) {}
+
+static iree_status_t IREE_API_PTR counting_buffer_map_range(
+    iree_hal_buffer_t* base_buffer, iree_hal_mapping_mode_t /*mapping_mode*/,
+    iree_hal_memory_access_t memory_access, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length, iree_hal_buffer_mapping_t* mapping) {
+  auto* buffer = reinterpret_cast<CountingBuffer*>(base_buffer);
+  iree_atomic_fetch_add(&buffer->map_count, 1, iree_memory_order_relaxed);
+  iree_atomic_store(&buffer->last_map_access, memory_access,
+                    iree_memory_order_relaxed);
+  mapping->contents =
+      iree_make_byte_span(buffer->storage + byte_offset, byte_length);
+  return iree_ok_status();
+}
+
+static iree_status_t IREE_API_PTR counting_buffer_unmap_range(
+    iree_hal_buffer_t* base_buffer, iree_device_size_t /*byte_offset*/,
+    iree_device_size_t /*byte_length*/,
+    iree_hal_buffer_mapping_t* /*mapping*/) {
+  auto* buffer = reinterpret_cast<CountingBuffer*>(base_buffer);
+  iree_atomic_fetch_add(&buffer->unmap_count, 1, iree_memory_order_relaxed);
+  return iree_ok_status();
+}
+
+static iree_status_t IREE_API_PTR counting_buffer_flush_range(
+    iree_hal_buffer_t* base_buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length) {
+  auto* buffer = reinterpret_cast<CountingBuffer*>(base_buffer);
+  iree_atomic_fetch_add(&buffer->flush_count, 1, iree_memory_order_relaxed);
+  iree_atomic_store(&buffer->flush_offset, byte_offset,
+                    iree_memory_order_relaxed);
+  iree_atomic_store(&buffer->flush_length, byte_length,
+                    iree_memory_order_relaxed);
+  if (buffer->mutate_on_flush) {
+    buffer->observed_before_flush = buffer->storage[0];
+    buffer->storage[0] = 0x22;
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t IREE_API_PTR counting_buffer_invalidate_range(
+    iree_hal_buffer_t* base_buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length) {
+  auto* buffer = reinterpret_cast<CountingBuffer*>(base_buffer);
+  iree_atomic_fetch_add(&buffer->invalidate_count, 1,
+                        iree_memory_order_relaxed);
+  iree_atomic_store(&buffer->invalidate_offset, byte_offset,
+                    iree_memory_order_relaxed);
+  iree_atomic_store(&buffer->invalidate_length, byte_length,
+                    iree_memory_order_relaxed);
+  return iree_ok_status();
+}
+
+static const iree_hal_buffer_vtable_t kCountingBufferVTable = {
+    /*.recycle=*/iree_hal_buffer_recycle,
+    /*.destroy=*/counting_buffer_destroy,
+    /*.map_range=*/counting_buffer_map_range,
+    /*.unmap_range=*/counting_buffer_unmap_range,
+    /*.invalidate_range=*/counting_buffer_invalidate_range,
+    /*.flush_range=*/counting_buffer_flush_range,
+};
+
+static void counting_buffer_initialize(
+    CountingBuffer* buffer,
+    iree_hal_memory_access_t allowed_access = IREE_HAL_MEMORY_ACCESS_READ |
+                                              IREE_HAL_MEMORY_ACCESS_WRITE) {
+  iree_hal_buffer_initialize(
+      /*placement=*/{}, /*allocated_buffer=*/&buffer->base,
+      /*allocation_size=*/sizeof(buffer->storage), /*byte_offset=*/0,
+      /*byte_length=*/sizeof(buffer->storage),
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+      allowed_access,
+      IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED |
+          IREE_HAL_BUFFER_USAGE_MAPPING_PERSISTENT |
+          IREE_HAL_BUFFER_USAGE_TRANSFER,
+      &kCountingBufferVTable, &buffer->base);
+}
 
 //===----------------------------------------------------------------------===//
 // Worker thread entry
@@ -156,6 +253,16 @@ class BlockProcessorTest : public ::testing::TestWithParam<uint32_t> {
   void TearDown() override { iree_arena_block_pool_deinitialize(&block_pool_); }
 
   uint32_t worker_count() const { return GetParam(); }
+
+  iree_status_t create_command_buffer(
+      iree_hal_command_buffer_t** out_command_buffer,
+      iree_host_size_t binding_capacity = 1) {
+    return iree_hal_block_command_buffer_create(
+        /*device_allocator=*/nullptr, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+        IREE_HAL_COMMAND_CATEGORY_TRANSFER, IREE_HAL_QUEUE_AFFINITY_ANY,
+        binding_capacity, &block_pool_, iree_allocator_system(),
+        out_command_buffer);
+  }
 
   // Records a dispatch with the given kernel, workgroup count, and bindings.
   // Uses indirect fixups (binding table) for simplicity.
@@ -1290,6 +1397,232 @@ TEST_P(BlockProcessorTest, NarrowToWideTransition) {
 
   iree_hal_cmd_block_recording_release(&recording);
   iree_hal_cmd_block_builder_deinitialize(&builder);
+}
+
+TEST_P(BlockProcessorTest, DirectCacheCommandsExecuteOnce) {
+  CountingBuffer buffer = {};
+  counting_buffer_initialize(&buffer);
+  iree_hal_command_buffer_t* command_buffer = nullptr;
+  IREE_ASSERT_OK(create_command_buffer(&command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_flush_buffer(
+      command_buffer, iree_hal_make_buffer_ref(&buffer.base, 37, 59)));
+  IREE_ASSERT_OK(iree_hal_command_buffer_invalidate_buffer(
+      command_buffer, iree_hal_make_buffer_ref(&buffer.base, 41, 61)));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  EXPECT_EQ(iree_atomic_load(&buffer.map_count, iree_memory_order_relaxed), 0);
+  IREE_ASSERT_OK(execute(
+      iree_hal_block_command_buffer_recording(command_buffer), nullptr, 0));
+  EXPECT_EQ(iree_atomic_load(&buffer.map_count, iree_memory_order_relaxed), 2);
+  EXPECT_EQ(iree_atomic_load(&buffer.unmap_count, iree_memory_order_relaxed),
+            2);
+  EXPECT_EQ(iree_atomic_load(&buffer.flush_count, iree_memory_order_relaxed),
+            1);
+  EXPECT_EQ(
+      iree_atomic_load(&buffer.invalidate_count, iree_memory_order_relaxed), 1);
+  EXPECT_EQ(iree_atomic_load(&buffer.flush_offset, iree_memory_order_relaxed),
+            37);
+  EXPECT_EQ(iree_atomic_load(&buffer.flush_length, iree_memory_order_relaxed),
+            59);
+  EXPECT_EQ(
+      iree_atomic_load(&buffer.invalidate_offset, iree_memory_order_relaxed),
+      41);
+  EXPECT_EQ(
+      iree_atomic_load(&buffer.invalidate_length, iree_memory_order_relaxed),
+      61);
+
+  iree_hal_command_buffer_release(command_buffer);
+  iree_hal_buffer_release(&buffer.base);
+}
+
+TEST_P(BlockProcessorTest, CacheBindingAccessIsPerSlot) {
+  iree_hal_command_buffer_t* command_buffer = nullptr;
+  IREE_ASSERT_OK(
+      create_command_buffer(&command_buffer, /*binding_capacity=*/4));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  const uint8_t pattern = 0x12;
+  IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
+      command_buffer, iree_hal_make_indirect_buffer_ref(0, 0, 8), &pattern,
+      sizeof(pattern), IREE_HAL_FILL_FLAG_NONE));
+  IREE_ASSERT_OK(iree_hal_command_buffer_flush_buffer(
+      command_buffer, iree_hal_make_indirect_buffer_ref(1, 0, 8)));
+  IREE_ASSERT_OK(iree_hal_command_buffer_invalidate_buffer(
+      command_buffer, iree_hal_make_indirect_buffer_ref(2, 0, 8)));
+  IREE_ASSERT_OK(iree_hal_command_buffer_flush_buffer(
+      command_buffer, iree_hal_make_indirect_buffer_ref(3, 0, 8)));
+  IREE_ASSERT_OK(iree_hal_command_buffer_invalidate_buffer(
+      command_buffer, iree_hal_make_indirect_buffer_ref(3, 0, 8)));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  const iree_hal_memory_access_t expected_access[] = {
+      IREE_HAL_MEMORY_ACCESS_NONE, IREE_HAL_MEMORY_ACCESS_WRITE,
+      IREE_HAL_MEMORY_ACCESS_READ,
+      IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE};
+  CountingBuffer buffer = {};
+  counting_buffer_initialize(&buffer);
+  for (iree_host_size_t slot = 0; slot < IREE_ARRAYSIZE(expected_access);
+       ++slot) {
+    const iree_hal_memory_access_t cache_access =
+        iree_hal_block_command_buffer_cache_binding_access(command_buffer,
+                                                           slot);
+    EXPECT_EQ(cache_access, expected_access[slot]);
+    const iree_hal_buffer_binding_t binding = {&buffer.base, 0, 32};
+    iree_hal_buffer_mapping_t mapping = {};
+    iree_hal_cmd_binding_entry_t entry = {};
+    IREE_ASSERT_OK(iree_hal_task_queue_resolve_binding_entry(
+        &binding, cache_access, &mapping, &entry));
+    EXPECT_EQ(
+        iree_atomic_load(&buffer.last_map_access, iree_memory_order_relaxed),
+        IREE_HAL_MEMORY_ACCESS_ANY | expected_access[slot]);
+    EXPECT_EQ(entry.mapping, &mapping);
+    IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
+  }
+
+  iree_hal_command_buffer_release(command_buffer);
+  iree_hal_buffer_release(&buffer.base);
+}
+
+TEST_P(BlockProcessorTest, CacheBindingAccessIsValidatedBeforeMapping) {
+  CountingBuffer read_only = {};
+  CountingBuffer write_only = {};
+  counting_buffer_initialize(&read_only, IREE_HAL_MEMORY_ACCESS_READ);
+  counting_buffer_initialize(&write_only, IREE_HAL_MEMORY_ACCESS_WRITE);
+  const iree_hal_buffer_binding_t bindings[] = {{&read_only.base, 0, 32},
+                                                {&write_only.base, 0, 32}};
+  const iree_hal_memory_access_t required_access[] = {
+      IREE_HAL_MEMORY_ACCESS_WRITE, IREE_HAL_MEMORY_ACCESS_READ};
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(bindings); ++i) {
+    iree_hal_buffer_mapping_t mapping = {};
+    iree_hal_cmd_binding_entry_t entry = {};
+    iree_status_t status = iree_hal_task_queue_resolve_binding_entry(
+        &bindings[i], required_access[i], &mapping, &entry);
+    EXPECT_EQ(iree_status_code(status), IREE_STATUS_PERMISSION_DENIED);
+    iree_status_ignore(status);
+  }
+  EXPECT_EQ(iree_atomic_load(&read_only.map_count, iree_memory_order_relaxed),
+            0);
+  EXPECT_EQ(iree_atomic_load(&write_only.map_count, iree_memory_order_relaxed),
+            0);
+  iree_hal_buffer_release(&read_only.base);
+  iree_hal_buffer_release(&write_only.base);
+}
+
+TEST_P(BlockProcessorTest, IndirectCacheCommandsUseSubmittedMapping) {
+  CountingBuffer buffer = {};
+  counting_buffer_initialize(&buffer);
+  iree_hal_buffer_mapping_t mapping;
+  // The mapped span deliberately exceeds the logical binding length.
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(
+      &buffer.base, IREE_HAL_MAPPING_MODE_SCOPED,
+      IREE_HAL_MEMORY_ACCESS_ANY | IREE_HAL_MEMORY_ACCESS_READ |
+          IREE_HAL_MEMORY_ACCESS_WRITE,
+      /*byte_offset=*/20, /*byte_length=*/100, &mapping));
+  iree_hal_cmd_binding_entry_t entry = {
+      mapping.contents.data, mapping.contents.data_length, &mapping, 40};
+
+  iree_hal_command_buffer_t* command_buffer = nullptr;
+  IREE_ASSERT_OK(create_command_buffer(&command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
+  IREE_ASSERT_OK(iree_hal_command_buffer_flush_buffer(
+      command_buffer,
+      iree_hal_make_indirect_buffer_ref(0, 7, IREE_HAL_WHOLE_BUFFER)));
+  IREE_ASSERT_OK(iree_hal_command_buffer_invalidate_buffer(
+      command_buffer, iree_hal_make_indirect_buffer_ref(0, 9, 13)));
+  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+
+  IREE_ASSERT_OK(execute(
+      iree_hal_block_command_buffer_recording(command_buffer), &entry, 1));
+  EXPECT_EQ(iree_atomic_load(&buffer.map_count, iree_memory_order_relaxed), 1);
+  EXPECT_EQ(iree_atomic_load(&buffer.unmap_count, iree_memory_order_relaxed),
+            0);
+  EXPECT_EQ(iree_atomic_load(&buffer.flush_count, iree_memory_order_relaxed),
+            1);
+  EXPECT_EQ(
+      iree_atomic_load(&buffer.invalidate_count, iree_memory_order_relaxed), 1);
+  EXPECT_EQ(iree_atomic_load(&buffer.flush_offset, iree_memory_order_relaxed),
+            27);
+  EXPECT_EQ(iree_atomic_load(&buffer.flush_length, iree_memory_order_relaxed),
+            33);
+  EXPECT_EQ(
+      iree_atomic_load(&buffer.invalidate_offset, iree_memory_order_relaxed),
+      29);
+  EXPECT_EQ(
+      iree_atomic_load(&buffer.invalidate_length, iree_memory_order_relaxed),
+      13);
+  IREE_ASSERT_OK(iree_hal_buffer_unmap_range(&mapping));
+  EXPECT_EQ(iree_atomic_load(&buffer.unmap_count, iree_memory_order_relaxed),
+            1);
+
+  iree_hal_command_buffer_release(command_buffer);
+  iree_hal_buffer_release(&buffer.base);
+}
+
+TEST_P(BlockProcessorTest, BarriersOrderCacheMaintenance) {
+  CountingBuffer buffer = {};
+  counting_buffer_initialize(&buffer);
+  buffer.mutate_on_flush = true;
+  uint8_t output = 0;
+
+  iree_hal_cmd_block_builder_t builder;
+  iree_hal_cmd_block_builder_initialize(&block_pool_, &builder);
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_begin(&builder));
+
+  iree_hal_cmd_fill_t* fill = nullptr;
+  iree_hal_cmd_fixup_t* fill_fixup = nullptr;
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_append_cmd(
+      &builder, IREE_HAL_CMD_FILL, IREE_HAL_CMD_FLAG_NONE, sizeof(*fill), 1, 1,
+      1, (void**)&fill, &fill_fixup));
+  fill->target_binding = 0;
+  fill->pattern_length = 1;
+  fill->params.direct.target_offset = 0;
+  fill->params.direct.length = 1;
+  fill->params.direct.pattern = 0x11;
+  *fill_fixup = {};
+  fill_fixup->host_ptr = buffer.storage;
+  fill_fixup->length = sizeof(buffer.storage);
+  fill_fixup->data_index = 0;
+
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_barrier(&builder));
+  iree_hal_cmd_cache_t* flush = nullptr;
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_append_cmd(
+      &builder, IREE_HAL_CMD_FLUSH, IREE_HAL_CMD_FLAG_NONE, sizeof(*flush), 0,
+      0, 1, (void**)&flush, nullptr));
+  flush->target_ref = iree_hal_make_buffer_ref(&buffer.base, 0, 1);
+
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_barrier(&builder));
+  iree_hal_cmd_copy_t* copy = nullptr;
+  iree_hal_cmd_fixup_t* copy_fixups = nullptr;
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_append_cmd(
+      &builder, IREE_HAL_CMD_COPY, IREE_HAL_CMD_FLAG_NONE, sizeof(*copy), 2, 2,
+      1, (void**)&copy, &copy_fixups));
+  copy->source_binding = 1;
+  copy->target_binding = 2;
+  copy->params.direct.source_offset = 0;
+  copy->params.direct.target_offset = 0;
+  copy->params.direct.length = 1;
+  copy_fixups[0] = {};
+  copy_fixups[0].host_ptr = buffer.storage;
+  copy_fixups[0].length = sizeof(buffer.storage);
+  copy_fixups[0].data_index = 1;
+  copy_fixups[1] = {};
+  copy_fixups[1].host_ptr = &output;
+  copy_fixups[1].length = sizeof(output);
+  copy_fixups[1].data_index = 2;
+
+  iree_hal_cmd_block_recording_t recording;
+  IREE_ASSERT_OK(iree_hal_cmd_block_builder_end(&builder, &recording));
+  uint64_t total_tiles = 0;
+  IREE_ASSERT_OK(execute(&recording, nullptr, 0, &total_tiles));
+  EXPECT_EQ(total_tiles, 3);
+  EXPECT_EQ(buffer.observed_before_flush, 0x11);
+  EXPECT_EQ(output, 0x22);
+  EXPECT_EQ(iree_atomic_load(&buffer.flush_count, iree_memory_order_relaxed),
+            1);
+
+  iree_hal_cmd_block_recording_release(&recording);
+  iree_hal_cmd_block_builder_deinitialize(&builder);
+  iree_hal_buffer_release(&buffer.base);
 }
 
 // Run all tests with 1, 2, 4, and 8 workers.

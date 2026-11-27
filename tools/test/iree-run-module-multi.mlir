@@ -18,9 +18,34 @@
 // RUN:      --task_topology_group_count=1) | \
 // RUN: FileCheck %s
 
+// RUN: iree-compile %s \
+// RUN:      --iree-execution-model=async-external \
+// RUN:      --iree-hal-target-device=device_a=local[0] \
+// RUN:      --iree-hal-target-device=device_b=local[1] \
+// RUN:      --iree-hal-local-target-device-backends=vmvx \
+// RUN:      --compile-to=stream | FileCheck %s --check-prefix=STREAM
+// RUN: iree-compile %s \
+// RUN:      --iree-execution-model=async-external \
+// RUN:      --iree-hal-target-device=device_a=local[0] \
+// RUN:      --iree-hal-target-device=device_b=local[1] \
+// RUN:      --iree-hal-local-target-device-backends=vmvx \
+// RUN:      --compile-to=hal | FileCheck %s --check-prefix=HAL
+// RUN: iree-compile %s \
+// RUN:      --iree-execution-model=async-external \
+// RUN:      --iree-hal-target-device=device_a=local[0] \
+// RUN:      --iree-hal-target-device=device_b=local[1] \
+// RUN:      --iree-hal-local-target-device-backends=vmvx \
+// RUN:      --compile-to=vm | FileCheck %s --check-prefix=VM
+
 // CHECK: EXEC @multi_device_mul
 // CHECK-NEXT: result[0]: hal.buffer_view
 // CHECK-NEXT: 4xf32=0 55 144 273
+// STREAM: stream.cmd.flush
+// STREAM: stream.cmd.invalidate
+// HAL: hal.command_buffer.flush_buffer
+// HAL: hal.command_buffer.invalidate_buffer
+// VM: vm.call @hal.command_buffer.flush_buffer
+// VM: vm.call @hal.command_buffer.invalidate_buffer
 func.func public @multi_device_mul(
   // Input argument is resident on device_a (tooling default to first device).
   %input_a: tensor<4xf32> {iree.abi.affinity = #hal.device.promise<@device_a>}

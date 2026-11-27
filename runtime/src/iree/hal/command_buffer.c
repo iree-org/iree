@@ -517,9 +517,6 @@ iree_hal_command_buffer_flush_buffer(iree_hal_command_buffer_t* command_buffer,
     status = _VTABLE_DISPATCH(command_buffer, flush_buffer)(command_buffer,
                                                             target_ref);
   } else {
-    // FIXME: Not all command-buffer backends implement flush_buffer yet.
-    // Stream-to-HAL lowering remains disabled until backend execution semantics
-    // are supported.
     status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                               "command buffer does not support flush_buffer");
   }
@@ -546,9 +543,6 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_invalidate_buffer(
     status = _VTABLE_DISPATCH(command_buffer, invalidate_buffer)(command_buffer,
                                                                  target_ref);
   } else {
-    // FIXME: Not all command-buffer backends implement invalidate_buffer yet.
-    // Stream-to-HAL lowering remains disabled until backend execution semantics
-    // are supported.
     status =
         iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                          "command buffer does not support invalidate_buffer");

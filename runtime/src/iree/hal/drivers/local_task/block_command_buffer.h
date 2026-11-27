@@ -47,6 +47,11 @@ const iree_hal_buffer_binding_t* iree_hal_block_command_buffer_late_bindings(
     iree_hal_command_buffer_t* command_buffer,
     iree_host_size_t* out_late_binding_count);
 
+// Returns the access required by cache commands targeting an indirect slot.
+// Returns NONE for slots outside the command buffer's binding capacity.
+iree_hal_memory_access_t iree_hal_block_command_buffer_cache_binding_access(
+    iree_hal_command_buffer_t* command_buffer, iree_host_size_t slot);
+
 // Returns the distinct executable list recorded for profiling metadata.
 //
 // Returned executable pointers are retained by the command buffer resource set
