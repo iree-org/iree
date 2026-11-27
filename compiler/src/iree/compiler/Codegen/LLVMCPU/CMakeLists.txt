@@ -65,6 +65,7 @@ iree_cc_library(
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUMmt4dVectorLowering.cpp"
     "LLVMCPUPeel.cpp"
+    "LLVMCPUPromoteLargeAllocasToWorkgroupLocalMemory.cpp"
     "LLVMCPUSelectLoweringStrategy.cpp"
     "LLVMCPUSelectUKernels.cpp"
     "LLVMCPUSplitReduction.cpp"
@@ -110,6 +111,7 @@ iree_cc_library(
     MLIRComplexToLLVM
     MLIRComplexToStandard
     MLIRControlFlowToLLVM
+    MLIRDataLayoutInterfaces
     MLIRFuncDialect
     MLIRFuncToLLVM
     MLIRFuncTransforms

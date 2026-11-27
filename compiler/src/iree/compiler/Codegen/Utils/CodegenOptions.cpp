@@ -122,6 +122,13 @@ void CPUCodegenOptions::bindOptions(OptionsBinder &binder) {
                      "cannot be solved."),
       llvm::cl::cat(category));
 
+  binder.opt<bool>(
+      "iree-llvmcpu-promote-allocas-to-scratch-memory",
+      promoteLargeAllocasToWorkgroupLocalMemory,
+      llvm::cl::desc("Move static allocas exceeding the stack-allocation limit "
+                     "to runtime-provided workgroup-local memory."),
+      llvm::cl::cat(category));
+
   binder.opt<bool>("iree-llvmcpu-reassociate-fp-reductions",
                    reassociateFpReductions,
                    {initAtOpt(llvm::OptimizationLevel::O0, false),

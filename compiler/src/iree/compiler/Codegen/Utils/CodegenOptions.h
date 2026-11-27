@@ -43,6 +43,9 @@ struct CPUCodegenOptions : CodegenOptions {
   // Fail if the upper bound of dynamic stack allocation cannot be solved.
   bool failOnOutOfBoundsStackAllocation = true;
 
+  // Move oversized static stack allocations to runtime workgroup-local memory.
+  bool promoteLargeAllocasToWorkgroupLocalMemory = false;
+
   // Enables reassociation for FP reductions.
   bool reassociateFpReductions = false;
 
