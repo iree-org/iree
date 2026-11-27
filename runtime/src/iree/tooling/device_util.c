@@ -548,8 +548,9 @@ struct iree_hal_profiling_session_t {
   // Background flush thread owned by the session when periodic flush is active.
   iree_thread_t* flush_thread;
 
-  // In-memory aggregate sink used by --print_device_statistics.
-  iree_hal_profile_statistics_sink_t* statistics_sink;
+  // In-memory aggregate sinks used by --print_device_statistics, one per
+  // device.
+  iree_hal_profile_statistics_sink_t** statistics_sinks;
 
   // Notification used to wake the flush thread during shutdown.
   iree_notification_t flush_notification;
@@ -968,6 +969,51 @@ iree_status_t iree_hal_profiling_from_flags_is_requested(bool* out_requested) {
   return iree_ok_status();
 }
 
+static void iree_hal_profiling_statistics_sinks_free(
+    iree_host_size_t sink_count, iree_hal_profile_statistics_sink_t** sinks,
+    iree_allocator_t host_allocator) {
+  if (!sinks) return;
+  for (iree_host_size_t i = 0; i < sink_count; ++i) {
+    iree_hal_profile_statistics_sink_release(sinks[i]);
+  }
+  iree_allocator_free(host_allocator, sinks);
+}
+
+static iree_status_t iree_hal_profiling_statistics_sinks_create(
+    iree_host_size_t sink_count, iree_allocator_t host_allocator,
+    iree_hal_profile_statistics_sink_t*** out_sinks) {
+  *out_sinks = NULL;
+  iree_host_size_t sinks_size = 0;
+  if (IREE_UNLIKELY(!iree_host_size_checked_mul(sink_count, sizeof(**out_sinks),
+                                                &sinks_size))) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "profiling device list is too large");
+  }
+  iree_hal_profile_statistics_sink_t** sinks = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(host_allocator, sinks_size, (void**)&sinks));
+  memset(sinks, 0, sinks_size);
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < sink_count && iree_status_is_ok(status);
+       ++i) {
+    status = iree_hal_profile_statistics_sink_create(host_allocator, &sinks[i]);
+  }
+  if (iree_status_is_ok(status)) {
+    *out_sinks = sinks;
+  } else {
+    iree_hal_profiling_statistics_sinks_free(sink_count, sinks, host_allocator);
+  }
+  return status;
+}
+
+static iree_status_t iree_hal_profiling_session_begin_with_sinks(
+    iree_host_size_t device_count, iree_hal_device_t* const* devices,
+    const iree_hal_device_profiling_options_t* options,
+    iree_hal_profile_statistics_sink_t* const* statistics_sinks,
+    const iree_hal_device_external_capture_options_t* external_options,
+    iree_duration_t flush_interval_ms, iree_allocator_t host_allocator,
+    iree_hal_profiling_session_t** out_profiling);
+
 iree_status_t iree_hal_begin_device_list_profiling_from_flags(
     iree_host_size_t device_count, iree_hal_device_t* const* devices,
     iree_allocator_t host_allocator,
@@ -981,14 +1027,11 @@ iree_status_t iree_hal_begin_device_list_profiling_from_flags(
   if (!request.requested) return iree_ok_status();
 
   iree_hal_profile_sink_t* sink = NULL;
-  iree_hal_profile_statistics_sink_t* statistics_sink = NULL;
+  iree_hal_profile_statistics_sink_t** statistics_sinks = NULL;
   iree_status_t status = iree_ok_status();
   if (request.statistics) {
-    status = iree_hal_profile_statistics_sink_create(host_allocator,
-                                                     &statistics_sink);
-    if (iree_status_is_ok(status)) {
-      sink = iree_hal_profile_statistics_sink_base(statistics_sink);
-    }
+    status = iree_hal_profiling_statistics_sinks_create(
+        device_count, host_allocator, &statistics_sinks);
   } else {
     status = iree_hal_profile_sink_create_from_flags(host_allocator, &sink);
   }
@@ -1000,22 +1043,36 @@ iree_status_t iree_hal_begin_device_list_profiling_from_flags(
     external_options.file_path =
         iree_make_cstring_view(FLAG_device_capture_file);
     external_options.label = iree_make_cstring_view(FLAG_device_capture_label);
-    status = iree_hal_profiling_session_begin(
-        device_count, devices, &request.options,
+    status = iree_hal_profiling_session_begin_with_sinks(
+        device_count, devices, &request.options, statistics_sinks,
         request.external_capture ? &external_options : NULL,
         FLAG_device_profiling_flush_interval_ms, host_allocator, out_profiling);
   }
-  if (iree_status_is_ok(status) && *out_profiling && statistics_sink) {
-    (*out_profiling)->statistics_sink = statistics_sink;
+  if (iree_status_is_ok(status) && *out_profiling) {
+    (*out_profiling)->statistics_sinks = statistics_sinks;
   } else {
-    iree_hal_profile_sink_release(sink);
+    iree_hal_profiling_statistics_sinks_free(device_count, statistics_sinks,
+                                             host_allocator);
   }
+  iree_hal_profile_sink_release(sink);
   return status;
 }
 
 iree_status_t iree_hal_profiling_session_begin(
     iree_host_size_t device_count, iree_hal_device_t* const* devices,
     const iree_hal_device_profiling_options_t* options,
+    const iree_hal_device_external_capture_options_t* external_options,
+    iree_duration_t flush_interval_ms, iree_allocator_t host_allocator,
+    iree_hal_profiling_session_t** out_profiling) {
+  return iree_hal_profiling_session_begin_with_sinks(
+      device_count, devices, options, /*statistics_sinks=*/NULL,
+      external_options, flush_interval_ms, host_allocator, out_profiling);
+}
+
+static iree_status_t iree_hal_profiling_session_begin_with_sinks(
+    iree_host_size_t device_count, iree_hal_device_t* const* devices,
+    const iree_hal_device_profiling_options_t* options,
+    iree_hal_profile_statistics_sink_t* const* statistics_sinks,
     const iree_hal_device_external_capture_options_t* external_options,
     iree_duration_t flush_interval_ms, iree_allocator_t host_allocator,
     iree_hal_profiling_session_t** out_profiling) {
@@ -1084,7 +1141,13 @@ iree_status_t iree_hal_profiling_session_begin(
 
   for (iree_host_size_t i = 0; i < device_count && iree_status_is_ok(status);
        ++i) {
-    status = iree_hal_device_profiling_begin(profiling->devices[i], options);
+    iree_hal_device_profiling_options_t device_options = *options;
+    if (statistics_sinks) {
+      device_options.sink =
+          iree_hal_profile_statistics_sink_base(statistics_sinks[i]);
+    }
+    status =
+        iree_hal_device_profiling_begin(profiling->devices[i], &device_options);
     profiling->native_profile_active[i] =
         iree_status_is_ok(status) &&
         (options->data_families != IREE_HAL_DEVICE_PROFILING_DATA_NONE ||
@@ -1149,6 +1212,22 @@ iree_status_t iree_hal_begin_device_group_profiling_from_flags(
   return status;
 }
 
+static iree_status_t iree_hal_profiling_session_print_statistics(
+    iree_hal_profiling_session_t* profiling, iree_host_size_t device_index) {
+  const iree_hal_profile_statistics_sink_t* sink =
+      profiling->statistics_sinks[device_index];
+  if (profiling->device_count == 1) {
+    return iree_hal_profile_statistics_sink_fprint(stderr, sink);
+  }
+  iree_string_view_t device_id =
+      iree_hal_device_id(profiling->devices[device_index]);
+  char label[128] = {0};
+  snprintf(label, sizeof(label), "device[%" PRIhsz "] %.*s", device_index,
+           (int)device_id.size, device_id.data);
+  return iree_hal_profile_statistics_sink_fprint_labeled(
+      stderr, sink, iree_make_cstring_view(label));
+}
+
 iree_status_t iree_hal_profiling_session_end(
     iree_hal_profiling_session_t* profiling) {
   if (!profiling) return iree_ok_status();
@@ -1167,10 +1246,14 @@ iree_status_t iree_hal_profiling_session_end(
           status, iree_hal_device_profiling_end(profiling->devices[i - 1]));
     }
   }
-  if (profiling->statistics_sink) {
-    status = iree_status_join(status, iree_hal_profile_statistics_sink_fprint(
-                                          stderr, profiling->statistics_sink));
-    iree_hal_profile_statistics_sink_release(profiling->statistics_sink);
+  if (profiling->statistics_sinks) {
+    for (iree_host_size_t i = 0; i < profiling->device_count; ++i) {
+      status = iree_status_join(
+          status, iree_hal_profiling_session_print_statistics(profiling, i));
+    }
+    iree_hal_profiling_statistics_sinks_free(profiling->device_count,
+                                             profiling->statistics_sinks,
+                                             profiling->host_allocator);
   }
   iree_hal_profiling_session_release_devices(profiling);
   iree_slim_mutex_deinitialize(&profiling->flush_mutex);

@@ -160,7 +160,8 @@ static iree_status_t iree_tooling_annotate_status_with_function_decl(
 
 static iree_status_t iree_tooling_run_function(
     iree_vm_context_t* context, iree_vm_function_t function,
-    iree_hal_device_t* device, iree_hal_allocator_t* device_allocator,
+    iree_hal_device_list_t* device_list, iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
     iree_hal_replay_recorder_t* replay_recorder,
     iree_allocator_t host_allocator, int* out_exit_code) {
   iree_string_view_t function_name = iree_vm_function_name(&function);
@@ -213,10 +214,12 @@ static iree_status_t iree_tooling_run_function(
 
   // Begin profiling immediately prior to invocation.
   iree_hal_profiling_session_t* profiling = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_status_annotate_f(
-        iree_hal_begin_profiling_from_flags(device, host_allocator, &profiling),
-        "beginning device profiling");
+  if (iree_status_is_ok(status) && device_list) {
+    status =
+        iree_status_annotate_f(iree_hal_begin_device_list_profiling_from_flags(
+                                   device_list->count, device_list->devices,
+                                   host_allocator, &profiling),
+                               "beginning device profiling");
   }
 
   // Invoke the function with the provided inputs.
@@ -316,9 +319,9 @@ iree_status_t iree_tooling_run_module_with_data(
       device_list ? iree_hal_device_list_at(device_list, 0) : NULL;
 
   // Parse inputs, run the function, and process outputs.
-  iree_status_t status =
-      iree_tooling_run_function(context, function, device, device_allocator,
-                                replay_recorder, host_allocator, out_exit_code);
+  iree_status_t status = iree_tooling_run_function(
+      context, function, device_list, device, device_allocator, replay_recorder,
+      host_allocator, out_exit_code);
 
   // Annotate errors with the function description.
   if (!iree_status_is_ok(status)) {

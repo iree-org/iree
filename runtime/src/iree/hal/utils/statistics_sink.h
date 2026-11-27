@@ -218,6 +218,10 @@ IREE_API_EXPORT bool iree_hal_profile_statistics_sink_scale_duration_to_ns(
 IREE_API_EXPORT iree_status_t iree_hal_profile_statistics_sink_fprint(
     FILE* file, const iree_hal_profile_statistics_sink_t* sink);
 
+IREE_API_EXPORT iree_status_t iree_hal_profile_statistics_sink_fprint_labeled(
+    FILE* file, const iree_hal_profile_statistics_sink_t* sink,
+    iree_string_view_t label);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

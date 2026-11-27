@@ -1330,6 +1330,13 @@ static iree_status_t iree_hal_profile_statistics_print_row(
 
 IREE_API_EXPORT iree_status_t iree_hal_profile_statistics_sink_fprint(
     FILE* file, const iree_hal_profile_statistics_sink_t* sink) {
+  return iree_hal_profile_statistics_sink_fprint_labeled(
+      file, sink, iree_string_view_empty());
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_profile_statistics_sink_fprint_labeled(
+    FILE* file, const iree_hal_profile_statistics_sink_t* sink,
+    iree_string_view_t label) {
   IREE_ASSERT_ARGUMENT(file);
   IREE_ASSERT_ARGUMENT(sink);
 
@@ -1344,7 +1351,12 @@ IREE_API_EXPORT iree_status_t iree_hal_profile_statistics_sink_fprint(
   IREE_RETURN_IF_ERROR(
       iree_hal_profile_statistics_sink_for_each_row(sink, accumulate_callback));
 
-  fprintf(file, "\nIREE HAL device statistics:\n");
+  if (iree_string_view_is_empty(label)) {
+    fprintf(file, "\nIREE HAL device statistics:\n");
+  } else {
+    fprintf(file, "\nIREE HAL device statistics (%.*s):\n", (int)label.size,
+            label.data);
+  }
   const iree_host_size_t row_count =
       iree_hal_profile_statistics_sink_row_count(sink);
   const uint64_t dropped_record_count =
