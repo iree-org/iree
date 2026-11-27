@@ -15,3 +15,17 @@ updates:
       github-actions:
         patterns:
           - "*"
+
+  # Check for updates to the PyPI deploy requirements, a hash lock made with
+  # `uv pip compile`, which the `uv` ecosystem regenerates.
+  - package-ecosystem: "uv"
+    directory: "/build_tools/python_deploy"
+    schedule:
+      interval: "weekly"
+    # Wait a week before proposing a new release, as for GitHub Actions above.
+    cooldown:
+      default-days: 7
+    groups:
+      pypi-deploy-requirements:
+        patterns:
+          - "*"

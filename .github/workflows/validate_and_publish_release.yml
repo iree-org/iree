@@ -1,5 +1,8 @@
 # Publishes a draft snapshot, after performing validation to make sure all linux
 # packages are stable.
+#
+# publish_pypi.yml calls this workflow without a release to validate the
+# packages of a stable release, which it built in the same run.
 name: Validate and Publish Release
 
 on:
@@ -23,6 +26,32 @@ on:
       build_run_id:
         description: "Run ID for the build_package.yml workflow that triggered this workflow"
         required: true
+  workflow_call:
+    inputs:
+      release_id:
+        description: "Release id to publish, or empty to only validate"
+        type: string
+        default: ""
+      package_version:
+        description: "Version of the package"
+        type: string
+        required: true
+      compiler_package_version:
+        description: "Version of the iree-base-compiler package"
+        type: string
+        required: true
+      runtime_package_version:
+        description: "Version of the iree-base-runtime package"
+        type: string
+        required: true
+      legacy_package_version:
+        description: "Version of the iree-tools-tf and iree-tools-tflite packages"
+        type: string
+        required: true
+      build_run_id:
+        description: "Run ID of a build_package.yml workflow, or empty for the packages built in the calling run"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -35,14 +64,21 @@ jobs:
     steps:
       - name: Download packages
         id: download_packages
+        if: inputs.build_run_id != ''
         uses: dawidd6/action-download-artifact@a92c7ae74cf1df8810783758581e485ac3aaa309 # v28
         with:
           github_token: ${{secrets.WRITE_ACCESS_TOKEN}}
           workflow: build_package.yml
-          run_id: ${{ github.event.inputs.build_run_id }}
+          run_id: ${{ inputs.build_run_id }}
+      # Like the step above, puts each artifact in a directory of its name.
+      - name: Download packages built in the calling run
+        if: inputs.build_run_id == ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: wheels-*
       - name: Extract and display downloaded files
         env:
-          PACKAGE_VERSION: ${{ github.event.inputs.package_version }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
         run: |
           tar -xf "wheels-linux-x86_64-main-dist-linux/iree-dist-${PACKAGE_VERSION}-linux-x86_64.tar.xz"
           pwd
@@ -55,9 +91,9 @@ jobs:
       - name: Install python packages
         id: install_python_packages
         env:
-          COMPILER_PACKAGE_VERSION: ${{ github.event.inputs.compiler_package_version }}
-          RUNTIME_PACKAGE_VERSION: ${{ github.event.inputs.runtime_package_version }}
-          LEGACY_PACKAGE_VERSION: ${{ github.event.inputs.legacy_package_version }}
+          COMPILER_PACKAGE_VERSION: ${{ inputs.compiler_package_version }}
+          RUNTIME_PACKAGE_VERSION: ${{ inputs.runtime_package_version }}
+          LEGACY_PACKAGE_VERSION: ${{ inputs.legacy_package_version }}
         run: |
           python -m pip install -f file://$PWD/wheels-linux-x86_64-py-compiler-pkg/ "iree-base-compiler[onnx]==${COMPILER_PACKAGE_VERSION}"
           python -m pip install -f file://$PWD/wheels-linux-x86_64-py-runtime-pkg/ "iree-base-runtime==${RUNTIME_PACKAGE_VERSION}"
@@ -144,6 +180,7 @@ jobs:
   publish_release:
     name: "Publish release"
     needs: validate_packages
+    if: inputs.release_id != ''
     runs-on: ubuntu-24.04
     steps:
       - name: Publish Release
@@ -152,7 +189,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.WRITE_ACCESS_TOKEN }}
         with:
-          release_id: ${{ github.event.inputs.release_id }}
+          release_id: ${{ inputs.release_id }}
 
       - name: Checking out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -170,7 +207,7 @@ jobs:
 
       - name: Check for patch release
         env:
-          PACKAGE_VERSION: ${{ github.event.inputs.package_version }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
         run: |
           python -m pip install packaging
           is_patch_release="$(python -c "import os;from packaging.version import Version;print('true' if Version(os.environ['PACKAGE_VERSION']).micro !=0 else 'false')")"

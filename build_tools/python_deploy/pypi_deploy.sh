@@ -35,7 +35,8 @@
 #
 # Each package is uploaded separately. If an upload fails (e.g. because your
 # credentials lack permission for that PyPI project), the remaining packages
-# are still uploaded and the failures are listed in a summary at the end.
+# are still uploaded and the failures are listed in a summary at the end. The
+# script exits with an error if a check or an upload failed.
 
 set -euo pipefail
 
@@ -107,7 +108,9 @@ EXPECTED_PACKAGES=(
 )
 
 SCRIPT_DIR="$(dirname -- "$( readlink -f -- "$0"; )")";
-REQUIREMENTS_FILE="${SCRIPT_DIR}/pypi_deploy_requirements.txt"
+# The tools that this script needs. pypi_deploy_requirements.txt pins them and
+# their dependencies by hash.
+REQUIREMENTS_FILE="${SCRIPT_DIR}/pypi_deploy_requirements.in"
 if [[ -n "${WHEEL_DIR}" ]]; then
   TMPDIR="$(readlink -f -- "${WHEEL_DIR}")"
 else
@@ -267,6 +270,9 @@ function upload_wheels() {
     echo ""
     echo "To upload these wheels without downloading them again, run:"
     echo "  $0 --publish --wheel-dir ${TMPDIR}"
+  fi
+  if (( ${#failed[@]} > 0 )); then
+    exit 1
   fi
 }
 
