@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtDialect.h"
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
@@ -37,6 +38,7 @@ namespace mlir::iree_compiler::GlobalOptimization {
 #include "iree/compiler/GlobalOptimization/Passes.h.inc"
 
 using IREE::LinalgExt::DequantizeAffineOp;
+using IREE::LinalgExt::getReshapeSource;
 using ConstValueInfo = IREE::Util::ConstExprAnalysis::ConstValueInfo;
 
 namespace {
@@ -70,16 +72,6 @@ static Attribute getConstantAttr(Value value,
     return {};
   }
   return globalOp.getGlobalInitialValue();
-}
-
-/// Returns the value that the reshapes producing `value` read, or `value`
-/// itself if no reshape produces it. Reshapes keep the data unchanged.
-static Value getReshapeSource(Value value) {
-  while (isa_and_present<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
-      value.getDefiningOp())) {
-    value = value.getDefiningOp()->getOperand(0);
-  }
-  return value;
 }
 
 /// Returns the integers in `attr`, read as unsigned if `isUnsigned`, or nullopt

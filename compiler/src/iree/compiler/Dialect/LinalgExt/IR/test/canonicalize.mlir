@@ -811,6 +811,25 @@ func.func @dequantize_affine_keep_nonzero_resource_zero_point(%q: tensor<4x2xi8>
 // CHECK-LABEL: func.func @dequantize_affine_keep_nonzero_resource_zero_point
 //       CHECK:   ins(%{{.+}}, %{{.+}}, %{{.+}} :
 
+// A per-channel zero point collapsed from [N, 1]. The reshape of a resource
+// does not fold, but it keeps the values, so the zero point is still dropped.
+func.func @dequantize_affine_drop_zero_reshaped_resource_zero_point(
+    %q: tensor<4x2xi8>, %s: tensor<4xf32>, %init: tensor<4x2xf32>)
+    -> tensor<4x2xf32> {
+  %cst = arith.constant dense_resource<zero_zero_points> : tensor<4x1xi64>
+  %zp = tensor.collapse_shape %cst [[0, 1]] : tensor<4x1xi64> into tensor<4xi64>
+  %0 = iree_linalg_ext.dequantize_affine
+      <indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0)>,
+                        affine_map<(d0, d1) -> (d0, d1)>]>
+      ins(%q, %s, %zp : tensor<4x2xi8>, tensor<4xf32>, tensor<4xi64>)
+      outs(%init : tensor<4x2xf32>) -> tensor<4x2xf32>
+  return %0 : tensor<4x2xf32>
+}
+// CHECK-LABEL: func.func @dequantize_affine_drop_zero_reshaped_resource_zero_point
+//       CHECK:   ins(%{{.+}}, %{{.+}} : tensor<4x2xi8>, tensor<4xf32>)
+
 {-#
   dialect_resources: {
     builtin: {

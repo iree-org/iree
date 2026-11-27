@@ -291,7 +291,12 @@ bool isPureBatchMatmul(Operation *op);
 /// Returns true if the given linalg op represents a transpose.
 bool isaTransposeOpInterface(linalg::LinalgOp linalgOp);
 
-/// True when `value` is a constant that is zero in every element.
+/// Returns the value that the reshapes producing `value` read, or `value`
+/// itself if no reshape produces it. Reshapes keep the data unchanged.
+Value getReshapeSource(Value value);
+
+/// True when `value`, or the source of the reshapes producing it, is a constant
+/// that is zero in every element.
 bool isKnownZero(Value value);
 
 /// If the value is defined by a chain of unary side effect-free ops, go up the
