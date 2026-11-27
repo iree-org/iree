@@ -1590,6 +1590,24 @@ func.func @i1_type(%3: tensor<8xi1>, %4: tensor<8xi1>)  -> tensor<8xi1> attribut
 
 // -----
 
+// Narrow-type emulation cannot rewrite masked loads of packed i4 elements once
+// their masks are lowered, so an op with an i4 operand peels instead of masking.
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}>
+func.func @i4_type(%arg0: tensor<34xi4>) -> tensor<34xf32> attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+  %0 = tensor.empty() : tensor<34xf32>
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%arg0 : tensor<34xi4>) outs(%0 : tensor<34xf32>) {
+  ^bb0(%in: i4, %out: f32):
+    %2 = arith.sitofp %in : i4 to f32
+    linalg.yield %2 : f32
+  } -> tensor<34xf32>
+  return %1 : tensor<34xf32>
+}
+// CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<pipeline = #iree_cpu.pipeline<DoubleTilingExpert>, {enable_loop_peeling}>
+// CHECK: func @i4_type(
+// CHECK-SAME: translation_info = #[[TRANSLATION]]
+
+// -----
+
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}>
 #map = affine_map<(d0, d1, d2) -> (d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
