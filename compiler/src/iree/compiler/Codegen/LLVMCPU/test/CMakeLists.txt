@@ -35,6 +35,7 @@ iree_lit_test_suite(
     "link_executables.mlir"
     "link_executables_errors.mlir"
     "lowering_strategy_from_tuning_spec.mlir"
+    "move_stack_allocations_to_workgroup_local_memory.mlir"
     "peel.mlir"
     "pipeline_arm_sme_streaming_mode_tests.mlir"
     "pipeline_bf16_native_converts_tests.mlir"
