@@ -1651,9 +1651,17 @@ static bool isAllZeroBytes(ArrayRef<char> data) {
   return llvm::all_of(data, [](char byte) { return byte == 0; });
 }
 
+Value getReshapeSource(Value value) {
+  while (isa_and_present<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
+      value.getDefiningOp())) {
+    value = value.getDefiningOp()->getOperand(0);
+  }
+  return value;
+}
+
 bool isKnownZero(Value value) {
   Attribute constant;
-  if (!matchPattern(value, m_Constant(&constant))) {
+  if (!matchPattern(getReshapeSource(value), m_Constant(&constant))) {
     return false;
   }
   if (auto intAttr = dyn_cast<IntegerAttr>(constant)) {
