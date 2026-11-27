@@ -469,7 +469,8 @@ std::optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     }
   }
 
-  debugDatabase.addFunctionSourceMap(funcOp, sourceMap);
+  debugDatabase.addFunctionSourceMap(ordinalAnalysis.getOrdinal(funcOp),
+                                     std::move(sourceMap));
 
   size_t finalLength = encoder.getOffset();
   if (failed(encoder.ensureAlignment(8))) {
