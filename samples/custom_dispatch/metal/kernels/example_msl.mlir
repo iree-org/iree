@@ -1,0 +1,125 @@
+// RUN: iree-compile %s \
+// RUN:     --iree-hal-executable-object-search-path=%p | \
+// RUN: iree-run-module \
+// RUN:     --device=metal \
+// RUN:     --module=- \
+// RUN:     --function=mixed_invocation \
+// RUN:     --input=8xf32=2 \
+// RUN:     --input=8xf32=4 | \
+// RUN: FileCheck %s
+
+// The same as example.mlir with the MSL source as the object: iree-compile
+// compiles it to a metallib with the Metal toolchain (or, with
+// --iree-metal-compile-to-metallib=false, embeds the source for the runtime
+// to compile).
+
+// The configuration used for executable compilation.
+// This lets the compiler and runtime know the format and requirements of the
+// executable binaries produced and multiple variants with differing formats
+// and compilation options (architectures, etc) can be embedded for runtime
+// selection.
+#metal_target = #hal.executable.target<"metal-spirv", "metal-msl-fb", {
+  iree_codegen.target_info = #iree_gpu.target<
+    arch = "", features = "spirv:v1.3,cap:Shader", wgp = <
+      compute = fp32|int32, storage = b32, subgroup = none,
+      subgroup_size_choices = [32],
+      max_workgroup_sizes = [1024, 1024, 1024],
+      max_thread_count_per_workgroup = 1024,
+      max_workgroup_memory_bytes = 32768,
+      max_workgroup_counts = [65535, 65535, 65535]>
+  >
+}>
+
+// The target devices that the program will run on.
+#metal_device = #hal.device.target<"metal", [
+  #metal_target
+]> : !hal.device
+
+module @example attributes {hal.device.targets = [#metal_device]} {
+
+  // Executable containing hand-authored kernels.
+  // Unlike SPIR-V, one Metal object can hold any number of kernels, so both
+  // exports share it.
+  hal.executable.source private @executable <
+    objects = #hal.executable.objects<{
+      #metal_target = [
+        #hal.executable.object<{
+          // MSL source, found next to this file.
+          path = "kernels.metal"
+        }>
+      ]
+    }>
+  > {
+
+    // Exported function with the MSL kernel name `simple_mul`.
+    // The ordinal must be assigned by the user and unique for the executable.
+    // The layout defines the required bindings and push constants and can be
+    // thought of as the function signature.
+    hal.executable.export public @simple_mul ordinal(0)
+        layout(#hal.pipeline.layout<constants = 1, bindings = [
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer>
+        ]>) count(%device: !hal.device, %workload: index) -> (index, index, index) {
+      // This host function is used to compute the XYZ threadgroup count
+      // dispatched at runtime. It can query the %device for capabilities
+      // and limits (shared memory size, etc). The other arguments are the
+      // values passed in the dispatch operation (usually things like root
+      // output op tensor dimensions and other abstract values).
+      %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
+      %c1 = arith.constant 1 : index
+      hal.return %x, %c1, %c1 : index, index, index
+    } <
+      // Metal needs the threadgroup size when dispatching.
+      workgroup_size = [64 : index, 1 : index, 1 : index]
+    >
+
+    // Similar to the above but in-place by using a read/write binding.
+    hal.executable.export public @simple_mul_inplace ordinal(1)
+        layout(#hal.pipeline.layout<constants = 1, bindings = [
+          #hal.pipeline.binding<storage_buffer, ReadOnly>,
+          #hal.pipeline.binding<storage_buffer>
+        ]>) count(%device: !hal.device, %workload: index) -> (index, index, index) {
+      %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
+      %c1 = arith.constant 1 : index
+      hal.return %x, %c1, %c1 : index, index, index
+    } <
+      workgroup_size = [64 : index, 1 : index, 1 : index]
+    >
+
+  }  // hal.executable.source
+
+  // Function demonstrating a few hand-authored dispatches mixed with codegen.
+  // Invoke with:
+  //  --device=metal
+  //  --function=mixed_invocation
+  //  --input=8xf32=2
+  //  --input=8xf32=4
+  // CHECK-LABEL: EXEC @mixed_invocation
+  func.func @mixed_invocation(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
+    // HACK: for hand-authored kernels all primitive values passed in need to
+    // be i32 or a bit-castable type. This is because ABI packing of other types
+    // happens inside of the PackDispatchOperandsPass that is currently not
+    // usable with external functions as it changes the ABI. In the future we
+    // can better define the ABI such that it's possible to match the compiler
+    // expectations around padding/alignment. For now users must do the packing
+    // themselves (splitting i64 into i32+i32, etc).
+    %c0 = arith.constant 0 : index
+    %dim = tensor.dim %arg0, %c0 : tensor<?xf32>
+    %dim_i32 = arith.index_cast %dim : index to i32
+
+    // Dispatch a basic `ret = lhs * rhs` kernel.
+    %0 = flow.dispatch @executable::@simple_mul[%dim](%dim_i32, %arg0, %arg1) : (i32, tensor<?xf32>{%dim}, tensor<?xf32>{%dim}) -> tensor<?xf32>{%dim}
+
+    // Code gen some other ops - these will interleave with the hand-authored
+    // ones but naturally won't be able to fuse with them.
+    %1 = arith.addf %0, %arg1 : tensor<?xf32>
+
+    // Dispatch an in-place `rhs *= lhs` kernel.
+    %2 = flow.dispatch @executable::@simple_mul_inplace[%dim](%dim_i32, %0, %1) : (i32, tensor<?xf32>{%dim}, tensor<?xf32>{%dim}) -> %1{%dim}
+
+    // CHECK: 8xf32=96 96 96 96 96 96 96 96
+    return %2 : tensor<?xf32>
+  }
+
+}  // module

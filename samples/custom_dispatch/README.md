@@ -36,7 +36,7 @@ there are limitations and these samples only cover the supported cases:
 |--------------------|:------------------:|:------------------:|:-----:|:------------------:|:---------------:|
 | Static Functions   | :white_check_mark: | TBD                | TBD   | TBD                | TBD             |
 | Dynamic Functions  | :white_check_mark: | TBD                | TBD   | :grey_question:    | :grey_question: |
-| Static Dispatches  | TBD                | :white_check_mark: | TBD   | :white_check_mark: | TBD             |
+| Static Dispatches  | TBD                | :white_check_mark: | :white_check_mark: | :white_check_mark: | TBD             |
 | Dynamic Dispatches | TBD                | TBD                | TBD   | TBD                | TBD             |
 | Commands           | TBD                | TBD                | TBD   | TBD                | TBD             |
 
@@ -168,6 +168,7 @@ declares it in IR, and dispatches it.
 **Samples**:
 
 * CUDA/PTX: [custom_dispatch/cuda/kernels/](./cuda/kernels/) (.cu -> .ptx)
+* Metal: [custom_dispatch/metal/kernels/](./metal/kernels/) (.metal or .metallib)
 * Vulkan/SPIR-V: [custom_dispatch/vulkan/shaders/](./vulkan/shaders/) (.glsl -> .spv)
 
 Here IREE is used for scheduling the work and ensuring that buffers and
