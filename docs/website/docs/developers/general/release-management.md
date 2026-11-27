@@ -289,7 +289,9 @@ module version, and whether they changed since the previous release:
     Release tags (`iree-*` and `v*`) cannot be moved or deleted after they
     are created, because a
     [tag ruleset](https://github.com/iree-org/iree/rules) blocks both.
-    Check the commit before you push the tag.
+    Check the commit before you push the tag. Anyone with write access can
+    create an `iree-*` tag at any commit, so only the `merge-base` check
+    shows that the release builds a reviewed commit from `main`.
 
     The workflow builds all packages at the tagged commit with the stable
     version, in the same way as the candidates. This takes about four hours.
@@ -402,7 +404,8 @@ commit, and create the GitHub release as in step 2 with the files in
 
     Checkout the corresponding stable release and create a branch
     for the patch release. Do not name the branch like the stable tag
-    `vX.Y.Z`, which the release needs.
+    `vX.Y.Z`, which the release needs. Only release maintainers can create
+    and push to `release/*` branches.
 
     <!-- TODO(scotttodd): Does this need a branch, or would just a tag work? -->
 

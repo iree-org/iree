@@ -32,6 +32,9 @@
 #   * A tag ruleset blocks updates and deletions of release tags (`iree-*` and
 #     `v*`), so that the tag that a release and its attestations name cannot be
 #     moved to another commit.
+#   * A branch ruleset lets only release maintainers create, update and delete
+#     `release/*` patch branches, so that a commit on a patch branch was pushed
+#     by a release maintainer.
 
 name: Publish to PyPI
 
