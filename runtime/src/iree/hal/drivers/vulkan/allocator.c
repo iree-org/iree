@@ -2055,8 +2055,11 @@ static iree_status_t iree_hal_vulkan_allocator_import_buffer(
   iree_hal_buffer_compatibility_t compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_NONE;
   if (iree_status_is_ok(status)) {
+    const iree_hal_memory_type_t import_memory_type = compat_params.type;
     compatibility = iree_hal_vulkan_allocator_query_buffer_compatibility(
         base_allocator, &compat_params, &allocation_size);
+    // The query may pick a type the host pointer can't be imported into.
+    compat_params.type = import_memory_type;
     if (!iree_all_bits_set(compatibility,
                            IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE)) {
 #if IREE_STATUS_MODE
