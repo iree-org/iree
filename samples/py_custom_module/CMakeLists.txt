@@ -18,4 +18,5 @@ iree_py_test(
     decode_secret_message_sample
   SRCS
     "decode_secret_message.py"
+  SCRIPT
 )

@@ -6,6 +6,7 @@
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("//build_tools/bazel:iree_py_test.bzl", "iree_py_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -13,7 +14,10 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-exports_files(["assert_empty_query.sh"])
+exports_files([
+    "assert_empty_query.sh",
+    "pytest_main.py",
+])
 
 # Helper tool for the IREE compiler ABI symbol rename (see renamed_link.bzl).
 py_binary(
@@ -21,7 +25,7 @@ py_binary(
     srcs = ["gen_rename_map.py"],
 )
 
-py_test(
+iree_py_test(
     name = "gen_rename_map_test",
     srcs = [
         "gen_rename_map.py",

@@ -11,3 +11,6 @@
 # Used by runtime/bindings/python for the numpy headers, which numpy 2 moved to
 # numpy/_core/include, and by tools/test.
 numpy>=2.0.0
+
+# Used by iree_py_test (build_tools/bazel/iree_py_test.bzl) to run the tests.
+pytest>=8.0.0

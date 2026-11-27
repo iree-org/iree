@@ -4,9 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("@rules_python//python:defs.bzl", "py_library", "py_test")
+load("@rules_python//python:defs.bzl", "py_library")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_py_test.bzl", "iree_py_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -48,47 +49,42 @@ py_library(
     ],
 )
 
-py_test(
+iree_py_test(
     name = "config_test",
     size = "small",
     srcs = ["test/config_test.py"],
-    legacy_create_init = False,
     main = "test/config_test.py",
     deps = [":core"],
 )
 
-py_test(
+iree_py_test(
     name = "plugins_test",
     size = "small",
     srcs = ["test/plugins_test.py"],
-    legacy_create_init = False,
     main = "test/plugins_test.py",
     deps = [":core"],
 )
 
-py_test(
+iree_py_test(
     name = "result_test",
     size = "small",
     srcs = ["test/result_test.py"],
-    legacy_create_init = False,
     main = "test/result_test.py",
     deps = [":core"],
 )
 
-py_test(
+iree_py_test(
     name = "package_test",
     size = "small",
     srcs = ["test/package_test.py"],
-    # A generated `iree/__init__.py` would hide iree.compiler and iree.runtime,
-    # which share the `iree` namespace.
-    legacy_create_init = False,
     main = "test/package_test.py",
     deps = [":core"],
 )
 
-# bazel_to_cmake does not convert py_test, so each test is mirrored here for
-# CTest. The tests are registered only if the dependencies in pyproject.toml
-# are installed, so that builds that use no Python need not install them.
+# bazel_to_cmake does not convert iree_py_test, so each test is mirrored here
+# for CTest. The tests are registered only if the dependencies in
+# pyproject.toml are installed, so that builds that use no Python need not
+# install them.
 iree_cmake_extra_content(
     content = """
 if(IREE_BUILD_TESTS)

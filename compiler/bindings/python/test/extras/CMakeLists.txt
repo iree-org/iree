@@ -5,11 +5,13 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 if(IREE_INPUT_TORCH)
+  # These only import a module and define no tests for pytest to collect.
   iree_py_test(
     NAME
       fx_importer_test
     SRCS
       "fx_importer_test.py"
+    SCRIPT
   )
 
   iree_py_test(
@@ -17,5 +19,6 @@ if(IREE_INPUT_TORCH)
       onnx_importer_test
     SRCS
       "onnx_importer_test.py"
+    SCRIPT
   )
 endif()

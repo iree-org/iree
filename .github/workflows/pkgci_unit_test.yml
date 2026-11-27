@@ -66,9 +66,7 @@ jobs:
             echo "This run has no iree-base-core wheel, skipping its tests"
             exit 0
           fi
-          for test in core/python/test/*_test.py; do
-            python "${test}"
-          done
+          python -m pytest core/python/test
       - name: Validate runtime wheel
         run: |
           source ${VENV_DIR}/bin/activate
@@ -91,7 +89,7 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           python -m pip install onnx>=1.16.0
-          python compiler/bindings/python/test/tools/import_onnx_test.py
+          python -m pytest compiler/bindings/python/test/tools/import_onnx_test.py
           python compiler/bindings/python/test/extras/onnx_importer_test.py
       - name: Test FX (PyTorch) importer
         run: |

@@ -26,6 +26,7 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
       collectives_test_cuda_1_gpu
     SRCS
       "collectives_test.py"
+    SCRIPT
     ARGS
       "-k" "SingleRank"
       ${COMMON_ARGS}
@@ -38,6 +39,7 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
       collectives_test_cuda_2_gpus
     SRCS
       "collectives_test.py"
+    SCRIPT
     ARGS
       "-k" "TwoRanks"
       ${COMMON_ARGS}
@@ -53,6 +55,7 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
       collectives_test_cuda_4_gpus
     SRCS
       "collectives_test.py"
+    SCRIPT
     ARGS
       "-k" "FourRanks"
       ${COMMON_ARGS}
@@ -79,6 +82,7 @@ if(IREE_TARGET_BACKEND_ROCM AND IREE_HAL_DRIVER_HIP AND IREE_ROCM_TEST_TARGET_CH
       collectives_test_hip_1_gpu
     SRCS
       "collectives_test.py"
+    SCRIPT
     ARGS
       "-k" "SingleRank"
       ${COMMON_ARGS}
@@ -91,6 +95,7 @@ if(IREE_TARGET_BACKEND_ROCM AND IREE_HAL_DRIVER_HIP AND IREE_ROCM_TEST_TARGET_CH
       collectives_test_hip_2_gpus
     SRCS
       "collectives_test.py"
+    SCRIPT
     ARGS
       "-k" "TwoRanks"
       ${COMMON_ARGS}
@@ -106,6 +111,7 @@ if(IREE_TARGET_BACKEND_ROCM AND IREE_HAL_DRIVER_HIP AND IREE_ROCM_TEST_TARGET_CH
       collectives_test_hip_4_gpus
     SRCS
       "collectives_test.py"
+    SCRIPT
     ARGS
       "-k" "FourRanks"
       ${COMMON_ARGS}

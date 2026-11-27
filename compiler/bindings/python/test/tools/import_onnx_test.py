@@ -4,8 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import importlib.util
 import os
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -28,6 +28,12 @@ LARGE_WEIGHTS_ONNX_FILE_PATH = os.path.join(
 )
 
 
+requires_onnx = unittest.skipUnless(
+    importlib.util.find_spec("onnx"), "the onnx package is not installed"
+)
+
+
+@requires_onnx
 class ImportOnnxTest(unittest.TestCase):
     def setUp(self):
         with tempfile.NamedTemporaryFile(delete=False) as f:
@@ -52,6 +58,7 @@ class ImportOnnxTest(unittest.TestCase):
             self.assertIn("torch.operator", contents)
 
 
+@requires_onnx
 class ImportOnnxwithExternalizationTest(unittest.TestCase):
     def setUp(self):
         with tempfile.NamedTemporaryFile(delete=False) as f:
@@ -192,10 +199,4 @@ class ImportOnnxwithExternalizationTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    try:
-        import onnx
-    except ModuleNotFoundError:
-        print(f"Skipping test {__file__} because Python dependency `onnx` is not found")
-        sys.exit(0)
-
     unittest.main()
