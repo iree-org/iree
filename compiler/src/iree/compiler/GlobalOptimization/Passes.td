@@ -93,6 +93,15 @@ def DemoteContractionInputsPass
                         "none",
                         "Demote no contraction ops.")
            )}]>,
+       // A contraction with reduction extent 1 is an outer product for an M x N
+       // result: each result is a single product, and the inputs (M + N
+       // elements) are small relative to the output (M * N). Narrowing them
+       // saves little memory and passes the rounding error directly to the
+       // result, hence the default of 2.
+       Option<"minReductionSize", "min-reduction-size", "int64_t",
+              /*default=*/"2",
+              "Only demote contractions whose static reduction extent is at "
+              "least this large.">,
   ];
 }
 
