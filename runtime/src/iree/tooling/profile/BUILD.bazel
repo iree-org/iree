@@ -6,6 +6,7 @@
 
 load("@rules_python//python:defs.bzl", "py_test")
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_binary", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:iree_py_test.bzl", "iree_py_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -304,7 +305,7 @@ iree_runtime_cc_binary(
     ],
 )
 
-py_test(
+iree_py_test(
     name = "render_test",
     srcs = [
         "render/__init__.py",
@@ -329,6 +330,8 @@ py_test(
     tags = ["noriscv"],
 )
 
+# In CMake these run as scripts: a build of the runtime alone needs no Python
+# packages, so its tests cannot rely on pytest.
 iree_cmake_extra_content(
     content = """
 iree_local_py_test(
@@ -336,6 +339,7 @@ iree_local_py_test(
     render_test
   SRC
     "render_test.py"
+  SCRIPT
   PACKAGE_DIRS
     "${CMAKE_CURRENT_SOURCE_DIR}"
 )
@@ -345,6 +349,7 @@ iree_local_py_test(
     cli_test
   SRC
     "cli_test.py"
+  SCRIPT
   ARGS
     "--fixture-generator=$<TARGET_FILE:iree_tooling_profile_test_fixture_generator>"
     "--iree-profile=$<TARGET_FILE:iree-profile>"

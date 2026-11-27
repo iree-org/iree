@@ -15,6 +15,7 @@ components and use different tooling depending on the needs of that component.
 |                 | iree_hal_cts_test_suite                         | Bazel/CMake  | Host/Device         |
 | Core E2E tests  | iree_check_test                                 | Bazel/CMake  | Host/Device         |
 |                 | iree_static_linker_test                         | CMake        | Host/Device         |
+| Python tests    | iree_py_test                                    | Bazel/CMake  | Host                |
 
 There are also more `*_test_suite` targets that groups test targets with the
 same configuration together.
@@ -204,6 +205,76 @@ for managing profiling state. Tests run with coverage enabled with automatically
 write profiles to the build directory and then the
 `iree-runtime-coverage-export` target can be built to export LCOV information
 for tooling/IDEs.
+
+## Python tests
+
+Tests for the Python packages (`iree.compiler`, `iree.runtime` and `iree.core`)
+are written in Python and run by [pytest](https://docs.pytest.org/en/stable/).
+Some older test files are still run as scripts, as described at the end of
+this section. The tests are in files named `*_test.py`, next to the package
+they test:
+
+* [`compiler/bindings/python/test/`](https://github.com/iree-org/iree/tree/main/compiler/bindings/python/test)
+* [`runtime/bindings/python/tests/`](https://github.com/iree-org/iree/tree/main/runtime/bindings/python/tests)
+* [`core/python/test/`](https://github.com/iree-org/iree/tree/main/core/python/test)
+
+### Running a test
+
+With CMake, the tests are registered with CTest. They need pytest for the
+Python interpreter of the build. It is installed with
+`runtime/bindings/python/iree/runtime/build_requirements.txt`.
+
+```shell
+# From the build directory
+ctest -R runtime/bindings/python
+```
+
+To run pytest yourself, make the packages importable first, as described in
+[Using the Python bindings](../../building-from-source/getting-started.md#using-the-python-bindings):
+
+```shell
+python -m pytest runtime/bindings/python/tests/vm_test.py
+```
+
+With Bazel, which so far only builds `iree.core` as a Python package:
+
+```shell
+bazel test //core/python/...
+```
+
+### Writing a test
+
+pytest runs test functions and `unittest.TestCase` classes alike, so both
+styles can be used. Most existing tests are `unittest.TestCase` classes.
+
+A test that needs an optional package should skip itself when the package is
+missing, for example with `unittest.skipUnless` on the test class. Do not skip
+a whole file while it is imported: pytest then finds no test in the file and
+reports a failure.
+
+### Configuring the build system
+
+In CMake, use `iree_py_test` for tests of the Python bindings, and
+`iree_local_py_test` for tests that do not need them:
+
+```cmake
+iree_py_test(
+  NAME
+    vm_test
+  SRCS
+    "vm_test.py"
+)
+```
+
+Files that pytest cannot run take the `SCRIPT` option and are run as scripts.
+These are the samples that are run as a check, and older test files that run
+their checks or exit when they are imported, or that are configured through
+their own command line. With `SCRIPT`, `ARGS` are passed to the file.
+Otherwise they are passed to pytest.
+
+In Bazel, use `iree_py_test` from `//build_tools/bazel:iree_py_test.bzl`. The
+Bazel to CMake converter does not convert it, so the CMake side is written by
+hand or added with `iree_cmake_extra_content`.
 
 ## IREE core end-to-end (e2e) tests
 

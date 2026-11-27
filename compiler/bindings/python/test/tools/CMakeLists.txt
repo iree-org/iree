@@ -31,11 +31,14 @@ iree_py_test(
     "ir_tool_test.py"
 )
 
+# The next two exit when they are imported without the TensorFlow tools
+# installed, which only works for a script.
 iree_py_test(
   NAME
     compiler_tf_test
   SRCS
     "compiler_tf_test.py"
+  SCRIPT
 )
 
 iree_py_test(
@@ -43,4 +46,5 @@ iree_py_test(
     compiler_tflite_test
   SRCS
     "compiler_tflite_test.py"
+  SCRIPT
 )

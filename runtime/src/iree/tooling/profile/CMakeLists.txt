@@ -363,6 +363,7 @@ iree_local_py_test(
     render_test
   SRC
     "render_test.py"
+  SCRIPT
   PACKAGE_DIRS
     "${CMAKE_CURRENT_SOURCE_DIR}"
 )
@@ -372,6 +373,7 @@ iree_local_py_test(
     cli_test
   SRC
     "cli_test.py"
+  SCRIPT
   ARGS
     "--fixture-generator=$<TARGET_FILE:iree_tooling_profile_test_fixture_generator>"
     "--iree-profile=$<TARGET_FILE:iree-profile>"

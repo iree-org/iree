@@ -4,7 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("@rules_python//python:defs.bzl", "py_binary", "py_test")
+load("@rules_python//python:defs.bzl", "py_binary")
+load("//build_tools/bazel:iree_py_test.bzl", "iree_py_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -23,7 +24,7 @@ py_binary(
     srcs = ["generate_vm_isa.py"],
 )
 
-py_test(
+iree_py_test(
     name = "gen_plugin_abi_hash_test",
     srcs = [
         "gen_plugin_abi_hash.py",

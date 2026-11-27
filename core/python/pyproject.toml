@@ -19,7 +19,11 @@ classifiers = [
 ]
 # Version ranges. requirements.txt pins them with hashes for builds and CI:
 # regenerate it after a change here, with the command at its top.
-dependencies = []
+dependencies = [
+    "dacite>=1.9.2",
+    "loguru>=0.7.3",
+    "pluggy>=1.5.0",
+]
 # Computed by setup.py.
 dynamic = ["version"]
 

@@ -4,6 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import importlib.util
 import io
 from pathlib import Path
 import re
@@ -22,6 +23,12 @@ DEFAULT_TARGET_ARGS = [
 ]
 
 
+requires_onnx = unittest.skipUnless(
+    importlib.util.find_spec("onnx"), "the onnx package is not installed"
+)
+
+
+@requires_onnx
 class MnistBuilderTest(unittest.TestCase):
     def setUp(self):
         self._temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
@@ -117,10 +124,4 @@ class MnistBuilderTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    try:
-        import onnx
-    except ModuleNotFoundError:
-        print(f"Skipping test {__file__} because Python dependency `onnx` is not found")
-        sys.exit(0)
-
     unittest.main()

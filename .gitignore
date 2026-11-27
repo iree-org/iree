@@ -4,6 +4,7 @@
 **/.ipynb_checkpoints/
 .pytype/
 **/__pycache__/**
+.pytest_cache/
 
 # Visual Studio files
 .vs/

@@ -6,6 +6,7 @@
 
 import io
 import os
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -13,6 +14,10 @@ import unittest
 from iree.build import *
 from iree.build.executor import BuildContext
 from iree.build.test_actions import ExecuteOutOfProcessThunkAction
+
+# iree.build looks up the entry points in this module, whether it runs as a
+# script or is imported by a test runner.
+THIS_MODULE = sys.modules[__name__]
 
 
 @entrypoint
@@ -66,7 +71,8 @@ class BasicTest(unittest.TestCase):
         parent_pid = os.getpid()
         print(f"Testing out of process concurrency: pid={parent_pid}")
         iree_build_main(
-            args=["write_out_of_process_pid", "--output-dir", str(self.output_path)]
+            THIS_MODULE,
+            args=["write_out_of_process_pid", "--output-dir", str(self.output_path)],
         )
         pid_file = (
             self.output_path / "genfiles" / "write_out_of_process_pid" / "pid.txt"
@@ -81,6 +87,7 @@ class BasicTest(unittest.TestCase):
         out_io = io.StringIO()
         err_io = io.StringIO()
         iree_build_main(
+            THIS_MODULE,
             args=[
                 "write_out_of_process_pid",
                 "--output-dir",
@@ -101,6 +108,7 @@ class BasicTest(unittest.TestCase):
         err_io = io.StringIO()
         with self.assertRaises(SystemExit):
             iree_build_main(
+                THIS_MODULE,
                 args=[
                     "exception_in_action",
                     "--output-dir",
@@ -122,6 +130,7 @@ class BasicTest(unittest.TestCase):
         out_io = io.StringIO()
         err_io = io.StringIO()
         iree_build_main(
+            THIS_MODULE,
             args=["write_out_of_process_pid", "--output-dir", str(self.output_path)],
             stderr=err_io,
             stdout=out_io,
@@ -135,6 +144,7 @@ class BasicTest(unittest.TestCase):
         out_io = io.StringIO()
         err_io = io.StringIO()
         iree_build_main(
+            THIS_MODULE,
             args=[
                 "write_out_of_process_pid",
                 "--output-dir",
