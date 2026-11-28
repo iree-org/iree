@@ -24,6 +24,8 @@ iree_lit_test_suite(
             "amdgpu_emulate_narrow_type.mlir",
             "assign_constant_ordinals.mlir",
             "cast_address_space_function.mlir",
+            "config_bounded_reduction.mlir",
+            "config_bounded_reduction_specialization.mlir",
             "config_complex_matmul.mlir",
             "config_custom_op.mlir",
             "config_gather_like_ops.mlir",

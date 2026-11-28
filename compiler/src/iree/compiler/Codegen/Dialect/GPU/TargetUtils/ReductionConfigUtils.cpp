@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 
+#include "iree/compiler/Codegen/Common/TensorDynamicDimAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -18,6 +19,7 @@
 #include "iree/compiler/Dialect/TensorExt/IR/TensorExtOps.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/Support/DebugLog.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
@@ -77,6 +79,43 @@ static bool hasReductionIterator(Operation *op) {
   return llvm::any_of(tilingOp.getLoopIteratorTypes(), [](auto type) {
     return type == utils::IteratorType::reduction;
   });
+}
+
+// Use range information only to estimate the launch size. The reduction remains
+// dynamic, so vectorization must still mask its last tile.
+static std::optional<int64_t>
+getBoundedReductionSize(Operation *op, unsigned reductionDim,
+                        mlir::FunctionOpInterface entryPoint) {
+  TensorDynamicDimAnalysis analysis(entryPoint);
+  if (failed(analysis.run())) {
+    return std::nullopt;
+  }
+
+  std::optional<uint64_t> upperBound;
+  auto maps = cast<IndexingMapOpInterface>(op).getIndexingMapsArray();
+  for (auto [operand, map] : llvm::zip(op->getOperands(), maps)) {
+    for (auto [dim, expr] : llvm::enumerate(map.getResults())) {
+      auto loopDim = dyn_cast<AffineDimExpr>(expr);
+      if (!loopDim || loopDim.getPosition() != reductionDim) {
+        continue;
+      }
+      auto range = analysis.getRangeInfo(operand, dim);
+      if (!range) {
+        continue;
+      }
+      uint64_t bound = range->umax().getLimitedValue(
+          kVectorDistributeReductionSizeToTargetIfDynamic);
+      if (bound == 0 ||
+          bound >= kVectorDistributeReductionSizeToTargetIfDynamic) {
+        continue;
+      }
+      upperBound = upperBound ? std::min(*upperBound, bound) : bound;
+    }
+  }
+  if (!upperBound) {
+    return std::nullopt;
+  }
+  return llvm::PowerOf2Ceil(*upperBound);
 }
 
 struct TensorSizeEstimate {
@@ -758,6 +797,12 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
 
   if (ShapedType::isDynamic(reductionSize)) {
     reductionSize = kVectorDistributeReductionSizeToTargetIfDynamic;
+    if (reductionDims.size() == 1) {
+      if (auto boundedSize =
+              getBoundedReductionSize(op, reductionDims.front(), entryPoint)) {
+        reductionSize = *boundedSize;
+      }
+    }
   }
 
   bool hasDynamicReductionDim = false;
@@ -841,6 +886,9 @@ LogicalResult setReductionConfig(IREE::GPU::TargetAttr target,
   }
 
   int64_t workgroupSize = reductionSize / threadLoads;
+  if (hasDynamicReductionDim) {
+    workgroupSize = std::max(workgroupSize, subgroupSize);
+  }
   if (workgroupSize > maxWorkgroupSize) {
     workgroupSize = llvm::APIntOps::GreatestCommonDivisor(
                         {64, static_cast<uint64_t>(workgroupSize)},
